@@ -8,7 +8,11 @@
     "incremental": true,
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "plugins": [{ "name": "next" }],
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
     "baseUrl": ".",
     "paths": {
       "@/*": ["./*"],
@@ -20,7 +24,8 @@
       "@nexushub/integrations/*": ["../../packages/integrations/src/*"],
       "@nexushub/ui": ["../../packages/ui/src/index.ts"],
       "@nexushub/ui/*": ["../../packages/ui/src/*"]
-    }
+    },
+    "allowJs": true
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
   "exclude": ["node_modules", ".next"]

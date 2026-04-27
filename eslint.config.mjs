@@ -16,6 +16,7 @@ export default tseslint.config(
       '**/playwright-report/**',
       '**/storybook-static/**',
       '**/*.generated.*',
+      '**/next-env.d.ts',
       'mockups/**',
     ],
   },

@@ -20,7 +20,13 @@
 import { PrismaClient } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 
-const prisma = new PrismaClient({ log: ['warn', 'error'] });
+// CLI scripts run interactive transactions; force the direct connection
+// (the pgbouncer transaction pooler does not support them).
+const directUrl = process.env['DIRECT_URL'];
+const prisma = new PrismaClient({
+  log: ['warn', 'error'],
+  ...(directUrl ? { datasources: { db: { url: directUrl } } } : {}),
+});
 
 const WORKSPACE_SLUG = 'studio-atlas';
 

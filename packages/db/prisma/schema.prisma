@@ -396,8 +396,9 @@ model Card {
   columnId         String    @map("column_id") @db.Uuid
   /// Mémorise la colonne avant Bloqué pour le retour automatique (PRD §8.3)
   previousColumnId String?   @map("previous_column_id") @db.Uuid
-  /// Auto-incrémenté par trigger Postgres (#124, #089…)
-  shortRef         Int       @map("short_ref")
+  /// Auto-incrémenté par trigger Postgres (#124, #089…). Default 0 lets
+  /// Prisma omit it on insert; the trigger replaces it with the real value.
+  shortRef         Int       @default(0) @map("short_ref")
   title            String
   description      String?
   /// Tag de catégorie coloré (cf. mockups: tag-tiktok, tag-design…)

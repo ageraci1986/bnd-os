@@ -3,9 +3,8 @@ import type { NextConfig } from 'next';
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
-  experimental: {
-    typedRoutes: true,
-  },
+  // Moved out of `experimental` in Next 15.5+
+  typedRoutes: true,
   // SECURITY: explicit transpilation for workspace packages
   transpilePackages: ['@nexushub/ui', '@nexushub/domain', '@nexushub/integrations'],
   // Headers handled in middleware.ts (CSP nonce per request).
