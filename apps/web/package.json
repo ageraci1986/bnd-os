@@ -10,8 +10,7 @@
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest",
-    "e2e": "playwright test"
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@nexushub/db": "workspace:*",
