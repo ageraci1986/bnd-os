@@ -1,2 +1,5 @@
-// Design system entry point — populated in Phase 3.2.
+// Design system entry point.
 export { cn } from './utils';
+export * from './atoms';
+export * from './molecules';
+export * from './organisms';
