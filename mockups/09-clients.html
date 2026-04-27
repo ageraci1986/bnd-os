@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clients — NexusHub</title>
+<link rel="stylesheet" href="styles.css">
+<style>
+  .clients-layout {
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    gap: 20px;
+    align-items: start;
+  }
+
+  .client-card {
+    display: grid;
+    grid-template-columns: 56px 1fr auto;
+    gap: 14px;
+    align-items: center;
+    padding: 18px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: var(--transition);
+    box-shadow: var(--shadow-card);
+  }
+  .client-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-hover); }
+  .client-card.active {
+    border-color: var(--accent-primary);
+    background: var(--accent-gradient-soft);
+  }
+  .client-mono {
+    width: 56px; height: 56px;
+    border-radius: var(--radius-md);
+    display: grid; place-items: center;
+    color: #fff;
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+  }
+  .client-mono.cm-acme { background: linear-gradient(135deg, #FF2A6D, #FF6B9D); }
+  .client-mono.cm-tech { background: linear-gradient(135deg, #2563EB, #60A5FA); }
+  .client-mono.cm-nova { background: linear-gradient(135deg, #059669, #10B981); }
+  .client-mono.cm-lumen { background: linear-gradient(135deg, #F59E0B, #FBBF24); }
+  .client-mono.cm-orbit { background: linear-gradient(135deg, #8B2BE2, #C084FC); }
+
+  .client-card-name {
+    font-size: 16px;
+    font-weight: 800;
+    letter-spacing: -0.3px;
+  }
+  .client-card-meta {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 500;
+    margin-top: 4px;
+  }
+  .client-card-edit {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 8px 14px;
+    border-radius: var(--radius-pill);
+    background: var(--bg-hover);
+    color: var(--text-muted);
+  }
+
+  .add-client-btn {
+    width: 100%;
+    padding: 22px;
+    border: 2px dashed var(--accent-primary);
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: var(--accent-primary);
+    font-size: 13px;
+    font-weight: 700;
+    transition: var(--transition);
+  }
+  [data-theme="dark"] .add-client-btn { color: #C084FC; border-color: #C084FC; }
+  .add-client-btn:hover { background: var(--accent-gradient-soft); }
+
+  /* Fiche */
+  .fiche {
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    padding: 32px;
+    box-shadow: var(--shadow-card);
+  }
+
+  .fiche-head {
+    display: grid;
+    grid-template-columns: 96px 1fr auto;
+    gap: 24px;
+    align-items: center;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--border-light);
+    margin-bottom: 24px;
+  }
+  .fiche-mono {
+    width: 96px; height: 96px;
+    border-radius: var(--radius-md);
+    display: grid; place-items: center;
+    color: #fff;
+    font-size: 38px;
+    font-weight: 800;
+    background: linear-gradient(135deg, #FF2A6D, #FF6B9D);
+    box-shadow: 0 8px 24px rgba(255, 42, 109, 0.25);
+  }
+  .fiche-name {
+    font-size: 40px;
+    font-weight: 800;
+    letter-spacing: -1.2px;
+    line-height: 1;
+    margin-bottom: 10px;
+  }
+  .fiche-sub {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+  .fiche-sub strong { color: var(--text-main); font-weight: 700; }
+
+  .fiche-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin-bottom: 28px;
+  }
+  .fiche-stat {
+    padding: 18px 20px;
+    background: var(--bg-muted);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+  }
+  .fiche-stat-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-muted);
+    font-weight: 700;
+  }
+  .fiche-stat-value {
+    font-size: 28px;
+    font-weight: 800;
+    margin-top: 6px;
+    letter-spacing: -0.8px;
+  }
+  .fiche-stat-value.danger { color: var(--danger); }
+
+  .contacts-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .contacts-table th {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-muted);
+    font-weight: 800;
+    text-align: left;
+    padding: 12px 14px 12px 0;
+    border-bottom: 1px solid var(--border-light);
+  }
+  .contacts-table td {
+    padding: 16px 14px 16px 0;
+    border-bottom: 1px solid var(--border-soft);
+    font-size: 13px;
+    vertical-align: middle;
+  }
+  .contacts-table tr:hover td { background: var(--bg-muted); }
+  .contact-name {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .contact-name .avatar { width: 36px; height: 36px; font-size: 11px; background: var(--c-acme); color: #fff; }
+  .contact-name strong { font-weight: 700; }
+  .contact-role { color: var(--text-muted); font-weight: 500; }
+  .contact-email {
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  .raci-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 12px 5px 5px;
+    border-radius: var(--radius-pill);
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .raci-badge::before {
+    content: attr(data-letter);
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    display: grid; place-items: center;
+    color: #fff;
+    font-weight: 800;
+    font-size: 11px;
+  }
+  .raci-R { background: rgba(37,99,235,0.1); color: var(--info); }
+  .raci-R::before { background: var(--info); }
+  .raci-A { background: rgba(245,158,11,0.1); color: var(--warning); }
+  .raci-A::before { background: var(--warning); }
+  .raci-C { background: rgba(5,150,105,0.1); color: var(--success); }
+  .raci-C::before { background: var(--success); }
+  .raci-I { background: var(--bg-hover); color: var(--text-muted); }
+  .raci-I::before { background: var(--text-muted); }
+
+  .raci-legend {
+    display: flex;
+    gap: 20px;
+    padding: 16px 20px;
+    background: var(--bg-muted);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    margin-top: 22px;
+    font-size: 12px;
+    color: var(--text-muted);
+    font-weight: 500;
+    flex-wrap: wrap;
+  }
+  .raci-legend strong { color: var(--text-main); font-weight: 700; }
+</style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand"><div class="brand-mark">N</div><div><div class="brand-name">NexusHub</div><span class="brand-sub">Studio Atlas</span></div></div>
+      <div class="nav-section">
+        <div class="nav-label">Main menu</div>
+        <a class="nav-item" href="03-overview.html"><span class="ico">◈</span> Dashboard</a>
+        <a class="nav-item" href="04-kanban.html"><span class="ico">◱</span> Projets <span class="count">14</span></a>
+        <a class="nav-item" href="08-communications.html"><span class="ico">✉</span> Communications <span class="count new">23</span></a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-label">Clients actifs</div>
+        <a class="client-row c-acme"><span class="client-dot"></span><span class="client-name">Acme Brands</span><span class="client-count">5</span></a>
+        <a class="client-row c-tech"><span class="client-dot"></span><span class="client-name">TechGroup SA</span><span class="client-count">3</span></a>
+        <a class="client-row c-nova"><span class="client-dot"></span><span class="client-name">Nova Editions</span><span class="client-count">2</span></a>
+        <a class="client-row c-lumen"><span class="client-dot"></span><span class="client-name">Lumen &amp; Co</span><span class="client-count">3</span></a>
+        <a class="client-row c-orbit"><span class="client-dot"></span><span class="client-name">Orbit Studio</span><span class="client-count">1</span></a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-label">Atelier</div>
+        <a class="nav-item active" href="09-clients.html"><span class="ico">◉</span> Clients</a>
+        <a class="nav-item" href="10-email-templates.html"><span class="ico">✎</span> Templates e-mail</a>
+        <a class="nav-item" href="11-kanban-templates.html"><span class="ico">▦</span> Templates Kanban</a>
+        <a class="nav-item" href="12-team.html"><span class="ico">⎔</span> Équipe</a>
+        <a class="nav-item" href="14-integrations.html"><span class="ico">⟷</span> Intégrations</a>
+        <a class="nav-item" href="13-settings.html"><span class="ico">⚙</span> Paramètres</a>
+      </div>
+      <div class="user-profile"><div class="avatar gradient">AL</div><div><div class="user-name">Angelo Lambert</div><div class="user-role">Admin</div></div></div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="search-wrap"><input type="text" class="search-bar" placeholder="Rechercher un client, un contact…"></div>
+        <div class="topbar-actions">
+          <button class="btn btn-ghost" data-theme-toggle>🌙 Dark</button>
+          <button class="btn btn-primary">+ Nouveau client</button>
+        </div>
+      </header>
+
+      <div class="contextbar">
+        <div class="crumb"><span>Atelier</span><span class="sep">/</span><strong>Gestion des clients</strong></div>
+      </div>
+
+      <div class="page-head">
+        <div class="page-head-text">
+          <h1 class="page-title">Clients &amp; <span class="gradient-text">RACI</span></h1>
+          <p class="page-sub">Fiches, contacts et matrice des rôles. Maintenir ces données permet au mode client global de fonctionner.</p>
+        </div>
+        <div class="page-meta">
+          <strong>5 clients actifs</strong>
+          18 contacts référencés
+        </div>
+      </div>
+
+      <div class="clients-layout">
+
+        <div>
+          <div class="client-card active">
+            <div class="client-mono cm-acme">AB</div>
+            <div>
+              <div class="client-card-name">Acme Brands</div>
+              <div class="client-card-meta">6 contacts · 2 canaux Slack · 5 projets</div>
+            </div>
+            <button class="client-card-edit">Modifier</button>
+          </div>
+
+          <div class="client-card">
+            <div class="client-mono cm-tech">TG</div>
+            <div>
+              <div class="client-card-name">TechGroup SA</div>
+              <div class="client-card-meta">4 contacts · 1 canal · 3 projets</div>
+            </div>
+            <button class="client-card-edit">Modifier</button>
+          </div>
+
+          <div class="client-card">
+            <div class="client-mono cm-nova">NV</div>
+            <div>
+              <div class="client-card-name">Nova Editions</div>
+              <div class="client-card-meta">3 contacts · 1 canal · 2 projets</div>
+            </div>
+            <button class="client-card-edit">Modifier</button>
+          </div>
+
+          <div class="client-card">
+            <div class="client-mono cm-lumen">LU</div>
+            <div>
+              <div class="client-card-name">Lumen &amp; Co</div>
+              <div class="client-card-meta">3 contacts · 1 canal · 3 projets</div>
+            </div>
+            <button class="client-card-edit">Modifier</button>
+          </div>
+
+          <div class="client-card">
+            <div class="client-mono cm-orbit">OR</div>
+            <div>
+              <div class="client-card-name">Orbit Studio</div>
+              <div class="client-card-meta">2 contacts · 0 canal · 1 projet</div>
+            </div>
+            <button class="client-card-edit">Modifier</button>
+          </div>
+
+          <button class="add-client-btn">+ Nouveau client</button>
+        </div>
+
+        <!-- Fiche -->
+        <div class="fiche">
+          <div class="fiche-head">
+            <div class="fiche-mono">AB</div>
+            <div>
+              <h2 class="fiche-name">Acme Brands</h2>
+              <div class="fiche-sub">
+                Canaux Slack : <strong>#acme-general</strong> · <strong>#acme-creation</strong> · Domaine : <strong>acme-brands.com</strong>
+              </div>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn btn-ghost btn-sm">Paramètres</button>
+              <button class="btn btn-primary btn-sm">+ Contact</button>
+            </div>
+          </div>
+
+          <div class="fiche-stats">
+            <div class="fiche-stat">
+              <div class="fiche-stat-label">Projets actifs</div>
+              <div class="fiche-stat-value">05</div>
+            </div>
+            <div class="fiche-stat">
+              <div class="fiche-stat-label">Contacts</div>
+              <div class="fiche-stat-value">06</div>
+            </div>
+            <div class="fiche-stat">
+              <div class="fiche-stat-label">Tâches ouvertes</div>
+              <div class="fiche-stat-value">24</div>
+            </div>
+            <div class="fiche-stat">
+              <div class="fiche-stat-label">Bloquées</div>
+              <div class="fiche-stat-value danger">02</div>
+            </div>
+          </div>
+
+          <h3 style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-muted); font-weight: 800; margin-bottom: 16px;">— Contacts et matrice RACI</h3>
+
+          <table class="contacts-table">
+            <thead>
+              <tr><th>Contact</th><th>Rôle entreprise</th><th>RACI</th><th>E-mail</th><th></th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><div class="contact-name"><div class="avatar">SR</div><strong>Sophie Renard</strong></div></td>
+                <td class="contact-role">Brand Manager</td>
+                <td><span class="raci-badge raci-A" data-letter="A">Approbateur</span></td>
+                <td class="contact-email">sophie@acme-brands.com</td>
+                <td><button style="color: var(--text-muted);">⋯</button></td>
+              </tr>
+              <tr>
+                <td><div class="contact-name"><div class="avatar">MT</div><strong>Marc Tellier</strong></div></td>
+                <td class="contact-role">Head of Marketing</td>
+                <td><span class="raci-badge raci-R" data-letter="R">Responsable</span></td>
+                <td class="contact-email">marc@acme-brands.com</td>
+                <td><button style="color: var(--text-muted);">⋯</button></td>
+              </tr>
+              <tr>
+                <td><div class="contact-name"><div class="avatar">LC</div><strong>Léonie Charpentier</strong></div></td>
+                <td class="contact-role">Media &amp; PR</td>
+                <td><span class="raci-badge raci-C" data-letter="C">Consulté</span></td>
+                <td class="contact-email">leonie@acme-brands.com</td>
+                <td><button style="color: var(--text-muted);">⋯</button></td>
+              </tr>
+              <tr>
+                <td><div class="contact-name"><div class="avatar">PG</div><strong>Paul Germain</strong></div></td>
+                <td class="contact-role">CEO</td>
+                <td><span class="raci-badge raci-I" data-letter="I">Informé</span></td>
+                <td class="contact-email">paul@acme-brands.com</td>
+                <td><button style="color: var(--text-muted);">⋯</button></td>
+              </tr>
+              <tr>
+                <td><div class="contact-name"><div class="avatar">EV</div><strong>Éléonore Vasseur</strong></div></td>
+                <td class="contact-role">Legal &amp; Compliance</td>
+                <td><span class="raci-badge raci-C" data-letter="C">Consulté</span></td>
+                <td class="contact-email">eleonore@acme-brands.com</td>
+                <td><button style="color: var(--text-muted);">⋯</button></td>
+              </tr>
+              <tr>
+                <td><div class="contact-name"><div class="avatar">HD</div><strong>Hugo Delvaux</strong></div></td>
+                <td class="contact-role">Product Owner digital</td>
+                <td><span class="raci-badge raci-R" data-letter="R">Responsable</span></td>
+                <td class="contact-email">hugo@acme-brands.com</td>
+                <td><button style="color: var(--text-muted);">⋯</button></td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="raci-legend">
+            <span><strong>R</strong> Responsable · opérationnel</span>
+            <span><strong>A</strong> Approbateur · décide</span>
+            <span><strong>C</strong> Consulté · sollicité pour avis</span>
+            <span><strong>I</strong> Informé · tenu au courant</span>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+  <script src="theme.js"></script>
+</body>
+</html>

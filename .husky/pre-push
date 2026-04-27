@@ -1,0 +1,7 @@
+#!/usr/bin/env sh
+# Phase 1.4 — pre-push gates
+# Run typecheck + tests before pushing. Slower but catches more.
+pnpm typecheck && pnpm test || {
+  echo "❌ pre-push: typecheck or tests failed. Push aborted."
+  exit 1
+}

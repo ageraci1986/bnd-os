@@ -1,0 +1,22 @@
+// =====================================================================
+// NexusHub — Prisma schema
+// All tables: workspace_id scoped + RLS Postgres policies (see Phase 2).
+// =====================================================================
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+  schemas   = ["public"]
+}
+
+// Skeleton — will be filled out in Phase 2.1 (cf. progress.md)
+// Models to add: Workspace, User, Membership, Invitation, Client, Contact,
+// Project, Column, Card, ChecklistItem, Comment, KanbanTemplate, EmailTemplate,
+// Integration, OAuthState, Notification, ActivityEvent, AuditLog,
+// EmailMessage, SlackMessage, Note.

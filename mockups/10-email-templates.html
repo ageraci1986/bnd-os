@@ -1,0 +1,426 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Templates e-mail — NexusHub</title>
+<link rel="stylesheet" href="styles.css">
+<style>
+  .tpl-layout {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 20px;
+    min-height: 680px;
+  }
+
+  .tpl-list {
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-card);
+    overflow: hidden;
+  }
+  .tpl-list-head {
+    padding: 18px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border-light);
+  }
+  .tpl-list-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+  }
+  .tpl-list-title strong { color: var(--text-main); font-weight: 800; }
+  .tpl-add-btn {
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--accent-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  [data-theme="dark"] .tpl-add-btn { color: #C084FC; }
+
+  .tpl-item {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border-soft);
+    cursor: pointer;
+    transition: var(--transition);
+    position: relative;
+  }
+  .tpl-item:hover { background: var(--bg-muted); }
+  .tpl-item.active { background: var(--accent-gradient-soft); }
+  .tpl-item.active::before {
+    content: '';
+    position: absolute;
+    top: 50%; left: 0;
+    transform: translateY(-50%);
+    width: 3px; height: 30px;
+    background: var(--accent-gradient);
+    border-radius: var(--radius-pill);
+  }
+  .tpl-item-name {
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 6px;
+    color: var(--text-main);
+  }
+  .tpl-item-meta {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .tpl-item-meta .chip {
+    padding: 2px 8px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-pill);
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--text-muted);
+  }
+
+  /* Editor */
+  .tpl-editor {
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-card);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .editor-head {
+    padding: 24px 32px 18px;
+    border-bottom: 1px solid var(--border-light);
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+  .editor-name-input {
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -0.8px;
+    border: 0;
+    background: transparent;
+    outline: none;
+    width: 100%;
+    color: var(--text-main);
+    font-family: inherit;
+  }
+  .editor-name-input:focus {
+    background: var(--accent-gradient-soft);
+    border-radius: 6px;
+    padding: 4px 8px;
+  }
+  .editor-actions { display: flex; gap: 8px; align-items: center; }
+
+  .dirty-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    background: var(--warning-bg);
+    color: var(--warning);
+    border-radius: var(--radius-pill);
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .dirty-pill::before {
+    content: '';
+    width: 6px; height: 6px;
+    background: currentColor;
+    border-radius: 50%;
+  }
+
+  .editor-body {
+    display: grid;
+    grid-template-columns: 1fr 240px;
+    padding: 24px 32px 32px;
+    gap: 28px;
+    flex: 1;
+  }
+
+  .editor-form { display: flex; flex-direction: column; gap: 20px; }
+  .editor-row {
+    display: grid;
+    grid-template-columns: 120px 1fr;
+    gap: 18px;
+    align-items: start;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .editor-row:last-child { border-bottom: 0; }
+  .editor-row-label {
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-muted);
+    padding-top: 12px;
+  }
+  .editor-row input {
+    width: 100%;
+    background: var(--bg-muted);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    padding: 12px 16px;
+    font-size: 13px;
+    outline: none;
+    font-weight: 500;
+    color: var(--text-main);
+    font-family: inherit;
+  }
+  .editor-row input:focus {
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px rgba(139, 43, 226, 0.1);
+  }
+
+  .body-with-vars {
+    width: 100%;
+    min-height: 280px;
+    padding: 16px 18px;
+    background: var(--bg-muted);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    line-height: 1.7;
+    font-weight: 500;
+    color: var(--text-soft);
+  }
+  .vtok {
+    display: inline-block;
+    padding: 2px 8px;
+    background: var(--accent-gradient);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    border-radius: var(--radius-pill);
+  }
+
+  .vars-panel {
+    padding: 20px;
+    background: var(--bg-muted);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    height: fit-content;
+  }
+  .vars-title {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-muted);
+    font-weight: 800;
+    margin-bottom: 14px;
+  }
+  .var-chip {
+    display: block;
+    padding: 12px 14px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: var(--transition);
+    text-align: left;
+    width: 100%;
+  }
+  .var-chip:hover {
+    border-color: var(--accent-primary);
+    transform: translateX(3px);
+    box-shadow: var(--shadow-hover);
+  }
+  .var-chip .var-name {
+    color: var(--accent-primary);
+    font-size: 12px;
+    font-weight: 800;
+    font-family: ui-monospace, monospace;
+  }
+  [data-theme="dark"] .var-chip .var-name { color: #C084FC; }
+  .var-chip .var-desc {
+    display: block;
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-top: 4px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .view-toggle-inline {
+    display: inline-flex;
+    background: var(--bg-muted);
+    border-radius: var(--radius-pill);
+    padding: 4px;
+  }
+  .view-toggle-inline button {
+    padding: 7px 14px;
+    border-radius: var(--radius-pill);
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-muted);
+  }
+  .view-toggle-inline button.active {
+    background: var(--bg-card);
+    color: var(--text-main);
+    box-shadow: var(--shadow-card);
+  }
+</style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand"><div class="brand-mark">N</div><div><div class="brand-name">NexusHub</div><span class="brand-sub">Studio Atlas</span></div></div>
+      <div class="nav-section">
+        <div class="nav-label">Main menu</div>
+        <a class="nav-item" href="03-overview.html"><span class="ico">◈</span> Dashboard</a>
+        <a class="nav-item" href="04-kanban.html"><span class="ico">◱</span> Projets <span class="count">14</span></a>
+        <a class="nav-item" href="08-communications.html"><span class="ico">✉</span> Communications <span class="count new">23</span></a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-label">Clients actifs</div>
+        <a class="client-row c-acme"><span class="client-dot"></span><span class="client-name">Acme Brands</span><span class="client-count">5</span></a>
+        <a class="client-row c-tech"><span class="client-dot"></span><span class="client-name">TechGroup SA</span><span class="client-count">3</span></a>
+        <a class="client-row c-nova"><span class="client-dot"></span><span class="client-name">Nova Editions</span><span class="client-count">2</span></a>
+        <a class="client-row c-lumen"><span class="client-dot"></span><span class="client-name">Lumen &amp; Co</span><span class="client-count">3</span></a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-label">Atelier</div>
+        <a class="nav-item" href="09-clients.html"><span class="ico">◉</span> Clients</a>
+        <a class="nav-item active" href="10-email-templates.html"><span class="ico">✎</span> Templates e-mail</a>
+        <a class="nav-item" href="11-kanban-templates.html"><span class="ico">▦</span> Templates Kanban</a>
+        <a class="nav-item" href="12-team.html"><span class="ico">⎔</span> Équipe</a>
+        <a class="nav-item" href="14-integrations.html"><span class="ico">⟷</span> Intégrations</a>
+        <a class="nav-item" href="13-settings.html"><span class="ico">⚙</span> Paramètres</a>
+      </div>
+      <div class="user-profile"><div class="avatar gradient">AL</div><div><div class="user-name">Angelo Lambert</div><div class="user-role">Admin</div></div></div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="search-wrap"><input type="text" class="search-bar" placeholder="Rechercher un template…"></div>
+        <div class="topbar-actions">
+          <button class="btn btn-ghost" data-theme-toggle>🌙 Dark</button>
+          <button class="btn btn-primary">+ Nouveau template</button>
+        </div>
+      </header>
+      <div class="contextbar"><div class="crumb"><span>Atelier</span><span class="sep">/</span><strong>Templates e-mail</strong></div></div>
+
+      <div class="page-head">
+        <div class="page-head-text">
+          <h1 class="page-title">Templates <span class="gradient-text">e-mail</span></h1>
+          <p class="page-sub">Modèles de réponses avec variables dynamiques, partagés par toute l'équipe.</p>
+        </div>
+        <div class="page-meta">
+          <strong>12 templates</strong>
+          147 utilisations ce mois
+        </div>
+      </div>
+
+      <div class="tpl-layout">
+
+        <!-- LIST -->
+        <div class="tpl-list">
+          <div class="tpl-list-head">
+            <div class="tpl-list-title"><strong>12</strong> templates</div>
+            <button class="tpl-add-btn">+ Nouveau</button>
+          </div>
+
+          <div class="tpl-item active">
+            <div class="tpl-item-name">Accusé &amp; plan d'action</div>
+            <div class="tpl-item-meta">
+              <span class="chip">5 variables</span>
+              <span class="chip">48 uses</span>
+            </div>
+          </div>
+          <div class="tpl-item">
+            <div class="tpl-item-name">Envoi livrable pour validation</div>
+            <div class="tpl-item-meta"><span class="chip">4 variables</span><span class="chip">32 uses</span></div>
+          </div>
+          <div class="tpl-item">
+            <div class="tpl-item-name">Relance BAT en attente</div>
+            <div class="tpl-item-meta"><span class="chip">3 variables</span><span class="chip">24 uses</span></div>
+          </div>
+          <div class="tpl-item">
+            <div class="tpl-item-name">Réponse générique — en cours</div>
+            <div class="tpl-item-meta"><span class="chip">2 variables</span><span class="chip">19 uses</span></div>
+          </div>
+          <div class="tpl-item">
+            <div class="tpl-item-name">Confirmation de réunion</div>
+            <div class="tpl-item-meta"><span class="chip">5 variables</span><span class="chip">14 uses</span></div>
+          </div>
+          <div class="tpl-item">
+            <div class="tpl-item-name">Clôture de projet</div>
+            <div class="tpl-item-meta"><span class="chip">4 variables</span><span class="chip">7 uses</span></div>
+          </div>
+          <div class="tpl-item">
+            <div class="tpl-item-name">Brief partagé — retours</div>
+            <div class="tpl-item-meta"><span class="chip">3 variables</span><span class="chip">3 uses</span></div>
+          </div>
+        </div>
+
+        <!-- EDITOR -->
+        <div class="tpl-editor">
+          <div class="editor-head">
+            <div style="flex: 1;">
+              <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--accent-primary); font-weight: 800; margin-bottom: 6px;">✦ Édition du template</div>
+              <input type="text" class="editor-name-input" value="Accusé & plan d'action">
+            </div>
+            <div class="editor-actions">
+              <span class="dirty-pill">Non sauvegardé</span>
+              <div class="view-toggle-inline">
+                <button class="active">✎ Édition</button>
+                <button>◎ Preview</button>
+              </div>
+              <button class="btn btn-ghost btn-sm">Dupliquer</button>
+              <button class="btn btn-primary btn-sm">Sauvegarder</button>
+            </div>
+          </div>
+
+          <div class="editor-body">
+            <div class="editor-form">
+              <div class="editor-row">
+                <div class="editor-row-label">Objet</div>
+                <input type="text" value="Re: {project_name} — Prochaines étapes">
+              </div>
+              <div class="editor-row">
+                <div class="editor-row-label">Corps</div>
+                <div class="body-with-vars">
+                  Bonjour <span class="vtok">{contact_name}</span>,<br><br>
+                  Merci pour votre message. J'ai bien pris en compte vos retours sur <span class="vtok">{project_name}</span> et nous avons défini le plan d'action suivant&nbsp;:<br><br>
+                  — Prise en compte des ajustements mentionnés<br>
+                  — Livraison d'une nouvelle version d'ici le <span class="vtok">{date}</span><br>
+                  — Validation croisée côté <span class="vtok">{client_name}</span> avant GO production<br><br>
+                  Je reste disponible pour tout complément d'information.<br><br>
+                  Belle journée,<br>
+                  <span class="vtok">{sender_name}</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="vars-panel">
+              <div class="vars-title">— Variables disponibles</div>
+              <button class="var-chip"><span class="var-name">{contact_name}</span><span class="var-desc">Nom du contact client</span></button>
+              <button class="var-chip"><span class="var-name">{client_name}</span><span class="var-desc">Nom du client</span></button>
+              <button class="var-chip"><span class="var-name">{project_name}</span><span class="var-desc">Projet en cours</span></button>
+              <button class="var-chip"><span class="var-name">{sender_name}</span><span class="var-desc">Votre nom</span></button>
+              <button class="var-chip"><span class="var-name">{date}</span><span class="var-desc">Date du jour</span></button>
+
+              <div style="margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border-light); font-size: 10px; color: var(--text-muted); line-height: 1.5; font-weight: 500;">
+                Cliquez une variable pour l'insérer à la position du curseur.
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+  <script src="theme.js"></script>
+</body>
+</html>

@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NexusHub — Mockups Index</title>
+<link rel="stylesheet" href="styles.css">
+<style>
+  body { padding: 0; min-height: 100vh; }
+  .idx-wrap {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 60px 48px 120px;
+  }
+  .idx-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 56px;
+  }
+  .idx-brand {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .idx-title {
+    font-size: 88px;
+    font-weight: 800;
+    letter-spacing: -3px;
+    line-height: 0.9;
+    margin: 40px 0 16px;
+  }
+  .idx-title span { background: var(--accent-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+  .idx-desc {
+    font-size: 17px;
+    color: var(--text-muted);
+    max-width: 560px;
+    font-weight: 500;
+    margin-bottom: 24px;
+  }
+  .idx-stats {
+    display: flex;
+    gap: 40px;
+    margin-top: 32px;
+    padding: 24px 32px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-card);
+  }
+  .idx-stat-v {
+    font-size: 32px;
+    font-weight: 800;
+    letter-spacing: -1px;
+  }
+  .idx-stat-l {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-weight: 700;
+    margin-top: 4px;
+  }
+
+  .idx-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 18px;
+    margin-top: 64px;
+  }
+  .idx-item {
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    padding: 24px;
+    box-shadow: var(--shadow-card);
+    transition: var(--transition);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+  }
+  .idx-item:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-hover);
+    border-color: rgba(138, 43, 226, 0.25);
+  }
+  .idx-item::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    height: 3px; width: 100%;
+    background: var(--border-light);
+    transition: var(--transition);
+  }
+  .idx-item:hover::before { background: var(--accent-gradient); }
+  .idx-item-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+  .idx-num {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-muted);
+    letter-spacing: 1px;
+  }
+  .idx-arrow {
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    background: var(--bg-hover);
+    display: grid; place-items: center;
+    font-size: 14px;
+    color: var(--text-muted);
+    transition: var(--transition);
+  }
+  .idx-item:hover .idx-arrow {
+    background: var(--accent-gradient);
+    color: #fff;
+    transform: translate(3px, -3px);
+  }
+  .idx-name {
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    color: var(--text-main);
+  }
+  .idx-desc-mini {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-weight: 500;
+    line-height: 1.5;
+  }
+
+  .idx-aesthetic {
+    margin-top: 64px;
+    padding: 32px;
+    background: var(--accent-gradient-soft);
+    border: 1px solid rgba(139, 43, 226, 0.2);
+    border-radius: var(--radius-md);
+  }
+  .idx-aesthetic h3 {
+    font-size: 14px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 12px;
+    color: var(--accent-primary);
+  }
+  [data-theme="dark"] .idx-aesthetic h3 { color: #C084FC; }
+  .idx-aesthetic p {
+    font-size: 13px;
+    color: var(--text-muted);
+    line-height: 1.6;
+    font-weight: 500;
+  }
+
+  .idx-top-toggle {
+    position: absolute;
+    top: 32px; right: 48px;
+  }
+</style>
+</head>
+<body>
+  <div class="idx-wrap">
+    <button class="btn btn-ghost idx-top-toggle" data-theme-toggle>🌙 Dark</button>
+
+    <div class="idx-top">
+      <div>
+        <div class="idx-brand">
+          <div class="brand-mark">N</div>
+          <div>
+            <div class="brand-name" style="font-size: 18px;">NexusHub</div>
+            <span class="brand-sub">Creative Agency OS · v2</span>
+          </div>
+        </div>
+
+        <h1 class="idx-title">Creative ops,<br><span>reimagined.</span></h1>
+        <p class="idx-desc">
+          Un espace de travail unique pour les agences créatives — organisé autour de la structure <strong style="color: var(--text-main);">Client › Projet › Tâche</strong>.
+          14 maquettes HTML complètes avec light &amp; dark mode.
+        </p>
+
+        <div class="idx-stats">
+          <div>
+            <div class="idx-stat-v gradient-text">14</div>
+            <div class="idx-stat-l">Écrans livrés</div>
+          </div>
+          <div>
+            <div class="idx-stat-v">2</div>
+            <div class="idx-stat-l">Thèmes light / dark</div>
+          </div>
+          <div>
+            <div class="idx-stat-v">100%</div>
+            <div class="idx-stat-l">HTML / CSS natif</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="idx-grid">
+      <a class="idx-item" href="01-login.html">
+        <div class="idx-item-top"><span class="idx-num">N° 01</span><div class="idx-arrow">→</div></div>
+        <div class="idx-name">Connexion</div>
+        <div class="idx-desc-mini">Login des membres existants avec split visuel</div>
+      </a>
+      <a class="idx-item" href="02-signup.html">
+        <div class="idx-item-top"><span class="idx-num">N° 02</span><div class="idx-arrow">→</div></div>
+        <div class="idx-name">Invitation</div>
+        <div class="idx-desc-mini">Création de compte depuis un lien d'invitation</div>
+      </a>
+      <a class="idx-item" href="03-overview.html">
+        <div class="idx-item-top"><span class="idx-num">N° 03</span><div class="idx-arrow">→</div></div>
+        <div class="idx-name">Dashboard</div>
+        <div class="idx-desc-mini">Métriques, tâches urgentes, avancement, activité</div>
+      </a>
+      <a class="idx-item" href="04-kanban.html">
+        <div class="idx-item-top"><span class="idx-num">N° 04</span><div class="idx-arrow">→</div></div>
+        <div class="idx-name">Kanban</div>
+        <div class="idx-desc-mini">Board projet avec colonne Bloqué automatique</div>
+      </a>
+      <a class="idx-item" href="05-calendar.html">
+        <div class="idx-item-top"><span class="idx-num">N° 05</span><div class="idx-arrow">→</div></div>
+        <div class="idx-name">Calendar</div>
+        <div class="idx-desc-mini">Vue mensuelle des échéances par client</div>
+      </a>
+      <a class="idx-item" href="06-card-modal.html">
+        <div class="idx-item-top"><span class="idx-num">N° 06</span><div class="idx-arrow">→</div></div>
+        <div class="idx-name">Détail de carte</div>
+        <div class="idx-desc-mini">Checklist, commentaires, auto-progression 1,8s</div>
+      </a>
+      <a class="idx-item" href="07-new-project.html">
+        <div class="idx-item-top"><span class="idx-num">N° 07</span><div class="idx-arrow">→</div></div>
+        <div class="idx-name">Nouveau projet</div>
+        <div class="idx-desc-mini">Wizard en 4 étapes · équipe &amp; récap</div>
+      </a>
+      <a class="idx-item" href="08-communications.html">
+        <div class="idx-item-top"><span class="idx-num">N° 08</span><div class="idx-arrow">→</div></div>
+        <div class="idx-name">Communications</div>
+        <div class="idx-desc-mini">Hub Mails / Slack / Notes filtré par client</div>
+      </a>
+      <a class="idx-item" href="09-clients.html">
+        <div class="idx-item-top"><span class="idx-num">N° 09</span><div class="idx-arrow">→</div></div>
+        <div class="idx-name">Clients &amp; RACI</div>
+        <div class="idx-desc-mini">Fiches, contacts et matrice des rôles</div>
+      </a>
+      <a class="idx-item" href="10-email-templates.html">
+        <div class="idx-item-top"><span class="idx-num">N° 10</span><div class="idx-arrow">→</div></div>
+        <div class="idx-name">Templates e-mail</div>
+        <div class="idx-desc-mini">Éditeur avec variables dynamiques</div>
+      </a>
+      <a class="idx-item" href="11-kanban-templates.html">
+        <div class="idx-item-top"><span class="idx-num">N° 11</span><div class="idx-arrow">→</div></div>
+        <div class="idx-name">Templates Kanban</div>
+        <div class="idx-desc-mini">Structures de colonnes réutilisables</div>
+      </a>
+      <a class="idx-item" href="12-team.html">
+        <div class="idx-item-top"><span class="idx-num">N° 12</span><div class="idx-arrow">→</div></div>
+        <div class="idx-name">Équipe</div>
+        <div class="idx-desc-mini">Gestion des membres et invitations (Admin)</div>
+      </a>
+      <a class="idx-item" href="13-settings.html">
+        <div class="idx-item-top"><span class="idx-num">N° 13</span><div class="idx-arrow">→</div></div>
+        <div class="idx-name">Paramètres</div>
+        <div class="idx-desc-mini">Profil, interface, notifications, sécurité</div>
+      </a>
+      <a class="idx-item" href="14-integrations.html">
+        <div class="idx-item-top"><span class="idx-num">N° 14</span><div class="idx-arrow">→</div></div>
+        <div class="idx-name">Intégrations</div>
+        <div class="idx-desc-mini">Slack, Exchange, Notes IA, Calendar</div>
+      </a>
+    </div>
+
+    <div class="idx-aesthetic">
+      <h3>✦ Design System v2</h3>
+      <p>
+        Modern Agency OS aesthetic — Plus Jakarta Sans, accents violet→rose gradient (#8B2BE2 → #FF2A6D), glassmorphism, soft shadows, rounded corners. Light &amp; dark mode avec persistance localStorage. Bouton de bascule disponible sur chaque écran en haut à droite.
+      </p>
+    </div>
+  </div>
+
+  <script src="theme.js"></script>
+</body>
+</html>

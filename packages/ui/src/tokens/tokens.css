@@ -1,0 +1,95 @@
+/* ============================================================
+   NEXUSHUB — Design tokens
+   Source: mockups/styles.css → ported to Tailwind v4 @theme
+   Modes: light (default) + dark via [data-theme="dark"]
+   ============================================================ */
+
+@theme {
+  /* — Canvas — */
+  --color-bg-app: #f4f6f9;
+  --color-bg-sidebar: #ffffff;
+  --color-bg-card: #ffffff;
+  --color-bg-card-alt: #fafbfc;
+  --color-bg-hover: #f0f2f5;
+  --color-bg-muted: #f8f9fb;
+
+  /* — Text — */
+  --color-text-main: #111827;
+  --color-text-soft: #374151;
+  --color-text-muted: #6b7280;
+  --color-text-ghost: #9ca3af;
+
+  /* — Borders — */
+  --color-border-light: #e5e7eb;
+  --color-border-soft: #eef0f3;
+
+  /* — Brand — */
+  --color-accent-primary: #8b2be2;
+  --color-accent-secondary: #ff2a6d;
+
+  /* — Semantic — */
+  --color-success: #059669;
+  --color-success-bg: #d1fae5;
+  --color-warning: #d97706;
+  --color-warning-bg: #fef3c7;
+  --color-danger: #e11d48;
+  --color-danger-bg: #ffe4e6;
+  --color-info: #2563eb;
+  --color-info-bg: #dbeafe;
+
+  /* — Client palette (5 fixed clients per workspace style guide) — */
+  --color-c-acme: #ff2a6d;
+  --color-c-tech: #2563eb;
+  --color-c-nova: #059669;
+  --color-c-lumen: #f59e0b;
+  --color-c-orbit: #8b2be2;
+
+  /* — Typography — */
+  --font-sans: 'Plus Jakarta Sans', system-ui, sans-serif;
+
+  /* — Radius — */
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --radius-pill: 999px;
+
+  /* — Layout — */
+  --layout-sidebar-w: 260px;
+  --layout-topbar-h: 72px;
+
+  /* — Transitions — */
+  --ease-emphasized: cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+/* Dark mode overrides (cf. mockups/styles.css [data-theme="dark"]) */
+[data-theme='dark'] {
+  --color-bg-app: #0b0c10;
+  --color-bg-sidebar: #12141a;
+  --color-bg-card: #1c1e26;
+  --color-bg-card-alt: #171923;
+  --color-bg-hover: rgba(255, 255, 255, 0.05);
+  --color-bg-muted: #14161e;
+
+  --color-text-main: #f9fafb;
+  --color-text-soft: #e5e7eb;
+  --color-text-muted: #9ca3af;
+  --color-text-ghost: #6b7280;
+
+  --color-border-light: rgba(255, 255, 255, 0.08);
+  --color-border-soft: rgba(255, 255, 255, 0.05);
+
+  --color-success: #00f0ff;
+  --color-success-bg: rgba(0, 240, 255, 0.1);
+  --color-warning: #ffb000;
+  --color-warning-bg: rgba(255, 176, 0, 0.1);
+  --color-danger: #ff0055;
+  --color-danger-bg: rgba(255, 0, 85, 0.08);
+  --color-info: #60a5fa;
+  --color-info-bg: rgba(96, 165, 250, 0.1);
+
+  --color-c-acme: #ff2a6d;
+  --color-c-tech: #60a5fa;
+  --color-c-nova: #00f0ff;
+  --color-c-lumen: #ffb000;
+  --color-c-orbit: #c084fc;
+}

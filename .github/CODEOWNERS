@@ -1,0 +1,20 @@
+# NexusHub — code ownership rules
+
+# Default owner
+*                       @ageraci
+
+# Security-critical paths require an explicit security review
+.github/workflows/      @ageraci
+.gitleaks.toml          @ageraci
+.husky/                 @ageraci
+apps/web/middleware.ts  @ageraci
+apps/web/lib/env.ts     @ageraci
+apps/web/lib/supabase/  @ageraci
+apps/web/lib/security/  @ageraci
+packages/db/prisma/     @ageraci
+packages/integrations/  @ageraci
+
+# Architecture decisions
+docs/adr/               @ageraci
+CLAUDE.md               @ageraci
+progress.md             @ageraci

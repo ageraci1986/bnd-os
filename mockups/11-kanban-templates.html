@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Templates Kanban — NexusHub</title>
+<link rel="stylesheet" href="styles.css">
+<style>
+  .ktpl-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 24px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-card);
+    margin-bottom: 20px;
+  }
+  .ktpl-select {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .ktpl-select-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-muted);
+    font-weight: 800;
+  }
+  .ktpl-dropdown {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 18px;
+    background: var(--bg-muted);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-pill);
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: -0.3px;
+    min-width: 260px;
+    cursor: pointer;
+  }
+  .ktpl-dropdown::after {
+    content: '▾';
+    margin-left: auto;
+    color: var(--text-muted);
+    font-size: 11px;
+  }
+
+  .warning {
+    padding: 18px 22px;
+    background: var(--warning-bg);
+    border: 1px solid var(--warning);
+    border-radius: var(--radius-md);
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    margin-bottom: 24px;
+    font-size: 13px;
+    color: var(--text-soft);
+    font-weight: 500;
+  }
+  .warning::before { content: '⚠'; color: var(--warning); font-size: 22px; }
+  .warning strong { color: var(--text-main); font-weight: 700; }
+
+  .tpl-board {
+    display: flex;
+    gap: 16px;
+    overflow-x: auto;
+    padding: 32px 24px;
+    background: var(--bg-muted);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+  }
+  .tpl-col {
+    flex: 0 0 240px;
+    display: flex;
+    flex-direction: column;
+  }
+  .tpl-col-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 12px;
+    border-bottom: 2px solid var(--border-light);
+    margin-bottom: 12px;
+  }
+  .tpl-col-head input {
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: -0.3px;
+    border: 0;
+    background: transparent;
+    outline: none;
+    width: 80%;
+    color: var(--text-main);
+    font-family: inherit;
+  }
+  .tpl-col-head input:focus {
+    background: var(--accent-gradient-soft);
+    border-radius: 4px;
+    padding: 2px 6px;
+  }
+  .tpl-col-menu { color: var(--text-muted); font-size: 16px; padding: 2px 6px; }
+  .tpl-col-flow {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    margin-bottom: 14px;
+    font-weight: 600;
+  }
+  .tpl-col-flow::before { content: '→ '; color: var(--accent-primary); font-weight: 800; }
+  [data-theme="dark"] .tpl-col-flow::before { color: #C084FC; }
+
+  .tpl-sample {
+    background: var(--bg-card);
+    border: 1px dashed var(--border-light);
+    border-radius: var(--radius-sm);
+    padding: 12px;
+    margin-bottom: 8px;
+    opacity: 0.6;
+  }
+  .tpl-sample .tag { margin-bottom: 8px; }
+  .tpl-sample-title {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 500;
+    line-height: 1.4;
+  }
+
+  .tpl-col.blocked {
+    background: var(--danger-bg);
+    border: 1px solid var(--danger);
+    border-radius: var(--radius-md);
+    padding: 16px;
+  }
+  .tpl-col.blocked .tpl-col-head {
+    border-bottom-color: var(--danger);
+  }
+  .tpl-col.blocked input {
+    color: var(--danger);
+    pointer-events: none;
+  }
+  .tpl-col.blocked .tpl-col-flow { color: var(--danger); }
+  .tpl-col.blocked .tpl-col-flow::before { content: '⚙ '; color: var(--danger); }
+
+  .sys-badge {
+    padding: 4px 10px;
+    background: var(--danger);
+    color: #fff;
+    border-radius: var(--radius-pill);
+    font-size: 9px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .blocked-note {
+    padding: 14px;
+    background: var(--bg-card);
+    border: 1px dashed var(--danger);
+    border-radius: var(--radius-sm);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--danger);
+    font-weight: 700;
+    text-align: center;
+    line-height: 1.8;
+  }
+
+  .tpl-add-col {
+    flex: 0 0 180px;
+    display: flex;
+    align-items: center;
+  }
+  .tpl-add-col button {
+    width: 100%;
+    padding: 24px;
+    border: 2px dashed var(--border-light);
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    transition: var(--transition);
+  }
+  .tpl-add-col button:hover { border-color: var(--accent-primary); color: var(--accent-primary); }
+  [data-theme="dark"] .tpl-add-col button:hover { color: #C084FC; }
+
+  .saved-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 14px;
+    margin-top: 32px;
+  }
+  .saved-card {
+    padding: 20px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-card);
+    cursor: pointer;
+    transition: var(--transition);
+  }
+  .saved-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-hover); }
+  .saved-card.active {
+    border-color: var(--accent-primary);
+    background: var(--accent-gradient-soft);
+  }
+  .saved-card-name {
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: -0.3px;
+    margin-bottom: 8px;
+  }
+  .saved-card-cols {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 500;
+    line-height: 1.5;
+  }
+  .saved-card-used {
+    display: inline-block;
+    margin-top: 12px;
+    padding: 4px 10px;
+    background: var(--bg-muted);
+    border-radius: var(--radius-pill);
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--accent-primary);
+  }
+  [data-theme="dark"] .saved-card-used { color: #C084FC; }
+</style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand"><div class="brand-mark">N</div><div><div class="brand-name">NexusHub</div><span class="brand-sub">Studio Atlas</span></div></div>
+      <div class="nav-section">
+        <div class="nav-label">Main menu</div>
+        <a class="nav-item" href="03-overview.html"><span class="ico">◈</span> Dashboard</a>
+        <a class="nav-item" href="04-kanban.html"><span class="ico">◱</span> Projets <span class="count">14</span></a>
+        <a class="nav-item" href="08-communications.html"><span class="ico">✉</span> Communications <span class="count new">23</span></a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-label">Clients actifs</div>
+        <a class="client-row c-acme"><span class="client-dot"></span><span class="client-name">Acme Brands</span><span class="client-count">5</span></a>
+        <a class="client-row c-tech"><span class="client-dot"></span><span class="client-name">TechGroup SA</span><span class="client-count">3</span></a>
+        <a class="client-row c-nova"><span class="client-dot"></span><span class="client-name">Nova Editions</span><span class="client-count">2</span></a>
+        <a class="client-row c-lumen"><span class="client-dot"></span><span class="client-name">Lumen &amp; Co</span><span class="client-count">3</span></a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-label">Atelier</div>
+        <a class="nav-item" href="09-clients.html"><span class="ico">◉</span> Clients</a>
+        <a class="nav-item" href="10-email-templates.html"><span class="ico">✎</span> Templates e-mail</a>
+        <a class="nav-item active" href="11-kanban-templates.html"><span class="ico">▦</span> Templates Kanban</a>
+        <a class="nav-item" href="12-team.html"><span class="ico">⎔</span> Équipe</a>
+        <a class="nav-item" href="14-integrations.html"><span class="ico">⟷</span> Intégrations</a>
+        <a class="nav-item" href="13-settings.html"><span class="ico">⚙</span> Paramètres</a>
+      </div>
+      <div class="user-profile"><div class="avatar gradient">AL</div><div><div class="user-name">Angelo Lambert</div><div class="user-role">Admin</div></div></div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="search-wrap"><input type="text" class="search-bar" placeholder="Rechercher…"></div>
+        <div class="topbar-actions">
+          <button class="btn btn-ghost" data-theme-toggle>🌙 Dark</button>
+          <button class="btn btn-primary">+ Nouveau template</button>
+        </div>
+      </header>
+      <div class="contextbar"><div class="crumb"><span>Atelier</span><span class="sep">/</span><strong>Templates Kanban</strong></div></div>
+
+      <div class="page-head">
+        <div class="page-head-text">
+          <h1 class="page-title">Templates <span class="gradient-text">Kanban</span></h1>
+          <p class="page-sub">Définissez des structures de colonnes prêtes à consommer lors de la création d'un projet.</p>
+        </div>
+      </div>
+
+      <div class="ktpl-toolbar">
+        <div class="ktpl-select">
+          <div class="ktpl-select-label">✦ Template en édition</div>
+          <div class="ktpl-dropdown">Campagne créa</div>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button class="btn btn-ghost btn-sm">Dupliquer</button>
+          <button class="btn btn-danger btn-sm">Supprimer</button>
+          <button class="btn btn-primary btn-sm">Sauvegarder</button>
+        </div>
+      </div>
+
+      <div class="warning">
+        <div>
+          <strong>Modifier ce template n'affecte pas les projets existants.</strong>
+          Le template n'est consommé qu'au moment de la création d'un nouveau projet. Vos 14 projets actifs garderont leur structure actuelle.
+        </div>
+      </div>
+
+      <div class="tpl-board">
+        <div class="tpl-col">
+          <div class="tpl-col-head"><input type="text" value="Brief"><button class="tpl-col-menu">⋯</button></div>
+          <div class="tpl-col-flow">si checklist complète → Créa</div>
+          <div class="tpl-sample">
+            <span class="tag tag-strategy">Stratégie</span>
+            <div class="tpl-sample-title">Exemple — cadrage client</div>
+          </div>
+          <div class="tpl-sample">
+            <span class="tag tag-info">Recherche</span>
+            <div class="tpl-sample-title">Exemple de carte</div>
+          </div>
+        </div>
+
+        <div class="tpl-col">
+          <div class="tpl-col-head"><input type="text" value="Créa"><button class="tpl-col-menu">⋯</button></div>
+          <div class="tpl-col-flow">si checklist complète → Revue</div>
+          <div class="tpl-sample">
+            <span class="tag tag-design">Design</span>
+            <div class="tpl-sample-title">Exemple — maquette</div>
+          </div>
+          <div class="tpl-sample">
+            <span class="tag tag-copy">Copy</span>
+            <div class="tpl-sample-title">Exemple de carte</div>
+          </div>
+        </div>
+
+        <div class="tpl-col">
+          <div class="tpl-col-head"><input type="text" value="Revue interne"><button class="tpl-col-menu">⋯</button></div>
+          <div class="tpl-col-flow">si checklist complète → Validation</div>
+          <div class="tpl-sample">
+            <span class="tag tag-primary">Revue DA</span>
+            <div class="tpl-sample-title">Exemple de carte</div>
+          </div>
+        </div>
+
+        <div class="tpl-col">
+          <div class="tpl-col-head"><input type="text" value="Validation client"><button class="tpl-col-menu">⋯</button></div>
+          <div class="tpl-col-flow">si checklist complète → Livré</div>
+          <div class="tpl-sample">
+            <span class="tag tag-warning">BAT</span>
+            <div class="tpl-sample-title">Exemple — validation</div>
+          </div>
+        </div>
+
+        <div class="tpl-col">
+          <div class="tpl-col-head"><input type="text" value="Livré"><button class="tpl-col-menu">⋯</button></div>
+          <div class="tpl-col-flow" style="opacity: 0.5;">colonne finale · archivage 30j</div>
+          <div class="tpl-sample">
+            <span class="tag tag-success">✓ Done</span>
+            <div class="tpl-sample-title">Exemple de carte</div>
+          </div>
+        </div>
+
+        <div class="tpl-col blocked">
+          <div class="tpl-col-head">
+            <input type="text" value="Bloqué">
+            <span class="sys-badge">Système</span>
+          </div>
+          <div class="tpl-col-flow">géré automatiquement</div>
+          <div class="blocked-note">
+            Colonne système<br>
+            Non modifiable<br>
+            Non supprimable
+          </div>
+        </div>
+
+        <div class="tpl-add-col">
+          <button>+ Nouvelle colonne</button>
+        </div>
+      </div>
+
+      <h3 class="section-title" style="margin-top: 40px; margin-bottom: 16px;">Tous les templates</h3>
+
+      <div class="saved-grid">
+        <div class="saved-card active">
+          <div class="saved-card-name">Campagne créa</div>
+          <div class="saved-card-cols">6 colonnes · Brief → Créa → Revue → Valid. → Livré</div>
+          <span class="saved-card-used">● En édition</span>
+        </div>
+        <div class="saved-card">
+          <div class="saved-card-name">Production vidéo</div>
+          <div class="saved-card-cols">7 colonnes · Pré-prod à Post</div>
+          <span class="saved-card-used">Utilisé 4×</span>
+        </div>
+        <div class="saved-card">
+          <div class="saved-card-name">Social Media</div>
+          <div class="saved-card-cols">5 colonnes · Ideation à Online</div>
+          <span class="saved-card-used">Utilisé 3×</span>
+        </div>
+        <div class="saved-card">
+          <div class="saved-card-name">Standard</div>
+          <div class="saved-card-cols">4 colonnes · À faire, En cours, Revue, Fait</div>
+          <span class="saved-card-used">Utilisé 8×</span>
+        </div>
+        <div class="saved-card">
+          <div class="saved-card-name">Vide</div>
+          <div class="saved-card-cols">Aucune colonne pré-définie</div>
+          <span class="saved-card-used">Utilisé 2×</span>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script src="theme.js"></script>
+</body>
+</html>

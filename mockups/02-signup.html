@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Invitation — NexusHub</title>
+<link rel="stylesheet" href="styles.css">
+<style>
+  .invite-card {
+    margin-top: 56px;
+    padding: 28px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: var(--radius-md);
+    backdrop-filter: blur(12px);
+  }
+  .invite-kicker {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: rgba(255,255,255,0.5);
+    font-weight: 700;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .invite-kicker::before {
+    content: '';
+    width: 24px; height: 1px;
+    background: #FF2A6D;
+  }
+  .invite-text {
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 1.3;
+    color: #fff;
+    letter-spacing: -0.5px;
+  }
+  .invite-text span {
+    background: linear-gradient(135deg, #C084FC, #FF2A6D);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .invite-role {
+    margin-top: 18px;
+    padding-top: 14px;
+    border-top: 1px solid rgba(255,255,255,0.1);
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: rgba(255,255,255,0.5);
+    font-weight: 600;
+  }
+  .invite-role strong { color: #fff; }
+</style>
+</head>
+<body>
+  <div class="auth">
+    <aside class="auth-visual">
+      <div class="auth-brand">
+        <div class="brand-mark">N</div>
+        <div>
+          <div class="brand-name">NexusHub</div>
+          <span class="brand-sub">Creative Agency OS</span>
+        </div>
+      </div>
+
+      <div class="invite-card">
+        <div class="invite-kicker">✦ Invitation reçue</div>
+        <div class="invite-text">
+          <span>Marie Lavigne</span> vous invite à rejoindre l'espace <span>Studio Atlas</span>.
+        </div>
+        <div class="invite-role">
+          <span>Rôle assigné</span>
+          <strong>Membre</strong>
+        </div>
+      </div>
+
+      <div class="auth-hero" style="margin-top: 64px;">
+        <h2>Welcome to<br>the <span>atelier.</span></h2>
+        <p>Votre compte est à quelques clics. Vos collègues vous attendent déjà sur 14 projets en cours.</p>
+      </div>
+    </aside>
+
+    <main class="auth-form-wrap">
+      <button class="btn btn-ghost auth-theme-toggle" data-theme-toggle>🌙 Dark</button>
+
+      <div class="auth-form">
+        <div class="auth-kicker">✦ Activation du compte</div>
+        <h1 class="auth-title">Créez votre<br>identité.</h1>
+        <p class="auth-sub">Quelques informations et l'accès est à vous. Votre rôle a été défini par Marie.</p>
+
+        <form>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="field">
+              <label class="field-label">Prénom</label>
+              <input type="text" class="field-input" placeholder="Angelo">
+            </div>
+            <div class="field">
+              <label class="field-label">Nom</label>
+              <input type="text" class="field-input" placeholder="Lambert">
+            </div>
+          </div>
+
+          <div class="field">
+            <label class="field-label">Adresse e-mail <span style="color: var(--text-ghost); font-weight: 500; text-transform: none; letter-spacing: 0;">(pré-rempli)</span></label>
+            <input type="email" class="field-input" value="angelo@studio-atlas.com" disabled style="background: var(--bg-hover); color: var(--text-muted);">
+          </div>
+
+          <div class="field">
+            <label class="field-label">Mot de passe</label>
+            <input type="password" class="field-input" placeholder="Minimum 10 caractères">
+            <div class="field-hint">Au moins 10 caractères. Pas d'exigence esthétique.</div>
+          </div>
+
+          <div class="field">
+            <label class="field-label">Confirmation</label>
+            <input type="password" class="field-input" placeholder="••••••••••">
+          </div>
+
+          <label style="display: flex; align-items: flex-start; gap: 10px; margin: 20px 0 24px; font-size: 12px; color: var(--text-muted); font-weight: 500;">
+            <input type="checkbox" style="margin-top: 3px; accent-color: var(--accent-primary);" checked>
+            <span>J'accepte les <a href="#" class="auth-link" style="text-transform: none; letter-spacing: 0;">conditions d'utilisation</a> et la politique de confidentialité.</span>
+          </label>
+
+          <button type="button" class="btn btn-primary btn-lg" style="width: 100%; justify-content: center;">
+            Créer mon compte et entrer
+            <span>→</span>
+          </button>
+        </form>
+
+        <div class="auth-foot">
+          Lien valide 7 jours — expire le 20 avril 2026.<br>
+          <a href="index.html" class="auth-link" style="margin-top: 12px; display: inline-block;">← Retour à l'index</a>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script src="theme.js"></script>
+</body>
+</html>

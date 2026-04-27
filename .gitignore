@@ -1,0 +1,75 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+.next/
+.turbo/
+dist/
+build/
+out/
+*.tsbuildinfo
+.swc/
+
+# Environment & secrets
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.*.local
+!.env.example
+*.pem
+*.key
+*.p12
+*.cert
+
+# Editors / OS
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.recommended.json
+.idea/
+.DS_Store
+Thumbs.db
+
+# Testing
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+playwright/.cache/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Caches
+.eslintcache
+.stylelintcache
+.cache/
+.parcel-cache/
+
+# Storybook
+storybook-static/
+
+# Prisma
+prisma/migrations/dev/
+
+# Sentry
+.sentryclirc
+
+# Vercel
+.vercel/
+
+# Local-only
+.local/
+TODO.local.md
+NOTES.local.md
+
+# Generated
+*.generated.ts
+*.generated.tsx

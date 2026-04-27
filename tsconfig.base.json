@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "moduleDetection": "force",
+    "allowImportingTsExtensions": false,
+    "resolveJsonModule": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitReturns": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "useUnknownInCatchVariables": true,
+
+    "skipLibCheck": true,
+    "incremental": true,
+    "composite": false,
+    "declaration": false,
+    "sourceMap": true,
+    "removeComments": false,
+
+    "paths": {
+      "@nexushub/db": ["./packages/db/src/index.ts"],
+      "@nexushub/db/*": ["./packages/db/src/*"],
+      "@nexushub/domain": ["./packages/domain/src/index.ts"],
+      "@nexushub/domain/*": ["./packages/domain/src/*"],
+      "@nexushub/integrations": ["./packages/integrations/src/index.ts"],
+      "@nexushub/integrations/*": ["./packages/integrations/src/*"],
+      "@nexushub/ui": ["./packages/ui/src/index.ts"],
+      "@nexushub/ui/*": ["./packages/ui/src/*"]
+    }
+  },
+  "exclude": ["node_modules", ".turbo", ".next", "dist", "build", "coverage"]
+}

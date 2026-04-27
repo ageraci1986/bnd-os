@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Intégrations — NexusHub</title>
+<link rel="stylesheet" href="styles.css">
+<style>
+  .integrations-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+  }
+
+  .integration {
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    padding: 28px;
+    box-shadow: var(--shadow-card);
+    transition: var(--transition);
+    position: relative;
+    overflow: hidden;
+  }
+  .integration:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-hover);
+  }
+
+  .int-head {
+    display: grid;
+    grid-template-columns: 64px 1fr auto;
+    gap: 16px;
+    align-items: center;
+    margin-bottom: 18px;
+  }
+  .int-logo {
+    width: 64px; height: 64px;
+    border-radius: var(--radius-md);
+    display: grid; place-items: center;
+    color: #fff;
+    font-size: 28px;
+    font-weight: 800;
+  }
+  .int-logo.slack { background: linear-gradient(135deg, #4A154B, #ECB22E); }
+  .int-logo.exchange { background: linear-gradient(135deg, #0078D4, #60A5FA); }
+  .int-logo.ai { background: linear-gradient(135deg, #8B2BE2, #C084FC); }
+  .int-logo.cal { background: linear-gradient(135deg, #059669, #10B981); }
+
+  .int-name {
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+  }
+  .int-tagline {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 600;
+    margin-top: 4px;
+  }
+
+  .int-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 14px;
+    border-radius: var(--radius-pill);
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .int-status::before {
+    content: '';
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+  .int-status.active { background: var(--success-bg); color: var(--success); }
+  .int-status.inactive { background: var(--bg-hover); color: var(--text-muted); }
+  .int-status.soon { background: var(--warning-bg); color: var(--warning); }
+
+  .int-desc {
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--text-muted);
+    margin-bottom: 22px;
+    font-weight: 500;
+  }
+
+  .int-meta {
+    padding: 16px 18px;
+    background: var(--bg-muted);
+    border-radius: var(--radius-sm);
+    margin-bottom: 18px;
+  }
+  .meta-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 0;
+    font-size: 12px;
+  }
+  .meta-row .label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    font-weight: 700;
+  }
+  .meta-row .value { font-weight: 700; }
+
+  .channels-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 14px;
+  }
+  .channel-pill {
+    padding: 5px 12px;
+    background: var(--bg-muted);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-pill);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-soft);
+  }
+  .channel-pill::before { content: '#'; color: var(--accent-primary); font-weight: 800; margin-right: 2px; }
+  [data-theme="dark"] .channel-pill::before { color: #C084FC; }
+  .channel-pill.add {
+    border-style: dashed;
+    border-color: var(--accent-primary);
+    color: var(--accent-primary);
+    background: transparent;
+  }
+  [data-theme="dark"] .channel-pill.add { color: #C084FC; border-color: #C084FC; }
+
+  .int-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .soon-banner {
+    padding: 12px 18px;
+    background: var(--warning-bg);
+    border: 1px solid var(--warning);
+    border-radius: var(--radius-sm);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--warning);
+    font-weight: 800;
+    margin-bottom: 16px;
+    text-align: center;
+  }
+
+  .int-foot-note {
+    margin-top: 32px;
+    padding: 26px 32px;
+    background: var(--accent-gradient-soft);
+    border: 1px solid rgba(139, 43, 226, 0.2);
+    border-radius: var(--radius-md);
+    font-size: 13px;
+    color: var(--text-soft);
+    line-height: 1.6;
+    font-weight: 500;
+  }
+  .int-foot-note strong {
+    display: block;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--accent-primary);
+    font-weight: 800;
+    margin-bottom: 10px;
+  }
+  [data-theme="dark"] .int-foot-note strong { color: #C084FC; }
+</style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand"><div class="brand-mark">N</div><div><div class="brand-name">NexusHub</div><span class="brand-sub">Studio Atlas</span></div></div>
+      <div class="nav-section">
+        <div class="nav-label">Main menu</div>
+        <a class="nav-item" href="03-overview.html"><span class="ico">◈</span> Dashboard</a>
+        <a class="nav-item" href="04-kanban.html"><span class="ico">◱</span> Projets <span class="count">14</span></a>
+        <a class="nav-item" href="08-communications.html"><span class="ico">✉</span> Communications <span class="count new">23</span></a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-label">Clients actifs</div>
+        <a class="client-row c-acme"><span class="client-dot"></span><span class="client-name">Acme Brands</span><span class="client-count">5</span></a>
+        <a class="client-row c-tech"><span class="client-dot"></span><span class="client-name">TechGroup SA</span><span class="client-count">3</span></a>
+        <a class="client-row c-nova"><span class="client-dot"></span><span class="client-name">Nova Editions</span><span class="client-count">2</span></a>
+        <a class="client-row c-lumen"><span class="client-dot"></span><span class="client-name">Lumen &amp; Co</span><span class="client-count">3</span></a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-label">Atelier</div>
+        <a class="nav-item" href="09-clients.html"><span class="ico">◉</span> Clients</a>
+        <a class="nav-item" href="10-email-templates.html"><span class="ico">✎</span> Templates e-mail</a>
+        <a class="nav-item" href="11-kanban-templates.html"><span class="ico">▦</span> Templates Kanban</a>
+        <a class="nav-item" href="12-team.html"><span class="ico">⎔</span> Équipe</a>
+        <a class="nav-item active" href="14-integrations.html"><span class="ico">⟷</span> Intégrations</a>
+        <a class="nav-item" href="13-settings.html"><span class="ico">⚙</span> Paramètres</a>
+      </div>
+      <div class="user-profile"><div class="avatar gradient">AL</div><div><div class="user-name">Angelo Lambert</div><div class="user-role">Admin</div></div></div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="search-wrap"><input type="text" class="search-bar" placeholder="Rechercher une intégration…"></div>
+        <div class="topbar-actions">
+          <button class="btn btn-ghost" data-theme-toggle>🌙 Dark</button>
+          <span style="font-size: 11px; color: var(--accent-primary); font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">◆ Admin uniquement</span>
+        </div>
+      </header>
+      <div class="contextbar"><div class="crumb"><span>Atelier</span><span class="sep">/</span><strong>Intégrations</strong></div></div>
+
+      <div class="page-head">
+        <div class="page-head-text">
+          <h1 class="page-title">Vos <span class="gradient-text">intégrations</span></h1>
+          <p class="page-sub">Connectez NexusHub à vos outils existants pour centraliser les communications client par contexte.</p>
+        </div>
+        <div class="page-meta">
+          <strong>2 / 4 actives</strong>
+          Dernière synchro 09:32
+        </div>
+      </div>
+
+      <div class="integrations-grid">
+
+        <div class="integration">
+          <div class="int-head">
+            <div class="int-logo slack">#</div>
+            <div>
+              <div class="int-name">Slack</div>
+              <div class="int-tagline">Messagerie d'équipe · bidirectionnel</div>
+            </div>
+            <span class="int-status active">Connecté</span>
+          </div>
+
+          <p class="int-desc">
+            Les messages reçus sur les canaux associés apparaissent dans le hub Communications filtré par client. Vos réponses depuis NexusHub sont publiées directement sur le canal Slack d'origine.
+          </p>
+
+          <div class="int-meta">
+            <div class="meta-row"><span class="label">Workspace</span><span class="value">studio-atlas.slack.com</span></div>
+            <div class="meta-row"><span class="label">Connecté le</span><span class="value">12 oct. 2024</span></div>
+            <div class="meta-row"><span class="label">Canaux suivis</span><span class="value">6 sur 28</span></div>
+          </div>
+
+          <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); font-weight: 800; margin-bottom: 10px;">— Canaux associés</div>
+          <div class="channels-list">
+            <span class="channel-pill">acme-general</span>
+            <span class="channel-pill">acme-creation</span>
+            <span class="channel-pill">techgroup-q2</span>
+            <span class="channel-pill">nova-editions</span>
+            <span class="channel-pill">lumen-print</span>
+            <span class="channel-pill">lumen-tv</span>
+            <span class="channel-pill add">+ Associer</span>
+          </div>
+
+          <div class="int-actions" style="margin-top: 22px;">
+            <button class="btn btn-ghost btn-sm">Gérer les canaux</button>
+            <button class="btn btn-danger btn-sm">Déconnecter</button>
+          </div>
+        </div>
+
+        <div class="integration">
+          <div class="int-head">
+            <div class="int-logo exchange">✉</div>
+            <div>
+              <div class="int-name">Microsoft Exchange</div>
+              <div class="int-tagline">Boîte mail · association automatique</div>
+            </div>
+            <span class="int-status active">Connecté</span>
+          </div>
+
+          <p class="int-desc">
+            Synchronisation bidirectionnelle de la boîte mail. Les e-mails sont automatiquement associés au client correspondant grâce aux domaines déclarés dans la fiche client.
+          </p>
+
+          <div class="int-meta">
+            <div class="meta-row"><span class="label">Compte</span><span class="value">angelo@studio-atlas.com</span></div>
+            <div class="meta-row"><span class="label">Connecté le</span><span class="value">10 oct. 2024</span></div>
+            <div class="meta-row"><span class="label">Dernière synchro</span><span class="value" style="color: var(--success);">il y a 2 min</span></div>
+            <div class="meta-row"><span class="label">Mails associés (jour)</span><span class="value">42</span></div>
+          </div>
+
+          <div class="int-actions">
+            <button class="btn btn-ghost btn-sm">Paramètres</button>
+            <button class="btn btn-ghost btn-sm">Forcer sync</button>
+            <button class="btn btn-danger btn-sm">Déconnecter</button>
+          </div>
+        </div>
+
+        <div class="integration">
+          <div class="int-head">
+            <div class="int-logo ai">◆</div>
+            <div>
+              <div class="int-name">Notes IA (Fireflies / Otter)</div>
+              <div class="int-tagline">Résumés de réunion automatiques</div>
+            </div>
+            <span class="int-status soon">Prochainement</span>
+          </div>
+
+          <div class="soon-banner">Disponible en V1.5 — T3 2026</div>
+
+          <p class="int-desc">
+            Importez automatiquement vos résumés de réunion Fireflies ou Otter directement dans l'onglet Notes des Communications, rangés par client.
+          </p>
+
+          <div class="int-actions">
+            <button class="btn btn-ghost btn-sm" disabled style="opacity: 0.5; cursor: not-allowed;">Connecter</button>
+            <button class="btn btn-ghost btn-sm">Me prévenir au lancement</button>
+          </div>
+        </div>
+
+        <div class="integration">
+          <div class="int-head">
+            <div class="int-logo cal">▭</div>
+            <div>
+              <div class="int-name">Google Calendar</div>
+              <div class="int-tagline">Échéances &amp; réunions client</div>
+            </div>
+            <span class="int-status inactive">Non connecté</span>
+          </div>
+
+          <p class="int-desc">
+            Synchronisez les échéances de vos projets vers votre agenda Google, et affichez vos réunions externes dans le calendrier NexusHub.
+          </p>
+
+          <div class="int-meta">
+            <div class="meta-row"><span class="label">Type de sync</span><span class="value">Bidirectionnelle</span></div>
+            <div class="meta-row"><span class="label">Permissions</span><span class="value">Lecture &amp; écriture</span></div>
+          </div>
+
+          <div class="int-actions">
+            <button class="btn btn-primary btn-sm">Connecter</button>
+            <button class="btn btn-ghost btn-sm">En savoir plus</button>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="int-foot-note">
+        <strong>✦ À propos des intégrations</strong>
+        Seul un Admin peut connecter ou déconnecter une intégration au niveau de l'espace. Chaque membre connecte individuellement son propre compte Exchange depuis ses paramètres personnels pour la synchronisation mail. Les canaux Slack associés aux clients, en revanche, sont configurés une seule fois au niveau de l'espace et s'appliquent à toute l'équipe.
+      </div>
+    </main>
+  </div>
+  <script src="theme.js"></script>
+</body>
+</html>

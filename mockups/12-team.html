@@ -1,0 +1,455 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Équipe — NexusHub</title>
+<link rel="stylesheet" href="styles.css">
+<style>
+  .team-layout {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr;
+    gap: 28px;
+    align-items: start;
+  }
+
+  .members-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    padding: 28px;
+    box-shadow: var(--shadow-card);
+  }
+  .members-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding-bottom: 18px;
+    margin-bottom: 12px;
+    border-bottom: 1px solid var(--border-light);
+  }
+  .members-head h3 {
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: -0.8px;
+  }
+  .members-head h3 span {
+    color: var(--text-muted);
+    font-weight: 600;
+    margin-left: 8px;
+  }
+  .members-head .chip {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-muted);
+    padding: 6px 12px;
+    background: var(--bg-muted);
+    border-radius: var(--radius-pill);
+  }
+
+  .member-row {
+    display: grid;
+    grid-template-columns: auto 1fr auto auto;
+    gap: 18px;
+    align-items: center;
+    padding: 18px 4px;
+    border-bottom: 1px solid var(--border-soft);
+    transition: var(--transition);
+    border-radius: var(--radius-sm);
+  }
+  .member-row:hover { background: var(--bg-muted); padding: 18px 16px; }
+  .member-row:last-child { border-bottom: 0; }
+  .member-row .avatar { width: 46px; height: 46px; font-size: 13px; }
+  .m-name {
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: -0.3px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .m-name .you-pill {
+    font-size: 9px;
+    font-weight: 700;
+    padding: 2px 8px;
+    background: var(--accent-gradient);
+    color: #fff;
+    border-radius: var(--radius-pill);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .m-email { font-size: 11px; color: var(--text-muted); font-weight: 600; margin-top: 3px; }
+  .m-meta { font-size: 11px; color: var(--text-muted); font-weight: 500; margin-top: 4px; }
+
+  .role-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: var(--radius-pill);
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .role-badge.admin {
+    background: var(--accent-gradient);
+    color: #fff;
+  }
+  .role-badge.member {
+    background: var(--bg-muted);
+    color: var(--text-muted);
+    border: 1px solid var(--border-light);
+  }
+
+  .remove-btn {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 7px 14px;
+    border-radius: var(--radius-pill);
+    background: var(--bg-muted);
+    color: var(--text-muted);
+    border: 1px solid var(--border-light);
+    transition: var(--transition);
+  }
+  .remove-btn:hover { background: var(--danger-bg); color: var(--danger); border-color: var(--danger); }
+
+  /* Invite card */
+  .invite-card {
+    background: var(--bg-card);
+    border: 2px dashed var(--accent-primary);
+    border-radius: var(--radius-md);
+    padding: 32px;
+    position: relative;
+    overflow: hidden;
+  }
+  .invite-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: radial-gradient(circle at 0% 0%, rgba(139,43,226,0.05), transparent 60%);
+    pointer-events: none;
+  }
+  .invite-kicker {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--accent-primary);
+    font-weight: 800;
+    margin-bottom: 10px;
+  }
+  [data-theme="dark"] .invite-kicker { color: #C084FC; }
+  .invite-card h3 {
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -0.8px;
+    line-height: 1.1;
+    margin-bottom: 10px;
+  }
+  .invite-card p {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 24px;
+    font-weight: 500;
+  }
+
+  .pending-list { margin-top: 28px; }
+  .pending-head {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-muted);
+    font-weight: 800;
+    margin-bottom: 12px;
+  }
+  .pending-row {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 14px;
+    padding: 14px 18px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    margin-bottom: 8px;
+    align-items: center;
+    font-size: 12px;
+    box-shadow: var(--shadow-card);
+  }
+  .pending-row .email { font-weight: 600; color: var(--text-soft); }
+  .pending-row .expires {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .pending-row .re {
+    font-size: 10px;
+    font-weight: 800;
+    color: var(--accent-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  [data-theme="dark"] .pending-row .re { color: #C084FC; }
+
+  .role-rights {
+    margin-top: 28px;
+    padding: 24px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-card);
+  }
+  .role-rights h4 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-muted);
+    font-weight: 800;
+    margin-bottom: 16px;
+  }
+  .rights-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  .rights-table td {
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border-soft);
+    font-weight: 500;
+  }
+  .rights-table td:nth-child(2), .rights-table td:nth-child(3) {
+    text-align: center;
+    width: 70px;
+  }
+  .rights-table thead td {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-muted);
+    font-weight: 800;
+    border-bottom: 2px solid var(--border-light);
+  }
+  .yes { color: var(--success); font-weight: 800; font-size: 14px; }
+  .no { color: var(--danger); font-weight: 800; font-size: 14px; }
+
+  .admin-only-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 14px;
+    background: var(--accent-gradient);
+    color: #fff;
+    border-radius: var(--radius-pill);
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+</style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand"><div class="brand-mark">N</div><div><div class="brand-name">NexusHub</div><span class="brand-sub">Studio Atlas</span></div></div>
+      <div class="nav-section">
+        <div class="nav-label">Main menu</div>
+        <a class="nav-item" href="03-overview.html"><span class="ico">◈</span> Dashboard</a>
+        <a class="nav-item" href="04-kanban.html"><span class="ico">◱</span> Projets <span class="count">14</span></a>
+        <a class="nav-item" href="08-communications.html"><span class="ico">✉</span> Communications <span class="count new">23</span></a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-label">Clients actifs</div>
+        <a class="client-row c-acme"><span class="client-dot"></span><span class="client-name">Acme Brands</span><span class="client-count">5</span></a>
+        <a class="client-row c-tech"><span class="client-dot"></span><span class="client-name">TechGroup SA</span><span class="client-count">3</span></a>
+        <a class="client-row c-nova"><span class="client-dot"></span><span class="client-name">Nova Editions</span><span class="client-count">2</span></a>
+        <a class="client-row c-lumen"><span class="client-dot"></span><span class="client-name">Lumen &amp; Co</span><span class="client-count">3</span></a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-label">Atelier</div>
+        <a class="nav-item" href="09-clients.html"><span class="ico">◉</span> Clients</a>
+        <a class="nav-item" href="10-email-templates.html"><span class="ico">✎</span> Templates e-mail</a>
+        <a class="nav-item" href="11-kanban-templates.html"><span class="ico">▦</span> Templates Kanban</a>
+        <a class="nav-item active" href="12-team.html"><span class="ico">⎔</span> Équipe</a>
+        <a class="nav-item" href="14-integrations.html"><span class="ico">⟷</span> Intégrations</a>
+        <a class="nav-item" href="13-settings.html"><span class="ico">⚙</span> Paramètres</a>
+      </div>
+      <div class="user-profile"><div class="avatar gradient">AL</div><div><div class="user-name">Angelo Lambert</div><div class="user-role">Admin</div></div></div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="search-wrap"><input type="text" class="search-bar" placeholder="Rechercher un membre…"></div>
+        <div class="topbar-actions">
+          <button class="btn btn-ghost" data-theme-toggle>🌙 Dark</button>
+          <button class="btn btn-primary">+ Inviter</button>
+        </div>
+      </header>
+      <div class="contextbar">
+        <div class="crumb"><span>Atelier</span><span class="sep">/</span><strong>Équipe &amp; invitations</strong></div>
+        <span class="admin-only-badge" style="margin-left: auto;">◆ Admin uniquement</span>
+      </div>
+
+      <div class="page-head">
+        <div class="page-head-text">
+          <h1 class="page-title">Votre <span class="gradient-text">équipe</span></h1>
+          <p class="page-sub">Invitez, gérez et retirez les membres de l'espace Studio Atlas. Seul un Admin peut effectuer ces actions.</p>
+        </div>
+      </div>
+
+      <div class="team-layout">
+
+        <div class="members-card">
+          <div class="members-head">
+            <h3>Membres <span>(08)</span></h3>
+            <span class="chip">2 admins · 6 membres</span>
+          </div>
+
+          <div class="member-row">
+            <div class="avatar gradient">AL</div>
+            <div>
+              <div class="m-name">Angelo Lambert <span class="you-pill">Vous</span></div>
+              <div class="m-email">angelo@studio-atlas.com</div>
+              <div class="m-meta">Rejoint en septembre 2024 · Fondateur</div>
+            </div>
+            <span class="role-badge admin">◆ Admin</span>
+            <button class="remove-btn" style="opacity: 0.3; pointer-events: none;">Retirer</button>
+          </div>
+
+          <div class="member-row">
+            <div class="avatar" style="background: var(--c-nova); color: #fff;">MD</div>
+            <div>
+              <div class="m-name">Marie Duval</div>
+              <div class="m-email">marie@studio-atlas.com</div>
+              <div class="m-meta">Rejoint en octobre 2024 · Design</div>
+            </div>
+            <span class="role-badge admin">◆ Admin</span>
+            <button class="remove-btn">Retirer</button>
+          </div>
+
+          <div class="member-row">
+            <div class="avatar" style="background: var(--c-tech); color: #fff;">JT</div>
+            <div>
+              <div class="m-name">Julien Trémaux</div>
+              <div class="m-email">julien@studio-atlas.com</div>
+              <div class="m-meta">Rejoint en novembre 2024 · Copy</div>
+            </div>
+            <span class="role-badge member">Membre</span>
+            <button class="remove-btn">Retirer</button>
+          </div>
+
+          <div class="member-row">
+            <div class="avatar" style="background: var(--c-acme); color: #fff;">CR</div>
+            <div>
+              <div class="m-name">Claire Rémy</div>
+              <div class="m-email">claire@studio-atlas.com</div>
+              <div class="m-meta">Rejoint en janvier 2025 · Design</div>
+            </div>
+            <span class="role-badge member">Membre</span>
+            <button class="remove-btn">Retirer</button>
+          </div>
+
+          <div class="member-row">
+            <div class="avatar" style="background: var(--c-orbit); color: #fff;">LP</div>
+            <div>
+              <div class="m-name">Léa Paoli</div>
+              <div class="m-email">lea@studio-atlas.com</div>
+              <div class="m-meta">Rejoint en février 2025 · Prod vidéo</div>
+            </div>
+            <span class="role-badge member">Membre</span>
+            <button class="remove-btn">Retirer</button>
+          </div>
+
+          <div class="member-row">
+            <div class="avatar" style="background: var(--c-lumen); color: #fff;">TH</div>
+            <div>
+              <div class="m-name">Tom Hénard</div>
+              <div class="m-email">tom@studio-atlas.com</div>
+              <div class="m-meta">Rejoint en mars 2025 · Motion</div>
+            </div>
+            <span class="role-badge member">Membre</span>
+            <button class="remove-btn">Retirer</button>
+          </div>
+
+          <div class="member-row">
+            <div class="avatar" style="background: var(--c-nova); color: #fff;">NK</div>
+            <div>
+              <div class="m-name">Nina Kessler</div>
+              <div class="m-email">nina@studio-atlas.com</div>
+              <div class="m-meta">Rejoint en juin 2025 · PM</div>
+            </div>
+            <span class="role-badge member">Membre</span>
+            <button class="remove-btn">Retirer</button>
+          </div>
+
+          <div class="member-row">
+            <div class="avatar" style="background: var(--c-tech); color: #fff;">RB</div>
+            <div>
+              <div class="m-name">Raphaël Bastin</div>
+              <div class="m-email">raphael@studio-atlas.com</div>
+              <div class="m-meta">Rejoint en février 2026 · Stratégie</div>
+            </div>
+            <span class="role-badge member">Membre</span>
+            <button class="remove-btn">Retirer</button>
+          </div>
+        </div>
+
+        <div>
+          <div class="invite-card">
+            <div class="invite-kicker">✦ Nouvelle invitation</div>
+            <h3>Ajouter un <span class="gradient-text">équipier</span></h3>
+            <p>Un lien unique sera envoyé par e-mail. Valide 7 jours.</p>
+
+            <div class="field">
+              <label class="field-label">Adresse e-mail</label>
+              <input type="email" class="field-input" placeholder="prenom@studio-atlas.com">
+            </div>
+            <div class="field">
+              <label class="field-label">Rôle attribué</label>
+              <select class="field-select">
+                <option>Membre — accès à tout sauf équipe</option>
+                <option>Admin — accès total + invitations</option>
+              </select>
+            </div>
+            <button class="btn btn-primary btn-lg" style="width: 100%; justify-content: center;">Envoyer l'invitation →</button>
+          </div>
+
+          <div class="pending-list">
+            <div class="pending-head">— Invitations en attente · 2</div>
+            <div class="pending-row">
+              <span class="email">stagiaire@studio-atlas.com</span>
+              <span class="expires">Expire dans 5j</span>
+              <a class="re">Renvoyer</a>
+            </div>
+            <div class="pending-row">
+              <span class="email">freelance-motion@gmail.com</span>
+              <span class="expires">Expire dans 2j</span>
+              <a class="re">Renvoyer</a>
+            </div>
+          </div>
+
+          <div class="role-rights">
+            <h4>— Droits par rôle</h4>
+            <table class="rights-table">
+              <thead>
+                <tr><td>Capacité</td><td>Admin</td><td>Membre</td></tr>
+              </thead>
+              <tbody>
+                <tr><td>Voir tous projets &amp; clients</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+                <tr><td>Créer / modifier projets</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+                <tr><td>Gérer les templates</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+                <tr><td>Modifier les clients</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+                <tr><td>Inviter / retirer membres</td><td class="yes">✓</td><td class="no">✕</td></tr>
+                <tr><td>Gérer les intégrations</td><td class="yes">✓</td><td class="no">✕</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+  <script src="theme.js"></script>
+</body>
+</html>

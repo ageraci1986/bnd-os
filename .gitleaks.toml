@@ -1,0 +1,46 @@
+title = "NexusHub gitleaks rules"
+
+# Use the upstream rule set as a base
+[extend]
+useDefault = true
+
+# Project-specific custom rules
+[[rules]]
+id = "supabase-service-role"
+description = "Supabase service role JWT (eyJ... role:service_role)"
+regex = '''eyJ[A-Za-z0-9_=-]{20,}\.eyJ[A-Za-z0-9_=-]+role[^a-z]+service_role'''
+tags = ["supabase", "service-role", "critical"]
+
+[[rules]]
+id = "supabase-url-with-key"
+description = "Supabase project URL accidentally paired with a key in the same string"
+regex = '''https://[a-z0-9-]+\.supabase\.co.*eyJ[A-Za-z0-9_=-]{20,}'''
+tags = ["supabase"]
+
+[[rules]]
+id = "slack-token"
+description = "Slack tokens (xoxb, xoxp, xoxa, xoxr)"
+regex = '''xox[abprs]-[A-Za-z0-9-]{10,}'''
+tags = ["slack"]
+
+[[rules]]
+id = "resend-api-key"
+description = "Resend API key (re_...)"
+regex = '''re_[A-Za-z0-9_]{20,}'''
+tags = ["resend"]
+
+[[rules]]
+id = "openai-key"
+description = "OpenAI API key (sk-...)"
+regex = '''sk-[A-Za-z0-9]{20,}'''
+tags = ["openai"]
+
+[allowlist]
+description = "Allowlist documentation, examples, and lockfiles"
+paths = [
+  '''(.*\.md)''',
+  '''(.*\.example)''',
+  '''pnpm-lock\.yaml''',
+  '''package-lock\.json''',
+  '''mockups/.*''',
+]

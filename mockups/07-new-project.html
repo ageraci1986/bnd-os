@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nouveau projet — NexusHub</title>
+<link rel="stylesheet" href="styles.css">
+<style>
+  .wizard {
+    position: fixed;
+    top: 4vh;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(980px, 94vw);
+    max-height: 92vh;
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-lg);
+    z-index: 101;
+    display: grid;
+    grid-template-rows: auto auto 1fr auto;
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+  }
+
+  .wiz-head {
+    padding: 32px 40px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+  .wiz-kicker {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--accent-primary);
+    font-weight: 700;
+    margin-bottom: 10px;
+  }
+  [data-theme="dark"] .wiz-kicker { color: #C084FC; }
+  .wiz-title {
+    font-size: 36px;
+    font-weight: 800;
+    letter-spacing: -1px;
+    line-height: 1.05;
+  }
+
+  .stepper {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    margin: 32px 40px 0;
+    padding: 6px;
+    background: var(--bg-muted);
+    border-radius: var(--radius-md);
+    gap: 4px;
+  }
+  .step {
+    padding: 14px 18px;
+    border-radius: var(--radius-sm);
+    position: relative;
+    transition: var(--transition);
+  }
+  .step-idx {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+    font-weight: 700;
+    margin-bottom: 2px;
+  }
+  .step-name {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-main);
+  }
+  .step.done .step-idx { color: var(--success); }
+  .step.done .step-idx::before { content: '✓ '; }
+  .step.active {
+    background: var(--accent-gradient);
+  }
+  .step.active .step-idx, .step.active .step-name { color: #fff; }
+  .step.active .step-idx { color: rgba(255,255,255,0.7); }
+  .step.pending .step-name { color: var(--text-ghost); }
+
+  .wiz-body { padding: 36px 40px; overflow-y: auto; }
+
+  .wiz-foot {
+    padding: 20px 40px;
+    border-top: 1px solid var(--border-light);
+    background: var(--bg-muted);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .wiz-foot-info {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+
+  .recap-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 36px;
+  }
+  .recap-block h4 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+    font-weight: 800;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-light);
+  }
+
+  .recap-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 0;
+    font-size: 13px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .recap-row:last-child { border: 0; }
+  .recap-row .label {
+    color: var(--text-muted);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 700;
+  }
+  .recap-row .value { font-weight: 700; }
+
+  .members-list { display: flex; flex-direction: column; gap: 10px; }
+  .member-row {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 14px;
+    align-items: center;
+    padding: 14px 16px;
+    background: var(--bg-muted);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+  }
+  .member-row .avatar { width: 36px; height: 36px; font-size: 11px; }
+  .m-name { font-size: 13px; font-weight: 700; }
+  .m-role { font-size: 11px; color: var(--text-muted); font-weight: 500; margin-top: 2px; }
+  .member-row select {
+    border: 1px solid var(--border-light);
+    background: var(--bg-card);
+    border-radius: var(--radius-pill);
+    padding: 6px 14px;
+    font-size: 11px;
+    font-weight: 700;
+    outline: none;
+    color: var(--text-main);
+  }
+  .member-row.add { background: transparent; border-style: dashed; border-color: var(--accent-primary); }
+  .member-row.add .m-name { color: var(--accent-primary); }
+  [data-theme="dark"] .member-row.add .m-name { color: #C084FC; }
+
+  .tpl-preview {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 14px;
+  }
+  .tpl-pill {
+    padding: 5px 12px;
+    background: var(--bg-muted);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-pill);
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-soft);
+  }
+  .tpl-pill.blocked { border-color: var(--danger); color: var(--danger); }
+
+  .notes {
+    margin-top: 20px;
+    padding: 16px 18px;
+    background: var(--accent-gradient-soft);
+    border: 1px solid rgba(139, 43, 226, 0.2);
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    color: var(--text-soft);
+    line-height: 1.5;
+    font-weight: 500;
+  }
+  .notes strong {
+    display: block;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--accent-primary);
+    margin-bottom: 6px;
+    font-weight: 800;
+  }
+  [data-theme="dark"] .notes strong { color: #C084FC; }
+
+  .wiz-close {
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    background: var(--bg-hover);
+    color: var(--text-main);
+    display: grid; place-items: center;
+    font-size: 16px;
+    transition: var(--transition);
+  }
+  .wiz-close:hover { background: var(--danger); color: #fff; }
+</style>
+</head>
+<body>
+  <div class="app" style="filter: blur(3px) opacity(0.3); pointer-events: none;">
+    <aside class="sidebar"></aside>
+    <main class="main"><header class="topbar"></header></main>
+  </div>
+
+  <div class="page-backdrop"></div>
+
+  <div class="wizard">
+    <div class="wiz-head">
+      <div>
+        <div class="wiz-kicker">✦ Assistant de création · étape 4 / 4</div>
+        <h1 class="wiz-title">Équipe &amp; <span class="gradient-text">récapitulatif</span></h1>
+      </div>
+      <button class="wiz-close">✕</button>
+    </div>
+
+    <div class="stepper">
+      <div class="step done">
+        <div class="step-idx">N° 01</div>
+        <div class="step-name">Informations</div>
+      </div>
+      <div class="step done">
+        <div class="step-idx">N° 02</div>
+        <div class="step-name">Type de projet</div>
+      </div>
+      <div class="step done">
+        <div class="step-idx">N° 03</div>
+        <div class="step-name">Template Kanban</div>
+      </div>
+      <div class="step active">
+        <div class="step-idx">N° 04</div>
+        <div class="step-name">Équipe &amp; récap</div>
+      </div>
+    </div>
+
+    <div class="wiz-body">
+      <div class="recap-grid">
+
+        <div class="recap-block">
+          <h4>— Assignez l'équipe</h4>
+          <div class="members-list">
+            <div class="member-row">
+              <div class="avatar gradient">AL</div>
+              <div>
+                <div class="m-name">Angelo Lambert</div>
+                <div class="m-role">Admin · vous</div>
+              </div>
+              <select><option>Pilote</option><option>Membre</option></select>
+            </div>
+            <div class="member-row">
+              <div class="avatar" style="background: var(--c-nova); color: #fff;">MD</div>
+              <div>
+                <div class="m-name">Marie Duval</div>
+                <div class="m-role">Design · membre</div>
+              </div>
+              <select><option>Membre</option><option>Pilote</option></select>
+            </div>
+            <div class="member-row">
+              <div class="avatar" style="background: var(--c-tech); color: #fff;">JT</div>
+              <div>
+                <div class="m-name">Julien Trémaux</div>
+                <div class="m-role">Copy · membre</div>
+              </div>
+              <select><option>Membre</option><option>Pilote</option></select>
+            </div>
+            <div class="member-row">
+              <div class="avatar" style="background: var(--c-orbit); color: #fff;">LP</div>
+              <div>
+                <div class="m-name">Léa Paoli</div>
+                <div class="m-role">Prod vidéo · membre</div>
+              </div>
+              <select><option>Membre</option><option>Pilote</option></select>
+            </div>
+            <div class="member-row add">
+              <div style="width: 36px; height: 36px; border-radius: 50%; border: 2px dashed var(--accent-primary); display: grid; place-items: center; color: var(--accent-primary); font-size: 16px;">+</div>
+              <div>
+                <div class="m-name">Ajouter un membre</div>
+                <div class="m-role">parmi les 8 de l'équipe</div>
+              </div>
+              <span></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="recap-block">
+          <h4>— Récapitulatif final</h4>
+          <div class="recap-row">
+            <span class="label">Nom</span>
+            <span class="value">Campagne Été 2025</span>
+          </div>
+          <div class="recap-row">
+            <span class="label">Client</span>
+            <span class="value"><span class="tag-client c-acme">Acme Brands</span></span>
+          </div>
+          <div class="recap-row">
+            <span class="label">Dates</span>
+            <span class="value">14 → 28 avril</span>
+          </div>
+          <div class="recap-row">
+            <span class="label">Type</span>
+            <span class="value">🎯 Campagne</span>
+          </div>
+          <div class="recap-row">
+            <span class="label">Template</span>
+            <span class="value">Campagne créa</span>
+          </div>
+
+          <div style="font-size: 10px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-muted); font-weight: 800; margin-top: 18px; margin-bottom: 8px;">— Colonnes</div>
+          <div class="tpl-preview">
+            <span class="tpl-pill">Brief</span>
+            <span class="tpl-pill">Créa</span>
+            <span class="tpl-pill">Revue</span>
+            <span class="tpl-pill">Validation</span>
+            <span class="tpl-pill">Livré</span>
+            <span class="tpl-pill blocked">Bloqué</span>
+          </div>
+
+          <div class="recap-row" style="margin-top: 16px;">
+            <span class="label">Équipe</span>
+            <span class="value">4 membres (1 pilote)</span>
+          </div>
+
+          <div class="notes">
+            <strong>✦ Prêt pour la création</strong>
+            Une fois créé, le projet s'ouvrira directement en vue Kanban. Les membres recevront une notification desktop.
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="wiz-foot">
+      <div class="wiz-foot-info">Étape 04 / 04 · Dernière étape</div>
+      <div style="display: flex; gap: 10px;">
+        <button class="btn btn-ghost btn-sm">← Retour</button>
+        <button class="btn btn-primary">Créer le projet →</button>
+      </div>
+    </div>
+  </div>
+
+  <div style="position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 200; display: flex; gap: 10px;">
+    <a href="04-kanban.html" class="btn btn-ghost btn-sm">← Kanban</a>
+    <a href="index.html" class="btn btn-ghost btn-sm">Index</a>
+    <button class="btn btn-ghost btn-sm" data-theme-toggle>🌙 Dark</button>
+  </div>
+  <script src="theme.js"></script>
+</body>
+</html>

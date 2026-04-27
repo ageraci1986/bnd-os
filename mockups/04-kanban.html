@@ -1,0 +1,646 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kanban — NexusHub</title>
+<link rel="stylesheet" href="styles.css">
+<style>
+  .project-chips {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+  }
+  .project-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 18px;
+    border-radius: var(--radius-pill);
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: var(--transition);
+    box-shadow: var(--shadow-card);
+  }
+  .project-chip:hover { color: var(--text-main); transform: translateY(-1px); }
+  .project-chip.active {
+    background: var(--accent-gradient);
+    color: #fff;
+    border-color: transparent;
+    box-shadow: 0 4px 15px rgba(138, 43, 226, 0.3);
+  }
+  .project-chip .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .project-chip.add {
+    border-style: dashed;
+    color: var(--accent-primary);
+    border-color: rgba(138, 43, 226, 0.4);
+    background: transparent;
+    box-shadow: none;
+  }
+  [data-theme="dark"] .project-chip.add { color: #C084FC; }
+  .project-chip.add:hover {
+    background: var(--accent-gradient-soft);
+  }
+
+  .view-toggle {
+    display: inline-flex;
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-pill);
+    padding: 4px;
+    box-shadow: var(--shadow-card);
+  }
+  .view-toggle button {
+    padding: 8px 18px;
+    font-size: 12px;
+    font-weight: 700;
+    border-radius: var(--radius-pill);
+    color: var(--text-muted);
+    transition: var(--transition);
+  }
+  .view-toggle button.active {
+    background: var(--accent-gradient);
+    color: #fff;
+  }
+
+  .kanban-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+  }
+  .toolbar-info {
+    display: flex;
+    gap: 20px;
+    font-size: 12px;
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+  .toolbar-info strong { color: var(--text-main); font-weight: 700; }
+
+  .kanban-board {
+    display: flex;
+    gap: 20px;
+    overflow-x: auto;
+    padding-bottom: 24px;
+    margin: 0 -40px;
+    padding-left: 40px;
+    padding-right: 40px;
+  }
+
+  .column {
+    flex: 0 0 310px;
+    display: flex;
+    flex-direction: column;
+  }
+  .col-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding: 0 4px;
+  }
+  .col-title {
+    font-size: 13px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .col-title .col-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+  }
+  .col-count {
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    padding: 3px 10px;
+    border-radius: var(--radius-pill);
+    font-size: 11px;
+    color: var(--text-main);
+    font-weight: 700;
+  }
+  .col-flow {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-weight: 600;
+    margin-bottom: 14px;
+    padding: 0 4px;
+  }
+  .col-flow::before { content: '→ '; color: var(--accent-primary); font-weight: 800; }
+  [data-theme="dark"] .col-flow::before { color: #C084FC; }
+
+  .column.blocked {
+    background: var(--danger-bg);
+    border: 1px solid rgba(225, 29, 72, 0.2);
+    border-radius: var(--radius-md);
+    padding: 18px 14px;
+  }
+  .column.blocked .col-header { margin-bottom: 12px; }
+  .column.blocked .col-title { color: var(--danger); }
+
+  /* Cards */
+  .kcard {
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    padding: 16px;
+    margin-bottom: 12px;
+    cursor: pointer;
+    transition: var(--transition);
+    box-shadow: var(--shadow-card);
+    position: relative;
+  }
+  .kcard:hover {
+    border-color: rgba(138, 43, 226, 0.3);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-hover);
+  }
+  .kcard-tags {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+  .kcard-title {
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1.4;
+    margin-bottom: 14px;
+    color: var(--text-main);
+  }
+  .kcard-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .kcard-due {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+  }
+  .kcard-due.overdue { color: var(--danger); font-weight: 700; }
+  .kcard-due.soon { color: var(--warning); font-weight: 700; }
+  .kcard-avatars { display: flex; }
+  .kcard-avatars .avatar {
+    width: 26px; height: 26px;
+    font-size: 9px;
+    margin-left: -6px;
+    border: 2px solid var(--bg-card);
+  }
+  .kcard-avatars .avatar:first-child { margin-left: 0; }
+
+  .kcard-progress {
+    margin-top: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .kcard-progress .progress-bar { flex: 1; }
+  .kcard-progress-text {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-muted);
+  }
+
+  .kcard.is-done { opacity: 0.55; }
+  .kcard.is-done .kcard-title { text-decoration: line-through; }
+
+  .kcard.blocked {
+    border-color: rgba(225, 29, 72, 0.4);
+    background: var(--bg-card);
+  }
+  .kcard.blocked::after {
+    content: 'Bloqué';
+    position: absolute;
+    top: -9px; right: 12px;
+    background: var(--danger);
+    color: #fff;
+    padding: 3px 10px;
+    border-radius: var(--radius-pill);
+    font-size: 9px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    box-shadow: 0 4px 12px rgba(225, 29, 72, 0.3);
+  }
+
+  .add-card {
+    padding: 12px;
+    width: 100%;
+    text-align: center;
+    border: 1px dashed var(--border-light);
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 600;
+    transition: var(--transition);
+  }
+  .add-card:hover {
+    border-color: var(--accent-primary);
+    color: var(--accent-primary);
+    background: var(--accent-gradient-soft);
+  }
+  [data-theme="dark"] .add-card:hover { color: #C084FC; }
+
+  .add-column {
+    flex: 0 0 220px;
+    display: flex;
+    align-items: flex-start;
+    padding-top: 50px;
+  }
+  .add-column button {
+    width: 100%;
+    padding: 24px;
+    border: 2px dashed var(--border-light);
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 700;
+    transition: var(--transition);
+  }
+  .add-column button:hover {
+    border-color: var(--accent-primary);
+    color: var(--accent-primary);
+  }
+  [data-theme="dark"] .add-column button:hover { color: #C084FC; }
+</style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand"><div class="brand-mark">N</div><div><div class="brand-name">NexusHub</div><span class="brand-sub">Studio Atlas</span></div></div>
+      <div class="nav-section">
+        <div class="nav-label">Main menu</div>
+        <a class="nav-item" href="03-overview.html"><span class="ico">◈</span> Dashboard</a>
+        <a class="nav-item active" href="04-kanban.html"><span class="ico">◱</span> Projets <span class="count">14</span></a>
+        <a class="nav-item" href="08-communications.html"><span class="ico">✉</span> Communications <span class="count new">23</span></a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-label">Clients actifs</div>
+        <a class="client-row c-acme active"><span class="client-dot"></span><span class="client-name">Acme Brands</span><span class="client-count">5</span></a>
+        <a class="client-row c-tech"><span class="client-dot"></span><span class="client-name">TechGroup SA</span><span class="client-count">3</span></a>
+        <a class="client-row c-nova"><span class="client-dot"></span><span class="client-name">Nova Editions</span><span class="client-count">2</span></a>
+        <a class="client-row c-lumen"><span class="client-dot"></span><span class="client-name">Lumen &amp; Co</span><span class="client-count">3</span></a>
+        <a class="client-row c-orbit"><span class="client-dot"></span><span class="client-name">Orbit Studio</span><span class="client-count">1</span></a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-label">Atelier</div>
+        <a class="nav-item" href="09-clients.html"><span class="ico">◉</span> Clients</a>
+        <a class="nav-item" href="10-email-templates.html"><span class="ico">✎</span> Templates e-mail</a>
+        <a class="nav-item" href="11-kanban-templates.html"><span class="ico">▦</span> Templates Kanban</a>
+        <a class="nav-item" href="12-team.html"><span class="ico">⎔</span> Équipe</a>
+        <a class="nav-item" href="14-integrations.html"><span class="ico">⟷</span> Intégrations</a>
+        <a class="nav-item" href="13-settings.html"><span class="ico">⚙</span> Paramètres</a>
+      </div>
+      <div class="user-profile">
+        <div class="avatar gradient">AL</div>
+        <div><div class="user-name">Angelo Lambert</div><div class="user-role">Admin</div></div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="search-wrap"><input type="text" class="search-bar" placeholder="Rechercher dans Acme Brands…"></div>
+        <div class="topbar-actions">
+          <button class="btn btn-ghost" data-theme-toggle>🌙 Dark</button>
+          <button class="btn btn-ghost">🔔 3 alertes</button>
+          <a class="btn btn-primary" href="07-new-project.html">+ Nouveau projet</a>
+        </div>
+      </header>
+
+      <div class="contextbar">
+        <div class="crumb">
+          <span>Projets</span><span class="sep">/</span>
+          <span>Acme Brands</span><span class="sep">/</span>
+          <strong>Campagne Été 2025</strong>
+        </div>
+        <div class="client-pill active">
+          <span class="dot" style="background: var(--c-acme);"></span>
+          Mode Acme Brands
+          <span class="x">×</span>
+        </div>
+      </div>
+
+      <div class="page-head">
+        <div class="page-head-text">
+          <h1 class="page-title">Campagne <span class="gradient-text">Été 2025</span></h1>
+          <p class="page-sub">Brand activation multicanal · équipe de 5 · livraison 28 avril · 82% réalisé.</p>
+        </div>
+        <div style="display: flex; gap: 10px;">
+          <button class="btn btn-ghost btn-sm">Partager</button>
+          <button class="btn btn-ghost btn-sm">Paramètres</button>
+        </div>
+      </div>
+
+      <div class="project-chips">
+        <a class="project-chip active"><span class="dot"></span> Campagne Été 2025</a>
+        <a class="project-chip"><span class="dot"></span> Refonte Packaging</a>
+        <a class="project-chip"><span class="dot"></span> Pop-up Bordeaux</a>
+        <a class="project-chip"><span class="dot"></span> Identité sous-marque</a>
+        <a class="project-chip"><span class="dot"></span> Ongoing Social</a>
+        <a class="project-chip add" href="07-new-project.html">+ Nouveau</a>
+      </div>
+
+      <div class="kanban-toolbar">
+        <div class="view-toggle">
+          <button class="active">▦ Kanban</button>
+          <button onclick="location.href='05-calendar.html'">▭ Calendrier</button>
+        </div>
+        <div class="toolbar-info">
+          <span><strong>24</strong> cartes</span>
+          <span><strong>2</strong> bloquées</span>
+          <span><strong>5</strong> équipiers</span>
+          <span>Auto-progression <strong style="color: var(--success);">active</strong></span>
+        </div>
+      </div>
+
+      <div class="kanban-board">
+
+        <!-- Brief -->
+        <div class="column">
+          <div class="col-header">
+            <div class="col-title"><span class="col-dot" style="background: var(--info);"></span>Brief</div>
+            <div class="col-count">04</div>
+          </div>
+          <div class="col-flow">si checklist complète → Créa</div>
+
+          <div class="kcard" onclick="location.href='06-card-modal.html'">
+            <div class="kcard-tags"><span class="tag tag-strategy">Stratégie</span></div>
+            <div class="kcard-title">Workshop de cadrage avec Sophie (Acme)</div>
+            <div class="kcard-footer">
+              <span class="kcard-due">◷ 15 avr.</span>
+              <div class="kcard-avatars">
+                <div class="avatar gradient">AL</div>
+                <div class="avatar" style="background: var(--c-nova); color: #fff;">MD</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="kcard">
+            <div class="kcard-tags"><span class="tag tag-strategy">Stratégie</span><span class="tag tag-copy">Copy</span></div>
+            <div class="kcard-title">Brief créatif v2 — retours légal</div>
+            <div class="kcard-footer">
+              <span class="kcard-due">◷ 16 avr.</span>
+              <div class="kcard-avatars"><div class="avatar" style="background: var(--c-tech); color: #fff;">JT</div></div>
+            </div>
+            <div class="kcard-progress">
+              <div class="progress-bar"><div class="progress-fill" style="width: 40%;"></div></div>
+              <span class="kcard-progress-text">2/5</span>
+            </div>
+          </div>
+
+          <div class="kcard">
+            <div class="kcard-tags"><span class="tag tag-info">Recherche</span></div>
+            <div class="kcard-title">Benchmark concurrence été 2024</div>
+            <div class="kcard-footer">
+              <span class="kcard-due">◷ 18 avr.</span>
+              <div class="kcard-avatars"><div class="avatar" style="background: var(--c-orbit); color: #fff;">LP</div></div>
+            </div>
+          </div>
+
+          <div class="kcard">
+            <div class="kcard-tags"><span class="tag tag-warning">Client</span></div>
+            <div class="kcard-title">Présenter la note d'intention</div>
+            <div class="kcard-footer">
+              <span class="kcard-due">◷ 19 avr.</span>
+              <div class="kcard-avatars"><div class="avatar gradient">AL</div></div>
+            </div>
+          </div>
+
+          <button class="add-card">+ Ajouter une carte</button>
+        </div>
+
+        <!-- Créa -->
+        <div class="column">
+          <div class="col-header">
+            <div class="col-title"><span class="col-dot" style="background: var(--accent-primary);"></span>Créa</div>
+            <div class="col-count">06</div>
+          </div>
+          <div class="col-flow">si checklist complète → Revue</div>
+
+          <div class="kcard">
+            <div class="kcard-tags"><span class="tag tag-design">Design</span><span class="tag tag-primary">Key visual</span></div>
+            <div class="kcard-title">Hero web desktop + mobile</div>
+            <div class="kcard-footer">
+              <span class="kcard-due soon">◷ Aujourd'hui</span>
+              <div class="kcard-avatars">
+                <div class="avatar" style="background: var(--c-acme); color: #fff;">CR</div>
+                <div class="avatar gradient">AL</div>
+              </div>
+            </div>
+            <div class="kcard-progress">
+              <div class="progress-bar"><div class="progress-fill" style="width: 80%;"></div></div>
+              <span class="kcard-progress-text">4/5</span>
+            </div>
+          </div>
+
+          <div class="kcard">
+            <div class="kcard-tags"><span class="tag tag-design">Design</span></div>
+            <div class="kcard-title">6 formats print OOH 4×3</div>
+            <div class="kcard-footer">
+              <span class="kcard-due">◷ 21 avr.</span>
+              <div class="kcard-avatars"><div class="avatar" style="background: var(--c-acme); color: #fff;">CR</div></div>
+            </div>
+          </div>
+
+          <div class="kcard">
+            <div class="kcard-tags"><span class="tag tag-video">Vidéo</span></div>
+            <div class="kcard-title">Storyboard spot digital 15''</div>
+            <div class="kcard-footer">
+              <span class="kcard-due">◷ 22 avr.</span>
+              <div class="kcard-avatars"><div class="avatar" style="background: var(--c-nova); color: #fff;">MD</div></div>
+            </div>
+            <div class="kcard-progress">
+              <div class="progress-bar"><div class="progress-fill" style="width: 30%;"></div></div>
+              <span class="kcard-progress-text">3/10</span>
+            </div>
+          </div>
+
+          <div class="kcard">
+            <div class="kcard-tags"><span class="tag tag-copy">Copy</span></div>
+            <div class="kcard-title">Baseline et accroches FR/EN</div>
+            <div class="kcard-footer">
+              <span class="kcard-due">◷ 23 avr.</span>
+              <div class="kcard-avatars"><div class="avatar" style="background: var(--c-tech); color: #fff;">JT</div></div>
+            </div>
+          </div>
+
+          <div class="kcard">
+            <div class="kcard-tags"><span class="tag tag-design">Design</span></div>
+            <div class="kcard-title">Packaging édition limitée</div>
+            <div class="kcard-footer">
+              <span class="kcard-due">◷ 25 avr.</span>
+              <div class="kcard-avatars"><div class="avatar" style="background: var(--c-orbit); color: #fff;">LP</div></div>
+            </div>
+          </div>
+
+          <button class="add-card">+ Ajouter une carte</button>
+        </div>
+
+        <!-- Revue -->
+        <div class="column">
+          <div class="col-header">
+            <div class="col-title"><span class="col-dot" style="background: var(--warning);"></span>Revue interne</div>
+            <div class="col-count">03</div>
+          </div>
+          <div class="col-flow">si checklist complète → Client</div>
+
+          <div class="kcard">
+            <div class="kcard-tags"><span class="tag tag-design">Design</span></div>
+            <div class="kcard-title">Maquettes hero — relecture DA</div>
+            <div class="kcard-footer">
+              <span class="kcard-due">◷ 17 avr.</span>
+              <div class="kcard-avatars"><div class="avatar gradient">AL</div></div>
+            </div>
+            <div class="kcard-progress">
+              <div class="progress-bar"><div class="progress-fill success" style="width: 100%;"></div></div>
+              <span class="kcard-progress-text" style="color: var(--success);">3/3 ✓</span>
+            </div>
+          </div>
+
+          <div class="kcard">
+            <div class="kcard-tags"><span class="tag tag-copy">Copy</span></div>
+            <div class="kcard-title">Taglines — arbitrage DG</div>
+            <div class="kcard-footer">
+              <span class="kcard-due">◷ 18 avr.</span>
+              <div class="kcard-avatars"><div class="avatar" style="background: var(--c-tech); color: #fff;">JT</div></div>
+            </div>
+          </div>
+
+          <div class="kcard">
+            <div class="kcard-tags"><span class="tag tag-video">Vidéo</span></div>
+            <div class="kcard-title">Rough cut 30'' — retours prod</div>
+            <div class="kcard-footer">
+              <span class="kcard-due">◷ 20 avr.</span>
+              <div class="kcard-avatars"><div class="avatar" style="background: var(--c-nova); color: #fff;">MD</div></div>
+            </div>
+          </div>
+
+          <button class="add-card">+ Ajouter une carte</button>
+        </div>
+
+        <!-- Validation -->
+        <div class="column">
+          <div class="col-header">
+            <div class="col-title"><span class="col-dot" style="background: var(--accent-secondary);"></span>Validation client</div>
+            <div class="col-count">02</div>
+          </div>
+          <div class="col-flow">si checklist complète → Livré</div>
+
+          <div class="kcard">
+            <div class="kcard-tags"><span class="tag tag-design">Design</span></div>
+            <div class="kcard-title">Key visual v3 — validation Sophie</div>
+            <div class="kcard-footer">
+              <span class="kcard-due soon">◷ Demain</span>
+              <div class="kcard-avatars"><div class="avatar gradient">AL</div></div>
+            </div>
+            <div class="kcard-progress">
+              <div class="progress-bar"><div class="progress-fill" style="width: 50%;"></div></div>
+              <span class="kcard-progress-text">1/2</span>
+            </div>
+          </div>
+
+          <div class="kcard">
+            <div class="kcard-tags"><span class="tag tag-warning">Web</span></div>
+            <div class="kcard-title">Landing — BAT client</div>
+            <div class="kcard-footer">
+              <span class="kcard-due">◷ 24 avr.</span>
+              <div class="kcard-avatars"><div class="avatar gradient">AL</div></div>
+            </div>
+          </div>
+
+          <button class="add-card">+ Ajouter une carte</button>
+        </div>
+
+        <!-- Livré -->
+        <div class="column">
+          <div class="col-header">
+            <div class="col-title"><span class="col-dot" style="background: var(--success);"></span>Livré</div>
+            <div class="col-count">09</div>
+          </div>
+          <div class="col-flow" style="opacity: 0.5;">colonne finale · archivage auto 30j</div>
+
+          <div class="kcard is-done">
+            <div class="kcard-tags"><span class="tag tag-strategy">Stratégie</span></div>
+            <div class="kcard-title">Note d'intention validée</div>
+            <div class="kcard-footer">
+              <span class="kcard-due">✓ 02 avr.</span>
+              <div class="kcard-avatars"><div class="avatar gradient">AL</div></div>
+            </div>
+          </div>
+
+          <div class="kcard is-done">
+            <div class="kcard-tags"><span class="tag tag-info">Recherche</span></div>
+            <div class="kcard-title">Moodboard — validé</div>
+            <div class="kcard-footer">
+              <span class="kcard-due">✓ 05 avr.</span>
+              <div class="kcard-avatars"><div class="avatar" style="background: var(--c-orbit); color: #fff;">LP</div></div>
+            </div>
+          </div>
+
+          <div class="kcard is-done">
+            <div class="kcard-tags"><span class="tag tag-design">Design</span></div>
+            <div class="kcard-title">Logo activation été</div>
+            <div class="kcard-footer">
+              <span class="kcard-due">✓ 08 avr.</span>
+              <div class="kcard-avatars"><div class="avatar" style="background: var(--c-acme); color: #fff;">CR</div></div>
+            </div>
+          </div>
+
+          <button class="add-card">+ Ajouter une carte</button>
+        </div>
+
+        <!-- Blocked (system) -->
+        <div class="column blocked">
+          <div class="col-header">
+            <div class="col-title"><span class="col-dot" style="background: var(--danger);"></span>Bloqué</div>
+            <div class="col-count">02</div>
+          </div>
+          <div class="col-flow" style="color: var(--danger);">système · non configurable</div>
+
+          <div class="kcard blocked">
+            <div class="kcard-tags"><span class="tag tag-design">Design</span></div>
+            <div class="kcard-title">Valider la DA de la key visual</div>
+            <div class="kcard-footer">
+              <span class="kcard-due overdue">◷ 8 avr · +2j</span>
+              <div class="kcard-avatars"><div class="avatar gradient">AL</div></div>
+            </div>
+            <div style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border-light); font-size: 10px; color: var(--danger); font-weight: 700;">
+              ← Créa · repousser l'échéance pour sortir
+            </div>
+          </div>
+
+          <div class="kcard blocked">
+            <div class="kcard-tags"><span class="tag tag-warning">Web</span></div>
+            <div class="kcard-title">Export final packaging — BAT</div>
+            <div class="kcard-footer">
+              <span class="kcard-due overdue">◷ 9 avr · +1j</span>
+              <div class="kcard-avatars"><div class="avatar" style="background: var(--c-orbit); color: #fff;">LP</div></div>
+            </div>
+            <div style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border-light); font-size: 10px; color: var(--danger); font-weight: 700;">
+              ← Validation client
+            </div>
+          </div>
+        </div>
+
+        <div class="add-column">
+          <button>+ Nouvelle colonne</button>
+        </div>
+
+      </div>
+    </main>
+  </div>
+  <script src="theme.js"></script>
+</body>
+</html>

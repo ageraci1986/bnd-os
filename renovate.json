@@ -1,0 +1,37 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":semanticCommits",
+    ":dependencyDashboard",
+    "group:monorepos",
+    "group:recommended"
+  ],
+  "timezone": "Europe/Paris",
+  "schedule": ["before 6am on Monday"],
+  "labels": ["dependencies"],
+  "rangeStrategy": "bump",
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["before 6am on the first day of the month"]
+  },
+  "vulnerabilityAlerts": {
+    "labels": ["security"],
+    "schedule": ["at any time"]
+  },
+  "packageRules": [
+    {
+      "matchUpdateTypes": ["patch", "pin", "digest"],
+      "automerge": true
+    },
+    {
+      "matchPackageNames": ["next", "react", "react-dom", "@prisma/*", "prisma"],
+      "automerge": false,
+      "labels": ["framework"]
+    },
+    {
+      "matchManagers": ["github-actions"],
+      "automerge": true
+    }
+  ]
+}

@@ -1,0 +1,459 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Paramètres — NexusHub</title>
+<link rel="stylesheet" href="styles.css">
+<style>
+  .settings-layout {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    gap: 48px;
+    align-items: start;
+  }
+
+  .settings-nav {
+    position: sticky;
+    top: 140px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .settings-nav a {
+    padding: 12px 18px;
+    border-radius: var(--radius-pill);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-muted);
+    transition: var(--transition);
+  }
+  .settings-nav a.active {
+    background: var(--accent-gradient);
+    color: #fff;
+    box-shadow: 0 4px 15px rgba(138,43,226,0.25);
+  }
+  .settings-nav a:hover:not(.active) { background: var(--bg-hover); color: var(--text-main); }
+
+  .settings-section {
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    padding: 36px;
+    margin-bottom: 24px;
+    box-shadow: var(--shadow-card);
+  }
+
+  .section-head {
+    margin-bottom: 28px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--border-light);
+  }
+  .section-num {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--accent-primary);
+    font-weight: 800;
+    margin-bottom: 6px;
+  }
+  [data-theme="dark"] .section-num { color: #C084FC; }
+  .section-num-danger { color: var(--danger) !important; }
+
+  .section-title-big {
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -0.8px;
+    line-height: 1;
+  }
+  .section-desc {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-top: 8px;
+    font-weight: 500;
+  }
+
+  .pref-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 24px;
+    padding: 20px 0;
+    border-bottom: 1px solid var(--border-soft);
+    align-items: center;
+  }
+  .pref-row:last-child { border-bottom: 0; }
+  .pref-name { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+  .pref-hint { font-size: 11px; color: var(--text-muted); font-weight: 500; line-height: 1.5; }
+
+  /* Toggle */
+  .toggle {
+    width: 44px; height: 24px;
+    background: var(--bg-hover);
+    border-radius: var(--radius-pill);
+    position: relative;
+    cursor: pointer;
+    transition: var(--transition);
+    display: inline-block;
+    vertical-align: middle;
+  }
+  .toggle::after {
+    content: '';
+    position: absolute;
+    top: 3px; left: 3px;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: var(--bg-card);
+    transition: all 0.2s;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  }
+  .toggle.on { background: var(--accent-gradient); }
+  .toggle.on::after { left: 23px; }
+
+  .seg {
+    display: inline-flex;
+    background: var(--bg-muted);
+    border-radius: var(--radius-pill);
+    padding: 4px;
+    gap: 2px;
+  }
+  .seg button {
+    padding: 8px 16px;
+    border-radius: var(--radius-pill);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-muted);
+  }
+  .seg button.active {
+    background: var(--bg-card);
+    color: var(--text-main);
+    box-shadow: var(--shadow-card);
+  }
+
+  .tz-select {
+    background: var(--bg-muted);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    padding: 10px 16px;
+    font-size: 12px;
+    font-weight: 600;
+    min-width: 300px;
+    outline: none;
+    color: var(--text-main);
+    font-family: inherit;
+  }
+
+  .profile-head {
+    display: grid;
+    grid-template-columns: 96px 1fr;
+    gap: 24px;
+    align-items: center;
+    padding: 28px;
+    background: var(--accent-gradient-soft);
+    border-radius: var(--radius-md);
+    margin-bottom: 24px;
+  }
+  .profile-head .avatar {
+    width: 96px; height: 96px;
+    font-size: 28px;
+  }
+  .profile-info strong {
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    display: block;
+  }
+  .profile-info .role {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-muted);
+    font-weight: 700;
+    margin-top: 4px;
+  }
+
+  .notif-matrix {
+    display: grid;
+    grid-template-columns: 1fr auto auto auto;
+    gap: 0;
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+  }
+  .notif-matrix > div {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border-soft);
+    border-right: 1px solid var(--border-soft);
+  }
+  .notif-matrix > div:nth-last-child(-n+4) { border-bottom: 0; }
+  .notif-matrix > div:nth-child(4n) { border-right: 0; }
+  .notif-matrix .header {
+    background: var(--bg-muted);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-muted);
+    text-align: center;
+    font-weight: 800;
+  }
+  .notif-matrix .header:first-child { text-align: left; }
+  .notif-matrix .event { font-size: 13px; font-weight: 700; }
+  .notif-matrix .event small {
+    display: block;
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 500;
+    margin-top: 3px;
+  }
+  .notif-matrix .cell { text-align: center; }
+
+  .danger-section {
+    border-color: var(--danger) !important;
+  }
+  .danger-row {
+    background: var(--danger-bg);
+    border: 1px solid var(--danger);
+    border-radius: var(--radius-md);
+    padding: 24px;
+  }
+</style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand"><div class="brand-mark">N</div><div><div class="brand-name">NexusHub</div><span class="brand-sub">Studio Atlas</span></div></div>
+      <div class="nav-section">
+        <div class="nav-label">Main menu</div>
+        <a class="nav-item" href="03-overview.html"><span class="ico">◈</span> Dashboard</a>
+        <a class="nav-item" href="04-kanban.html"><span class="ico">◱</span> Projets <span class="count">14</span></a>
+        <a class="nav-item" href="08-communications.html"><span class="ico">✉</span> Communications <span class="count new">23</span></a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-label">Clients actifs</div>
+        <a class="client-row c-acme"><span class="client-dot"></span><span class="client-name">Acme Brands</span><span class="client-count">5</span></a>
+        <a class="client-row c-tech"><span class="client-dot"></span><span class="client-name">TechGroup SA</span><span class="client-count">3</span></a>
+        <a class="client-row c-nova"><span class="client-dot"></span><span class="client-name">Nova Editions</span><span class="client-count">2</span></a>
+        <a class="client-row c-lumen"><span class="client-dot"></span><span class="client-name">Lumen &amp; Co</span><span class="client-count">3</span></a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-label">Atelier</div>
+        <a class="nav-item" href="09-clients.html"><span class="ico">◉</span> Clients</a>
+        <a class="nav-item" href="10-email-templates.html"><span class="ico">✎</span> Templates e-mail</a>
+        <a class="nav-item" href="11-kanban-templates.html"><span class="ico">▦</span> Templates Kanban</a>
+        <a class="nav-item" href="12-team.html"><span class="ico">⎔</span> Équipe</a>
+        <a class="nav-item" href="14-integrations.html"><span class="ico">⟷</span> Intégrations</a>
+        <a class="nav-item active" href="13-settings.html"><span class="ico">⚙</span> Paramètres</a>
+      </div>
+      <div class="user-profile"><div class="avatar gradient">AL</div><div><div class="user-name">Angelo Lambert</div><div class="user-role">Admin</div></div></div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="search-wrap"><input type="text" class="search-bar" placeholder="Rechercher un paramètre…"></div>
+        <div class="topbar-actions">
+          <button class="btn btn-ghost" data-theme-toggle>🌙 Dark</button>
+          <span style="font-size: 11px; color: var(--success); font-weight: 700;">● Sauvegardé automatiquement</span>
+        </div>
+      </header>
+      <div class="contextbar"><div class="crumb"><span>Atelier</span><span class="sep">/</span><strong>Paramètres</strong></div></div>
+
+      <div class="page-head">
+        <div class="page-head-text">
+          <h1 class="page-title">Vos <span class="gradient-text">paramètres</span></h1>
+          <p class="page-sub">Ces préférences ne s'appliquent qu'à votre compte. Les changements sont sauvegardés automatiquement.</p>
+        </div>
+      </div>
+
+      <div class="settings-layout">
+
+        <nav class="settings-nav">
+          <a href="#profile" class="active">01 · Profil</a>
+          <a href="#interface">02 · Interface</a>
+          <a href="#notifications">03 · Notifications</a>
+          <a href="#security">04 · Sécurité</a>
+          <a href="#danger">05 · Zone rouge</a>
+        </nav>
+
+        <div>
+          <!-- Profile -->
+          <section class="settings-section" id="profile">
+            <div class="section-head">
+              <div class="section-num">N° 01 · Profil</div>
+              <h2 class="section-title-big">Votre <span class="gradient-text">profil</span></h2>
+              <p class="section-desc">Les informations visibles par votre équipe.</p>
+            </div>
+
+            <div class="profile-head">
+              <div class="avatar gradient">AL</div>
+              <div class="profile-info">
+                <strong>Angelo Lambert</strong>
+                <div class="role">Admin · angelo@studio-atlas.com</div>
+                <div style="margin-top: 14px; display: flex; gap: 8px;">
+                  <button class="btn btn-ghost btn-sm">Changer l'avatar</button>
+                  <button class="btn btn-ghost btn-sm">Modifier</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="pref-row">
+              <div>
+                <div class="pref-name">Nom affiché</div>
+                <div class="pref-hint">Visible dans les commentaires et assignations.</div>
+              </div>
+              <input type="text" class="field-input" value="Angelo Lambert" style="max-width: 280px;">
+            </div>
+            <div class="pref-row">
+              <div>
+                <div class="pref-name">Adresse e-mail</div>
+                <div class="pref-hint">Utilisée pour les notifications et la connexion.</div>
+              </div>
+              <input type="email" class="field-input" value="angelo@studio-atlas.com" style="max-width: 280px;">
+            </div>
+          </section>
+
+          <!-- Interface -->
+          <section class="settings-section" id="interface">
+            <div class="section-head">
+              <div class="section-num">N° 02 · Interface</div>
+              <h2 class="section-title-big"><span class="gradient-text">Interface</span> &amp; langue</h2>
+              <p class="section-desc">Comment NexusHub apparaît sur votre poste de travail.</p>
+            </div>
+
+            <div class="pref-row">
+              <div>
+                <div class="pref-name">Thème</div>
+                <div class="pref-hint">Light pour le jour, Dark pour la soirée. Votre choix est mémorisé.</div>
+              </div>
+              <button class="btn btn-primary btn-sm" data-theme-toggle>🌙 Basculer</button>
+            </div>
+            <div class="pref-row">
+              <div>
+                <div class="pref-name">Langue</div>
+                <div class="pref-hint">Le contenu que vous saisissez n'est pas traduit.</div>
+              </div>
+              <div class="seg">
+                <button class="active">Français</button>
+                <button>English</button>
+              </div>
+            </div>
+            <div class="pref-row">
+              <div>
+                <div class="pref-name">Fuseau horaire</div>
+                <div class="pref-hint">Sert à calculer « aujourd'hui » et les notifications.</div>
+              </div>
+              <select class="tz-select">
+                <option>Europe / Paris — UTC+2</option>
+                <option>Europe / Brussels — UTC+2</option>
+                <option>Europe / London — UTC+1</option>
+              </select>
+            </div>
+            <div class="pref-row">
+              <div>
+                <div class="pref-name">Format de date</div>
+              </div>
+              <div class="seg">
+                <button class="active">13 avr.</button>
+                <button>13/04</button>
+                <button>Apr 13</button>
+              </div>
+            </div>
+            <div class="pref-row">
+              <div>
+                <div class="pref-name">Premier jour de la semaine</div>
+              </div>
+              <div class="seg">
+                <button class="active">Lundi</button>
+                <button>Dimanche</button>
+              </div>
+            </div>
+          </section>
+
+          <!-- Notifications -->
+          <section class="settings-section" id="notifications">
+            <div class="section-head">
+              <div class="section-num">N° 03 · Notifications</div>
+              <h2 class="section-title-big"><span class="gradient-text">Notifications</span></h2>
+              <p class="section-desc">Choisissez les événements qui vous alertent et par quel canal.</p>
+            </div>
+
+            <div class="notif-matrix">
+              <div class="header">Événement</div>
+              <div class="header">Desktop</div>
+              <div class="header">Slack</div>
+              <div class="header">Email <span style="color: var(--warning);">(V1.5)</span></div>
+
+              <div class="event">Carte assignée à moi<small>Je reçois une nouvelle tâche</small></div>
+              <div class="cell"><span class="toggle on"></span></div>
+              <div class="cell"><span class="toggle on"></span></div>
+              <div class="cell"><span class="toggle" style="opacity: 0.3;"></span></div>
+
+              <div class="event">Commentaire sur mes cartes<small>Quelqu'un réagit sur une tâche où je suis assigné</small></div>
+              <div class="cell"><span class="toggle on"></span></div>
+              <div class="cell"><span class="toggle on"></span></div>
+              <div class="cell"><span class="toggle" style="opacity: 0.3;"></span></div>
+
+              <div class="event">Carte passée en Bloqué<small>Alerte système auto</small></div>
+              <div class="cell"><span class="toggle on"></span></div>
+              <div class="cell"><span class="toggle"></span></div>
+              <div class="cell"><span class="toggle" style="opacity: 0.3;"></span></div>
+
+              <div class="event">Nouveau mail client<small>Via l'intégration Exchange</small></div>
+              <div class="cell"><span class="toggle on"></span></div>
+              <div class="cell"><span class="toggle"></span></div>
+              <div class="cell"><span class="toggle" style="opacity: 0.3;"></span></div>
+
+              <div class="event">Mention Slack sur canal intégré<small>Quelqu'un vous cite dans un canal client</small></div>
+              <div class="cell"><span class="toggle on"></span></div>
+              <div class="cell"><span class="toggle on"></span></div>
+              <div class="cell"><span class="toggle" style="opacity: 0.3;"></span></div>
+            </div>
+          </section>
+
+          <!-- Security -->
+          <section class="settings-section" id="security">
+            <div class="section-head">
+              <div class="section-num">N° 04 · Sécurité</div>
+              <h2 class="section-title-big"><span class="gradient-text">Sécurité</span></h2>
+              <p class="section-desc">Mot de passe et sessions actives.</p>
+            </div>
+
+            <div class="pref-row">
+              <div>
+                <div class="pref-name">Mot de passe</div>
+                <div class="pref-hint">Dernière modification il y a 3 mois</div>
+              </div>
+              <button class="btn btn-ghost btn-sm">Changer le mot de passe</button>
+            </div>
+            <div class="pref-row">
+              <div>
+                <div class="pref-name">Sessions actives · 2</div>
+                <div class="pref-hint">MacBook Pro (Paris) · Chrome Windows (bureau)</div>
+              </div>
+              <button class="btn btn-ghost btn-sm">Tout déconnecter</button>
+            </div>
+          </section>
+
+          <!-- Danger -->
+          <section class="settings-section danger-section" id="danger" style="border-color: var(--danger);">
+            <div class="section-head" style="border-bottom-color: var(--danger);">
+              <div class="section-num section-num-danger">N° 05 · Zone rouge</div>
+              <h2 class="section-title-big" style="color: var(--danger);">Zone rouge</h2>
+              <p class="section-desc">Actions irréversibles.</p>
+            </div>
+
+            <div class="danger-row">
+              <div style="display: flex; justify-content: space-between; align-items: center; gap: 20px;">
+                <div>
+                  <div class="pref-name" style="color: var(--danger);">Supprimer mon compte</div>
+                  <div class="pref-hint">Vos commentaires seront conservés. Vous devez transférer votre rôle d'Admin avant de partir si vous êtes le seul Admin.</div>
+                </div>
+                <button class="btn btn-danger">Supprimer</button>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script src="theme.js"></script>
+</body>
+</html>

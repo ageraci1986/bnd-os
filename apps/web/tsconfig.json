@@ -1,0 +1,27 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["DOM", "DOM.Iterable", "ES2022"],
+    "jsx": "preserve",
+    "noEmit": true,
+    "incremental": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "plugins": [{ "name": "next" }],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./*"],
+      "@nexushub/db": ["../../packages/db/src/index.ts"],
+      "@nexushub/db/*": ["../../packages/db/src/*"],
+      "@nexushub/domain": ["../../packages/domain/src/index.ts"],
+      "@nexushub/domain/*": ["../../packages/domain/src/*"],
+      "@nexushub/integrations": ["../../packages/integrations/src/index.ts"],
+      "@nexushub/integrations/*": ["../../packages/integrations/src/*"],
+      "@nexushub/ui": ["../../packages/ui/src/index.ts"],
+      "@nexushub/ui/*": ["../../packages/ui/src/*"]
+    }
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules", ".next"]
+}

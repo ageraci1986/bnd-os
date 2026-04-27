@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Calendrier — NexusHub</title>
+<link rel="stylesheet" href="styles.css">
+<style>
+  .cal-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    padding: 16px 20px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-card);
+  }
+  .cal-nav { display: flex; align-items: center; gap: 14px; }
+  .cal-nav button.nav-btn {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: var(--bg-hover);
+    color: var(--text-main);
+    display: grid; place-items: center;
+    font-size: 16px;
+    font-weight: 700;
+    transition: var(--transition);
+  }
+  .cal-nav button.nav-btn:hover { background: var(--accent-gradient); color: #fff; }
+  .cal-month {
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: -0.8px;
+    padding: 0 8px;
+  }
+  .cal-month span { color: var(--text-muted); font-weight: 600; }
+
+  .cal-legend {
+    display: flex;
+    gap: 14px;
+  }
+  .cal-legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+  }
+  .cal-legend span::before {
+    content: '';
+    width: 9px; height: 9px;
+    border-radius: 50%;
+  }
+  .cal-legend .l-acme::before { background: var(--c-acme); }
+  .cal-legend .l-tech::before { background: var(--c-tech); }
+  .cal-legend .l-nova::before { background: var(--c-nova); }
+  .cal-legend .l-lumen::before { background: var(--c-lumen); }
+  .cal-legend .l-blocked::before { background: transparent; border: 2px solid var(--danger); }
+
+  .cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-card);
+    overflow: hidden;
+  }
+  .cal-dow {
+    padding: 14px;
+    background: var(--bg-muted);
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+    border-right: 1px solid var(--border-soft);
+    border-bottom: 1px solid var(--border-light);
+  }
+  .cal-dow:last-child { border-right: 0; }
+
+  .cal-day {
+    min-height: 128px;
+    padding: 12px;
+    border-right: 1px solid var(--border-soft);
+    border-bottom: 1px solid var(--border-soft);
+    position: relative;
+    transition: var(--transition);
+  }
+  .cal-day:hover { background: var(--bg-muted); }
+  .cal-day:nth-child(7n+8) { border-right: 0; }
+  .cal-day.muted { background: var(--bg-muted); opacity: 0.55; }
+  .cal-day.today {
+    background: var(--accent-gradient-soft);
+  }
+  .cal-day.today .cal-date {
+    background: var(--accent-gradient);
+    color: #fff;
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    display: grid; place-items: center;
+    font-weight: 800;
+    margin-bottom: 8px;
+  }
+  .cal-date {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-main);
+    margin-bottom: 10px;
+  }
+  .cal-items { display: flex; flex-direction: column; gap: 4px; }
+  .cal-item {
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: var(--transition);
+  }
+  .cal-item:hover { transform: translateX(2px); }
+  .cal-item.i-acme { background: rgba(255, 42, 109, 0.12); color: var(--c-acme); }
+  .cal-item.i-tech { background: rgba(37, 99, 235, 0.12); color: var(--c-tech); }
+  .cal-item.i-nova { background: rgba(5, 150, 105, 0.12); color: var(--c-nova); }
+  .cal-item.i-lumen { background: rgba(245, 158, 11, 0.12); color: var(--c-lumen); }
+  .cal-item.blocked {
+    background: var(--danger-bg);
+    color: var(--danger);
+    border: 1px solid var(--danger);
+  }
+  [data-theme="dark"] .cal-item.i-acme { background: rgba(255, 42, 109, 0.15); }
+  [data-theme="dark"] .cal-item.i-tech { background: rgba(96, 165, 250, 0.15); color: var(--c-tech); }
+  [data-theme="dark"] .cal-item.i-nova { background: rgba(0, 240, 255, 0.12); color: var(--c-nova); }
+
+  .cal-more {
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--text-muted);
+    padding: 2px 8px;
+  }
+</style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand"><div class="brand-mark">N</div><div><div class="brand-name">NexusHub</div><span class="brand-sub">Studio Atlas</span></div></div>
+      <div class="nav-section">
+        <div class="nav-label">Main menu</div>
+        <a class="nav-item" href="03-overview.html"><span class="ico">◈</span> Dashboard</a>
+        <a class="nav-item active" href="04-kanban.html"><span class="ico">◱</span> Projets <span class="count">14</span></a>
+        <a class="nav-item" href="08-communications.html"><span class="ico">✉</span> Communications <span class="count new">23</span></a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-label">Clients actifs</div>
+        <a class="client-row c-acme"><span class="client-dot"></span><span class="client-name">Acme Brands</span><span class="client-count">5</span></a>
+        <a class="client-row c-tech"><span class="client-dot"></span><span class="client-name">TechGroup SA</span><span class="client-count">3</span></a>
+        <a class="client-row c-nova"><span class="client-dot"></span><span class="client-name">Nova Editions</span><span class="client-count">2</span></a>
+        <a class="client-row c-lumen"><span class="client-dot"></span><span class="client-name">Lumen &amp; Co</span><span class="client-count">3</span></a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-label">Atelier</div>
+        <a class="nav-item" href="09-clients.html"><span class="ico">◉</span> Clients</a>
+        <a class="nav-item" href="10-email-templates.html"><span class="ico">✎</span> Templates e-mail</a>
+        <a class="nav-item" href="11-kanban-templates.html"><span class="ico">▦</span> Templates Kanban</a>
+        <a class="nav-item" href="12-team.html"><span class="ico">⎔</span> Équipe</a>
+        <a class="nav-item" href="14-integrations.html"><span class="ico">⟷</span> Intégrations</a>
+        <a class="nav-item" href="13-settings.html"><span class="ico">⚙</span> Paramètres</a>
+      </div>
+      <div class="user-profile"><div class="avatar gradient">AL</div><div><div class="user-name">Angelo Lambert</div><div class="user-role">Admin</div></div></div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="search-wrap"><input type="text" class="search-bar" placeholder="Rechercher une tâche, une date…"></div>
+        <div class="topbar-actions">
+          <button class="btn btn-ghost" data-theme-toggle>🌙 Dark</button>
+          <button class="btn btn-ghost">🔔 3 alertes</button>
+          <a class="btn btn-primary" href="07-new-project.html">+ Nouveau projet</a>
+        </div>
+      </header>
+
+      <div class="contextbar">
+        <div class="crumb"><span>Projets</span><span class="sep">/</span><span>Tous clients</span><span class="sep">/</span><strong>Calendrier</strong></div>
+        <div class="client-pill"><span class="dot" style="background: var(--text-muted);"></span>Tous les clients</div>
+      </div>
+
+      <div class="page-head">
+        <div class="page-head-text">
+          <h1 class="page-title">Échéances <span class="gradient-text">d'avril</span></h1>
+          <p class="page-sub">42 tâches avec date d'échéance ce mois. Cliquez une tâche pour l'ouvrir.</p>
+        </div>
+        <div class="view-toggle">
+          <button onclick="location.href='04-kanban.html'">▦ Kanban</button>
+          <button class="active">▭ Calendrier</button>
+        </div>
+      </div>
+
+      <div class="cal-toolbar">
+        <div class="cal-nav">
+          <button class="nav-btn">‹</button>
+          <div class="cal-month">Avril <span>2026</span></div>
+          <button class="nav-btn">›</button>
+          <button class="btn btn-ghost btn-sm" style="margin-left: 12px;">Aujourd'hui</button>
+        </div>
+        <div class="cal-legend">
+          <span class="l-acme">Acme</span>
+          <span class="l-tech">TechGroup</span>
+          <span class="l-nova">Nova</span>
+          <span class="l-lumen">Lumen</span>
+          <span class="l-blocked">Bloqué</span>
+        </div>
+      </div>
+
+      <div class="cal-grid">
+        <div class="cal-dow">Lun</div>
+        <div class="cal-dow">Mar</div>
+        <div class="cal-dow">Mer</div>
+        <div class="cal-dow">Jeu</div>
+        <div class="cal-dow">Ven</div>
+        <div class="cal-dow">Sam</div>
+        <div class="cal-dow">Dim</div>
+
+        <!-- Week 1 -->
+        <div class="cal-day muted"><div class="cal-date">30</div></div>
+        <div class="cal-day muted"><div class="cal-date">31</div></div>
+        <div class="cal-day"><div class="cal-date">01</div>
+          <div class="cal-items"><div class="cal-item i-nova">Kick-off Ongoing mai</div></div>
+        </div>
+        <div class="cal-day"><div class="cal-date">02</div>
+          <div class="cal-items"><div class="cal-item i-acme">Note d'intention</div></div>
+        </div>
+        <div class="cal-day"><div class="cal-date">03</div></div>
+        <div class="cal-day"><div class="cal-date">04</div></div>
+        <div class="cal-day"><div class="cal-date">05</div>
+          <div class="cal-items"><div class="cal-item i-acme">Moodboard validé</div></div>
+        </div>
+
+        <!-- Week 2 -->
+        <div class="cal-day"><div class="cal-date">06</div>
+          <div class="cal-items"><div class="cal-item i-tech">Brief lancement Q2</div></div>
+        </div>
+        <div class="cal-day"><div class="cal-date">07</div></div>
+        <div class="cal-day"><div class="cal-date">08</div>
+          <div class="cal-items"><div class="cal-item blocked">⚠ Valider DA</div></div>
+        </div>
+        <div class="cal-day"><div class="cal-date">09</div>
+          <div class="cal-items"><div class="cal-item blocked">⚠ Export BAT</div></div>
+        </div>
+        <div class="cal-day"><div class="cal-date">10</div></div>
+        <div class="cal-day muted"><div class="cal-date">11</div></div>
+        <div class="cal-day muted"><div class="cal-date">12</div></div>
+
+        <!-- Week 3 (today) -->
+        <div class="cal-day today"><div class="cal-date">13</div>
+          <div class="cal-items">
+            <div class="cal-item i-acme">Hero web desktop</div>
+            <div class="cal-item i-tech">Formats Meta</div>
+            <div class="cal-item i-nova">Brief social mai</div>
+            <div class="cal-more">+2 autres</div>
+          </div>
+        </div>
+        <div class="cal-day"><div class="cal-date">14</div>
+          <div class="cal-items">
+            <div class="cal-item i-acme">Key visual v3</div>
+            <div class="cal-item i-lumen">Script spot 30''</div>
+          </div>
+        </div>
+        <div class="cal-day"><div class="cal-date">15</div>
+          <div class="cal-items"><div class="cal-item i-acme">Workshop Sophie</div></div>
+        </div>
+        <div class="cal-day"><div class="cal-date">16</div>
+          <div class="cal-items">
+            <div class="cal-item i-acme">Brief créatif v2</div>
+            <div class="cal-item i-tech">Wireframes produit</div>
+          </div>
+        </div>
+        <div class="cal-day"><div class="cal-date">17</div>
+          <div class="cal-items"><div class="cal-item i-acme">Relecture DA hero</div></div>
+        </div>
+        <div class="cal-day muted"><div class="cal-date">18</div>
+          <div class="cal-items"><div class="cal-item i-acme">Benchmark été</div></div>
+        </div>
+        <div class="cal-day muted"><div class="cal-date">19</div></div>
+
+        <!-- Week 4 -->
+        <div class="cal-day"><div class="cal-date">20</div>
+          <div class="cal-items"><div class="cal-item i-acme">Rough cut 30''</div></div>
+        </div>
+        <div class="cal-day"><div class="cal-date">21</div>
+          <div class="cal-items">
+            <div class="cal-item i-acme">6 formats OOH</div>
+            <div class="cal-item i-lumen">Casting spot TV</div>
+          </div>
+        </div>
+        <div class="cal-day"><div class="cal-date">22</div>
+          <div class="cal-items">
+            <div class="cal-item i-acme">Storyboard 15''</div>
+            <div class="cal-item i-lumen">Livraison spot TV</div>
+          </div>
+        </div>
+        <div class="cal-day"><div class="cal-date">23</div>
+          <div class="cal-items"><div class="cal-item i-acme">Taglines FR/EN</div></div>
+        </div>
+        <div class="cal-day"><div class="cal-date">24</div>
+          <div class="cal-items">
+            <div class="cal-item i-acme">Landing BAT</div>
+            <div class="cal-item i-tech">Module CMS</div>
+          </div>
+        </div>
+        <div class="cal-day muted"><div class="cal-date">25</div>
+          <div class="cal-items"><div class="cal-item i-acme">Packaging édition</div></div>
+        </div>
+        <div class="cal-day muted"><div class="cal-date">26</div>
+          <div class="cal-items"><div class="cal-item i-acme">Landing intégration</div></div>
+        </div>
+
+        <!-- Week 5 -->
+        <div class="cal-day"><div class="cal-date">27</div>
+          <div class="cal-items"><div class="cal-item i-nova">Content plan mai</div></div>
+        </div>
+        <div class="cal-day"><div class="cal-date">28</div>
+          <div class="cal-items"><div class="cal-item i-acme">🎯 Livraison Campagne Été</div></div>
+        </div>
+        <div class="cal-day"><div class="cal-date">29</div></div>
+        <div class="cal-day"><div class="cal-date">30</div>
+          <div class="cal-items"><div class="cal-item i-tech">Mid-review Q2</div></div>
+        </div>
+        <div class="cal-day muted"><div class="cal-date">01</div></div>
+        <div class="cal-day muted"><div class="cal-date">02</div></div>
+        <div class="cal-day muted"><div class="cal-date">03</div></div>
+      </div>
+
+    </main>
+  </div>
+  <script src="theme.js"></script>
+</body>
+</html>

@@ -1,0 +1,511 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Détail carte — NexusHub</title>
+<link rel="stylesheet" href="styles.css">
+<style>
+  .modal-head {
+    padding: 28px 32px 24px;
+    border-bottom: 1px solid var(--border-light);
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 20px;
+    align-items: start;
+  }
+  .modal-breadcrumb {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 600;
+    margin-bottom: 10px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .modal-breadcrumb strong { color: var(--accent-primary); }
+  [data-theme="dark"] .modal-breadcrumb strong { color: #C084FC; }
+  .card-title-input {
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: -0.6px;
+    line-height: 1.2;
+    width: 100%;
+    border: 0;
+    background: transparent;
+    outline: none;
+    padding: 4px 0;
+    color: var(--text-main);
+  }
+  .card-title-input:focus {
+    background: var(--accent-gradient-soft);
+    border-radius: 6px;
+    padding: 4px 8px;
+  }
+
+  .flow-banner {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 18px;
+    background: var(--success-bg);
+    border: 1px solid var(--success);
+    border-radius: var(--radius-sm);
+    margin-top: 16px;
+  }
+  .flow-banner-text {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--success);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .countdown {
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--success);
+  }
+  .countdown-bar {
+    width: 80px;
+    height: 4px;
+    background: rgba(5, 150, 105, 0.25);
+    border-radius: var(--radius-pill);
+    overflow: hidden;
+    margin-right: 10px;
+    display: inline-block;
+    vertical-align: middle;
+  }
+  .countdown-bar::after {
+    content: '';
+    display: block;
+    width: 35%;
+    height: 100%;
+    background: var(--success);
+    border-radius: var(--radius-pill);
+  }
+
+  .modal-body {
+    display: grid;
+    grid-template-columns: 1fr 280px;
+    overflow: hidden;
+    max-height: calc(90vh - 200px);
+  }
+  .modal-main { padding: 24px 32px; overflow-y: auto; }
+  .modal-side {
+    padding: 24px 24px;
+    background: var(--bg-muted);
+    border-left: 1px solid var(--border-light);
+    overflow-y: auto;
+  }
+
+  .section-label {
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+  }
+  .section + .section { margin-top: 28px; }
+
+  .description {
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--text-soft);
+    font-weight: 500;
+  }
+
+  .checklist-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+  }
+  .checklist-hint {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+  .checklist-count {
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--success);
+  }
+
+  .check-item {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 12px;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border-soft);
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .check-item .box {
+    width: 18px; height: 18px;
+    border: 2px solid var(--border-light);
+    border-radius: 6px;
+    display: grid; place-items: center;
+    font-size: 11px;
+    line-height: 1;
+    transition: var(--transition);
+  }
+  .check-item.done .box {
+    background: var(--accent-gradient);
+    border-color: transparent;
+    color: #fff;
+  }
+  .check-item.done .text {
+    color: var(--text-muted);
+    text-decoration: line-through;
+  }
+  .check-item .remove {
+    font-size: 16px;
+    color: var(--text-ghost);
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  .check-item:hover .remove { opacity: 1; }
+  .check-item .remove:hover { color: var(--danger); }
+
+  .check-add {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    padding: 14px 0 0;
+  }
+  .check-add-plus {
+    width: 18px; height: 18px;
+    border: 2px dashed var(--accent-primary);
+    border-radius: 6px;
+    display: grid; place-items: center;
+    font-size: 11px;
+    color: var(--accent-primary);
+  }
+  [data-theme="dark"] .check-add-plus { color: #C084FC; border-color: #C084FC; }
+  .check-add input {
+    flex: 1;
+    border: 0;
+    background: transparent;
+    font-size: 13px;
+    font-weight: 500;
+    outline: none;
+    color: var(--text-muted);
+    font-family: inherit;
+  }
+
+  .comment {
+    display: grid;
+    grid-template-columns: 36px 1fr;
+    gap: 14px;
+    padding: 16px 0;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .comment:last-child { border-bottom: 0; }
+  .comment .avatar { width: 36px; height: 36px; font-size: 11px; }
+  .comment-head {
+    display: flex;
+    gap: 10px;
+    align-items: baseline;
+    margin-bottom: 4px;
+  }
+  .comment-author { font-size: 13px; font-weight: 700; color: var(--text-main); }
+  .comment-time { font-size: 10px; color: var(--text-muted); font-weight: 600; }
+  .comment-text { font-size: 13px; line-height: 1.6; color: var(--text-soft); font-weight: 500; }
+
+  .comment-compose {
+    display: grid;
+    grid-template-columns: 36px 1fr;
+    gap: 14px;
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 2px dashed var(--border-light);
+  }
+  .comment-compose textarea {
+    width: 100%;
+    min-height: 80px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+    font-size: 13px;
+    outline: none;
+    resize: vertical;
+    color: var(--text-main);
+    font-family: inherit;
+    font-weight: 500;
+  }
+  .comment-compose textarea:focus {
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px rgba(139, 43, 226, 0.08);
+  }
+  .compose-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .side-row {
+    padding: 16px 0;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .side-row:last-child { border-bottom: 0; }
+  .side-label {
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+  }
+  .col-current {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-pill);
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .col-current .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--accent-primary);
+  }
+  .next-col {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-top: 8px;
+    font-weight: 600;
+  }
+  .assignees { display: flex; gap: 6px; align-items: center; }
+  .assignees .add {
+    width: 32px; height: 32px;
+    border: 2px dashed var(--border-light);
+    border-radius: 50%;
+    display: grid; place-items: center;
+    color: var(--text-muted);
+    font-size: 14px;
+  }
+  .assignees .avatar { width: 32px; height: 32px; font-size: 10px; }
+  .date-input {
+    width: 100%;
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    outline: none;
+    color: var(--text-main);
+  }
+
+  .side-actions button {
+    width: 100%;
+    text-align: left;
+    padding: 10px 14px;
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    margin-bottom: 6px;
+    transition: var(--transition);
+  }
+  .side-actions button:hover { background: var(--bg-hover); color: var(--text-main); }
+  .side-actions button.danger { color: var(--danger); border-color: var(--danger); }
+  .side-actions button.danger:hover { background: var(--danger-bg); }
+</style>
+</head>
+<body>
+  <!-- Ghost underlying page -->
+  <div class="app" style="filter: blur(3px) opacity(0.3); pointer-events: none;">
+    <aside class="sidebar"></aside>
+    <main class="main"><header class="topbar"></header></main>
+  </div>
+
+  <div class="page-backdrop"></div>
+
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <div class="modal-breadcrumb">
+          <span>Acme Brands</span> <span>/</span>
+          <span>Campagne Été 2025</span> <span>/</span>
+          <strong>Carte #124</strong>
+        </div>
+        <input type="text" class="card-title-input" value="Déclinaison hero web desktop + mobile">
+
+        <div class="flow-banner">
+          <div class="flow-banner-text">
+            ✓ Checklist complète · déplacement vers <strong>Revue interne</strong>
+          </div>
+          <div style="display: flex; align-items: center;">
+            <span class="countdown-bar"></span>
+            <span class="countdown">1.2s</span>
+          </div>
+        </div>
+      </div>
+      <button class="modal-close">✕</button>
+    </div>
+
+    <div class="modal-body">
+      <div class="modal-main">
+        <div class="section">
+          <div class="section-label">Description</div>
+          <p class="description">
+            Décliner le key visual de la campagne Été 2025 pour le hero de la landing page : desktop (1920×1080), tablette (1024×768) et mobile (390×844). Respecter la grille 8pt, conserver la palette chaude validée par Sophie le 2 avril. Export PNG + Figma source.
+          </p>
+        </div>
+
+        <div class="section">
+          <div class="section-label">Checklist</div>
+          <div class="checklist-meta">
+            <div class="checklist-hint">Auto-progression active — la carte avance dès que tout est coché.</div>
+            <div class="checklist-count">5 / 5 ✓</div>
+          </div>
+          <div class="progress-bar" style="height: 4px; margin-bottom: 16px;"><div class="progress-fill success" style="width: 100%;"></div></div>
+
+          <div class="check-item done">
+            <div class="box">✓</div>
+            <span class="text">Grille 8pt et variables couleurs synchronisées</span>
+            <button class="remove">×</button>
+          </div>
+          <div class="check-item done">
+            <div class="box">✓</div>
+            <span class="text">Version desktop 1920×1080 exportée</span>
+            <button class="remove">×</button>
+          </div>
+          <div class="check-item done">
+            <div class="box">✓</div>
+            <span class="text">Version tablette 1024×768 exportée</span>
+            <button class="remove">×</button>
+          </div>
+          <div class="check-item done">
+            <div class="box">✓</div>
+            <span class="text">Version mobile 390×844 exportée</span>
+            <button class="remove">×</button>
+          </div>
+          <div class="check-item done">
+            <div class="box">✓</div>
+            <span class="text">Lien Figma partagé dans #acme-creation</span>
+            <button class="remove">×</button>
+          </div>
+
+          <div class="check-add">
+            <div class="check-add-plus">+</div>
+            <input type="text" placeholder="Ajouter un item…">
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-label">Commentaires · 3</div>
+
+          <div class="comment">
+            <div class="avatar" style="background: var(--c-nova); color: #fff;">MD</div>
+            <div>
+              <div class="comment-head">
+                <span class="comment-author">Marie Duval</span>
+                <span class="comment-time">Hier · 16:42</span>
+              </div>
+              <div class="comment-text">J'ai poussé la v2 avec les ajustements typo. Le mobile tient bien, il faudra juste revoir le crop de la photo.</div>
+            </div>
+          </div>
+
+          <div class="comment">
+            <div class="avatar gradient">AL</div>
+            <div>
+              <div class="comment-head">
+                <span class="comment-author">Angelo Lambert</span>
+                <span class="comment-time">Hier · 18:05</span>
+              </div>
+              <div class="comment-text">Parfait. J'ai validé côté DA. @Marie tu peux exporter quand tu veux, j'ai prévenu Sophie.</div>
+            </div>
+          </div>
+
+          <div class="comment">
+            <div class="avatar" style="background: var(--c-acme); color: #fff;">CR</div>
+            <div>
+              <div class="comment-head">
+                <span class="comment-author">Claire Rémy</span>
+                <span class="comment-time">Aujourd'hui · 09:12</span>
+              </div>
+              <div class="comment-text">Exports faits, tout est dans le dossier partagé. Je coche les derniers items.</div>
+            </div>
+          </div>
+
+          <div class="comment-compose">
+            <div class="avatar gradient">AL</div>
+            <div>
+              <textarea placeholder="Écrire un commentaire… (⌘ + Entrée pour publier)"></textarea>
+              <div class="compose-actions">
+                <button class="btn btn-ghost btn-sm">@ Mentionner</button>
+                <button class="btn btn-primary btn-sm">Publier</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <aside class="modal-side">
+        <div class="side-row">
+          <div class="side-label">Colonne actuelle</div>
+          <div class="col-current"><span class="dot"></span> Créa</div>
+          <div class="next-col">→ Revue interne · auto</div>
+        </div>
+
+        <div class="side-row">
+          <div class="side-label">Catégorie</div>
+          <span class="tag tag-design">Design</span>
+          <span class="tag tag-primary" style="margin-left: 4px;">Key visual</span>
+        </div>
+
+        <div class="side-row">
+          <div class="side-label">Assignés · 2</div>
+          <div class="assignees">
+            <div class="avatar" style="background: var(--c-acme); color: #fff;">CR</div>
+            <div class="avatar gradient">AL</div>
+            <button class="add">+</button>
+          </div>
+        </div>
+
+        <div class="side-row">
+          <div class="side-label">Échéance</div>
+          <input type="text" class="date-input" value="13 avril 2026 · aujourd'hui">
+          <div class="next-col">à risque si > aujourd'hui</div>
+        </div>
+
+        <div class="side-row">
+          <div class="side-label">Progression</div>
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div class="progress-bar" style="flex: 1;"><div class="progress-fill success" style="width: 100%;"></div></div>
+            <span style="font-size: 11px; font-weight: 800; color: var(--success);">100%</span>
+          </div>
+        </div>
+
+        <div class="side-row">
+          <div class="side-label">Actions</div>
+          <div class="side-actions">
+            <button>Dupliquer</button>
+            <button>Archiver</button>
+            <button class="danger">Supprimer</button>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <div style="position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 200; display: flex; gap: 10px;">
+    <a href="04-kanban.html" class="btn btn-ghost btn-sm">← Kanban</a>
+    <a href="index.html" class="btn btn-ghost btn-sm">Index</a>
+    <button class="btn btn-ghost btn-sm" data-theme-toggle>🌙 Dark</button>
+  </div>
+  <script src="theme.js"></script>
+</body>
+</html>

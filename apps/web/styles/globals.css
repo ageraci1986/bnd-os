@@ -1,0 +1,35 @@
+@import 'tailwindcss';
+@import '@nexushub/ui/tokens.css';
+
+@layer base {
+  html,
+  body {
+    background: var(--color-bg-app);
+    color: var(--color-text-main);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+    transition:
+      background-color 0.3s ease,
+      color 0.3s ease;
+  }
+
+  body {
+    background-image:
+      radial-gradient(ellipse at top left, rgba(139, 43, 226, 0.04), transparent 50%),
+      radial-gradient(ellipse at bottom right, rgba(255, 42, 109, 0.04), transparent 50%);
+  }
+
+  [data-theme='dark'] body {
+    background-image:
+      radial-gradient(ellipse at top left, rgba(139, 43, 226, 0.12), transparent 50%),
+      radial-gradient(ellipse at bottom right, rgba(255, 42, 109, 0.08), transparent 50%);
+  }
+
+  *:focus-visible {
+    outline: 2px solid var(--color-accent-primary);
+    outline-offset: 2px;
+  }
+}

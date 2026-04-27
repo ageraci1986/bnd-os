@@ -1,0 +1,15 @@
+#!/usr/bin/env sh
+# Phase 1.4 — pre-commit gates
+# 1) Secret scan (gitleaks) on staged files only
+# 2) Lint + typecheck on staged TS files (lint-staged)
+
+if command -v gitleaks >/dev/null 2>&1; then
+  gitleaks protect --staged --redact --config .gitleaks.toml || {
+    echo "❌ gitleaks: secret detected in staged files. Aborting commit."
+    exit 1
+  }
+else
+  echo "⚠ gitleaks not installed locally. Install via 'brew install gitleaks'. CI will block on push."
+fi
+
+pnpm exec lint-staged
