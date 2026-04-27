@@ -92,12 +92,19 @@ export function createEmailAdapter(config: EmailAdapterConfig) {
         // We surface a generic message; full error is logged for ops.
         console.error('[email] send failed', {
           tag: params.tag,
+          to: params.to,
+          from,
           name: result.error.name,
           message: result.error.message,
         });
         throw new Error('EMAIL_SEND_FAILED');
       }
 
+      // Always log success in dev so we can trace the Resend message id.
+      // SECURITY: we log the message id (safe, public-facing) but never the body.
+      console.warn(
+        `[email] sent id=${result.data?.id ?? 'unknown'} to=${params.to} tag=${params.tag} from=${from}`,
+      );
       return { id: result.data?.id ?? null, delivered: true };
     },
   };
