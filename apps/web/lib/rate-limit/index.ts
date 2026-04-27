@@ -1,0 +1,138 @@
+/**
+ * Rate limiting (CLAUDE.md §4.3).
+ *
+ * - Production: Upstash Redis sliding window (when UPSTASH_REDIS_REST_URL is set).
+ * - Dev/test: in-memory sliding window (process-local, resets on restart).
+ *
+ * SECURITY note: never use the in-memory fallback in production — it offers
+ * no protection across processes and is bypassed by horizontal scaling.
+ * `getRateLimiter` throws in production if Upstash is missing.
+ */
+import 'server-only';
+import { Ratelimit } from '@upstash/ratelimit';
+import { Redis } from '@upstash/redis';
+
+export type RateLimitKey = 'login' | 'password_reset' | 'invitation' | 'signup_token';
+
+export interface RateLimitResult {
+  readonly success: boolean;
+  readonly remaining: number;
+  /** Unix ms timestamp at which the limit resets. */
+  readonly reset: number;
+}
+
+interface Limiter {
+  readonly check: (identifier: string) => Promise<RateLimitResult>;
+}
+
+const WINDOWS: Record<
+  RateLimitKey,
+  { readonly limit: number; readonly window: `${number} ${'s' | 'm' | 'h'}` }
+> = {
+  login: { limit: 5, window: '15 m' },
+  password_reset: { limit: 3, window: '1 h' },
+  invitation: { limit: 20, window: '24 h' },
+  signup_token: { limit: 5, window: '1 h' },
+};
+
+/* ---------- Upstash backend ---------------------------------------------- */
+
+function makeUpstashLimiter(redis: Redis, key: RateLimitKey): Limiter {
+  const { limit, window } = WINDOWS[key];
+  const rl = new Ratelimit({
+    redis,
+    limiter: Ratelimit.slidingWindow(limit, window),
+    analytics: false,
+    prefix: `rl:${key}`,
+  });
+  return {
+    async check(identifier) {
+      const r = await rl.limit(identifier);
+      return { success: r.success, remaining: r.remaining, reset: r.reset };
+    },
+  };
+}
+
+/* ---------- In-memory backend (dev/test only) ---------------------------- */
+
+interface MemoryBucket {
+  hits: number[];
+}
+const MEM_BUCKETS = new Map<string, MemoryBucket>();
+
+function windowToMs(window: `${number} ${'s' | 'm' | 'h'}`): number {
+  const [n, unit] = window.split(' ') as [string, 's' | 'm' | 'h'];
+  const num = Number(n);
+  if (unit === 's') return num * 1000;
+  if (unit === 'm') return num * 60_000;
+  return num * 3_600_000;
+}
+
+function makeMemoryLimiter(key: RateLimitKey): Limiter {
+  const { limit, window } = WINDOWS[key];
+  const windowMs = windowToMs(window);
+  return {
+    async check(identifier) {
+      const now = Date.now();
+      const bucketKey = `${key}:${identifier}`;
+      const bucket = MEM_BUCKETS.get(bucketKey) ?? { hits: [] };
+      bucket.hits = bucket.hits.filter((t) => now - t < windowMs);
+      const success = bucket.hits.length < limit;
+      if (success) bucket.hits.push(now);
+      MEM_BUCKETS.set(bucketKey, bucket);
+      const oldest = bucket.hits[0] ?? now;
+      return {
+        success,
+        remaining: Math.max(0, limit - bucket.hits.length),
+        reset: oldest + windowMs,
+      };
+    },
+  };
+}
+
+/* ---------- Public factory ---------------------------------------------- */
+
+let _redis: Redis | null = null;
+const _limiters = new Map<RateLimitKey, Limiter>();
+
+function getRedis(): Redis | null {
+  if (_redis !== null) return _redis;
+  const url = process.env['UPSTASH_REDIS_REST_URL'];
+  const token = process.env['UPSTASH_REDIS_REST_TOKEN'];
+  if (!url || !token) return null;
+  _redis = new Redis({ url, token });
+  return _redis;
+}
+
+export function getRateLimiter(key: RateLimitKey): Limiter {
+  const cached = _limiters.get(key);
+  if (cached) return cached;
+
+  const redis = getRedis();
+  if (redis) {
+    const limiter = makeUpstashLimiter(redis, key);
+    _limiters.set(key, limiter);
+    return limiter;
+  }
+
+  if (process.env['NODE_ENV'] === 'production') {
+    throw new Error(
+      'Rate limiter: Upstash credentials missing in production. ' +
+        'Set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN.',
+    );
+  }
+
+  const limiter = makeMemoryLimiter(key);
+  _limiters.set(key, limiter);
+  return limiter;
+}
+
+/** Extract the client IP from common Vercel/Edge headers. */
+export function getClientIp(headers: Headers): string {
+  return (
+    headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
+    headers.get('x-real-ip') ??
+    headers.get('cf-connecting-ip') ??
+    'unknown'
+  );
+}

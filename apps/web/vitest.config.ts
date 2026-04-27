@@ -29,6 +29,8 @@ export default defineConfig({
       '@nexushub/domain': path.resolve(__dirname, '../../packages/domain/src/index.ts'),
       '@nexushub/integrations': path.resolve(__dirname, '../../packages/integrations/src/index.ts'),
       '@nexushub/ui': path.resolve(__dirname, '../../packages/ui/src/index.ts'),
+      // Stub Next's `server-only` marker in tests (it throws at import in non-RSC contexts).
+      'server-only': path.resolve(__dirname, 'test/stubs/server-only.ts'),
     },
   },
 });

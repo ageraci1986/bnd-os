@@ -22,7 +22,11 @@ const ServerEnvSchema = z.object({
   INVITATION_SECRET: z.string().min(32),
 
   // Integrations
-  RESEND_API_KEY: z.string().min(20),
+  // RESEND_API_KEY is required in production but optional in dev (the email
+  // adapter falls back to a redacted console preview when missing).
+  RESEND_API_KEY: z.string().min(20).optional(),
+  RESEND_FROM_EMAIL: z.string().email().default('invitations@mail.nexushub.app'),
+  RESEND_FROM_NAME: z.string().default('NexusHub'),
   SLACK_CLIENT_ID: z.string().optional(),
   SLACK_CLIENT_SECRET: z.string().optional(),
   SLACK_SIGNING_SECRET: z.string().optional(),

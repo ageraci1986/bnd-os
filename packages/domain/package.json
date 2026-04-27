@@ -12,6 +12,7 @@
     "./checklist": "./src/checklist/index.ts",
     "./client-filter": "./src/client-filter/index.ts",
     "./permissions": "./src/permissions/index.ts",
+    "./invitations": "./src/invitations/index.ts",
     "./crypto": "./src/crypto/index.ts",
     "./errors": "./src/errors/index.ts"
   },

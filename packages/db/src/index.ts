@@ -19,4 +19,17 @@ if (NODE_ENV !== 'production') {
   globalThis.__prisma = prisma;
 }
 
-export type { Prisma } from '@prisma/client';
+export type {
+  Prisma,
+  ActivityKind,
+  AuditAction,
+  IntegrationKind,
+  IntegrationScope,
+  IntegrationStatus,
+  InvitationStatus,
+  NotificationChannel,
+  NotificationKind,
+  ProjectMemberRole,
+  RACI,
+  Role,
+} from '@prisma/client';
