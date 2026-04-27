@@ -4,7 +4,27 @@ import { z } from 'zod';
 /**
  * SECURITY: server-only env schema. Validated at build time + runtime.
  * NEXT_PUBLIC_* values that need validation are checked separately.
+ *
+ * Note on optional + empty strings: when a key is declared in `.env.local`
+ * but left empty (`FOO=`), Node sets `process.env.FOO` to "". A bare
+ * `z.string().min(20).optional()` would then reject "". The helpers below
+ * coerce empty / whitespace-only strings to `undefined` before validation.
  */
+
+/** Optional string with a min length when present. Empty/whitespace = absent. */
+const optionalString = (min: number) =>
+  z.preprocess(
+    (v) => (typeof v === 'string' && v.trim().length === 0 ? undefined : v),
+    z.string().min(min).optional(),
+  );
+
+/** Optional URL. Empty/whitespace = absent. */
+const optionalUrl = () =>
+  z.preprocess(
+    (v) => (typeof v === 'string' && v.trim().length === 0 ? undefined : v),
+    z.string().url().optional(),
+  );
+
 const ServerEnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
 
@@ -24,25 +44,25 @@ const ServerEnvSchema = z.object({
   // Integrations
   // RESEND_API_KEY is required in production but optional in dev (the email
   // adapter falls back to a redacted console preview when missing).
-  RESEND_API_KEY: z.string().min(20).optional(),
+  RESEND_API_KEY: optionalString(20),
   RESEND_FROM_EMAIL: z.string().email().default('invitations@mail.nexushub.app'),
   RESEND_FROM_NAME: z.string().default('NexusHub'),
-  SLACK_CLIENT_ID: z.string().optional(),
-  SLACK_CLIENT_SECRET: z.string().optional(),
-  SLACK_SIGNING_SECRET: z.string().optional(),
-  GRAPH_CLIENT_ID: z.string().optional(),
-  GRAPH_CLIENT_SECRET: z.string().optional(),
+  SLACK_CLIENT_ID: optionalString(1),
+  SLACK_CLIENT_SECRET: optionalString(1),
+  SLACK_SIGNING_SECRET: optionalString(1),
+  GRAPH_CLIENT_ID: optionalString(1),
+  GRAPH_CLIENT_SECRET: optionalString(1),
 
   // Inngest
-  INNGEST_EVENT_KEY: z.string().optional(),
-  INNGEST_SIGNING_KEY: z.string().optional(),
+  INNGEST_EVENT_KEY: optionalString(1),
+  INNGEST_SIGNING_KEY: optionalString(1),
 
   // Upstash (rate limiting)
-  UPSTASH_REDIS_REST_URL: z.string().url().optional(),
-  UPSTASH_REDIS_REST_TOKEN: z.string().optional(),
+  UPSTASH_REDIS_REST_URL: optionalUrl(),
+  UPSTASH_REDIS_REST_TOKEN: optionalString(1),
 
   // Sentry
-  SENTRY_DSN: z.string().url().optional(),
+  SENTRY_DSN: optionalUrl(),
 });
 
 export type ServerEnv = z.infer<typeof ServerEnvSchema>;
