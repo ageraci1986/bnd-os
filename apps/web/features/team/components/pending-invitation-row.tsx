@@ -1,6 +1,6 @@
 'use client';
 import { useActionState } from 'react';
-import { CSRF_FIELD_NAME } from '@/lib/csrf';
+import { CSRF_FIELD_NAME } from '@/lib/csrf/field';
 import { revokeInvitation, type RevokeInvitationState } from '../actions/revoke-invitation';
 
 export interface PendingInvitationRowProps {

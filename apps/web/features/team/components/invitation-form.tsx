@@ -1,6 +1,6 @@
 'use client';
 import { useActionState, useEffect, useRef } from 'react';
-import { CSRF_FIELD_NAME } from '@/lib/csrf';
+import { CSRF_FIELD_NAME } from '@/lib/csrf/field';
 import {
   createInvitation,
   type CreateInvitationState,

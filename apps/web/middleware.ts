@@ -16,6 +16,19 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr';
  * inside pages/actions — it only decodes the cookie. Use `getUser()` (which
  * validates the JWT against Supabase) in `lib/auth/index.ts`.
  */
+// CSRF cookie config (mirrored in lib/csrf/index.ts)
+const CSRF_COOKIE = 'nh_csrf';
+const CSRF_TTL_SECONDS = 60 * 60 * 8;
+
+function randomCsrfToken(): string {
+  const bytes = new Uint8Array(24);
+  crypto.getRandomValues(bytes);
+  // base64url, no padding
+  let bin = '';
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return globalThis.btoa(bin).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
+}
+
 export async function middleware(request: NextRequest): Promise<NextResponse> {
   const nonce = crypto.randomUUID().replaceAll('-', '');
 
@@ -23,6 +36,21 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   let response = NextResponse.next({
     request: { headers: new Headers(request.headers) },
   });
+
+  // ---- CSRF cookie (mint if absent; only place allowed to set it) ---------------
+  const existingCsrf = request.cookies.get(CSRF_COOKIE)?.value;
+  if (!existingCsrf || existingCsrf.length < 32) {
+    const csrf = randomCsrfToken();
+    request.cookies.set(CSRF_COOKIE, csrf);
+    response = NextResponse.next({ request });
+    response.cookies.set(CSRF_COOKIE, csrf, {
+      httpOnly: true,
+      secure: process.env['NODE_ENV'] === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: CSRF_TTL_SECONDS,
+    });
+  }
 
   // ---- Supabase session refresh -------------------------------------------------
   const supabaseUrl = process.env['NEXT_PUBLIC_SUPABASE_URL'];

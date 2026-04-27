@@ -1,7 +1,7 @@
 'use client';
 import { useActionState } from 'react';
 import Link from 'next/link';
-import { CSRF_FIELD_NAME } from '@/lib/csrf';
+import { CSRF_FIELD_NAME } from '@/lib/csrf/field';
 import {
   forgotPassword,
   GENERIC_OK_MESSAGE,

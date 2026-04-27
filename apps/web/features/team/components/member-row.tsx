@@ -1,6 +1,6 @@
 'use client';
 import { useActionState } from 'react';
-import { CSRF_FIELD_NAME } from '@/lib/csrf';
+import { CSRF_FIELD_NAME } from '@/lib/csrf/field';
 import { changeMemberRole, type ChangeRoleState } from '../actions/change-member-role';
 import { removeMember, type RemoveMemberState } from '../actions/remove-member';
 

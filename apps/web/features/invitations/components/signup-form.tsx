@@ -1,6 +1,6 @@
 'use client';
 import { useActionState } from 'react';
-import { CSRF_FIELD_NAME } from '@/lib/csrf';
+import { CSRF_FIELD_NAME } from '@/lib/csrf/field';
 import { acceptInvitation, type AcceptInvitationState } from '../actions/accept-invitation';
 
 interface SignupFormProps {

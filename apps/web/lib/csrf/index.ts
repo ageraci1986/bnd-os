@@ -5,40 +5,39 @@
  * layer: a short-lived random token is set as a cookie + sent with every
  * mutating request as a hidden form field. Server compares them.
  *
- * Use:
- *  - `getCsrfTokenForForm()` in a Server Component to mint+stash a token and
- *    return its value to embed in a hidden `<input name="_csrf">`.
- *  - `assertCsrfFromFormData(formData)` at the top of every Server Action.
+ * Architecture (Next 15+):
+ *  - The token is **minted in middleware.ts** (which is the only place
+ *    allowed to write cookies on a normal navigation in the App Router).
+ *  - `getCsrfTokenForForm()` is read-only and runs in Server Components.
+ *  - `assertCsrfFromFormData()` runs at the top of every mutating Server Action.
  */
 import 'server-only';
 import { cookies } from 'next/headers';
-import { randomToken, timingSafeEqual } from '@nexushub/domain/crypto';
+import { timingSafeEqual } from '@nexushub/domain/crypto';
+import { CSRF_FIELD_NAME } from './field';
 
-const CSRF_COOKIE = 'nh_csrf';
-const CSRF_FIELD = '_csrf';
-const CSRF_TTL_SECONDS = 60 * 60 * 8; // 8h
+export const CSRF_COOKIE = 'nh_csrf';
+export const CSRF_TTL_SECONDS = 60 * 60 * 8; // 8h
 
-export const CSRF_FIELD_NAME = CSRF_FIELD;
+// Re-export so existing server imports (server actions, pages) keep working.
+// Client components must import directly from `./field` to avoid pulling in
+// the server-only side-effects of this module.
+export { CSRF_FIELD_NAME } from './field';
 
-/** Mint a token, stash it in a cookie, return the value to embed in a form. */
+/**
+ * Read the CSRF token from cookies for embedding in a form.
+ * The cookie is minted by middleware.ts — this function is read-only.
+ * If the cookie is missing (very rare race), we return an empty string;
+ * the next form submit will then fail CSRF validation and the user is
+ * prompted to refresh.
+ */
 export async function getCsrfTokenForForm(): Promise<string> {
   const store = await cookies();
-  const existing = store.get(CSRF_COOKIE)?.value;
-  if (existing && existing.length >= 32) return existing;
-
-  const token = randomToken(24);
-  store.set(CSRF_COOKIE, token, {
-    httpOnly: true,
-    secure: process.env['NODE_ENV'] === 'production',
-    sameSite: 'lax',
-    path: '/',
-    maxAge: CSRF_TTL_SECONDS,
-  });
-  return token;
+  return store.get(CSRF_COOKIE)?.value ?? '';
 }
 
 export async function assertCsrfFromFormData(formData: FormData): Promise<void> {
-  const submitted = formData.get(CSRF_FIELD);
+  const submitted = formData.get(CSRF_FIELD_NAME);
   if (typeof submitted !== 'string' || submitted.length === 0) {
     throw new Error('CSRF: missing token');
   }
