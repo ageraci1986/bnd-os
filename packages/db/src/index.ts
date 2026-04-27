@@ -19,8 +19,11 @@ if (NODE_ENV !== 'production') {
   globalThis.__prisma = prisma;
 }
 
+// Runtime re-export of the `Prisma` namespace — needed for instanceof checks
+// against PrismaClientKnownRequestError and friends. The namespace also acts
+// as a type, so this single export covers both uses.
+export { Prisma } from '@prisma/client';
 export type {
-  Prisma,
   ActivityKind,
   AuditAction,
   IntegrationKind,

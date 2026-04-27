@@ -360,12 +360,17 @@
 
 ## Phase 9 — Équipe, Paramètres, Notifications
 
-### 9.1 Équipe & invitations (Admin only)
+### 9.1 Équipe & invitations (Admin only) — partiel (avancé en Phase 2.5)
 
-- [ ] Page `/team` (liste + invitations)
-- [ ] Inviter (email + rôle), retirer, modifier rôle
-- [ ] Protection dernier Admin
-- [ ] Audit log
+- [x] Page `/team` (liste membres + invitations en attente + form d'invitation)
+- [x] Inviter (email + rôle) — `createInvitation` Server Action
+- [x] Retirer un membre — `removeMember` Server Action (Admin only, Last-Admin protégé via trigger DB)
+- [x] Modifier le rôle d'un membre — `changeMemberRole` Server Action (Last-Admin protégé)
+- [x] Révoquer une invitation pending — `revokeInvitation` Server Action
+- [x] Protection dernier Admin (trigger Postgres `protect_last_admin` + UI désactivée pour soi)
+- [x] Audit log : `invitation_created`, `invitation_accepted`, `invitation_revoked`, `member_removed`, `member_role_changed`
+- [ ] Refonte UI complète (avatars, table moderne) en Phase 3 design system
+- [ ] Tests E2E Playwright (login → invite → accept → remove) en Phase 11
 
 ### 9.2 Paramètres utilisateur
 
@@ -494,5 +499,6 @@
 | 2026-04-27 | —     | docs    | Runbook `docs/runbooks/supabase-setup.md` (provisioning Supabase staging pas-à-pas) ajouté pour parallèle utilisateur.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | 2026-04-27 | 2     | 2.1     | **Migrations appliquées sur Supabase staging** (`bnd-os-staging`, eu-west-1) via MCP. 5 migrations versionnées dans `prisma/migrations/` : init_schema (27 tables + FKs + indexes), rls_helpers_and_policies (~30 policies), triggers_and_constraints, security_advisors_fixes (search_path pin, citext → extensions, REVOKE EXECUTE), lock_down_rls_auto_enable. **Advisors : 13 → 2 warnings** (faux positifs intentionnels sur les helpers RLS, documentés via COMMENT ON FUNCTION + docs/security.md §5.1). RLS active sur 100% des tables.                                                                                                                                                                                                                                                      |
 | 2026-04-27 | 2     | 2.3+2.4 | **Auth flow + invitation flow custom** terminé. Adapters Resend (dev console fallback) + Upstash rate-limit (in-memory fallback). Auth helpers `requireUser` / `requireAdmin` (JWT validé via `auth.getUser()`, jamais `getSession`). CSRF double-submit + audit log fail-safe. Middleware avec session refresh silencieux + auth gating + CSP nonce. Server Actions `signIn` / `signOut` / `forgotPassword` / `createInvitation` (Admin only, audit, idempotent) / `acceptInvitation` (transaction Prisma + admin.createUser + Membership). Pages `/login` + `/forgot-password` + `/signup/[token]` (branches expired/consumed/revoked/invalid). Templates email FR XSS-safe. **64 tests verts** (10 invitations domain + 7 web email + 47 autres). Resend reporté ; fallback dev console en place. |
+| 2026-04-27 | 2     | 2.5+9.1 | **Step C — Page Équipe + bootstrap admin** : pour pouvoir tester le invitation flow end-to-end. Script CLI `db:bootstrap-admin --email --password` (idempotent, validation password ≥ 12, audit log). Layout `(app)` minimal (topbar avec brand, signout, lien Équipe Admin-only). Page `/overview` placeholder. **Page `/team`** complète (Admin only) : form d'invitation, liste membres avec promote/demote/remove, liste invitations en attente avec révocation. Server Actions `removeMember`, `changeMemberRole`, `revokeInvitation` — Last-Admin protégé via trigger DB Postgres (erreur capturée et message UX clair). Runbook `docs/runbooks/local-dev-quickstart.md` pour valider en local le parcours complet PRD §4.1. Gates verts.                                                      |
 
 > **Règle :** chaque session de travail ajoute une ligne ici (ou plusieurs si plusieurs étapes touchées).
