@@ -4,7 +4,7 @@ import {
   checkInvitationUsable,
   computeInvitationExpiry,
   type InvitationRow,
-} from './index.js';
+} from './index';
 
 const now = new Date('2026-04-27T12:00:00Z');
 const future = new Date(now.getTime() + 60_000);

@@ -10,7 +10,7 @@ import {
   shouldRestoreFromBlocked,
   type Card,
   type Column,
-} from './index.js';
+} from './index';
 
 const cols: Column[] = [
   { id: 'todo', name: 'À faire', position: 1, isBlockedSystem: false },

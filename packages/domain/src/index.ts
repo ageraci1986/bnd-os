@@ -1,7 +1,7 @@
-export * from './errors/index.js';
-export * from './permissions/index.js';
-export * from './client-filter/index.js';
-export * from './kanban/index.js';
-export * from './checklist/index.js';
-export * from './invitations/index.js';
-export * as crypto from './crypto/index.js';
+export * from './errors/index';
+export * from './permissions/index';
+export * from './client-filter/index';
+export * from './kanban/index';
+export * from './checklist/index';
+export * from './invitations/index';
+export * as crypto from './crypto/index';

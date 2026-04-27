@@ -10,7 +10,7 @@ import {
   timingSafeEqual,
   validateInvitationTokenShape,
   verifyHmacSha256,
-} from './index.js';
+} from './index';
 
 const TEST_KEY_B64 = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA='; // 32 zero bytes
 const TEST_KEY_B64_V2 = 'AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE='; // 32 bytes of 0x01
