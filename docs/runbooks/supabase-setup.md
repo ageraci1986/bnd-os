@@ -33,14 +33,39 @@ Aller dans `nexushub-staging` → **Settings → API** :
 | `SUPABASE_SERVICE_ROLE_KEY`     | `service_role secret`     |        🔴 critique        |
 | `SUPABASE_JWT_SECRET`           | JWT Settings → JWT Secret |        🔴 critique        |
 
-Aller dans **Settings → Database → Connection string** :
+### Connection strings (UI Supabase 2025)
 
-| Champ          | Source                                    | Notes                      |
-| -------------- | ----------------------------------------- | -------------------------- |
-| `DATABASE_URL` | "Transaction" mode (port 6543, PgBouncer) | URL pour runtime           |
-| `DIRECT_URL`   | "Session" mode (port 5432)                | URL pour migrations Prisma |
+**Méthode rapide** : sur la page principale du projet, en haut à droite, cliquer sur **`Connect`** (bouton avec icône) → onglet **"ORMs"** → choisir **"Prisma"** dans le sélecteur.
 
-> ⚠️ Les URLs contiennent le mot de passe DB. **Ne jamais commit**, **ne jamais log**.
+**Méthode alternative** : `Settings` (engrenage en bas à gauche) → **Database** → **Connection string** dans la sidebar latérale.
+
+Tu verras 3 modes. Récupérer **les deux suivants** :
+
+| Mode dans Supabase                 |   Port   | Variable `.env.local` | Usage                            |
+| ---------------------------------- | :------: | --------------------- | -------------------------------- |
+| **Direct connection**              |   5432   | `DIRECT_URL`          | Migrations Prisma uniquement     |
+| **Transaction pooler** (Supavisor) | **6543** | `DATABASE_URL`        | Runtime de l'app (edge-friendly) |
+
+Format attendu :
+
+```bash
+DIRECT_URL="postgresql://postgres:[YOUR-PASSWORD]@db.<project-ref>.supabase.co:5432/postgres"
+DATABASE_URL="postgresql://postgres.<project-ref>:[YOUR-PASSWORD]@aws-0-<region>.pooler.supabase.com:6543/postgres?pgbouncer=true"
+```
+
+⚠️ **`[YOUR-PASSWORD]`** = le mot de passe DB défini à l'étape 1. Si perdu : `Settings → Database → Reset database password` (invalide les connexions actives, à éviter sauf urgence).
+
+⚠️ Les URLs contiennent le mot de passe DB. **Ne jamais commit**, **ne jamais log**, jamais en `NEXT_PUBLIC_*`.
+
+### Test de la connexion
+
+```bash
+# Test rapide depuis le repo
+DATABASE_URL='...' DIRECT_URL='...' \
+  pnpm --filter @nexushub/db exec prisma db pull --force
+# Doit afficher "Introspecting based on datasource defined in prisma/schema.prisma"
+# puis se terminer sans erreur (le schéma vide est attendu).
+```
 
 ---
 

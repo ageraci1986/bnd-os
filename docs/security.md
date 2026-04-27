@@ -112,6 +112,19 @@ CREATE POLICY "Members can read"
 - Connexion en tant qu'`authenticated` user du workspace A → impossible de lire les cards du workspace B
 - Tests sur 100 % des tables applicatives
 
+### 5.1 Avertissements linter Supabase acceptés
+
+Le linter Supabase (`get_advisors`) remonte 2 warnings sur les helpers RLS, **acceptés et documentés** :
+
+| Lint | Function                                  | Pourquoi acceptable                                                                                                                                                        |
+| ---- | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0029 | `public.workspace_ids_for_current_user()` | Appelée par 100% des policies RLS. Sans `EXECUTE` pour `authenticated`, toutes les policies casseraient. Retourne uniquement les workspace_ids du caller — zéro info-leak. |
+| 0029 | `public.is_workspace_admin(uuid)`         | Idem. Retourne un booléen scopé au caller.                                                                                                                                 |
+
+Alternative possible (V1.5 ou Phase 12) : déplacer ces 2 fonctions dans un schéma `private` non exposé par PostgREST + DROP/RECREATE des ~30 policies. Pas prioritaire — `COMMENT ON FUNCTION` documente l'intention en base.
+
+**Tous les autres warnings du linter doivent rester corrigés** (search_path mutable, extension in public, function exposed). Tracker via `mcp__supabase__get_advisors` ou Supabase Dashboard → Security Advisor.
+
 ---
 
 ## 6. Réponse à incident
