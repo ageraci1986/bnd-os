@@ -1,5 +1,6 @@
 @import 'tailwindcss';
-@import '@nexushub/ui/tokens.css';
+@import '../../../packages/ui/src/tokens/tokens.css';
+@import '../../../packages/ui/src/tokens/components.css';
 
 @layer base {
   html,

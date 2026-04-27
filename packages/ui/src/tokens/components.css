@@ -1,0 +1,300 @@
+/* ============================================================
+   NexusHub component classes (sourced from mockups/styles.css).
+   Imported globally; works alongside Tailwind utilities.
+   The full design-system port (Storybook + React components) lands
+   in Phase 3.
+   ============================================================ */
+
+/* ---- Buttons --------------------------------------------------------- */
+.btn {
+  padding: 11px 20px;
+  border-radius: var(--radius-pill);
+  border: none;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: var(--transition);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: inherit;
+  white-space: nowrap;
+}
+.btn-primary {
+  background: var(--accent-gradient);
+  color: #fff;
+  box-shadow: 0 4px 15px rgba(138, 43, 226, 0.3);
+}
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 22px rgba(138, 43, 226, 0.45);
+}
+.btn-ghost {
+  background: var(--bg-card);
+  color: var(--text-main);
+  border: 1px solid var(--border-light);
+  box-shadow: var(--shadow-card);
+}
+.btn-ghost:hover {
+  background: var(--bg-hover);
+  transform: translateY(-1px);
+}
+.btn-danger {
+  background: var(--bg-card);
+  color: var(--danger);
+  border: 1px solid var(--danger);
+  box-shadow: var(--shadow-card);
+}
+.btn-danger:hover {
+  background: var(--danger-bg);
+}
+.btn:disabled,
+.btn[aria-busy='true'] {
+  opacity: 0.6;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+.btn-sm {
+  padding: 8px 15px;
+  font-size: 12px;
+}
+.btn-lg {
+  padding: 14px 28px;
+  font-size: 14px;
+}
+.btn-icon {
+  padding: 11px;
+  aspect-ratio: 1;
+}
+
+/* ---- Form fields ----------------------------------------------------- */
+.field {
+  margin-bottom: 18px;
+}
+.field-label {
+  display: block;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-muted);
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.field-input,
+.field-select,
+.field-textarea {
+  width: 100%;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  padding: 12px 16px;
+  font-size: 13px;
+  outline: none;
+  color: var(--text-main);
+  transition: var(--transition);
+  font-family: inherit;
+}
+.field-input:focus,
+.field-select:focus,
+.field-textarea:focus {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(139, 43, 226, 0.1);
+}
+.field-textarea {
+  resize: vertical;
+  min-height: 90px;
+  line-height: 1.6;
+}
+.field-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 6px;
+}
+
+/* ---- Brand mark (used in topbar + auth screens) --------------------- */
+.brand-mark {
+  width: 38px;
+  height: 38px;
+  background: var(--accent-gradient);
+  border-radius: 10px;
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  font-size: 18px;
+  box-shadow: 0 6px 20px rgba(138, 43, 226, 0.3);
+}
+.brand-name {
+  font-weight: 800;
+  font-size: 16px;
+  letter-spacing: -0.5px;
+  color: var(--text-main);
+}
+.brand-sub {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  font-weight: 600;
+  display: block;
+  margin-top: 1px;
+}
+
+/* ---- Auth split layout ---------------------------------------------- */
+.auth {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: var(--bg-app);
+}
+.auth-visual {
+  background: linear-gradient(135deg, #0b0c10 0%, #1a0b2e 50%, #2d0f3f 100%);
+  color: #fff;
+  padding: 56px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+.auth-visual::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 30% 20%, rgba(139, 43, 226, 0.4), transparent 50%),
+    radial-gradient(circle at 80% 80%, rgba(255, 42, 109, 0.3), transparent 60%);
+}
+.auth-visual::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle at 20% 80%, rgba(0, 240, 255, 0.15), transparent 40%);
+}
+.auth-visual > * {
+  position: relative;
+  z-index: 1;
+}
+
+.auth-brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.auth-brand .brand-name {
+  color: #fff;
+  font-size: 18px;
+}
+.auth-brand .brand-sub {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.auth-hero {
+  margin-top: auto;
+}
+.auth-hero h2 {
+  font-size: 58px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -2px;
+  color: #fff;
+}
+.auth-hero h2 span {
+  background: linear-gradient(135deg, #c084fc 0%, #ff2a6d 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.auth-hero p {
+  color: rgba(255, 255, 255, 0.7);
+  margin-top: 20px;
+  font-size: 15px;
+  font-weight: 500;
+  max-width: 420px;
+  line-height: 1.6;
+}
+
+.auth-stats {
+  display: flex;
+  gap: 32px;
+  margin-top: 48px;
+  padding-top: 32px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+.auth-stat-value {
+  font-size: 28px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -0.5px;
+}
+.auth-stat-label {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+.auth-form-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 56px;
+  position: relative;
+  background: var(--bg-app);
+}
+.auth-form {
+  width: 100%;
+  max-width: 420px;
+}
+.auth-kicker {
+  font-size: 12px;
+  color: var(--accent-primary);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  margin-bottom: 14px;
+}
+[data-theme='dark'] .auth-kicker {
+  color: #c084fc;
+}
+.auth-title {
+  font-size: 38px;
+  font-weight: 800;
+  letter-spacing: -1px;
+  line-height: 1.1;
+  margin-bottom: 12px;
+}
+.auth-sub {
+  color: var(--text-muted);
+  font-size: 14px;
+  margin-bottom: 32px;
+  font-weight: 500;
+}
+.auth-link {
+  font-size: 12px;
+  color: var(--accent-primary);
+  font-weight: 700;
+}
+[data-theme='dark'] .auth-link {
+  color: #c084fc;
+}
+.auth-foot {
+  margin-top: 32px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-light);
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* Responsive: stack the visual + form on small screens */
+@media (max-width: 900px) {
+  .auth {
+    grid-template-columns: 1fr;
+  }
+  .auth-visual {
+    display: none;
+  }
+}

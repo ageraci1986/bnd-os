@@ -61,6 +61,66 @@
   --ease-emphasized: cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
+/* ============================================================
+   Mockup-compatible aliases.
+   The HTML mockups use unprefixed names (--bg-app, --text-main, …).
+   Tailwind v4 wants prefixed names (--color-*) inside @theme. We
+   keep both: the prefixed forms drive Tailwind, the aliases let us
+   copy/paste mockup CSS verbatim into components.css.
+   ============================================================ */
+:root {
+  --bg-app: var(--color-bg-app);
+  --bg-sidebar: var(--color-bg-sidebar);
+  --bg-card: var(--color-bg-card);
+  --bg-card-alt: var(--color-bg-card-alt);
+  --bg-hover: var(--color-bg-hover);
+  --bg-muted: var(--color-bg-muted);
+  --text-main: var(--color-text-main);
+  --text-soft: var(--color-text-soft);
+  --text-muted: var(--color-text-muted);
+  --text-ghost: var(--color-text-ghost);
+  --border-light: var(--color-border-light);
+  --border-soft: var(--color-border-soft);
+  --accent-primary: var(--color-accent-primary);
+  --accent-secondary: var(--color-accent-secondary);
+  --success: var(--color-success);
+  --success-bg: var(--color-success-bg);
+  --warning: var(--color-warning);
+  --warning-bg: var(--color-warning-bg);
+  --danger: var(--color-danger);
+  --danger-bg: var(--color-danger-bg);
+  --info: var(--color-info);
+  --info-bg: var(--color-info-bg);
+  --c-acme: var(--color-c-acme);
+  --c-tech: var(--color-c-tech);
+  --c-nova: var(--color-c-nova);
+  --c-lumen: var(--color-c-lumen);
+  --c-orbit: var(--color-c-orbit);
+
+  /* Gradients & shadows expected by mockup classes */
+  --accent-gradient: linear-gradient(135deg, #8b2be2 0%, #ff2a6d 100%);
+  --accent-gradient-soft: linear-gradient(
+    135deg,
+    rgba(139, 43, 226, 0.08),
+    rgba(255, 42, 109, 0.08)
+  );
+  --shadow-card: 0 4px 15px rgba(0, 0, 0, 0.03);
+  --shadow-hover: 0 10px 25px rgba(138, 43, 226, 0.1);
+  --shadow-lg: 0 20px 60px rgba(17, 24, 39, 0.15);
+  --glass-bg: rgba(255, 255, 255, 0.85);
+  --transition: all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1);
+
+  --sidebar-w: 260px;
+  --topbar-h: 72px;
+}
+
+[data-theme='dark'] {
+  --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.3);
+  --shadow-hover: 0 8px 25px rgba(138, 43, 226, 0.25);
+  --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.5);
+  --glass-bg: rgba(11, 12, 16, 0.75);
+}
+
 /* Dark mode overrides (cf. mockups/styles.css [data-theme="dark"]) */
 [data-theme='dark'] {
   --color-bg-app: #0b0c10;
