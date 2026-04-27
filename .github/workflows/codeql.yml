@@ -1,12 +1,27 @@
 name: CodeQL
 
+# DISABLED until Code Scanning is enabled in GitHub repo settings.
+#
+# To re-enable:
+#   1. GitHub UI → Settings → Code security → Code scanning → "Set up"
+#      (or `gh api -X PATCH /repos/<owner>/<repo>` with appropriate flags).
+#      For private repos on GitHub Free this requires either GHAS or the
+#      "default" CodeQL setup which is free for public repos / paid for
+#      private. Alternative: configure CodeQL Action with `upload: never`
+#      and inspect SARIF artifacts manually.
+#   2. Restore the `on:` triggers below.
+#   3. Push the change.
+#
+# Tracked for Phase 12 (security audit).
+
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
-  schedule:
-    - cron: '23 4 * * 1'
+  workflow_dispatch:
+  # push:
+  #   branches: [main]
+  # pull_request:
+  #   branches: [main]
+  # schedule:
+  #   - cron: '23 4 * * 1'
 
 permissions:
   contents: read
