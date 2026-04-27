@@ -3,3 +3,4 @@ export * from './permissions/index.js';
 export * from './client-filter/index.js';
 export * from './kanban/index.js';
 export * from './checklist/index.js';
+export * as crypto from './crypto/index.js';

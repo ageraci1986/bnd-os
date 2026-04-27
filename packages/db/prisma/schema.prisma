@@ -1,22 +1,747 @@
 // =====================================================================
-// NexusHub — Prisma schema
-// All tables: workspace_id scoped + RLS Postgres policies (see Phase 2).
+// NexusHub — Prisma schema (Phase 2.1)
+//
+// Conventions:
+// - Tous les modèles applicatifs sont scopés par workspace_id.
+// - RLS Postgres activée via SQL séparé (cf. prisma/sql/01_rls.sql).
+// - Soft delete via `deletedAt` sur Project, Card, Client, Contact.
+// - IDs UUID (gen_random_uuid()) — alignés avec auth.users de Supabase.
+// - Timestamps en `timestamptz` partout.
+//
+// Sécurité (cf. CLAUDE.md §4 et docs/security.md):
+// - User.id == auth.users.id (FK logique vers Supabase Auth)
+// - Integration.encryptedTokens chiffré AES-256-GCM (clé hors-DB)
+// - Invitation.tokenHash = SHA-256 du token; le token clair n'est
+//   jamais persisté.
 // =====================================================================
 
 generator client {
-  provider        = "prisma-client-js"
-  previewFeatures = ["multiSchema"]
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
-  schemas   = ["public"]
 }
 
-// Skeleton — will be filled out in Phase 2.1 (cf. progress.md)
-// Models to add: Workspace, User, Membership, Invitation, Client, Contact,
-// Project, Column, Card, ChecklistItem, Comment, KanbanTemplate, EmailTemplate,
-// Integration, OAuthState, Notification, ActivityEvent, AuditLog,
-// EmailMessage, SlackMessage, Note.
+// =====================================================================
+// ENUMS
+// =====================================================================
+
+enum Role {
+  admin
+  member
+}
+
+enum ProjectMemberRole {
+  lead
+  member
+}
+
+enum InvitationStatus {
+  pending
+  accepted
+  expired
+  revoked
+}
+
+enum RACI {
+  responsible
+  approver
+  consulted
+  informed
+}
+
+enum IntegrationKind {
+  slack
+  graph
+  fireflies
+  otter
+}
+
+enum IntegrationScope {
+  workspace
+  user
+}
+
+enum IntegrationStatus {
+  inactive
+  active
+  error
+  revoked
+}
+
+enum NotificationKind {
+  card_assigned
+  card_commented
+  card_blocked
+  email_new
+  slack_mention
+}
+
+enum NotificationChannel {
+  push
+  slack
+}
+
+enum ActivityKind {
+  card_created
+  card_updated
+  card_moved
+  card_auto_advanced
+  card_auto_blocked
+  card_auto_restored
+  card_archived
+  checklist_completed
+  comment_added
+  project_created
+  project_archived
+  client_created
+  member_invited
+  member_joined
+  member_removed
+  member_role_changed
+  integration_connected
+  integration_disconnected
+}
+
+enum AuditAction {
+  login_success
+  login_failed
+  password_reset
+  invitation_created
+  invitation_accepted
+  invitation_revoked
+  member_removed
+  member_role_changed
+  integration_connected
+  integration_disconnected
+  client_deleted
+  project_deleted
+  project_restored
+  card_deleted
+  encryption_key_rotated
+}
+
+// =====================================================================
+// IDENTITY & WORKSPACE
+// =====================================================================
+
+/// Mirror of auth.users (Supabase). Synced via DB trigger (cf. 01_rls.sql).
+/// Contains app-side profile fields only. Auth fields stay in auth schema.
+model User {
+  id        String   @id @db.Uuid
+  email     String   @unique @db.Citext
+  firstName String?  @map("first_name")
+  lastName  String?  @map("last_name")
+  avatarUrl String?  @map("avatar_url")
+  locale    String   @default("fr") @db.VarChar(8)
+  timezone  String   @default("Europe/Paris") @db.VarChar(64)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  memberships        Membership[]
+  invitationsCreated Invitation[]             @relation("InvitationCreatedBy")
+  pushSubscriptions  PushSubscription[]
+  notificationPrefs  NotificationPreference[]
+  notificationsTo    Notification[]
+  activityActor      ActivityEvent[]
+  auditEvents        AuditLog[]
+  cardAssignments    CardAssignee[]
+  comments           Comment[]
+  projectMemberships ProjectMember[]
+  ownedIntegrations  Integration[]            @relation("IntegrationOwner")
+
+  @@index([email])
+  @@map("users")
+}
+
+model Workspace {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  slug            String   @unique @db.Citext
+  name            String
+  defaultLocale   String   @default("fr") @map("default_locale") @db.VarChar(8)
+  defaultTimezone String   @default("Europe/Paris") @map("default_timezone") @db.VarChar(64)
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  memberships     Membership[]
+  invitations     Invitation[]
+  clients         Client[]
+  projectTypes    ProjectType[]
+  projects        Project[]
+  emailTemplates  EmailTemplate[]
+  kanbanTemplates KanbanTemplate[]
+  integrations    Integration[]
+  activityEvents  ActivityEvent[]
+  auditLogs       AuditLog[]
+  notifications   Notification[]
+  emailMessages   EmailMessage[]
+  slackMessages   SlackMessage[]
+
+  @@map("workspaces")
+}
+
+model Membership {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId String   @map("workspace_id") @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  role        Role     @default(member)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@index([workspaceId])
+  @@index([userId])
+  @@map("memberships")
+}
+
+/// Custom invitation flow (HMAC-signed token, 72h expiry, single-use).
+/// The clear token is never stored: only its SHA-256 hash.
+model Invitation {
+  id               String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId      String           @map("workspace_id") @db.Uuid
+  email            String           @db.Citext
+  role             Role             @default(member)
+  tokenHash        String           @unique @map("token_hash") @db.VarChar(64) // sha256 hex
+  expiresAt        DateTime         @map("expires_at") @db.Timestamptz(6)
+  status           InvitationStatus @default(pending)
+  createdById      String           @map("created_by_id") @db.Uuid
+  consumedAt       DateTime?        @map("consumed_at") @db.Timestamptz(6)
+  consumedByUserId String?          @map("consumed_by_user_id") @db.Uuid
+  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy User      @relation("InvitationCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([workspaceId])
+  @@index([email, workspaceId])
+  @@index([expiresAt])
+  @@map("invitations")
+}
+
+// =====================================================================
+// CLIENTS & CONTACTS (PRD §7 — Gestion clients)
+// =====================================================================
+
+model Client {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId String    @map("workspace_id") @db.Uuid
+  name        String
+  /// Tailwind token name (c-acme, c-tech, c-nova, c-lumen, c-orbit) or hex
+  colorToken  String    @default("c-acme") @map("color_token") @db.VarChar(32)
+  initials    String    @db.VarChar(4)
+  /// Domains used to auto-associate Exchange emails (cf. PRD §7 Communications)
+  domains     String[]  @default([])
+  notes       String?
+  archivedAt  DateTime? @map("archived_at") @db.Timestamptz(6)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  workspace       Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  contacts        Contact[]
+  projects        Project[]
+  channelMappings ClientChannelMapping[]
+  emailMessages   EmailMessage[]
+  slackMessages   SlackMessage[]
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId])
+  @@index([workspaceId, deletedAt])
+  @@map("clients")
+}
+
+model Contact {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId String    @map("workspace_id") @db.Uuid
+  clientId    String    @map("client_id") @db.Uuid
+  firstName   String    @map("first_name")
+  lastName    String    @map("last_name")
+  jobTitle    String?   @map("job_title")
+  email       String?   @db.Citext
+  phone       String?
+  raci        RACI?
+  notes       String?
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([clientId])
+  @@map("contacts")
+}
+
+/// Slack channel ↔ client mapping (workspace-level, ADR 0001 §8)
+model ClientChannelMapping {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId   String   @map("workspace_id") @db.Uuid
+  clientId      String   @map("client_id") @db.Uuid
+  integrationId String   @map("integration_id") @db.Uuid
+  /// Slack channel ID (e.g. C0123456ABC)
+  channelId     String   @map("channel_id") @db.VarChar(64)
+  /// Slack channel name snapshot (display only)
+  channelName   String   @map("channel_name")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  client      Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  integration Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@unique([integrationId, channelId])
+  @@index([workspaceId])
+  @@index([clientId])
+  @@map("client_channel_mappings")
+}
+
+// =====================================================================
+// PROJECTS, COLUMNS, CARDS (PRD §7 + §8)
+// =====================================================================
+
+model ProjectType {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId String   @map("workspace_id") @db.Uuid
+  name        String
+  /// Emoji or short token rendered in the UI
+  icon        String   @db.VarChar(8)
+  description String?
+  isBuiltin   Boolean  @default(false) @map("is_builtin")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  projects  Project[]
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId])
+  @@map("project_types")
+}
+
+model Project {
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId     String    @map("workspace_id") @db.Uuid
+  clientId        String    @map("client_id") @db.Uuid
+  typeId          String?   @map("type_id") @db.Uuid
+  name            String
+  description     String?
+  /// PRD §7 Wizard step 1
+  startDate       DateTime? @map("start_date") @db.Date
+  endDate         DateTime? @map("end_date") @db.Date
+  /// ADR 0001 #2: archive auto Done > 30j si projet opt-in
+  archiveAutoDone Boolean   @default(false) @map("archive_auto_done")
+  archivedAt      DateTime? @map("archived_at") @db.Timestamptz(6)
+  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz(6)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  workspace Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  client    Client          @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  type      ProjectType?    @relation(fields: [typeId], references: [id], onDelete: SetNull)
+  members   ProjectMember[]
+  columns   Column[]
+  cards     Card[]
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId])
+  @@index([clientId])
+  @@index([workspaceId, deletedAt])
+  @@map("projects")
+}
+
+model ProjectMember {
+  id        String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  projectId String            @map("project_id") @db.Uuid
+  userId    String            @map("user_id") @db.Uuid
+  role      ProjectMemberRole @default(member)
+  createdAt DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@index([userId])
+  @@map("project_members")
+}
+
+/// Kanban column. The Blocked system column is enforced by a partial unique
+/// index ensuring exactly one is_blocked_system=true row per project.
+model Column {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  projectId       String   @map("project_id") @db.Uuid
+  name            String
+  /// Sparse to allow reordering without renumbering
+  position        Int
+  isBlockedSystem Boolean  @default(false) @map("is_blocked_system")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  cards   Card[]
+
+  @@index([projectId, position])
+  @@map("columns")
+}
+
+model Card {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId      String    @map("workspace_id") @db.Uuid
+  projectId        String    @map("project_id") @db.Uuid
+  columnId         String    @map("column_id") @db.Uuid
+  /// Mémorise la colonne avant Bloqué pour le retour automatique (PRD §8.3)
+  previousColumnId String?   @map("previous_column_id") @db.Uuid
+  /// Auto-incrémenté par trigger Postgres (#124, #089…)
+  shortRef         Int       @map("short_ref")
+  title            String
+  description      String?
+  /// Tag de catégorie coloré (cf. mockups: tag-tiktok, tag-design…)
+  categoryTag      String?   @map("category_tag") @db.VarChar(32)
+  dueDate          DateTime? @map("due_date") @db.Timestamptz(6)
+  /// Quand la carte est entrée dans la dernière colonne (= candidate archivage)
+  movedToLastAt    DateTime? @map("moved_to_last_at") @db.Timestamptz(6)
+  /// Position dans sa colonne (sparse)
+  position         Int
+  archivedAt       DateTime? @map("archived_at") @db.Timestamptz(6)
+  deletedAt        DateTime? @map("deleted_at") @db.Timestamptz(6)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  project        Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  column         Column          @relation(fields: [columnId], references: [id], onDelete: Restrict)
+  assignees      CardAssignee[]
+  checklistItems ChecklistItem[]
+  comments       Comment[]
+
+  @@unique([projectId, shortRef])
+  @@index([workspaceId])
+  @@index([columnId, position])
+  @@index([dueDate])
+  @@index([workspaceId, deletedAt])
+  @@map("cards")
+}
+
+model CardAssignee {
+  cardId    String   @map("card_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  card Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([cardId, userId])
+  @@index([userId])
+  @@map("card_assignees")
+}
+
+model ChecklistItem {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cardId    String   @map("card_id") @db.Uuid
+  title     String
+  isChecked Boolean  @default(false) @map("is_checked")
+  position  Int
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  card Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@index([cardId, position])
+  @@map("checklist_items")
+}
+
+model Comment {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cardId    String    @map("card_id") @db.Uuid
+  authorId  String    @map("author_id") @db.Uuid
+  body      String
+  /// SECURITY: rendered as plain text or sanitized markdown only
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  card   Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  author User @relation(fields: [authorId], references: [id], onDelete: Restrict)
+
+  @@index([cardId, createdAt])
+  @@index([authorId])
+  @@map("comments")
+}
+
+// =====================================================================
+// TEMPLATES (PRD §7 — Email + Kanban)
+// =====================================================================
+
+model EmailTemplate {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId String   @map("workspace_id") @db.Uuid
+  name        String
+  subject     String
+  /// Plain text or sanitized markdown only. NO raw HTML — rule §7.1.
+  body        String
+  /// Variables documented in PRD §7 — validated at save time.
+  variables   String[] @default([])
+  usageCount  Int      @default(0) @map("usage_count")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId])
+  @@map("email_templates")
+}
+
+/// IMPORTANT (PRD §7.2 / CLAUDE.md §6.4):
+/// Editing a template does NOT impact existing projects. Columns are
+/// copied-on-create at project creation time. Frozen.
+model KanbanTemplate {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId String   @map("workspace_id") @db.Uuid
+  name        String
+  isBuiltin   Boolean  @default(false) @map("is_builtin")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  workspace Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  columns   KanbanTemplateColumn[]
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId])
+  @@map("kanban_templates")
+}
+
+model KanbanTemplateColumn {
+  id         String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  templateId String @map("template_id") @db.Uuid
+  name       String
+  position   Int
+
+  template KanbanTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, position])
+  @@index([templateId])
+  @@map("kanban_template_columns")
+}
+
+// =====================================================================
+// INTEGRATIONS (PRD §7 — Slack / Graph)
+// =====================================================================
+
+/// SECURITY: encryptedTokens is AES-256-GCM ciphertext of access+refresh.
+/// keyVersion enables rotation without re-encrypting all rows in one shot.
+model Integration {
+  id                   String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId          String            @map("workspace_id") @db.Uuid
+  /// For user-scoped integrations (Graph), the owning user; null for workspace-scope (Slack)
+  ownerUserId          String?           @map("owner_user_id") @db.Uuid
+  kind                 IntegrationKind
+  scope                IntegrationScope
+  status               IntegrationStatus @default(inactive)
+  /// Slack workspace_id, Microsoft tenant_id, etc.
+  externalAccountId    String?           @map("external_account_id")
+  externalAccountLabel String?           @map("external_account_label")
+  /// AES-256-GCM ciphertext (base64). NEVER log this column.
+  encryptedTokens      String?           @map("encrypted_tokens")
+  keyVersion           Int               @default(1) @map("key_version")
+  /// Subset of granted scopes (audit only)
+  grantedScopes        String[]          @default([]) @map("granted_scopes")
+  expiresAt            DateTime?         @map("expires_at") @db.Timestamptz(6)
+  lastSyncedAt         DateTime?         @map("last_synced_at") @db.Timestamptz(6)
+  lastError            String?           @map("last_error")
+  createdAt            DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  workspace       Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  owner           User?                  @relation("IntegrationOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  channelMappings ClientChannelMapping[]
+
+  @@unique([workspaceId, kind, ownerUserId, externalAccountId])
+  @@index([workspaceId])
+  @@index([ownerUserId])
+  @@index([kind, status])
+  @@map("integrations")
+}
+
+/// Stored OAuth state (workspace-scoped). Single-use, TTL via expiresAt.
+/// Production may store this in Redis instead — schema kept for fallback / audit.
+model OAuthState {
+  state       String          @id @db.VarChar(128)
+  workspaceId String          @map("workspace_id") @db.Uuid
+  userId      String          @map("user_id") @db.Uuid
+  kind        IntegrationKind
+  /// Where to redirect after success
+  returnTo    String          @map("return_to")
+  expiresAt   DateTime        @map("expires_at") @db.Timestamptz(6)
+  consumedAt  DateTime?       @map("consumed_at") @db.Timestamptz(6)
+  createdAt   DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([workspaceId])
+  @@index([expiresAt])
+  @@map("oauth_states")
+}
+
+// =====================================================================
+// COMMUNICATIONS (PRD §7 — Mails / Slack)
+// =====================================================================
+
+model EmailMessage {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId       String   @map("workspace_id") @db.Uuid
+  /// Auto-associated by domain rules (PRD §7) — nullable while resolving
+  clientId          String?  @map("client_id") @db.Uuid
+  /// Microsoft Graph message id (idempotency)
+  externalId        String   @map("external_id")
+  /// Folder: inbox / sent / draft
+  folder            String   @default("inbox") @db.VarChar(16)
+  fromEmail         String   @map("from_email") @db.Citext
+  fromName          String?  @map("from_name")
+  toRecipients      String[] @default([]) @map("to_recipients")
+  ccRecipients      String[] @default([]) @map("cc_recipients")
+  subject           String
+  /// Plain text or sanitized HTML — never rendered as raw HTML in UI
+  bodyText          String?  @map("body_text")
+  bodyHtmlSanitized String?  @map("body_html_sanitized")
+  receivedAt        DateTime @map("received_at") @db.Timestamptz(6)
+  isRead            Boolean  @default(false) @map("is_read")
+  conversationId    String?  @map("conversation_id")
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  client    Client?   @relation(fields: [clientId], references: [id], onDelete: SetNull)
+
+  @@unique([workspaceId, externalId])
+  @@index([workspaceId, isRead])
+  @@index([clientId, receivedAt])
+  @@index([conversationId])
+  @@map("email_messages")
+}
+
+model SlackMessage {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId     String   @map("workspace_id") @db.Uuid
+  clientId        String?  @map("client_id") @db.Uuid
+  /// Slack channel id
+  channelId       String   @map("channel_id") @db.VarChar(64)
+  channelName     String   @map("channel_name")
+  /// Slack ts (also message id for idempotency)
+  ts              String   @db.VarChar(32)
+  /// Parent thread ts
+  threadTs        String?  @map("thread_ts") @db.VarChar(32)
+  fromSlackUserId String   @map("from_slack_user_id") @db.VarChar(32)
+  fromDisplayName String?  @map("from_display_name")
+  text            String
+  /// True if posted from NexusHub via chat.postMessage
+  postedFromApp   Boolean  @default(false) @map("posted_from_app")
+  postedAt        DateTime @map("posted_at") @db.Timestamptz(6)
+  isRead          Boolean  @default(false) @map("is_read")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  client    Client?   @relation(fields: [clientId], references: [id], onDelete: SetNull)
+
+  @@unique([channelId, ts])
+  @@index([workspaceId, isRead])
+  @@index([clientId, postedAt])
+  @@map("slack_messages")
+}
+
+// =====================================================================
+// NOTIFICATIONS, ACTIVITY, AUDIT
+// =====================================================================
+
+model NotificationPreference {
+  userId  String              @map("user_id") @db.Uuid
+  kind    NotificationKind
+  channel NotificationChannel
+  enabled Boolean             @default(true)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, kind, channel])
+  @@map("notification_preferences")
+}
+
+model PushSubscription {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  endpoint   String    @unique
+  p256dh     String
+  auth       String
+  userAgent  String?   @map("user_agent")
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  lastUsedAt DateTime? @map("last_used_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("push_subscriptions")
+}
+
+model Notification {
+  id          String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId String              @map("workspace_id") @db.Uuid
+  userId      String              @map("user_id") @db.Uuid
+  kind        NotificationKind
+  channel     NotificationChannel
+  /// Free-form payload (card_id, comment_id, etc.) — sanitized
+  data        Json                @default("{}")
+  readAt      DateTime?           @map("read_at") @db.Timestamptz(6)
+  sentAt      DateTime?           @map("sent_at") @db.Timestamptz(6)
+  createdAt   DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([userId, readAt])
+  @@map("notifications")
+}
+
+model ActivityEvent {
+  id          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId String       @map("workspace_id") @db.Uuid
+  /// Null if performed by the system (auto-move, auto-block, archiving)
+  actorId     String?      @map("actor_id") @db.Uuid
+  kind        ActivityKind
+  /// Subject (project/card/...) — denormalized for UI feed
+  subjectType String       @map("subject_type") @db.VarChar(32)
+  subjectId   String       @map("subject_id") @db.Uuid
+  data        Json         @default("{}")
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  actor     User?     @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, createdAt])
+  @@map("activity_events")
+}
+
+/// Append-only audit trail. RLS denies UPDATE / DELETE; INSERT only by service-role.
+model AuditLog {
+  id          String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId String?     @map("workspace_id") @db.Uuid
+  actorId     String?     @map("actor_id") @db.Uuid
+  action      AuditAction
+  /// Optional resource pointer (subject_type:subject_id)
+  subjectType String?     @map("subject_type") @db.VarChar(32)
+  subjectId   String?     @map("subject_id") @db.Uuid
+  /// PII-safe metadata (no email content, no token)
+  data        Json        @default("{}")
+  ip          String?     @db.Inet
+  userAgent   String?     @map("user_agent")
+  createdAt   DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  workspace Workspace? @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  actor     User?      @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, createdAt])
+  @@index([actorId, createdAt])
+  @@index([action, createdAt])
+  @@map("audit_log")
+}

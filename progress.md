@@ -20,7 +20,7 @@
 | ----- | ---------------------------------------- | ------------- | ------ |
 | 0     | Cadrage & fondations                     | M             | `[x]`  |
 | 1     | Setup repo, CI/CD, sécurité de base      | M             | `[~]`  |
-| 2     | Modèle de données + Auth                 | L             | `[ ]`  |
+| 2     | Modèle de données + Auth                 | L             | `[~]`  |
 | 3     | Design system + Shell applicatif         | L             | `[ ]`  |
 | 4     | Module Clients & Contacts (RACI)         | M             | `[ ]`  |
 | 5     | Module Projets (Kanban + règles auto)    | XL            | `[ ]`  |
@@ -103,25 +103,33 @@
 
 ### 2.1 Schéma Prisma
 
-- [ ] Modèles : `Workspace`, `User`, `Membership` (avec rôle `Admin|Member`), `Invitation`
-- [ ] Modèles : `Client`, `Contact` (avec RACI), `ClientChannelMapping` (Slack)
-- [ ] Modèles : `Project`, `ProjectType`, `ProjectMember`
-- [ ] Modèles : `Column` (avec flag `is_blocked_system`), `Card`, `CardAssignee`, `ChecklistItem`, `Comment`
-- [ ] Modèles : `KanbanTemplate` + `KanbanTemplateColumn`, `EmailTemplate`
-- [ ] Modèles : `Integration` (type, status, encrypted_tokens, key_version), `OAuthState`
-- [ ] Modèles : `Notification`, `ActivityEvent`, `AuditLog` (append-only)
-- [ ] Modèles : `EmailMessage`, `SlackMessage`, `Note`
-- [ ] Index sur `workspace_id`, `client_id`, `due_date`, `column_id`, `created_at`
-- [ ] **RLS Postgres** sur toutes les tables (policies par `workspace_id`)
-- [ ] Soft delete (`deleted_at`) sur `Project`, `Card`, `Client`, `Contact`
-- [ ] Migration initiale appliquée + seed dev (5 clients, 14 projets fictifs, type des mockups)
+- [x] Modèles : `Workspace`, `User` (mirror auth.users), `Membership` (avec rôle `admin|member`), `Invitation` (token_hash + expires_at)
+- [x] Modèles : `Client`, `Contact` (RACI enum), `ClientChannelMapping` (Slack workspace-level)
+- [x] Modèles : `Project` (archive_auto_done opt-in), `ProjectType`, `ProjectMember` (role lead/member)
+- [x] Modèles : `Column` (avec `is_blocked_system`), `Card` (`previous_column_id`, `short_ref` auto), `CardAssignee`, `ChecklistItem`, `Comment`
+- [x] Modèles : `KanbanTemplate` + `KanbanTemplateColumn`, `EmailTemplate`
+- [x] Modèles : `Integration` (encrypted_tokens + key_version + scope workspace/user), `OAuthState`
+- [x] Modèles : `Notification`, `PushSubscription`, `NotificationPreference`, `ActivityEvent`, `AuditLog` (append-only)
+- [x] Modèles : `EmailMessage`, `SlackMessage` (Note V1.5)
+- [x] Index sur `workspace_id`, `client_id`, `due_date`, `column_id`, `created_at` + uniques métier
+- [x] **RLS Postgres** complet (`prisma/sql/02_rls_policies.sql`) — policies par workspace_id, Admin-only sur invitations/intégrations/audit
+- [x] Triggers (`prisma/sql/03_triggers_and_constraints.sql`) : sync auth.users → public.users, last-Admin protection, garde Bloqué column unique, short_ref auto, updated_at générique
+- [x] Soft delete (`deleted_at`) sur `Project`, `Card`, `Client`, `Contact`, `Comment`
+- [x] Helpers Postgres (`prisma/sql/01_extensions_and_helpers.sql`) : `workspace_ids_for_current_user()`, `is_workspace_admin()`
+- [x] Schéma validé via `prisma validate` + `prisma generate` OK
+- [ ] Migration initiale appliquée sur Supabase staging (en attente — dépend de B)
+- [ ] Seed dev (5 clients, 14 projets fictifs, types des mockups) — à écrire en Phase 2.3
 
 ### 2.2 Crypto utilitaire
 
-- [ ] `packages/domain/crypto`: AES-256-GCM helpers `encrypt(plain, keyVersion)` / `decrypt(cipher, keyVersion)`
-- [ ] HMAC helpers (signature invitations, OAuth state, webhook validation)
-- [ ] Argon2id wrapper avec params durcis
-- [ ] **Tests unitaires** sur tous les helpers crypto (vecteurs de test)
+- [x] `packages/domain/crypto` : AES-256-GCM `encryptString` / `decryptString` avec key versioning (rotation prête)
+- [x] HMAC-SHA-256 `hmacSha256` / `verifyHmacSha256` (signature invitations, webhooks)
+- [x] SHA-256 hex `sha256Hex` (token-at-rest)
+- [x] `randomToken` (url-safe, 256-bit entropy)
+- [x] `createInvitationToken` / `validateInvitationTokenShape` (token = random.hmac, hash en DB)
+- [x] `timingSafeEqual` (constant-time string compare)
+- [s] Argon2id wrapper : **délégué à Supabase Auth** (cf. ADR 0002) — pas d'implémentation NexusHub
+- [x] **25 tests unitaires** : round-trip, IV unique, key rotation, GCM auth-tag, HMAC verification, token forgery, timing safety
 
 ### 2.3 Auth (Supabase Auth + flow invitation custom)
 
@@ -472,10 +480,14 @@
 
 ## Journal d'avancement
 
-| Date       | Phase | Étape   | Note                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| ---------- | ----- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-04-27 | 0     | —       | Création du plan, analyse PRD + 14 mockups + design system. Aucune ligne de code écrite.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| 2026-04-27 | 0     | 0.1–0.6 | 6 ADR créées (`docs/adr/0001`–`0006`). Décisions actées : Supabase Auth, Supabase DB, Supabase Realtime, Inngest, design tokens depuis mockups, 15 hypothèses PRD §10 tranchées.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| 2026-04-27 | 1     | 1.1–1.5 | **Bootstrap monorepo** : git init, pnpm workspaces + turbo, tsconfig.base strict, `apps/web` (Next 15 + RSC + middleware CSP/HSTS), `packages/{db,domain,integrations,ui}` squelettés. Logique métier Kanban/Checklist/Permissions/ClientFilter implémentée + tests Vitest. Outillage : ESLint flat (security rules), Prettier, Husky (pre-commit gitleaks + lint-staged, pre-push typecheck+test, commit-msg commitlint), Vitest + Playwright + MSW. Sécurité pipeline : `.gitleaks.toml`, GitHub Actions CI (install/lint/typecheck/test/build/e2e/security), CodeQL, Renovate, PR template, CODEOWNERS. Docs : README, `.env.example`, `docs/security.md`, `docs/api.md`, runbooks (secret-rotation, incident-response, secret-management). |
+| Date       | Phase | Étape   | Note                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ---------- | ----- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-04-27 | 0     | —       | Création du plan, analyse PRD + 14 mockups + design system. Aucune ligne de code écrite.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| 2026-04-27 | 0     | 0.1–0.6 | 6 ADR créées (`docs/adr/0001`–`0006`). Décisions actées : Supabase Auth, Supabase DB, Supabase Realtime, Inngest, design tokens depuis mockups, 15 hypothèses PRD §10 tranchées.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| 2026-04-27 | 1     | 1.1–1.5 | **Bootstrap monorepo** : git init, pnpm workspaces + turbo, tsconfig.base strict, `apps/web` (Next 15 + RSC + middleware CSP/HSTS), `packages/{db,domain,integrations,ui}` squelettés. Logique métier Kanban/Checklist/Permissions/ClientFilter implémentée + tests Vitest. Outillage : ESLint flat (security rules), Prettier, Husky (pre-commit gitleaks + lint-staged, pre-push typecheck+test, commit-msg commitlint), Vitest + Playwright + MSW. Sécurité pipeline : `.gitleaks.toml`, GitHub Actions CI (install/lint/typecheck/test/build/e2e/security), CodeQL, Renovate, PR template, CODEOWNERS. Docs : README, `.env.example`, `docs/security.md`, `docs/api.md`, runbooks (secret-rotation, incident-response, secret-management). Commit `1eb54ba`. |
+| 2026-04-27 | 1     | gates   | Gates verts : 5 typecheck, 5 lint, 23 tests passent. Fixes : suppression imports `.ts/.tsx` (Bundler resolution), accès `process.env['X']` (noPropertyAccessFromIndexSignature), `@vitejs/plugin-react` ajouté, ESLint deps mutualisées au root, override tests.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| 2026-04-27 | 2     | 2.1     | **Schéma Prisma complet** (~30 modèles, 8 enums) : Workspace/User/Membership/Invitation, Client/Contact/Channel mapping, Project/Column/Card/Checklist/Comment, Templates Email & Kanban, Integration/OAuthState, Notifications/Activity/AuditLog, EmailMessage/SlackMessage. RLS policies SQL (Admin-only sur invitations/intégrations/audit, member-CRUD sur le reste, encrypted_tokens column-revoked). Triggers : sync auth.users → public.users, last-Admin protection, garde colonne Bloqué unique, Card.short_ref auto. `prisma validate` + `prisma generate` OK.                                                                                                                                                                                         |
+| 2026-04-27 | 2     | 2.2     | **Crypto utilities** dans `packages/domain/crypto` : AES-256-GCM avec key-versioning, HMAC-SHA-256, SHA-256, random tokens 256-bit, invitation token (random.hmac + sha256), constant-time compare. **25 tests** : round-trip, key rotation, GCM auth-tag tampering, HMAC forgery, token shape forgery. Argon2id délégué à Supabase Auth.                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| 2026-04-27 | —     | docs    | Runbook `docs/runbooks/supabase-setup.md` (provisioning Supabase staging pas-à-pas) ajouté pour parallèle utilisateur.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 
 > **Règle :** chaque session de travail ajoute une ligne ici (ou plusieurs si plusieurs étapes touchées).
