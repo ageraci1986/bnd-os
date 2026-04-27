@@ -45,10 +45,20 @@ Le script :
 
 ## 4. Lancer l'app
 
+⚠️ **Première fois seulement** — Next.js 15 cherche `.env.local` dans `apps/web/`. Crée un symlink vers le `.env.local` racine :
+
+```bash
+ln -sf ../../.env.local apps/web/.env.local
+```
+
+Puis lance le dev server :
+
 ```bash
 pnpm dev
 # http://localhost:3000
 ```
+
+> Au boot tu dois voir `▲ Next.js 15.x ... - Environments: .env.local` — sinon le fichier n'est pas chargé et toutes les vars sont undefined côté serveur.
 
 ## 5. Tester le flow complet
 
