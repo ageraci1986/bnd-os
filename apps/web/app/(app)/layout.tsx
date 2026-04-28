@@ -1,24 +1,47 @@
 /**
- * Minimal `(app)` shell — Phase 2.5 (Step C).
+ * Authenticated app shell — Phase 3 (Step B.3).
  *
- * Provides just enough chrome to test the auth + invitation loop end-to-end:
- *  - Topbar with brand, current workspace, link to /team (Admin only),
- *    and a Sign-out form.
- *  - Server-side `requireUser()` guard. Members without a workspace get
- *    redirected to /login (defense in depth — middleware already gates).
+ * Composes the design-system primitives (Sidebar, Topbar, ContextBar)
+ * and resolves the global client filter from the URL (PRD §8.1).
  *
- * The full Sidebar + ContextBar + client filter (PRD §6) lands in Phase 3 (Step B).
+ * Server Component: every client / project count comes from a single
+ * Prisma transaction so the sidebar stays consistent across navigation.
  */
 import Link from 'next/link';
 import { prisma } from '@nexushub/db';
 import { Roles } from '@nexushub/domain';
+import {
+  Sidebar,
+  SidebarBrand,
+  SidebarFooter,
+  SidebarSection,
+  Topbar,
+  SearchBar,
+} from '@nexushub/ui';
+
 import { requireUser } from '@/lib/auth';
-import { signOut } from '@/features/auth/actions/sign-out';
+import {
+  getClientFilterFromSearchParams,
+  resolveActiveClient,
+  clientSlug,
+} from '@/lib/client-filter/server';
 
-export default async function AppLayout({ children }: { children: React.ReactNode }) {
+import { NavLink } from '@/features/shell/components/nav-link';
+import { ClientLink, AllClientsLink } from '@/features/shell/components/client-link';
+import { UserChip } from '@/features/shell/components/user-chip';
+import { ContextBarHost } from '@/features/shell/components/context-bar-host';
+
+interface AppLayoutProps {
+  readonly children: React.ReactNode;
+  readonly searchParams?: Promise<Record<string, string | string[] | undefined>>;
+}
+
+export default async function AppLayout({ children, searchParams }: AppLayoutProps) {
   const ctx = await requireUser();
+  const sp = (await searchParams) ?? {};
+  const filter = getClientFilterFromSearchParams(sp);
 
-  const [workspace, profile] = await Promise.all([
+  const [workspace, profile, clients, projectsCount, activeClient] = await Promise.all([
     prisma.workspace.findUniqueOrThrow({
       where: { id: ctx.workspaceId },
       select: { name: true, slug: true },
@@ -27,13 +50,23 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       where: { id: ctx.userId },
       select: { firstName: true, lastName: true, email: true },
     }),
+    prisma.client.findMany({
+      where: { workspaceId: ctx.workspaceId, deletedAt: null, archivedAt: null },
+      orderBy: { name: 'asc' },
+      select: {
+        id: true,
+        name: true,
+        colorToken: true,
+        _count: {
+          select: { projects: { where: { deletedAt: null, archivedAt: null } } },
+        },
+      },
+    }),
+    prisma.project.count({
+      where: { workspaceId: ctx.workspaceId, deletedAt: null, archivedAt: null },
+    }),
+    resolveActiveClient(filter, ctx.workspaceId),
   ]);
-
-  const initials =
-    [profile.firstName?.[0], profile.lastName?.[0]]
-      .filter((c): c is string => Boolean(c))
-      .join('')
-      .toUpperCase() || profile.email.slice(0, 2).toUpperCase();
 
   const displayName =
     [profile.firstName, profile.lastName]
@@ -41,74 +74,82 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       .join(' ')
       .trim() || profile.email;
 
+  const initials =
+    [profile.firstName?.[0], profile.lastName?.[0]]
+      .filter((c): c is string => Boolean(c))
+      .join('')
+      .toUpperCase() || profile.email.slice(0, 2).toUpperCase();
+
+  const isAdmin = ctx.role === Roles.Admin;
+
   return (
-    <div className="min-h-screen">
-      <header
-        className="sticky top-0 z-10 flex items-center justify-between border-b border-[color:var(--color-border-soft)] bg-[color:var(--glass-bg)] px-10 py-5 backdrop-blur"
-        style={{ backgroundColor: 'var(--color-bg-app)' }}
-      >
-        <div className="flex items-center gap-4">
-          <Link href="/overview" className="flex items-center gap-3" aria-label="Tableau de bord">
-            <span
-              className="grid h-9 w-9 place-items-center rounded-[10px] font-extrabold text-white shadow-md"
-              style={{ background: 'linear-gradient(135deg,#8B2BE2,#FF2A6D)' }}
-            >
-              N
-            </span>
-            <span className="flex flex-col leading-tight">
-              <span className="text-[15px] font-extrabold tracking-tight">NexusHub</span>
-              <span className="text-[10px] font-semibold uppercase tracking-[1.2px] text-[color:var(--color-text-muted)]">
-                {workspace.name}
-              </span>
-            </span>
-          </Link>
-        </div>
+    <div className="grid min-h-screen grid-cols-[260px_1fr]">
+      <Sidebar>
+        <SidebarBrand mark="N" name="NexusHub" subtitle={workspace.name} />
 
-        <nav className="flex items-center gap-2">
-          <Link
-            href="/overview"
-            className="rounded-full px-4 py-2 text-[13px] font-semibold text-[color:var(--color-text-muted)] hover:bg-[color:var(--color-bg-hover)] hover:text-[color:var(--color-text-main)]"
-          >
-            Overview
-          </Link>
-          {ctx.role === Roles.Admin ? (
+        <SidebarSection label="Main menu">
+          <NavLink href="/overview" icon="◈" label="Tableau de bord" />
+          <NavLink href="/projects" icon="◱" label="Projets" count={projectsCount} />
+          <NavLink href="/communications" icon="✉" label="Communications" />
+        </SidebarSection>
+
+        <SidebarSection label="Clients actifs">
+          <AllClientsLink count={clients.length} />
+          {clients.map((c) => (
+            <ClientLink
+              key={c.id}
+              slug={clientSlug(c.name)}
+              name={c.name}
+              colorToken={c.colorToken}
+              count={c._count.projects}
+            />
+          ))}
+        </SidebarSection>
+
+        <SidebarSection label="Atelier">
+          <NavLink href="/clients" icon="◉" label="Clients" />
+          <NavLink href="/templates/email" icon="✎" label="Templates e-mail" />
+          <NavLink href="/templates/kanban" icon="▦" label="Templates Kanban" />
+          {isAdmin ? <NavLink href="/team" icon="⎔" label="Équipe" /> : null}
+          <NavLink href="/integrations" icon="⟷" label="Intégrations" />
+          <NavLink href="/settings" icon="⚙" label="Paramètres" />
+        </SidebarSection>
+
+        <SidebarFooter>
+          <UserChip
+            displayName={displayName}
+            email={profile.email}
+            initials={initials}
+            role={isAdmin ? 'Admin' : 'Membre'}
+          />
+        </SidebarFooter>
+      </Sidebar>
+
+      <div className="flex min-w-0 flex-col overflow-x-hidden">
+        <Topbar
+          left={<SearchBar disabled />}
+          right={
             <Link
-              href="/team"
-              className="rounded-full px-4 py-2 text-[13px] font-semibold text-[color:var(--color-text-muted)] hover:bg-[color:var(--color-bg-hover)] hover:text-[color:var(--color-text-main)]"
+              href="/projects"
+              className="btn btn-primary btn-sm"
+              aria-label="Créer un nouveau projet"
             >
-              Équipe
+              + Nouveau projet
             </Link>
-          ) : null}
-        </nav>
+          }
+        />
 
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 text-right">
-            <div className="hidden flex-col text-right leading-tight sm:flex">
-              <span className="text-[13px] font-bold">{displayName}</span>
-              <span className="text-[10px] font-semibold uppercase tracking-[0.5px] text-[color:var(--color-text-muted)]">
-                {ctx.role === Roles.Admin ? 'Admin' : 'Membre'}
-              </span>
-            </div>
-            <span
-              className="grid h-9 w-9 place-items-center rounded-full text-xs font-bold text-white"
-              style={{ background: 'linear-gradient(135deg,#8B2BE2,#FF2A6D)' }}
-              aria-hidden="true"
-            >
-              {initials}
-            </span>
-          </div>
-          <form action={signOut}>
-            <button
-              type="submit"
-              className="rounded-full border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] px-4 py-2 text-[13px] font-bold shadow-sm transition hover:bg-[color:var(--color-bg-hover)]"
-            >
-              Déconnexion
-            </button>
-          </form>
+        <div className="px-10 pb-10">
+          <ContextBarHost
+            workspaceName={workspace.name}
+            activeClient={
+              activeClient ? { name: activeClient.name, colorToken: activeClient.colorToken } : null
+            }
+            totalClients={clients.length}
+          />
+          {children}
         </div>
-      </header>
-
-      <main className="px-10 py-10">{children}</main>
+      </div>
     </div>
   );
 }
