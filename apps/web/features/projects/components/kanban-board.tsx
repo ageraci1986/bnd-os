@@ -1,6 +1,7 @@
 'use client';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+// useEffect kept for the incomingKey resync below.
 import {
   DndContext,
   PointerSensor,
@@ -119,8 +120,19 @@ export function KanbanBoard({ csrfToken, projectId, columns, cards }: KanbanBoar
 
   const activeCard = activeId ? (localCards.find((c) => c.id === activeId) ?? null) : null;
 
+  // dnd-kit's auto-generated `DndDescribedBy-N` aria-describedby uses a
+  // module-level counter that diverges between SSR and CSR. Pinning the
+  // DndContext to a React-stable id makes the generated attributes
+  // identical on both renders.
+  const dndId = useId();
+
   return (
-    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+    <DndContext
+      id={dndId}
+      sensors={sensors}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+    >
       <div className="kanban-board">
         {columns.map((col) => (
           <KanbanColumn
