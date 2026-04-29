@@ -41,3 +41,13 @@ test('login page exposes the shell brand mark', async ({ page }) => {
   await page.goto('/login');
   await expect(page.getByText(/NexusHub/i).first()).toBeVisible();
 });
+
+test('clients sub-routes (?selected=, ?edit=1) inherit the auth gate', async ({ page }) => {
+  // The middleware matches on `pathname.startsWith('/clients')`, so query
+  // params should never accidentally bypass the redirect.
+  await page.goto('/clients?selected=acme');
+  await expect(page).toHaveURL(/\/login(\?|$)/);
+
+  await page.goto('/clients?selected=acme&edit=1');
+  await expect(page).toHaveURL(/\/login(\?|$)/);
+});
