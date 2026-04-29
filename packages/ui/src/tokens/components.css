@@ -582,6 +582,173 @@
   font-weight: 700;
 }
 
+/* ---- Kanban board (mockup §04-kanban, faithful port) ---------------- */
+.kanban-board {
+  display: flex;
+  gap: 20px;
+  overflow-x: auto;
+  padding-bottom: 24px;
+  margin: 0 -40px;
+  padding-left: 40px;
+  padding-right: 40px;
+}
+.column {
+  flex: 0 0 310px;
+  display: flex;
+  flex-direction: column;
+}
+.col-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+  padding: 0 4px;
+}
+.col-title {
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.col-title .col-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-accent-primary);
+}
+.col-count {
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  padding: 3px 10px;
+  border-radius: 9999px;
+  font-size: 11px;
+  color: var(--text-main);
+  font-weight: 700;
+}
+.column.blocked {
+  background: var(--color-danger-bg);
+  border: 1px solid rgba(225, 29, 72, 0.2);
+  border-radius: 12px;
+  padding: 18px 14px;
+}
+.column.blocked .col-title {
+  color: var(--color-danger);
+}
+.column.blocked .col-title .col-dot {
+  background: var(--color-danger);
+}
+.col-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-height: 24px;
+}
+.col-cards.is-over {
+  background: var(--accent-gradient-soft);
+  border-radius: 12px;
+  outline: 1px dashed var(--color-accent-primary);
+  outline-offset: 4px;
+}
+
+/* Cards */
+.kcard {
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  cursor: grab;
+  transition:
+    transform 0.12s,
+    box-shadow 0.12s,
+    border-color 0.12s;
+  box-shadow: var(--shadow-card);
+  position: relative;
+}
+.kcard:hover {
+  border-color: rgba(138, 43, 226, 0.3);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-hover);
+}
+.kcard.dragging {
+  opacity: 0.5;
+  cursor: grabbing;
+}
+.kcard-ref {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-ghost);
+  margin-bottom: 6px;
+}
+.kcard-title {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--text-main);
+}
+.kcard-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 10px;
+}
+.kcard-due {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.kcard-due.overdue {
+  color: var(--color-danger);
+  font-weight: 700;
+}
+.kcard-due.soon {
+  color: var(--color-warning);
+  font-weight: 700;
+}
+.kcard.blocked {
+  border-color: rgba(225, 29, 72, 0.4);
+}
+.kcard.blocked::after {
+  content: 'Bloqué';
+  position: absolute;
+  top: -9px;
+  right: 12px;
+  background: var(--color-danger);
+  color: #fff;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.add-card-btn {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px dashed var(--border-light);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    color 0.15s,
+    background-color 0.15s;
+  margin-top: 4px;
+}
+.add-card-btn:hover {
+  border-color: var(--color-accent-primary);
+  color: var(--color-accent-primary);
+  background: var(--accent-gradient-soft);
+}
+
 /* ---- Auth split layout ---------------------------------------------- */
 .auth {
   min-height: 100vh;

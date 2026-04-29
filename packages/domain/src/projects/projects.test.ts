@@ -5,6 +5,7 @@ import {
   BUILTIN_PROJECT_TYPES,
   BUILTIN_TEMPLATES,
   buildProjectColumns,
+  computeCardPosition,
   findTemplate,
   validateProjectDates,
   validateProjectName,
@@ -129,5 +130,42 @@ describe('buildProjectColumns', () => {
       position: BLOCKED_COLUMN_POSITION,
       isBlockedSystem: true,
     });
+  });
+});
+
+describe('computeCardPosition', () => {
+  it('returns 1024 when the column is empty', () => {
+    expect(computeCardPosition({ orderedSiblingPositions: [], targetIndex: 0 })).toBe(1024);
+  });
+
+  it('inserts at the top by halving the first sibling', () => {
+    expect(
+      computeCardPosition({ orderedSiblingPositions: [2048, 3072, 4096], targetIndex: 0 }),
+    ).toBe(1024);
+  });
+
+  it('inserts at the bottom by appending +1024', () => {
+    expect(
+      computeCardPosition({ orderedSiblingPositions: [1024, 2048, 3072], targetIndex: 3 }),
+    ).toBe(4096);
+  });
+
+  it('inserts in the middle as the floor midpoint', () => {
+    expect(
+      computeCardPosition({ orderedSiblingPositions: [1024, 2048, 3072], targetIndex: 1 }),
+    ).toBe(1536);
+    expect(
+      computeCardPosition({ orderedSiblingPositions: [1024, 2048, 3072], targetIndex: 2 }),
+    ).toBe(2560);
+  });
+
+  it('handles a tight gap (positions adjacent — slot still computes)', () => {
+    // before=10, after=11 → floor(21/2)=10 (collision!) — caller must rebalance
+    // but the function itself shouldn't throw.
+    expect(computeCardPosition({ orderedSiblingPositions: [10, 11], targetIndex: 1 })).toBe(10);
+  });
+
+  it('falls back to first-1024 when the only sibling is at position 1', () => {
+    expect(computeCardPosition({ orderedSiblingPositions: [1], targetIndex: 0 })).toBe(-1023);
   });
 });

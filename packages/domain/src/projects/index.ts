@@ -121,6 +121,37 @@ export interface ProjectColumnSeed {
 export const BLOCKED_COLUMN_POSITION = 9999;
 export const BLOCKED_COLUMN_NAME = 'Bloqué';
 
+/**
+ * Compute the `position` to assign to a card moved into the slot of index
+ * `targetIndex` within an array of existing card positions. The list is
+ * assumed to already exclude the card being moved.
+ *
+ * Sparse 1024-step positioning means we can almost always pick the
+ * midpoint between neighbours; the first / last / empty cases are
+ * special-cased so positions never collide with the system Bloqué
+ * column at 9999.
+ */
+export function computeCardPosition(input: {
+  readonly orderedSiblingPositions: readonly number[];
+  readonly targetIndex: number;
+}): number {
+  const { orderedSiblingPositions: siblings, targetIndex } = input;
+  const first = siblings[0];
+  if (first === undefined) return 1024;
+
+  if (targetIndex <= 0) {
+    return first > 1 ? Math.floor(first / 2) : first - 1024;
+  }
+  const last = siblings[siblings.length - 1];
+  if (last !== undefined && targetIndex >= siblings.length) {
+    return last + 1024;
+  }
+  const before = siblings[targetIndex - 1];
+  const after = siblings[targetIndex];
+  if (before === undefined || after === undefined) return 1024;
+  return Math.floor((before + after) / 2);
+}
+
 export function buildProjectColumns(template: KanbanTemplate): readonly ProjectColumnSeed[] {
   // Sparse positions (1024-step) so columns can be reordered without rewriting.
   const userColumns = template.columns.map((name, idx) => ({
