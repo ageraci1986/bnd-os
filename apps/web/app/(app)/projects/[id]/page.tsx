@@ -26,8 +26,12 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
   const sp = (await searchParams) ?? {};
   const openCardId = readParam(sp['card']);
 
-  const [csrf, project] = await Promise.all([
+  const [csrf, workspace, project] = await Promise.all([
     getCsrfTokenForForm(),
+    prisma.workspace.findUniqueOrThrow({
+      where: { id: ctx.workspaceId },
+      select: { name: true },
+    }),
     prisma.project.findFirst({
       where: { id, workspaceId: ctx.workspaceId, deletedAt: null },
       select: {
@@ -43,7 +47,13 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
         cards: {
           where: { deletedAt: null },
           orderBy: { position: 'asc' },
-          select: { id: true, columnId: true, shortRef: true, title: true },
+          select: {
+            id: true,
+            columnId: true,
+            shortRef: true,
+            title: true,
+            categoryTag: true,
+          },
         },
       },
     }),
@@ -65,6 +75,7 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
           description: true,
           dueDate: true,
           shortRef: true,
+          categoryTag: true,
           column: { select: { name: true, isBlockedSystem: true } },
           checklistItems: {
             orderBy: { position: 'asc' },
@@ -120,6 +131,8 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
       {openCard ? (
         <CardModal
           csrfToken={csrf}
+          workspaceName={workspace.name}
+          projectName={project.name}
           card={{
             id: openCard.id,
             title: openCard.title,
@@ -128,6 +141,7 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
             shortRef: openCard.shortRef,
             columnName: openCard.column.name,
             columnIsBlocked: openCard.column.isBlockedSystem,
+            categoryTag: openCard.categoryTag,
             checklist: openCard.checklistItems,
           }}
         />

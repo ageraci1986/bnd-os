@@ -1,7 +1,12 @@
 'use client';
 import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { AUTO_ADVANCE_DELAY_MS } from '@nexushub/domain';
+import { Tag } from '@nexushub/ui';
+import {
+  AUTO_ADVANCE_DELAY_MS,
+  BUILTIN_CARD_CATEGORIES,
+  type BuiltinCardCategoryId,
+} from '@nexushub/domain';
 import {
   createChecklistItem,
   deleteChecklistItem,
@@ -16,6 +21,8 @@ import { CSRF_FIELD_NAME } from '@/lib/csrf/field';
 
 export interface CardModalProps {
   readonly csrfToken: string;
+  readonly workspaceName: string;
+  readonly projectName: string;
   readonly card: {
     readonly id: string;
     readonly title: string;
@@ -24,6 +31,7 @@ export interface CardModalProps {
     readonly shortRef: number;
     readonly columnName: string;
     readonly columnIsBlocked: boolean;
+    readonly categoryTag: string | null;
     readonly checklist: readonly ChecklistItemDTO[];
   };
 }
@@ -34,7 +42,7 @@ export interface CardModalProps {
  * (1.8s — `AUTO_ADVANCE_DELAY_MS`) lives client-side and is cancelled
  * if the user un-ticks before deadline.
  */
-export function CardModal({ csrfToken, card }: CardModalProps) {
+export function CardModal({ csrfToken, workspaceName, projectName, card }: CardModalProps) {
   const router = useRouter();
   const [items, setItems] = useState<readonly ChecklistItemDTO[]>(card.checklist);
   const [_pending, startTransition] = useTransition();
@@ -68,6 +76,10 @@ export function CardModal({ csrfToken, card }: CardModalProps) {
         <header className="modal-head">
           <div>
             <div className="modal-breadcrumb">
+              <span>{workspaceName}</span>
+              <span>·</span>
+              <span>{projectName}</span>
+              <span>·</span>
               <span>#{String(card.shortRef).padStart(3, '0')}</span>
               <span>·</span>
               <strong>{card.columnName}</strong>
@@ -84,6 +96,11 @@ export function CardModal({ csrfToken, card }: CardModalProps) {
         </header>
 
         <div className="modal-body">
+          <section className="modal-section">
+            <div className="section-label">Catégorie</div>
+            <CategorySelector cardId={card.id} initial={card.categoryTag} />
+          </section>
+
           <section className="modal-section">
             <div className="section-label">Description</div>
             <CardDescriptionInput cardId={card.id} initial={card.description ?? ''} />
@@ -142,8 +159,68 @@ export function CardModal({ csrfToken, card }: CardModalProps) {
             <DeleteCardButton cardId={card.id} csrfToken={csrfToken} onDeleted={close} />
           </section>
         </div>
+
+        <footer className="modal-foot">
+          <span className="modal-foot-info">
+            ✦ Sauvegarde automatique — vos modifications sont enregistrées au fil de l’eau.
+          </span>
+          <button type="button" className="btn btn-primary btn-sm" onClick={close}>
+            Fermer
+          </button>
+        </footer>
       </article>
     </>
+  );
+}
+
+// ---------- Category selector --------------------------------------------
+
+function CategorySelector({ cardId, initial }: { cardId: string; initial: string | null }) {
+  const [active, setActive] = useState<string | null>(initial);
+
+  const pick = (next: string | null) => {
+    setActive(next);
+    void updateCard({ cardId, categoryTag: next }).catch(() => {
+      setActive(initial); // rollback
+    });
+  };
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <button
+        type="button"
+        onClick={() => pick(null)}
+        aria-pressed={active === null}
+        className="rounded-full border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.5px] text-[color:var(--color-text-muted)] transition hover:border-[color:var(--color-text-main)] hover:text-[color:var(--color-text-main)] aria-pressed:border-[color:var(--color-accent-primary)] aria-pressed:text-[color:var(--color-accent-primary)]"
+        style={
+          active === null
+            ? { borderColor: 'var(--color-accent-primary)', color: 'var(--color-accent-primary)' }
+            : undefined
+        }
+      >
+        Aucune
+      </button>
+      {BUILTIN_CARD_CATEGORIES.map((c) => {
+        const isActive = active === c.id;
+        return (
+          <button
+            key={c.id}
+            type="button"
+            onClick={() => pick(c.id)}
+            aria-pressed={isActive}
+            style={{
+              outline: isActive ? '2px solid var(--color-accent-primary)' : 'none',
+              outlineOffset: 2,
+            }}
+            className="rounded-full"
+          >
+            <Tag variant={c.id as BuiltinCardCategoryId} size="sm">
+              {c.label}
+            </Tag>
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -337,11 +414,14 @@ function ChecklistAdder({
       <input
         type="text"
         maxLength={200}
-        placeholder="Ajouter un élément…"
+        placeholder="Ajouter un élément… (Entrée pour valider)"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         disabled={pending}
       />
+      <button type="submit" disabled={pending || title.trim().length === 0}>
+        {pending ? 'Ajout…' : 'Ajouter'}
+      </button>
     </form>
   );
 }

@@ -54,6 +54,27 @@ export const BUILTIN_PROJECT_TYPES = [
 
 export type BuiltinProjectTypeId = (typeof BUILTIN_PROJECT_TYPES)[number]['id'];
 
+// ---------- Card category tags (PRD §6.3, mockup §04-kanban) ----------------
+
+/**
+ * Built-in card category tags. The id maps 1:1 to a Tag variant in
+ * `@nexushub/ui` (design / copy / video / strategy / tiktok / insta).
+ */
+export const BUILTIN_CARD_CATEGORIES = [
+  { id: 'design', label: 'Design' },
+  { id: 'copy', label: 'Copy' },
+  { id: 'video', label: 'Vidéo' },
+  { id: 'strategy', label: 'Stratégie' },
+  { id: 'tiktok', label: 'TikTok' },
+  { id: 'insta', label: 'Insta' },
+] as const;
+
+export type BuiltinCardCategoryId = (typeof BUILTIN_CARD_CATEGORIES)[number]['id'];
+
+export function isBuiltinCardCategory(value: unknown): value is BuiltinCardCategoryId {
+  return typeof value === 'string' && BUILTIN_CARD_CATEGORIES.some((c) => c.id === value);
+}
+
 // ---------- Built-in Kanban templates (PRD §7 step 3) -----------------------
 
 /**

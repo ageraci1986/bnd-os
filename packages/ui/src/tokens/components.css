@@ -988,15 +988,68 @@
   padding: 12px 0 0;
 }
 .check-add-plus {
-  width: 20px;
-  height: 20px;
-  border: 2px dashed var(--color-accent-primary);
-  border-radius: 6px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background-image: var(--accent-gradient);
   display: grid;
   place-items: center;
-  font-size: 12px;
-  color: var(--color-accent-primary);
+  font-size: 14px;
+  font-weight: 800;
+  color: #fff;
   flex-shrink: 0;
+  line-height: 1;
+}
+.check-add input {
+  border: 1px solid var(--border-light);
+  background: var(--bg-card);
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+.check-add input:focus {
+  border-color: var(--color-accent-primary);
+  box-shadow: 0 0 0 3px rgba(139, 43, 226, 0.08);
+}
+.check-add button[type='submit'] {
+  background-image: var(--accent-gradient);
+  color: #fff;
+  border: none;
+  border-radius: 9999px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.check-add button[type='submit']:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Modal footer with explicit close — auto-save means no Save button. */
+.modal-foot {
+  border-top: 1px solid var(--border-light);
+  padding: 14px 28px;
+  background: var(--color-bg-muted);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.modal-foot-info {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.modal {
+  grid-template-rows: auto 1fr auto;
+}
+
+/* Card category tag (PRD §6.3 — coloured pill on the kanban card). */
+.kcard-tags {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
 }
 .check-add input {
   flex: 1;

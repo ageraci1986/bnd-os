@@ -2,12 +2,15 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useRouter } from 'next/navigation';
+import { Tag, type TagVariant } from '@nexushub/ui';
+import { BUILTIN_CARD_CATEGORIES, isBuiltinCardCategory } from '@nexushub/domain';
 
 export interface KanbanCardData {
   readonly id: string;
   readonly shortRef: number;
   readonly title: string;
   readonly columnId: string;
+  readonly categoryTag: string | null;
 }
 
 export interface KanbanCardProps {
@@ -46,6 +49,10 @@ export function KanbanCard({ card, blocked }: KanbanCardProps) {
     router.replace(url.pathname + url.search, { scroll: false });
   };
 
+  const categoryLabel = card.categoryTag
+    ? BUILTIN_CARD_CATEGORIES.find((c) => c.id === card.categoryTag)?.label
+    : null;
+
   return (
     <article
       ref={setNodeRef}
@@ -55,6 +62,13 @@ export function KanbanCard({ card, blocked }: KanbanCardProps) {
       {...attributes}
       {...listeners}
     >
+      {categoryLabel && isBuiltinCardCategory(card.categoryTag) ? (
+        <div className="kcard-tags">
+          <Tag variant={card.categoryTag as TagVariant} size="sm">
+            {categoryLabel}
+          </Tag>
+        </div>
+      ) : null}
       <div className="kcard-ref">#{String(card.shortRef).padStart(3, '0')}</div>
       <div className="kcard-title">{card.title}</div>
     </article>

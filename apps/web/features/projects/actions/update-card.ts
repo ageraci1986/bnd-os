@@ -3,8 +3,12 @@ import 'server-only';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { prisma } from '@nexushub/db';
-import { NotFoundError } from '@nexushub/domain';
+import { BUILTIN_CARD_CATEGORIES, NotFoundError } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
+
+const CategorySchema = z
+  .enum(BUILTIN_CARD_CATEGORIES.map((c) => c.id) as [string, ...string[]])
+  .nullable();
 
 const UpdateCardSchema = z.object({
   cardId: z.string().uuid(),
@@ -20,6 +24,7 @@ const UpdateCardSchema = z.object({
     .max(8000)
     .optional()
     .transform((v) => (v && v.trim().length > 0 ? v.trim() : null)),
+  categoryTag: CategorySchema.optional(),
 });
 
 export interface UpdateCardResult {
@@ -30,6 +35,7 @@ export async function updateCard(input: {
   cardId: string;
   title?: string;
   description?: string;
+  categoryTag?: string | null;
 }): Promise<UpdateCardResult> {
   const ctx = await requireUser();
   const parsed = UpdateCardSchema.safeParse(input);
@@ -43,9 +49,10 @@ export async function updateCard(input: {
   });
   if (!card) throw new NotFoundError('Card');
 
-  const data: { title?: string; description?: string | null } = {};
+  const data: { title?: string; description?: string | null; categoryTag?: string | null } = {};
   if (parsed.data.title !== undefined) data.title = parsed.data.title;
   if (parsed.data.description !== undefined) data.description = parsed.data.description;
+  if (parsed.data.categoryTag !== undefined) data.categoryTag = parsed.data.categoryTag;
 
   if (Object.keys(data).length > 0) {
     await prisma.card.update({ where: { id: card.id }, data });
