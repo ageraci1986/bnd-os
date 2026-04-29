@@ -30,6 +30,18 @@ import { NavLink } from '@/features/shell/components/nav-link';
 import { ClientLink, AllClientsLink } from '@/features/shell/components/client-link';
 import { UserChip } from '@/features/shell/components/user-chip';
 import { ContextBarHost } from '@/features/shell/components/context-bar-host';
+import {
+  DashboardIcon,
+  ProjectsIcon,
+  MailIcon,
+  ClientsIcon,
+  PencilIcon,
+  GridIcon,
+  TeamIcon,
+  PlugIcon,
+  GearIcon,
+  PlusIcon,
+} from '@/features/shell/components/icons';
 
 interface AppLayoutProps {
   readonly children: React.ReactNode;
@@ -88,9 +100,9 @@ export default async function AppLayout({ children, searchParams }: AppLayoutPro
         <SidebarBrand mark="N" name="NexusHub" subtitle={workspace.name} />
 
         <SidebarSection label="Main menu">
-          <NavLink href="/overview" icon="◈" label="Tableau de bord" />
-          <NavLink href="/projects" icon="◱" label="Projets" count={projectsCount} />
-          <NavLink href="/communications" icon="✉" label="Communications" />
+          <NavLink href="/overview" icon={<DashboardIcon />} label="Tableau de bord" />
+          <NavLink href="/projects" icon={<ProjectsIcon />} label="Projets" count={projectsCount} />
+          <NavLink href="/communications" icon={<MailIcon />} label="Communications" />
         </SidebarSection>
 
         <SidebarSection label="Clients actifs">
@@ -107,12 +119,12 @@ export default async function AppLayout({ children, searchParams }: AppLayoutPro
         </SidebarSection>
 
         <SidebarSection label="Atelier">
-          <NavLink href="/clients" icon="◉" label="Clients" />
-          <NavLink href="/templates/email" icon="✎" label="Templates e-mail" />
-          <NavLink href="/templates/kanban" icon="▦" label="Templates Kanban" />
-          {isAdmin ? <NavLink href="/team" icon="⎔" label="Équipe" /> : null}
-          <NavLink href="/integrations" icon="⟷" label="Intégrations" />
-          <NavLink href="/settings" icon="⚙" label="Paramètres" />
+          <NavLink href="/clients" icon={<ClientsIcon />} label="Clients" />
+          <NavLink href="/templates/email" icon={<PencilIcon />} label="Templates e-mail" />
+          <NavLink href="/templates/kanban" icon={<GridIcon />} label="Templates Kanban" />
+          {isAdmin ? <NavLink href="/team" icon={<TeamIcon />} label="Équipe" /> : null}
+          <NavLink href="/integrations" icon={<PlugIcon />} label="Intégrations" />
+          <NavLink href="/settings" icon={<GearIcon />} label="Paramètres" />
         </SidebarSection>
 
         <SidebarFooter>
@@ -131,10 +143,10 @@ export default async function AppLayout({ children, searchParams }: AppLayoutPro
           right={
             <Link
               href="/projects"
-              className="btn btn-primary btn-sm"
+              className="btn btn-primary btn-sm inline-flex items-center gap-1.5"
               aria-label="Créer un nouveau projet"
             >
-              + Nouveau projet
+              <PlusIcon /> Nouveau projet
             </Link>
           }
         />

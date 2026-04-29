@@ -1,4 +1,5 @@
 'use client';
+import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { NavItem } from '@nexushub/ui';
@@ -7,7 +8,7 @@ import { buildHrefWithClient, CLIENT_FILTER_PARAM } from '../lib/client-filter-u
 export interface NavLinkProps {
   /** App pathname (e.g. /overview, /projects). */
   readonly href: string;
-  readonly icon: string;
+  readonly icon: ReactNode;
   readonly label: string;
   /** Optional unread / item count badge. */
   readonly count?: number;

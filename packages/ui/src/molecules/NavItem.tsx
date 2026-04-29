@@ -1,7 +1,9 @@
+import type { ReactNode } from 'react';
 import { cn } from '../utils';
 
 export interface NavItemProps {
-  readonly icon: string;
+  /** String → rendered as text, ReactNode → rendered as-is (SVG icon, etc). */
+  readonly icon: ReactNode;
   readonly label: string;
   /** Optional unread / item count badge. */
   readonly count?: number;
@@ -35,11 +37,7 @@ export function NavItem({
     >
       <span
         aria-hidden="true"
-        className="grid h-[18px] w-[18px] place-items-center text-sm opacity-80"
-        style={{
-          fontFamily:
-            "'Apple Symbols','Segoe UI Symbol','Noto Sans Symbols 2','Segoe UI Emoji',sans-serif",
-        }}
+        className="grid h-[18px] w-[18px] place-items-center [&>svg]:h-[16px] [&>svg]:w-[16px]"
       >
         {icon}
       </span>

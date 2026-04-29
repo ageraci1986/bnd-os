@@ -1,5 +1,5 @@
 'use client';
-import { useActionState, useState } from 'react';
+import { useActionState, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CSRF_FIELD_NAME } from '@/lib/csrf/field';
 import { createClient, type CreateClientState } from '../actions/create-client';
@@ -53,10 +53,12 @@ function CreateForm({
   const [state, action, pending] = useActionState(createClient, CREATE_INITIAL);
   const [color, setColor] = useState<string>('c-acme');
 
-  if (state.status === 'success') {
-    router.replace(`/clients?selected=${encodeURIComponent(state.slug)}`);
-    router.refresh();
-  }
+  useEffect(() => {
+    if (state.status === 'success') {
+      router.replace(`/clients?selected=${encodeURIComponent(state.slug)}`);
+      router.refresh();
+    }
+  }, [state, router]);
 
   return (
     <form
@@ -95,10 +97,12 @@ function EditForm({
   const [state, action, pending] = useActionState(updateClient, UPDATE_INITIAL);
   const [color, setColor] = useState<string>(client.colorToken);
 
-  if (state.status === 'success') {
-    router.replace(`/clients?selected=${encodeURIComponent(state.slug)}`);
-    router.refresh();
-  }
+  useEffect(() => {
+    if (state.status === 'success') {
+      router.replace(`/clients?selected=${encodeURIComponent(state.slug)}`);
+      router.refresh();
+    }
+  }, [state, router]);
 
   return (
     <form action={action} noValidate>
