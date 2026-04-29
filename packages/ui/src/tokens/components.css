@@ -749,6 +749,266 @@
   background: var(--accent-gradient-soft);
 }
 
+/* ---- Card detail modal (mockup §06-card-modal, faithful port) ------ */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(7, 9, 16, 0.55);
+  backdrop-filter: blur(2px);
+  z-index: 100;
+}
+.modal {
+  position: fixed;
+  top: 4vh;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(940px, 94vw);
+  max-height: 92vh;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: 16px;
+  z-index: 101;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  box-shadow: var(--shadow-lg, 0 18px 48px rgba(0, 0, 0, 0.18));
+  overflow: hidden;
+}
+.modal-head {
+  padding: 24px 28px 20px;
+  border-bottom: 1px solid var(--border-light);
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 20px;
+  align-items: start;
+}
+.modal-breadcrumb {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 600;
+  margin-bottom: 8px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.modal-breadcrumb strong {
+  color: var(--color-accent-primary);
+}
+[data-theme='dark'] .modal-breadcrumb strong {
+  color: #c084fc;
+}
+.card-title-input {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  line-height: 1.2;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  outline: none;
+  padding: 4px 0;
+  color: var(--text-main);
+  font-family: inherit;
+}
+.card-title-input:focus {
+  background: var(--accent-gradient-soft);
+  border-radius: 6px;
+  padding: 4px 8px;
+}
+.modal-close {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--bg-hover);
+  color: var(--text-main);
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  border: none;
+  cursor: pointer;
+}
+.modal-close:hover {
+  background: var(--color-danger);
+  color: #fff;
+}
+
+.flow-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: var(--color-success-bg);
+  border: 1px solid var(--color-success);
+  border-radius: 10px;
+  margin-top: 14px;
+}
+.flow-banner-text {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-success);
+}
+.flow-banner button {
+  background: transparent;
+  color: var(--color-success);
+  font-size: 11px;
+  font-weight: 800;
+  border: 1px solid currentColor;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.flow-banner button:hover {
+  background: var(--color-success);
+  color: #fff;
+}
+
+.blocked-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: var(--color-danger-bg);
+  border: 1px solid var(--color-danger);
+  border-radius: 10px;
+  margin-top: 14px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-danger);
+}
+
+.modal-body {
+  padding: 24px 28px;
+  overflow-y: auto;
+}
+.modal-section + .modal-section {
+  margin-top: 28px;
+}
+.section-label {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+.description-input {
+  width: 100%;
+  min-height: 80px;
+  font-size: 13px;
+  line-height: 1.6;
+  font-family: inherit;
+  color: var(--text-soft);
+  border: 1px solid transparent;
+  background: transparent;
+  outline: none;
+  resize: vertical;
+  font-weight: 500;
+  padding: 8px;
+  border-radius: 8px;
+}
+.description-input:hover,
+.description-input:focus {
+  border-color: var(--border-light);
+  background: var(--bg-card);
+}
+
+/* Checklist */
+.checklist-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.checklist-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+.checklist-count {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--color-success);
+}
+.check-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-soft);
+  font-size: 13px;
+  font-weight: 500;
+}
+.check-item .box {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--border-light);
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  background: var(--bg-card);
+  flex-shrink: 0;
+}
+.check-item.done .box {
+  background-image: var(--accent-gradient);
+  border-color: transparent;
+  color: #fff;
+}
+.check-item.done .text {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+.check-item .text {
+  flex: 1;
+  color: var(--text-main);
+}
+.check-item .remove {
+  background: transparent;
+  border: none;
+  font-size: 16px;
+  color: var(--text-ghost);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.check-item:hover .remove {
+  opacity: 1;
+}
+.check-item .remove:hover {
+  color: var(--color-danger);
+}
+.check-add {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 0 0;
+}
+.check-add-plus {
+  width: 20px;
+  height: 20px;
+  border: 2px dashed var(--color-accent-primary);
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  color: var(--color-accent-primary);
+  flex-shrink: 0;
+}
+.check-add input {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 500;
+  outline: none;
+  color: var(--text-main);
+  font-family: inherit;
+}
+
 /* ---- Auth split layout ---------------------------------------------- */
 .auth {
   min-height: 100vh;

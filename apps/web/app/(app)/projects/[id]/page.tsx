@@ -5,16 +5,26 @@ import { prisma } from '@nexushub/db';
 import { requireUser } from '@/lib/auth';
 import { getCsrfTokenForForm } from '@/lib/csrf';
 import { KanbanBoard } from '@/features/projects/components/kanban-board';
+import { CardModal } from '@/features/projects/components/card-modal';
 
 export const metadata: Metadata = { title: 'Projet' };
 
 interface ProjectPageProps {
   readonly params: Promise<{ id: string }>;
+  readonly searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }
 
-export default async function ProjectPage({ params }: ProjectPageProps) {
+function readParam(value: string | string[] | undefined): string | null {
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value)) return value[0] ?? null;
+  return null;
+}
+
+export default async function ProjectPage({ params, searchParams }: ProjectPageProps) {
   const ctx = await requireUser();
   const { id } = await params;
+  const sp = (await searchParams) ?? {};
+  const openCardId = readParam(sp['card']);
 
   const [csrf, project] = await Promise.all([
     getCsrfTokenForForm(),
@@ -39,6 +49,30 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
     }),
   ]);
   if (!project) notFound();
+
+  // Optionally load the open card detail.
+  const openCard = openCardId
+    ? await prisma.card.findFirst({
+        where: {
+          id: openCardId,
+          projectId: project.id,
+          workspaceId: ctx.workspaceId,
+          deletedAt: null,
+        },
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          dueDate: true,
+          shortRef: true,
+          column: { select: { name: true, isBlockedSystem: true } },
+          checklistItems: {
+            orderBy: { position: 'asc' },
+            select: { id: true, title: true, isChecked: true, position: true },
+          },
+        },
+      })
+    : null;
 
   const cardCount = project.cards.length;
 
@@ -82,6 +116,22 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
         columns={project.columns}
         cards={project.cards}
       />
+
+      {openCard ? (
+        <CardModal
+          csrfToken={csrf}
+          card={{
+            id: openCard.id,
+            title: openCard.title,
+            description: openCard.description,
+            dueDate: openCard.dueDate ? openCard.dueDate.toISOString() : null,
+            shortRef: openCard.shortRef,
+            columnName: openCard.column.name,
+            columnIsBlocked: openCard.column.isBlockedSystem,
+            checklist: openCard.checklistItems,
+          }}
+        />
+      ) : null}
     </div>
   );
 }
