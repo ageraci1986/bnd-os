@@ -5,4 +5,5 @@ export * from './kanban/index';
 export * from './checklist/index';
 export * from './invitations/index';
 export * from './clients/index';
+export * from './projects/index';
 export * as crypto from './crypto/index';

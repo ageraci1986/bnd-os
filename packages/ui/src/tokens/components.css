@@ -365,6 +365,223 @@
   color: var(--color-danger);
 }
 
+/* ---- Project wizard (mockup §07-new-project, page-flow port) -------- */
+.wizard {
+  width: min(980px, 100%);
+  margin: 0 auto;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: 16px;
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+.wiz-head {
+  padding: 32px 40px 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+.wiz-kicker {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--color-accent-primary);
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+[data-theme='dark'] .wiz-kicker {
+  color: #c084fc;
+}
+.wiz-title {
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -1px;
+  line-height: 1.05;
+}
+.wiz-title .gradient-text {
+  background: var(--accent-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.stepper {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  margin: 28px 40px 0;
+  padding: 6px;
+  background: var(--color-bg-muted);
+  border-radius: 12px;
+  gap: 4px;
+}
+.step {
+  padding: 12px 16px;
+  border-radius: 8px;
+  position: relative;
+}
+.step-idx {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+.step-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+.step.done .step-idx {
+  color: var(--color-success);
+}
+.step.done .step-idx::before {
+  content: '✓ ';
+}
+.step.active {
+  background: var(--accent-gradient);
+}
+.step.active .step-idx {
+  color: rgba(255, 255, 255, 0.75);
+}
+.step.active .step-name {
+  color: #fff;
+}
+.step.pending .step-name {
+  color: var(--text-ghost);
+}
+.wiz-body {
+  padding: 32px 40px;
+}
+.wiz-foot {
+  padding: 18px 40px;
+  border-top: 1px solid var(--border-light);
+  background: var(--color-bg-muted);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.wiz-foot-info {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+/* Type & template selection cards */
+.pickable-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+.pickable-card {
+  padding: 18px 16px;
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  background: var(--bg-card);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    transform 0.15s,
+    box-shadow 0.15s;
+}
+.pickable-card:hover {
+  border-color: var(--color-accent-primary);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-card);
+}
+.pickable-card.active {
+  border-color: var(--color-accent-primary);
+  background: var(--accent-gradient-soft);
+}
+.pickable-card .pc-icon {
+  font-size: 28px;
+  line-height: 1;
+  margin-bottom: 10px;
+}
+.pickable-card .pc-name {
+  font-weight: 800;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+.pickable-card .pc-desc {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 500;
+  line-height: 1.4;
+}
+.pickable-card .pc-recommended {
+  display: inline-block;
+  margin-bottom: 6px;
+  font-size: 9px;
+  letter-spacing: 0.5px;
+  background: var(--accent-gradient);
+  color: #fff;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.tpl-preview {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+.tpl-pill {
+  padding: 4px 10px;
+  background: var(--color-bg-muted);
+  border: 1px solid var(--border-light);
+  border-radius: 9999px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-soft);
+}
+.tpl-pill.blocked {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+
+/* Recap (step 4) */
+.recap-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+}
+.recap-block h4 {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+  font-weight: 800;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-light);
+}
+.recap-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 9px 0;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.recap-row:last-child {
+  border: 0;
+}
+.recap-row .label {
+  color: var(--text-muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 700;
+}
+.recap-row .value {
+  font-weight: 700;
+}
+
 /* ---- Auth split layout ---------------------------------------------- */
 .auth {
   min-height: 100vh;
