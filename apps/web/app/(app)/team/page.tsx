@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { prisma } from '@nexushub/db';
 import { Roles } from '@nexushub/domain';
+import { MetricCard } from '@nexushub/ui';
 import { requireAdmin } from '@/lib/auth';
 import { getCsrfTokenForForm } from '@/lib/csrf';
 import { InvitationForm } from '@/features/team/components/invitation-form';
@@ -39,6 +40,9 @@ export default async function TeamPage() {
     }),
   ]);
 
+  const fmt = (n: number): string => n.toString().padStart(2, '0');
+  const isAlone = members.length <= 1;
+
   return (
     <div className="mx-auto max-w-4xl">
       <header className="mb-8">
@@ -48,10 +52,16 @@ export default async function TeamPage() {
         </p>
       </header>
 
-      <section aria-labelledby="invite-heading" className="mb-10">
-        <h2 id="invite-heading" className="sr-only">
-          Inviter une personne
-        </h2>
+      <div className="mb-8 grid grid-cols-2 gap-5">
+        <MetricCard label="Membres" value={fmt(members.length)} />
+        <MetricCard
+          label="Invitations en attente"
+          value={fmt(invitations.length)}
+          valueTone={invitations.length > 0 ? 'warning' : 'neutral'}
+        />
+      </div>
+
+      <section aria-label="Inviter une personne" className="mb-10">
         <InvitationForm csrfToken={csrf} />
       </section>
 
@@ -64,27 +74,34 @@ export default async function TeamPage() {
             Membres ({members.length})
           </h2>
         </header>
-        <ul className="divide-y divide-[color:var(--color-border-soft)]">
-          {members.map((m) => {
-            const displayName =
-              [m.user.firstName, m.user.lastName]
-                .filter((s): s is string => Boolean(s))
-                .join(' ')
-                .trim() || m.user.email;
-            return (
-              <MemberRow
-                key={m.id}
-                csrfToken={csrf}
-                membershipId={m.id}
-                userId={m.userId}
-                currentUserId={ctx.userId}
-                displayName={displayName}
-                email={m.user.email}
-                role={m.role === Roles.Admin ? 'admin' : 'member'}
-              />
-            );
-          })}
-        </ul>
+        {isAlone ? (
+          <p className="py-4 text-sm text-[color:var(--color-text-muted)]">
+            Vous êtes seul(e) dans l’espace pour l’instant. Envoyez une invitation ci-dessus pour
+            commencer à collaborer.
+          </p>
+        ) : (
+          <ul className="divide-y divide-[color:var(--color-border-soft)]">
+            {members.map((m) => {
+              const displayName =
+                [m.user.firstName, m.user.lastName]
+                  .filter((s): s is string => Boolean(s))
+                  .join(' ')
+                  .trim() || m.user.email;
+              return (
+                <MemberRow
+                  key={m.id}
+                  csrfToken={csrf}
+                  membershipId={m.id}
+                  userId={m.userId}
+                  currentUserId={ctx.userId}
+                  displayName={displayName}
+                  email={m.user.email}
+                  role={m.role === Roles.Admin ? 'admin' : 'member'}
+                />
+              );
+            })}
+          </ul>
+        )}
       </section>
 
       <section
@@ -98,7 +115,8 @@ export default async function TeamPage() {
         </header>
         {invitations.length === 0 ? (
           <p className="py-4 text-sm text-[color:var(--color-text-muted)]">
-            Aucune invitation en attente.
+            Aucune invitation en attente. Les liens envoyés expirent automatiquement après 72
+            heures.
           </p>
         ) : (
           <ul className="divide-y divide-[color:var(--color-border-soft)]">
