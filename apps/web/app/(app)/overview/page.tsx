@@ -138,7 +138,8 @@ function MemberWelcomeCard() {
     <div className="rounded-2xl border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] p-6 shadow-sm">
       <h2 className="text-xl font-extrabold tracking-tight">Bienvenue dans l’espace</h2>
       <p className="mt-1 text-sm text-[color:var(--color-text-muted)]">
-        Les modules Projets, Communications et Clients arrivent en Phases 4 à 8.
+        Les fiches clients sont disponibles dans l’atelier. Les modules Projets et Communications
+        arrivent dans les prochaines phases.
       </p>
     </div>
   );

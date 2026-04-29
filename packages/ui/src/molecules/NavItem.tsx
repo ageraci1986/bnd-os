@@ -36,6 +36,10 @@ export function NavItem({
       <span
         aria-hidden="true"
         className="grid h-[18px] w-[18px] place-items-center text-sm opacity-80"
+        style={{
+          fontFamily:
+            "'Apple Symbols','Segoe UI Symbol','Noto Sans Symbols 2','Segoe UI Emoji',sans-serif",
+        }}
       >
         {icon}
       </span>
