@@ -22,7 +22,7 @@
 | 1     | Setup repo, CI/CD, sécurité de base      | M             | `[~]`  |
 | 2     | Modèle de données + Auth                 | L             | `[x]`  |
 | 3     | Design system + Shell applicatif         | L             | `[x]`  |
-| 4     | Module Clients & Contacts (RACI)         | M             | `[ ]`  |
+| 4     | Module Clients & Contacts (RACI)         | M             | `[x]`  |
 | 5     | Module Projets (Kanban + règles auto)    | XL            | `[ ]`  |
 | 6     | Module Communications (Slack + Exchange) | XL            | `[ ]`  |
 | 7     | Templates (Email + Kanban)               | M             | `[ ]`  |
@@ -213,26 +213,30 @@
 
 ---
 
-## Phase 4 — Module Clients & Contacts (RACI)
+## Phase 4 — Module Clients & Contacts (RACI) ✅ TERMINÉE (2026-04-29)
 
-### 4.1 Domaine
+### 4.1 Domaine ✅ (Step C.1)
 
-- [ ] `packages/domain/clients` : règles RACI (un seul rôle par contact/projet, validation)
-- [ ] Tests unitaires : création client, ajout contact, attribution RACI, suppression bloquée si projets actifs
+- [x] `packages/domain/clients` : `CLIENT_COLOR_TOKENS`, `computeInitials` (NFD + diacritics), `validateClientName` / `validateInitials` / `validateContactName`, `parseDomainList` (RFC 1035 labels, dedup), `RACI_VALUES` + `raciLabelFr` (R/A/C/I) + `raciTagVariant` (info/warning/success/neutral), `canDeleteClient` (PRD §10 #14)
+- [x] 19 tests unitaires (suite domain : 71 → 90)
 
-### 4.2 UI
+### 4.2 UI ✅ (Step C.3)
 
-- [ ] Page `/clients` (liste cards + panneau fiche)
-- [ ] Modal création / édition client (nom, couleur palette 5, canaux Slack à mapper)
-- [ ] Table contacts avec RACI badges colorés
-- [ ] Modal ajout / édition contact
-- [ ] Soft delete + corbeille (visible Admin)
+- [x] Page `/clients` master/detail driven by URL : `?selected=<slug>` + `?edit=1`
+- [x] Form création/édition client (5-color swatch picker, initiales auto si vide, domaines email pour Exchange auto-association, notes)
+- [x] Table contacts avec RACI Tag (R bleu / A ambre / C vert / I gris)
+- [x] Form ajout / édition contact (RACI pill row 4-segments + "—")
+- [x] Soft delete client (avec confirmation native) + soft delete contact
+- [ ] Corbeille / restauration Admin reportée Phase 9 (settings)
+- [ ] Mapping canaux Slack reporté Phase 6 (Communications)
 
-### 4.3 API
+### 4.3 API ✅ (Step C.2)
 
-- [ ] Server Actions : `createClient`, `updateClient`, `deleteClient`, `addContact`, `updateContact`, `removeContact`, `setRACI`
-- [ ] Validation Zod
-- [ ] Tests integration
+- [x] Server Actions : `createClient`, `updateClient`, `deleteClient`, `createContact`, `updateContact`, `deleteContact`
+- [x] Zod schemas wrappant les validators du domain (`lib/schemas.ts`)
+- [x] `lib/queries.ts` : `listClients`, `getClientBySlug` (avec contacts + active-projects counts dans une seule transaction Prisma)
+- [x] CSRF + `requireUser` (clients CRUD ouvert à Member, PRD §6.7) + workspaceId defence-in-depth + audit log `client_deleted`
+- [x] 18 tests web supplémentaires (3 schemas + 11 actions Prisma-mocked + e2e auth-gate sub-routes /clients?selected=)
 
 ---
 
