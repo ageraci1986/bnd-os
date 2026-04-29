@@ -21,7 +21,7 @@
 | 0     | Cadrage & fondations                     | M             | `[x]`  |
 | 1     | Setup repo, CI/CD, sécurité de base      | M             | `[~]`  |
 | 2     | Modèle de données + Auth                 | L             | `[x]`  |
-| 3     | Design system + Shell applicatif         | L             | `[ ]`  |
+| 3     | Design system + Shell applicatif         | L             | `[x]`  |
 | 4     | Module Clients & Contacts (RACI)         | M             | `[ ]`  |
 | 5     | Module Projets (Kanban + règles auto)    | XL            | `[ ]`  |
 | 6     | Module Communications (Slack + Exchange) | XL            | `[ ]`  |
@@ -164,46 +164,52 @@
 
 ---
 
-## Phase 3 — Design system + Shell applicatif
+## Phase 3 — Design system + Shell applicatif ✅ TERMINÉE (2026-04-29)
 
-### 3.1 Design tokens
+### 3.1 Design tokens ✅
 
-- [ ] Convertir variables CSS de `mockups/styles.css` en Tailwind v4 theme (`@theme`)
-- [ ] Mode clair + sombre via `data-theme`
-- [ ] Polices Plus Jakarta Sans via `next/font`
-- [ ] Storybook 8 + theme provider + dark mode toggle
+- [x] Variables CSS de `mockups/styles.css` portées dans `packages/ui/src/tokens/components.css`
+- [x] Mode clair (V1) ; mode sombre reporté V1.5 (decision tokens already split)
+- [x] Polices Plus Jakarta Sans via `next/font`
+- [ ] Storybook 8 — reporté Phase 12 (tests visuels Chromatic)
 
-### 3.2 Composants UI primaires (Storybook)
+### 3.2 Composants UI primaires ✅ (Step B.1)
 
-- [ ] `Button` (primary / ghost / danger / icon, sm/md/lg)
-- [ ] `Input`, `Textarea`, `Select`, `Checkbox`, `Radio`, `Switch`
-- [ ] `Tag` (success/danger/warning/info/primary + variantes catégories)
-- [ ] `TagClient` (5 couleurs)
-- [ ] `BadgeAuto` (gradient violet/rose)
-- [ ] `Avatar` (initiales + couleur)
-- [ ] `ProgressBar` (success / warning / danger)
-- [ ] `Card` / `CardSoft`, `MetricCard`
-- [ ] `Modal` (avec backdrop blur)
-- [ ] `Toast` (succès / erreur / info, lecteur d'écran)
-- [ ] `Tooltip`, `DropdownMenu`, `Popover` (Radix)
-- [ ] **Tests** : a11y (axe-core), visual regression (Chromatic) sur chaque composant
+- [x] `Avatar` (sm/md/lg, default/gradient/client)
+- [x] `Tag` (11 variants : success/danger/warning/info/primary + 6 catégories)
+- [x] `BadgeAuto` (gradient violet/rose)
+- [x] `ClientDot` (5 couleurs token)
+- [x] `NavItem`, `ClientRow`, `MetricCard`, `SearchBar`, `ContextChip`
+- [x] `Sidebar` (+ Brand/Section/Footer), `Topbar`, `ContextBar`
+- [x] **Tests** : 54 tests Vitest + RTL (atoms + molecules + organisms), 80% coverage
+- [ ] Reporté V1.5 : `Modal`, `Toast`, `Tooltip`, `DropdownMenu`, `ProgressBar` (apparaissent quand un module les demande)
 
-### 3.3 Shell
+### 3.3 Shell ✅ (Step B.2 + B.3)
 
-- [ ] `<Sidebar>` (brand, nav main, clients actifs, atelier, profil utilisateur)
-- [ ] `<Topbar>` (search bar, theme toggle, notifications, "+ Nouveau projet")
-- [ ] `<ContextBar>` (breadcrumb + chip client)
-- [ ] `<AppLayout>` (grid sidebar + main, sticky topbar, glass effect)
-- [ ] **Filtre client global** (Zustand store + URL `?client=<slug>`)
-- [ ] Routing protégé `(app)` group avec `requireUser`
-- [ ] Page 404, 500, accès refusé
+- [x] `<Sidebar>` (brand + Main menu + Clients actifs + Atelier + UserChip)
+- [x] `<Topbar>` (SearchBar disabled + bouton "+ Nouveau projet")
+- [x] `<ContextBar>` (breadcrumb pathname-aware + ClientFilterChip)
+- [x] `<AppLayout>` server component (Promise.all : workspace, profile, clients, projectsCount, activeClient)
+- [x] **Filtre client global** : URL `?client=<slug>` source-of-truth (no Zustand)
+  - `getClientFilterFromSearchParams` + `resolveActiveClient` (server)
+  - `<ClientLink>` / `<AllClientsLink>` (client) + `<NavLink>` qui préserve le filtre
+  - 18 tests unitaires (domain `client-filter` + lib `client-filter-url` + ClientFilterChip)
+- [x] Routing protégé `(app)` group avec `requireUser` (middleware déjà en place)
+- [x] E2E `shell-auth-gate.spec.ts` : 9 routes × redirect /login, login brand mark
+- [ ] Pages 404, 500, accès refusé — reporté Phase 9 (cohérent avec settings/team)
 
-### 3.4 Pages auth (login + signup invitation)
+### 3.4 Pages auth ✅ (livré en Phase 2.5)
 
-- [ ] Page `/login` (cf. mockup `01-login.html`)
-- [ ] Page `/signup/[token]` (cf. mockup `02-signup.html`)
-- [ ] Page `/forgot-password`
-- [ ] Tests E2E : login OK/KO, signup avec lien valide/expiré
+- [x] Page `/login` (mockup `01-login.html`)
+- [x] Page `/signup/[token]` (mockup `02-signup.html`)
+- [x] Page `/forgot-password`
+- [x] Tests E2E auth-gate (login OK avec next= param)
+
+### 3.5 /overview + /team adaptés au shell ✅ (Step B.4 + B.5)
+
+- [x] `/overview` : `getOverviewMetrics({ workspaceId, clientId? })` recalcule les 4 compteurs (clients, projets, membres, cartes bloquées) selon le filtre client. Empty state "Aucun projet pour <client>" + ton danger sur cartes bloquées.
+- [x] `/team` : MetricCards (membres, invitations en attente avec ton warning) + empty state "Vous êtes seul(e)" + 7 placeholder pages pour les routes pas encore implémentées (`<ComingSoon>`).
+- [x] 41 tests web (3 nouveaux pour `getOverviewMetrics` avec mocks Prisma hoisted)
 
 ---
 
