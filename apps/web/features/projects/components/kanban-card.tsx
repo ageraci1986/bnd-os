@@ -30,14 +30,12 @@ export function KanbanCard({ card, blocked }: KanbanCardProps) {
     transition,
   };
 
+  const className = ['kcard', blocked && 'blocked', isDragging && 'dragging']
+    .filter(Boolean)
+    .join(' ');
+
   return (
-    <article
-      ref={setNodeRef}
-      style={style}
-      className={`kcard${blocked ? 'blocked' : ''}${isDragging ? 'dragging' : ''}`}
-      {...attributes}
-      {...listeners}
-    >
+    <article ref={setNodeRef} style={style} className={className} {...attributes} {...listeners}>
       <div className="kcard-ref">#{String(card.shortRef).padStart(3, '0')}</div>
       <div className="kcard-title">{card.title}</div>
     </article>

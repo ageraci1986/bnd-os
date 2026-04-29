@@ -28,8 +28,11 @@ export function KanbanColumn({ csrfToken, projectId, column, cards }: KanbanColu
     disabled: column.isBlockedSystem,
   });
 
+  const colCls = ['column', column.isBlockedSystem && 'blocked'].filter(Boolean).join(' ');
+  const cardsCls = ['col-cards', isOver && 'is-over'].filter(Boolean).join(' ');
+
   return (
-    <section className={`column${column.isBlockedSystem ? 'blocked' : ''}`}>
+    <section className={colCls}>
       <header className="col-header">
         <div className="col-title">
           <span className="col-dot" />
@@ -38,7 +41,7 @@ export function KanbanColumn({ csrfToken, projectId, column, cards }: KanbanColu
         <span className="col-count">{cards.length}</span>
       </header>
 
-      <div ref={setNodeRef} className={`col-cards${isOver ? 'is-over' : ''}`}>
+      <div ref={setNodeRef} className={cardsCls}>
         <SortableContext items={cards.map((c) => c.id)} strategy={verticalListSortingStrategy}>
           {cards.map((card) => (
             <KanbanCard key={card.id} card={card} blocked={column.isBlockedSystem} />
