@@ -1,7 +1,7 @@
 export { Avatar } from './Avatar';
 export type { AvatarProps, AvatarSize, AvatarVariant } from './Avatar';
 export { Tag } from './Tag';
-export type { TagProps, TagVariant } from './Tag';
+export type { TagProps, TagSize, TagVariant } from './Tag';
 export { BadgeAuto } from './BadgeAuto';
 export type { BadgeAutoProps } from './BadgeAuto';
 export { ClientDot } from './ClientDot';

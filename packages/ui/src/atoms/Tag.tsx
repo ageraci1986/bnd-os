@@ -1,6 +1,7 @@
 import { cn } from '../utils';
 
 export type TagVariant =
+  | 'neutral'
   | 'success'
   | 'danger'
   | 'warning'
@@ -14,13 +15,17 @@ export type TagVariant =
   | 'tiktok'
   | 'insta';
 
+export type TagSize = 'sm' | 'md';
+
 export interface TagProps {
   readonly variant: TagVariant;
+  readonly size?: TagSize;
   readonly children: React.ReactNode;
   readonly className?: string;
 }
 
 const VARIANTS: Record<TagVariant, string> = {
+  neutral: 'bg-[color:var(--color-bg-soft)] text-[color:var(--color-text-muted)]',
   success: 'bg-[color:var(--color-success-bg)] text-[color:var(--color-success)]',
   danger: 'bg-[color:var(--color-danger-bg)] text-[color:var(--color-danger)]',
   warning: 'bg-[color:var(--color-warning-bg)] text-[color:var(--color-warning)]',
@@ -36,12 +41,18 @@ const VARIANTS: Record<TagVariant, string> = {
   insta: 'bg-[color:var(--color-danger-bg)] text-[color:var(--color-danger)]',
 };
 
+const SIZES: Record<TagSize, string> = {
+  sm: 'px-2 py-0.5 text-[10px]',
+  md: 'px-2.5 py-1 text-[11px]',
+};
+
 /** Pill-shaped tag (10px uppercase, rounded full). */
-export function Tag({ variant, children, className }: TagProps) {
+export function Tag({ variant, size = 'md', children, className }: TagProps) {
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.5px]',
+        'inline-flex items-center gap-1 rounded-full font-bold uppercase tracking-[0.5px]',
+        SIZES[size],
         VARIANTS[variant],
         className,
       )}
