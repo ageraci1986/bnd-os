@@ -25,7 +25,12 @@ export function ClientLink({ slug, name, colorToken, count }: ClientLinkProps) {
   const href = buildHrefWithClient(pathname, searchParams.toString(), slug);
 
   return (
-    <Link href={href} prefetch={false} aria-current={active ? 'true' : undefined}>
+    <Link
+      href={href}
+      prefetch={false}
+      aria-current={active ? 'true' : undefined}
+      className="block no-underline"
+    >
       <ClientRow
         name={name}
         colorToken={colorToken}
@@ -45,7 +50,12 @@ export function AllClientsLink({ count }: { readonly count: number }) {
   const href = buildHrefWithClient(pathname, searchParams.toString(), null);
 
   return (
-    <Link href={href} prefetch={false} aria-current={active ? 'true' : undefined}>
+    <Link
+      href={href}
+      prefetch={false}
+      aria-current={active ? 'true' : undefined}
+      className="block no-underline"
+    >
       <ClientRow name="Tous les clients" colorToken="#9CA3AF" count={count} active={active} />
     </Link>
   );

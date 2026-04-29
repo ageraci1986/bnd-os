@@ -31,7 +31,12 @@ export function NavLink({ href, icon, label, count, countTone = 'neutral' }: Nav
   const fullHref = buildHrefWithClient(href, '', clientSlug);
 
   return (
-    <Link href={fullHref} prefetch={false} aria-current={active ? 'page' : undefined}>
+    <Link
+      href={fullHref}
+      prefetch={false}
+      aria-current={active ? 'page' : undefined}
+      className="block no-underline"
+    >
       <NavItem
         icon={icon}
         label={label}

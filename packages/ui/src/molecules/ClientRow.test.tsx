@@ -20,6 +20,6 @@ describe('<ClientRow />', () => {
 
   it('applies the active class when active', () => {
     render(<ClientRow name="Acme Brands" colorToken="c-acme" active />);
-    expect(screen.getByText('Acme Brands').parentElement?.className).toMatch(/bg-hover|text-main/);
+    expect(screen.getByText('Acme Brands').parentElement?.className).toMatch(/\bactive\b/);
   });
 });

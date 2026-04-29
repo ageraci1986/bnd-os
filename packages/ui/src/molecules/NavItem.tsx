@@ -14,8 +14,11 @@ export interface NavItemProps {
 }
 
 /**
- * Pure visual sidebar nav row. The hosting app wraps this in a
- * Next `<Link>` and computes `active` from `usePathname()`.
+ * Pure visual sidebar nav row, faithfully matching the mockup `.nav-item`
+ * structure: `<a><span class="ico">…</span> Label <span class="count">…</span></a>`.
+ *
+ * The hosting app wraps this in a Next `<Link>` and computes `active`
+ * from `usePathname()`.
  */
 export function NavItem({
   icon,
@@ -26,37 +29,13 @@ export function NavItem({
   className,
 }: NavItemProps) {
   return (
-    <span
-      className={cn(
-        'flex items-center gap-2.5 rounded-[10px] px-3 py-2.5 text-[13.5px] font-medium transition-colors',
-        active
-          ? 'bg-[image:var(--accent-gradient-soft)] font-bold text-[color:var(--color-accent-primary)] dark:text-[#C084FC]'
-          : 'text-[color:var(--color-text-muted)] hover:bg-[color:var(--color-bg-hover)] hover:text-[color:var(--color-text-main)]',
-        className,
-      )}
-    >
-      <span
-        aria-hidden="true"
-        className="grid h-[18px] w-[18px] place-items-center [&>svg]:h-[16px] [&>svg]:w-[16px]"
-      >
+    <span className={cn('nav-item', active && 'active', className)}>
+      <span aria-hidden="true" className="ico">
         {icon}
       </span>
-      <span className="flex-1 truncate">{label}</span>
+      <span className="label">{label}</span>
       {count !== undefined && count > 0 ? (
-        <span
-          style={
-            countTone === 'new'
-              ? { background: 'linear-gradient(135deg,#8B2BE2,#FF2A6D)', color: '#fff' }
-              : undefined
-          }
-          className={cn(
-            'rounded-full px-2 py-0.5 text-[11px] font-semibold',
-            countTone === 'neutral' &&
-              'bg-[color:var(--color-bg-hover)] text-[color:var(--color-text-main)]',
-          )}
-        >
-          {count}
-        </span>
+        <span className={cn('count', countTone === 'new' && 'new')}>{count}</span>
       ) : null}
     </span>
   );

@@ -25,16 +25,14 @@ describe('<NavItem />', () => {
     expect(container.querySelectorAll('span').length).toBeLessThan(4);
   });
 
-  it('renders the "new" tone with a gradient inline style', () => {
+  it('marks the count as "new" with the dedicated class', () => {
     render(<NavItem icon="✉" label="Mails" count={23} countTone="new" />);
     const badge = screen.getByText('23');
-    expect(badge.getAttribute('style')).toMatch(/linear-gradient/);
+    expect(badge.className).toMatch(/\bnew\b/);
   });
 
   it('applies the active class when active', () => {
     render(<NavItem icon="◈" label="Dashboard" active />);
-    expect(screen.getByText('Dashboard').parentElement?.className).toMatch(
-      /accent-gradient-soft|accent-primary/,
-    );
+    expect(screen.getByText('Dashboard').parentElement?.className).toMatch(/\bactive\b/);
   });
 });

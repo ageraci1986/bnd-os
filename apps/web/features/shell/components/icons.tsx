@@ -6,14 +6,15 @@
 import type { SVGProps } from 'react';
 
 const base = {
-  width: 16,
-  height: 16,
+  width: 18,
+  height: 18,
   viewBox: '0 0 24 24',
   fill: 'none',
   stroke: 'currentColor',
-  strokeWidth: 1.75,
+  strokeWidth: 2,
   strokeLinecap: 'round',
   strokeLinejoin: 'round',
+  style: { width: 18, height: 18, display: 'block' },
 } as const;
 
 type Props = SVGProps<SVGSVGElement>;

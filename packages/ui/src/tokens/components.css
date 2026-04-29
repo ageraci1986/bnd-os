@@ -141,6 +141,230 @@
   margin-top: 1px;
 }
 
+/* ---- Sidebar (mockup §03-overview, faithful port) ------------------- */
+.sidebar {
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border-light);
+  display: flex;
+  flex-direction: column;
+  padding: 24px 0 16px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  width: 260px;
+  flex-shrink: 0;
+  overflow-y: auto;
+  transition:
+    background-color 0.3s ease,
+    border-color 0.3s ease;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 24px 28px;
+}
+.nav-section {
+  padding: 0 16px 20px;
+}
+.nav-label {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  margin-bottom: 10px;
+  padding: 0 8px;
+  font-weight: 700;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.nav-label .pill-new {
+  background: var(--color-accent-secondary);
+  color: #fff;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 9px;
+  letter-spacing: 0.5px;
+}
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  color: var(--text-muted);
+  font-weight: 500;
+  font-size: 13.5px;
+  margin-bottom: 2px;
+  text-decoration: none;
+  transition:
+    background-color 0.15s,
+    color 0.15s;
+}
+.nav-item:hover {
+  background: var(--bg-hover);
+  color: var(--text-main);
+}
+.nav-item.active {
+  background: var(--accent-gradient-soft);
+  color: var(--color-accent-primary);
+  font-weight: 700;
+}
+[data-theme='dark'] .nav-item.active {
+  background: rgba(139, 43, 226, 0.15);
+  color: #c084fc;
+}
+.nav-item .ico {
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  opacity: 0.8;
+  flex-shrink: 0;
+  font-family:
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Apple Color Emoji',
+    'Segoe UI Emoji',
+    sans-serif;
+}
+.nav-item.active .ico {
+  opacity: 1;
+}
+.nav-item .label {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.nav-item .count {
+  margin-left: auto;
+  background: var(--bg-hover);
+  color: var(--text-main);
+  padding: 2px 9px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 600;
+}
+[data-theme='dark'] .nav-item .count {
+  background: rgba(255, 255, 255, 0.08);
+}
+.nav-item .count.new {
+  background: var(--accent-gradient);
+  color: #fff;
+}
+
+/* Client rows */
+.client-row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-bottom: 2px;
+  text-decoration: none;
+  transition:
+    background-color 0.15s,
+    color 0.15s;
+}
+.client-row:hover {
+  background: var(--bg-hover);
+  color: var(--text-main);
+}
+.client-row.active {
+  background: var(--bg-hover);
+  color: var(--text-main);
+  font-weight: 600;
+}
+.client-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--text-ghost);
+}
+.client-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.client-count {
+  font-size: 11px;
+  color: var(--text-ghost);
+  font-weight: 500;
+}
+
+/* Sidebar footer */
+.user-profile {
+  margin-top: auto;
+  padding: 18px 24px 0;
+  border-top: 1px solid var(--border-light);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.user-profile .avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--bg-hover);
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-main);
+  flex-shrink: 0;
+}
+.user-profile .avatar.gradient {
+  background: var(--accent-gradient);
+  color: #fff;
+}
+.user-profile .user-meta {
+  flex: 1;
+  min-width: 0;
+}
+.user-profile .user-name {
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.user-profile .user-role {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.user-profile .signout-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  transition:
+    background-color 0.15s,
+    color 0.15s;
+}
+.user-profile .signout-btn:hover {
+  background: var(--bg-hover);
+  color: var(--color-danger);
+}
+
 /* ---- Auth split layout ---------------------------------------------- */
 .auth {
   min-height: 100vh;
