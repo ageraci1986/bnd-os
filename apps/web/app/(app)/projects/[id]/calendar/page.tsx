@@ -5,6 +5,7 @@ import { prisma } from '@nexushub/db';
 import { monthGridRange, parseYearMonth } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
 import { CalendarView, type CalendarCardItem } from '@/features/projects/components/calendar-view';
+import { CalendarIcon, KanbanIcon } from '@/features/shell/components/icons';
 
 export const metadata: Metadata = { title: 'Calendrier · Projet' };
 
@@ -103,9 +104,11 @@ export default async function ProjectCalendarPage({
           </h1>
         </div>
         <div className="view-toggle">
-          <Link href={`/projects/${project.id}`}>▦ Kanban</Link>
+          <Link href={`/projects/${project.id}`}>
+            <KanbanIcon /> Kanban
+          </Link>
           <Link href="" className="active" aria-current="page">
-            ▭ Calendrier
+            <CalendarIcon /> Calendrier
           </Link>
         </div>
       </header>

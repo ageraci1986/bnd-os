@@ -1399,6 +1399,16 @@
   transition:
     background-color 0.15s,
     color 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.view-toggle a svg,
+.view-toggle button svg {
+  width: 14px;
+  height: 14px;
+  stroke: currentColor;
+  stroke-width: 2;
 }
 .view-toggle .active {
   background-image: var(--accent-gradient);

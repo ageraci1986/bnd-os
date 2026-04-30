@@ -7,6 +7,7 @@ import { getCsrfTokenForForm } from '@/lib/csrf';
 import { KanbanBoard } from '@/features/projects/components/kanban-board';
 import { CardModal } from '@/features/projects/components/card-modal';
 import { listCustomCategories } from '@/features/projects/lib/categories';
+import { CalendarIcon, KanbanIcon } from '@/features/shell/components/icons';
 
 export const metadata: Metadata = { title: 'Projet' };
 
@@ -137,9 +138,11 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
         </div>
         <div className="view-toggle">
           <Link href="" className="active" aria-current="page">
-            ▦ Kanban
+            <KanbanIcon /> Kanban
           </Link>
-          <Link href={`/projects/${project.id}/calendar`}>▭ Calendrier</Link>
+          <Link href={`/projects/${project.id}/calendar`}>
+            <CalendarIcon /> Calendrier
+          </Link>
         </div>
       </header>
 

@@ -119,3 +119,24 @@ export function PlusIcon(p: Props) {
     </svg>
   );
 }
+
+export function KanbanIcon(p: Props) {
+  return (
+    <svg {...base} {...p}>
+      <rect x="3" y="4" width="5" height="16" rx="1.5" />
+      <rect x="10" y="4" width="5" height="10" rx="1.5" />
+      <rect x="17" y="4" width="4" height="13" rx="1.5" />
+    </svg>
+  );
+}
+
+export function CalendarIcon(p: Props) {
+  return (
+    <svg {...base} {...p}>
+      <rect x="3" y="5" width="18" height="16" rx="2" />
+      <path d="M3 9h18" />
+      <path d="M8 3v4" />
+      <path d="M16 3v4" />
+    </svg>
+  );
+}

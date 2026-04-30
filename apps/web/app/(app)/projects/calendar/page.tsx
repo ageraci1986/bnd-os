@@ -9,6 +9,7 @@ import {
   clientSlug as toClientSlug,
 } from '@/lib/client-filter/server';
 import { CalendarView, type CalendarCardItem } from '@/features/projects/components/calendar-view';
+import { CalendarIcon, KanbanIcon } from '@/features/shell/components/icons';
 
 export const metadata: Metadata = { title: 'Calendrier · Projets' };
 
@@ -107,10 +108,10 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
           <Link
             href={`/projects${activeClient ? `?client=${toClientSlug(activeClient.name)}` : ''}`}
           >
-            ▦ Kanban
+            <KanbanIcon /> Kanban
           </Link>
           <Link href="" className="active" aria-current="page">
-            ▭ Calendrier
+            <CalendarIcon /> Calendrier
           </Link>
         </div>
       </header>

@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { prisma } from '@nexushub/db';
 import { requireUser } from '@/lib/auth';
 import { getClientFilterFromSearchParams, resolveActiveClient } from '@/lib/client-filter/server';
+import { CalendarIcon, KanbanIcon } from '@/features/shell/components/icons';
 
 export const metadata: Metadata = { title: 'Projets' };
 
@@ -54,9 +55,11 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
         <div className="flex items-center gap-3">
           <div className="view-toggle">
             <Link href="" className="active" aria-current="page">
-              ▦ Liste
+              <KanbanIcon /> Liste
             </Link>
-            <Link href={calendarHref}>▭ Calendrier</Link>
+            <Link href={calendarHref}>
+              <CalendarIcon /> Calendrier
+            </Link>
           </div>
           <Link href="/projects/new" className="btn btn-primary">
             + Nouveau projet
