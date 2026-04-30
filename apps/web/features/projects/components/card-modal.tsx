@@ -5,6 +5,7 @@ import { Tag } from '@nexushub/ui';
 import {
   AUTO_ADVANCE_DELAY_MS,
   BUILTIN_CARD_CATEGORIES,
+  isBuiltinCardCategory,
   type BuiltinCardCategoryId,
 } from '@nexushub/domain';
 import {
@@ -23,6 +24,7 @@ export interface CardModalProps {
   readonly csrfToken: string;
   readonly workspaceName: string;
   readonly projectName: string;
+  readonly customCategories: readonly string[];
   readonly card: {
     readonly id: string;
     readonly title: string;
@@ -31,6 +33,7 @@ export interface CardModalProps {
     readonly shortRef: number;
     readonly columnName: string;
     readonly columnIsBlocked: boolean;
+    readonly nextColumnName: string | null;
     readonly categoryTag: string | null;
     readonly checklist: readonly ChecklistItemDTO[];
   };
@@ -38,11 +41,16 @@ export interface CardModalProps {
 
 /**
  * Card detail modal (PRD §6 + §8.2). URL-driven via `?card=<id>` so the
- * modal is shareable and back-button friendly. Auto-advance timer
- * (1.8s — `AUTO_ADVANCE_DELAY_MS`) lives client-side and is cancelled
- * if the user un-ticks before deadline.
+ * modal is shareable and back-button friendly. Layout follows
+ * mockups/06-card-modal.html: main scrollable area + 280px side rail.
  */
-export function CardModal({ csrfToken, workspaceName, projectName, card }: CardModalProps) {
+export function CardModal({
+  csrfToken,
+  workspaceName,
+  projectName,
+  customCategories,
+  card,
+}: CardModalProps) {
   const router = useRouter();
   const [items, setItems] = useState<readonly ChecklistItemDTO[]>(card.checklist);
   const [_pending, startTransition] = useTransition();
@@ -53,7 +61,6 @@ export function CardModal({ csrfToken, workspaceName, projectName, card }: CardM
     router.replace(url.pathname + (url.search ? url.search : ''), { scroll: false });
   }, [router]);
 
-  // Esc → close
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') close();
@@ -62,12 +69,13 @@ export function CardModal({ csrfToken, workspaceName, projectName, card }: CardM
     return () => window.removeEventListener('keydown', onKey);
   }, [close]);
 
-  // Sync local checklist when prop changes (revalidate from server)
   useEffect(() => {
     setItems(card.checklist);
   }, [card.checklist]);
 
   const allChecked = items.length > 0 && items.every((i) => i.isChecked);
+  const checked = items.filter((i) => i.isChecked).length;
+  const progress = items.length === 0 ? 0 : Math.round((checked / items.length) * 100);
 
   return (
     <>
@@ -77,18 +85,22 @@ export function CardModal({ csrfToken, workspaceName, projectName, card }: CardM
           <div>
             <div className="modal-breadcrumb">
               <span>{workspaceName}</span>
-              <span>·</span>
+              <span>/</span>
               <span>{projectName}</span>
-              <span>·</span>
-              <span>#{String(card.shortRef).padStart(3, '0')}</span>
-              <span>·</span>
-              <strong>{card.columnName}</strong>
+              <span>/</span>
+              <strong>Carte #{String(card.shortRef).padStart(3, '0')}</strong>
             </div>
             <CardTitleInput cardId={card.id} initial={card.title} />
             {card.columnIsBlocked ? (
               <BlockedBanner cardId={card.id} dueDate={card.dueDate} />
             ) : null}
-            {allChecked ? <AutoAdvanceBanner cardId={card.id} onComplete={close} /> : null}
+            {allChecked ? (
+              <AutoAdvanceBanner
+                cardId={card.id}
+                nextColumnName={card.nextColumnName}
+                onComplete={close}
+              />
+            ) : null}
           </div>
           <button type="button" className="modal-close" onClick={close} aria-label="Fermer">
             ✕
@@ -96,68 +108,104 @@ export function CardModal({ csrfToken, workspaceName, projectName, card }: CardM
         </header>
 
         <div className="modal-body">
-          <section className="modal-section">
-            <div className="section-label">Catégorie</div>
-            <CategorySelector cardId={card.id} initial={card.categoryTag} />
-          </section>
+          <div className="modal-main">
+            <section className="modal-section">
+              <div className="section-label">Description</div>
+              <CardDescriptionInput cardId={card.id} initial={card.description ?? ''} />
+            </section>
 
-          <section className="modal-section">
-            <div className="section-label">Description</div>
-            <CardDescriptionInput cardId={card.id} initial={card.description ?? ''} />
-          </section>
-
-          <section className="modal-section">
-            <div className="section-label">Échéance</div>
-            <DueDateInput cardId={card.id} initial={card.dueDate} onAfterUpdate={close} />
-          </section>
-
-          <section className="modal-section">
-            <div className="checklist-meta">
-              <div className="section-label" style={{ marginBottom: 0 }}>
-                Checklist
+            <section className="modal-section">
+              <div className="checklist-meta">
+                <div className="section-label" style={{ marginBottom: 0 }}>
+                  Checklist
+                </div>
+                <div className="checklist-count">
+                  {checked} / {items.length}
+                  {allChecked ? ' ✓' : ''}
+                </div>
               </div>
-              <div className="checklist-count">
-                {items.filter((i) => i.isChecked).length} / {items.length}
-                {allChecked ? ' ✓' : ''}
-              </div>
-            </div>
-            {items.length > 0 ? (
-              <p className="checklist-hint">
-                Auto-progression active — la carte avance dès que tout est coché.
-              </p>
-            ) : null}
-            <div className="mt-2">
-              {items.map((item) => (
-                <CheckRow
-                  key={item.id}
-                  item={item}
-                  onToggle={(isChecked) => {
-                    setItems((prev) =>
-                      prev.map((i) => (i.id === item.id ? { ...i, isChecked } : i)),
-                    );
-                    startTransition(async () => {
-                      const res = await toggleChecklistItem({
-                        itemId: item.id,
-                        isChecked,
-                      });
-                      setItems(res.items);
-                    });
-                  }}
-                  onDelete={() => {
-                    startTransition(async () => {
-                      const res = await deleteChecklistItem({ itemId: item.id });
-                      setItems(res.items);
-                    });
+              {items.length > 0 ? (
+                <p className="checklist-hint">
+                  Auto-progression active — la carte avance dès que tout est coché.
+                </p>
+              ) : null}
+              <div
+                style={{
+                  height: 4,
+                  background: 'var(--color-border-light)',
+                  borderRadius: 9999,
+                  margin: '10px 0 14px',
+                }}
+              >
+                <div
+                  style={{
+                    width: `${progress}%`,
+                    height: '100%',
+                    background: allChecked ? 'var(--color-success)' : 'var(--accent-gradient)',
+                    borderRadius: 9999,
+                    transition: 'width 0.25s',
                   }}
                 />
-              ))}
-            </div>
-            <ChecklistAdder cardId={card.id} onAdd={(updated) => setItems(updated)} />
-          </section>
+              </div>
+              <div>
+                {items.map((item) => (
+                  <CheckRow
+                    key={item.id}
+                    item={item}
+                    onToggle={(isChecked) => {
+                      setItems((prev) =>
+                        prev.map((i) => (i.id === item.id ? { ...i, isChecked } : i)),
+                      );
+                      startTransition(async () => {
+                        const res = await toggleChecklistItem({ itemId: item.id, isChecked });
+                        setItems(res.items);
+                      });
+                    }}
+                    onDelete={() => {
+                      startTransition(async () => {
+                        const res = await deleteChecklistItem({ itemId: item.id });
+                        setItems(res.items);
+                      });
+                    }}
+                  />
+                ))}
+              </div>
+              <ChecklistAdder cardId={card.id} onAdd={(updated) => setItems(updated)} />
+            </section>
+          </div>
 
-          <section className="modal-section">
-            <DeleteCardButton cardId={card.id} csrfToken={csrfToken} onDeleted={close} />
-          </section>
+          <aside className="modal-side">
+            <div className="side-row">
+              <div className="side-label">Colonne actuelle</div>
+              <div className="col-current">
+                <span className="dot" /> {card.columnName}
+              </div>
+              {card.nextColumnName ? (
+                <div className="next-col">→ {card.nextColumnName} · auto</div>
+              ) : null}
+            </div>
+
+            <div className="side-row">
+              <div className="side-label">Catégorie</div>
+              <CategorySelector
+                cardId={card.id}
+                initial={card.categoryTag}
+                customCategories={customCategories}
+              />
+            </div>
+
+            <div className="side-row">
+              <div className="side-label">Échéance</div>
+              <DueDateInput cardId={card.id} initial={card.dueDate} onAfterUpdate={close} />
+            </div>
+
+            <div className="side-row">
+              <div className="side-label">Actions</div>
+              <div className="side-actions">
+                <DeleteCardButton cardId={card.id} csrfToken={csrfToken} onDeleted={close} />
+              </div>
+            </div>
+          </aside>
         </div>
 
         <footer className="modal-foot">
@@ -170,57 +218,6 @@ export function CardModal({ csrfToken, workspaceName, projectName, card }: CardM
         </footer>
       </article>
     </>
-  );
-}
-
-// ---------- Category selector --------------------------------------------
-
-function CategorySelector({ cardId, initial }: { cardId: string; initial: string | null }) {
-  const [active, setActive] = useState<string | null>(initial);
-
-  const pick = (next: string | null) => {
-    setActive(next);
-    void updateCard({ cardId, categoryTag: next }).catch(() => {
-      setActive(initial); // rollback
-    });
-  };
-
-  return (
-    <div className="flex flex-wrap items-center gap-2">
-      <button
-        type="button"
-        onClick={() => pick(null)}
-        aria-pressed={active === null}
-        className="rounded-full border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.5px] text-[color:var(--color-text-muted)] transition hover:border-[color:var(--color-text-main)] hover:text-[color:var(--color-text-main)] aria-pressed:border-[color:var(--color-accent-primary)] aria-pressed:text-[color:var(--color-accent-primary)]"
-        style={
-          active === null
-            ? { borderColor: 'var(--color-accent-primary)', color: 'var(--color-accent-primary)' }
-            : undefined
-        }
-      >
-        Aucune
-      </button>
-      {BUILTIN_CARD_CATEGORIES.map((c) => {
-        const isActive = active === c.id;
-        return (
-          <button
-            key={c.id}
-            type="button"
-            onClick={() => pick(c.id)}
-            aria-pressed={isActive}
-            style={{
-              outline: isActive ? '2px solid var(--color-accent-primary)' : 'none',
-              outlineOffset: 2,
-            }}
-            className="rounded-full"
-          >
-            <Tag variant={c.id as BuiltinCardCategoryId} size="sm">
-              {c.label}
-            </Tag>
-          </button>
-        );
-      })}
-    </div>
   );
 }
 
@@ -304,10 +301,7 @@ function DueDateInput({
 
   const save = (next: string | null) => {
     startTransition(async () => {
-      const res = await updateCardDueDate({
-        cardId,
-        dueDate: next,
-      });
+      const res = await updateCardDueDate({ cardId, dueDate: next });
       if (res.autoBlocked) {
         window.alert('Échéance dépassée — la carte a été déplacée vers Bloqué.');
         onAfterUpdate();
@@ -321,7 +315,7 @@ function DueDateInput({
   };
 
   return (
-    <div className="flex items-center gap-3">
+    <div>
       <input
         type="date"
         className="field-input"
@@ -331,7 +325,7 @@ function DueDateInput({
           save(e.target.value || null);
         }}
         disabled={pending}
-        style={{ maxWidth: 200 }}
+        style={{ width: '100%' }}
       />
       {value ? (
         <button
@@ -341,7 +335,15 @@ function DueDateInput({
             save(null);
           }}
           disabled={pending}
-          className="text-xs text-[color:var(--color-text-muted)] underline"
+          className="next-col"
+          style={{
+            background: 'transparent',
+            border: 'none',
+            cursor: 'pointer',
+            padding: 0,
+            marginTop: 8,
+            textDecoration: 'underline',
+          }}
         >
           Retirer l'échéance
         </button>
@@ -409,7 +411,9 @@ function ChecklistAdder({
       }}
     >
       <span className="check-add-plus" aria-hidden="true">
-        +
+        <svg viewBox="0 0 24 24" fill="none">
+          <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+        </svg>
       </span>
       <input
         type="text"
@@ -426,9 +430,144 @@ function ChecklistAdder({
   );
 }
 
+// ---------- Category selector --------------------------------------------
+
+function CategorySelector({
+  cardId,
+  initial,
+  customCategories,
+}: {
+  cardId: string;
+  initial: string | null;
+  customCategories: readonly string[];
+}) {
+  const router = useRouter();
+  const [active, setActive] = useState<string | null>(initial);
+  const [adding, setAdding] = useState(false);
+  const [draft, setDraft] = useState('');
+
+  const pick = (next: string | null) => {
+    setActive(next);
+    void updateCard({ cardId, categoryTag: next })
+      .then(() => router.refresh())
+      .catch(() => setActive(initial));
+  };
+
+  const submitCustom = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = draft.trim();
+    if (trimmed.length === 0 || trimmed.length > 32) return;
+    setActive(trimmed);
+    setAdding(false);
+    setDraft('');
+    void updateCard({ cardId, categoryTag: trimmed })
+      .then(() => router.refresh())
+      .catch(() => setActive(initial));
+  };
+
+  return (
+    <div>
+      <div className="category-pickrow">
+        <button
+          type="button"
+          onClick={() => pick(null)}
+          className={`category-pick none${active === null ? 'active' : ''}`}
+        >
+          Aucune
+        </button>
+        {BUILTIN_CARD_CATEGORIES.map((c) => (
+          <button
+            key={c.id}
+            type="button"
+            onClick={() => pick(c.id)}
+            className={`category-pick${active === c.id ? 'active' : ''}`}
+            aria-pressed={active === c.id}
+          >
+            <Tag variant={c.id as BuiltinCardCategoryId} size="sm">
+              {c.label}
+            </Tag>
+          </button>
+        ))}
+        {customCategories.map((label) => (
+          <button
+            key={label}
+            type="button"
+            onClick={() => pick(label)}
+            className={`category-pick${active === label ? 'active' : ''}`}
+            aria-pressed={active === label}
+          >
+            <Tag variant="primary" size="sm">
+              {label}
+            </Tag>
+          </button>
+        ))}
+        {/* Active custom tag not yet in the list (just-added on this card) */}
+        {active && !isBuiltinCardCategory(active) && !customCategories.includes(active) ? (
+          <button
+            type="button"
+            className="category-pick active"
+            aria-pressed
+            onClick={() => pick(null)}
+            title="Cliquer pour retirer"
+          >
+            <Tag variant="primary" size="sm">
+              {active}
+            </Tag>
+          </button>
+        ) : null}
+      </div>
+      {adding ? (
+        <form onSubmit={submitCustom} className="category-add-form">
+          <input
+            autoFocus
+            type="text"
+            placeholder="Nom (max 32)"
+            value={draft}
+            maxLength={32}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={() => {
+              if (draft.trim().length === 0) setAdding(false);
+            }}
+          />
+          <button
+            type="submit"
+            className="btn btn-primary btn-sm"
+            disabled={draft.trim().length === 0}
+          >
+            Créer
+          </button>
+        </form>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setAdding(true)}
+          className="next-col"
+          style={{
+            background: 'transparent',
+            border: 'none',
+            cursor: 'pointer',
+            padding: 0,
+            textDecoration: 'underline',
+          }}
+        >
+          + Catégorie personnalisée
+        </button>
+      )}
+    </div>
+  );
+}
+
 // ---------- 1.8s auto-advance bandeau -------------------------------------
 
-function AutoAdvanceBanner({ cardId, onComplete }: { cardId: string; onComplete: () => void }) {
+function AutoAdvanceBanner({
+  cardId,
+  nextColumnName,
+  onComplete,
+}: {
+  cardId: string;
+  nextColumnName: string | null;
+  onComplete: () => void;
+}) {
   const [remainingMs, setRemainingMs] = useState<number>(AUTO_ADVANCE_DELAY_MS);
   const cancelled = useRef(false);
 
@@ -461,7 +600,9 @@ function AutoAdvanceBanner({ cardId, onComplete }: { cardId: string; onComplete:
   return (
     <div className="flow-banner" role="status">
       <span className="flow-banner-text">
-        ✦ Avancement automatique dans {(remainingMs / 1000).toFixed(1)}s
+        ✓ Checklist complète{nextColumnName ? ` · déplacement vers ` : ''}
+        {nextColumnName ? <strong>{nextColumnName}</strong> : null} ·{' '}
+        {(remainingMs / 1000).toFixed(1)}s
       </span>
       <button type="button" onClick={cancel}>
         Annuler
@@ -501,7 +642,7 @@ function BlockedBanner({ cardId, dueDate }: { cardId: string; dueDate: string | 
   );
 }
 
-// ---------- Delete -------------------------------------------------------
+// ---------- Delete (rendered in side actions) -----------------------------
 
 function DeleteCardButton({
   cardId,
@@ -526,12 +667,8 @@ function DeleteCardButton({
     >
       <input type="hidden" name={CSRF_FIELD_NAME} value={csrfToken} />
       <input type="hidden" name="cardId" value={cardId} />
-      <button
-        type="submit"
-        disabled={pending}
-        className="text-xs text-[color:var(--color-danger)] underline"
-      >
-        Supprimer la carte
+      <button type="submit" disabled={pending} className="danger">
+        {pending ? 'Suppression…' : 'Supprimer la carte'}
       </button>
     </form>
   );

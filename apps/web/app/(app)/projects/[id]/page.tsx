@@ -6,6 +6,7 @@ import { requireUser } from '@/lib/auth';
 import { getCsrfTokenForForm } from '@/lib/csrf';
 import { KanbanBoard } from '@/features/projects/components/kanban-board';
 import { CardModal } from '@/features/projects/components/card-modal';
+import { listCustomCategories } from '@/features/projects/lib/categories';
 
 export const metadata: Metadata = { title: 'Projet' };
 
@@ -129,23 +130,69 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
       />
 
       {openCard ? (
-        <CardModal
+        <CardModalShell
           csrfToken={csrf}
           workspaceName={workspace.name}
           projectName={project.name}
-          card={{
-            id: openCard.id,
-            title: openCard.title,
-            description: openCard.description,
-            dueDate: openCard.dueDate ? openCard.dueDate.toISOString() : null,
-            shortRef: openCard.shortRef,
-            columnName: openCard.column.name,
-            columnIsBlocked: openCard.column.isBlockedSystem,
-            categoryTag: openCard.categoryTag,
-            checklist: openCard.checklistItems,
-          }}
+          workspaceId={ctx.workspaceId}
+          openCard={openCard}
+          columns={project.columns}
         />
       ) : null}
     </div>
+  );
+}
+
+async function CardModalShell({
+  csrfToken,
+  workspaceName,
+  projectName,
+  workspaceId,
+  openCard,
+  columns,
+}: {
+  csrfToken: string;
+  workspaceName: string;
+  projectName: string;
+  workspaceId: string;
+  openCard: {
+    id: string;
+    title: string;
+    description: string | null;
+    dueDate: Date | null;
+    shortRef: number;
+    categoryTag: string | null;
+    column: { name: string; isBlockedSystem: boolean };
+    checklistItems: readonly { id: string; title: string; isChecked: boolean; position: number }[];
+  };
+  columns: readonly { id: string; name: string; isBlockedSystem: boolean }[];
+}) {
+  const customCategories = await listCustomCategories(workspaceId);
+
+  // Compute the next user column for the auto-advance bandeau message.
+  const userCols = columns.filter((c) => !c.isBlockedSystem);
+  const idx = userCols.findIndex((c) => c.name === openCard.column.name);
+  const nextColumnName =
+    idx >= 0 && idx < userCols.length - 1 ? (userCols[idx + 1]?.name ?? null) : null;
+
+  return (
+    <CardModal
+      csrfToken={csrfToken}
+      workspaceName={workspaceName}
+      projectName={projectName}
+      customCategories={customCategories}
+      card={{
+        id: openCard.id,
+        title: openCard.title,
+        description: openCard.description,
+        dueDate: openCard.dueDate ? openCard.dueDate.toISOString() : null,
+        shortRef: openCard.shortRef,
+        columnName: openCard.column.name,
+        columnIsBlocked: openCard.column.isBlockedSystem,
+        nextColumnName,
+        categoryTag: openCard.categoryTag,
+        checklist: [...openCard.checklistItems],
+      }}
+    />
   );
 }

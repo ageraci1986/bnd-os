@@ -3,12 +3,11 @@ import 'server-only';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { prisma } from '@nexushub/db';
-import { BUILTIN_CARD_CATEGORIES, NotFoundError } from '@nexushub/domain';
+import { NotFoundError } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
 
-const CategorySchema = z
-  .enum(BUILTIN_CARD_CATEGORIES.map((c) => c.id) as [string, ...string[]])
-  .nullable();
+// Free-form so users can coin custom workspace-level categories.
+const CategorySchema = z.string().trim().min(1).max(32).nullable();
 
 const UpdateCardSchema = z.object({
   cardId: z.string().uuid(),
