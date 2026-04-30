@@ -33,27 +33,53 @@ export interface CalendarCardItem {
   readonly columnIsBlocked: boolean;
 }
 
+export interface CalendarLegendItem {
+  readonly name: string;
+  readonly colorToken: string;
+}
+
 export interface CalendarViewProps {
   readonly year: number;
   readonly month1: number;
   readonly cards: readonly CalendarCardItem[];
+  /** Used to build the month-nav URLs; the route owns the path. */
+  readonly basePath: string;
   /** Preserved across month navigation so the global filter follows. */
   readonly clientSlug: string | null;
+  /** Clients to display in the legend (only those actually drawn on the grid). */
+  readonly legend: readonly CalendarLegendItem[];
 }
 
-function buildHref(year: number, month1: number, clientSlug: string | null): string {
+function buildHref(
+  basePath: string,
+  year: number,
+  month1: number,
+  clientSlug: string | null,
+): string {
   const params = new URLSearchParams();
   params.set('month', formatYearMonth(year, month1));
   if (clientSlug) params.set('client', clientSlug);
-  return `/projects/calendar?${params.toString()}`;
+  return `${basePath}?${params.toString()}`;
 }
 
-export function CalendarView({ year, month1, cards, clientSlug }: CalendarViewProps) {
+export function CalendarView({
+  year,
+  month1,
+  cards,
+  basePath,
+  clientSlug,
+  legend,
+}: CalendarViewProps) {
   const prev = previousYearMonth(year, month1);
   const next = nextYearMonth(year, month1);
   const todayIso = new Date().toISOString().slice(0, 10);
   const today = new Date();
-  const todayHref = buildHref(today.getUTCFullYear(), today.getUTCMonth() + 1, clientSlug);
+  const todayHref = buildHref(
+    basePath,
+    today.getUTCFullYear(),
+    today.getUTCMonth() + 1,
+    clientSlug,
+  );
 
   const cells = buildMonthGrid(year, month1);
 
@@ -70,7 +96,7 @@ export function CalendarView({ year, month1, cards, clientSlug }: CalendarViewPr
       <div className="cal-toolbar">
         <div className="cal-nav">
           <Link
-            href={buildHref(prev.year, prev.month1, clientSlug)}
+            href={buildHref(basePath, prev.year, prev.month1, clientSlug)}
             aria-label="Mois précédent"
             className="cal-nav-btn"
           >
@@ -80,7 +106,7 @@ export function CalendarView({ year, month1, cards, clientSlug }: CalendarViewPr
             {MONTHS_FR[month1 - 1]} <span>{year}</span>
           </div>
           <Link
-            href={buildHref(next.year, next.month1, clientSlug)}
+            href={buildHref(basePath, next.year, next.month1, clientSlug)}
             aria-label="Mois suivant"
             className="cal-nav-btn"
           >
@@ -91,18 +117,18 @@ export function CalendarView({ year, month1, cards, clientSlug }: CalendarViewPr
           </Link>
         </div>
         <div className="cal-legend">
-          <LegendItem token="c-acme" label="Acme" />
-          <LegendItem token="c-tech" label="TechGroup" />
-          <LegendItem token="c-nova" label="Nova" />
-          <LegendItem token="c-lumen" label="Lumen" />
-          <LegendItem token="c-orbit" label="Orbit" />
-          <span className="cal-legend-item" style={{ color: 'var(--color-danger)' }}>
-            <span
-              className="cal-legend-dot"
-              style={{ background: 'transparent', border: '2px solid var(--color-danger)' }}
-            />
-            Bloqué
-          </span>
+          {legend.map((l) => (
+            <LegendItem key={l.name} token={l.colorToken} label={l.name} />
+          ))}
+          {cards.some((c) => c.columnIsBlocked) ? (
+            <span className="cal-legend-item" style={{ color: 'var(--color-danger)' }}>
+              <span
+                className="cal-legend-dot"
+                style={{ background: 'transparent', border: '2px solid var(--color-danger)' }}
+              />
+              Bloqué
+            </span>
+          ) : null}
         </div>
       </div>
 

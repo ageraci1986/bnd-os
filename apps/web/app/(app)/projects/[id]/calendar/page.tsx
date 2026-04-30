@@ -1,18 +1,15 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { notFound } from 'next/navigation';
 import { prisma } from '@nexushub/db';
 import { monthGridRange, parseYearMonth } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
-import {
-  getClientFilterFromSearchParams,
-  resolveActiveClient,
-  clientSlug as toClientSlug,
-} from '@/lib/client-filter/server';
 import { CalendarView, type CalendarCardItem } from '@/features/projects/components/calendar-view';
 
-export const metadata: Metadata = { title: 'Calendrier · Projets' };
+export const metadata: Metadata = { title: 'Calendrier · Projet' };
 
-interface CalendarPageProps {
+interface ProjectCalendarPageProps {
+  readonly params: Promise<{ id: string }>;
   readonly searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }
 
@@ -22,31 +19,37 @@ function readParam(value: string | string[] | undefined): string | null {
   return null;
 }
 
-export default async function CalendarPage({ searchParams }: CalendarPageProps) {
+export default async function ProjectCalendarPage({
+  params,
+  searchParams,
+}: ProjectCalendarPageProps) {
   const ctx = await requireUser();
+  const { id } = await params;
   const sp = (await searchParams) ?? {};
-
   const monthParam = readParam(sp['month']);
   const parsed = parseYearMonth(monthParam);
   const now = new Date();
   const year = parsed?.year ?? now.getUTCFullYear();
   const month1 = parsed?.month1 ?? now.getUTCMonth() + 1;
 
-  const filter = getClientFilterFromSearchParams(sp);
-  const activeClient = await resolveActiveClient(filter, ctx.workspaceId);
+  const project = await prisma.project.findFirst({
+    where: { id, workspaceId: ctx.workspaceId, deletedAt: null },
+    select: {
+      id: true,
+      name: true,
+      client: { select: { name: true, colorToken: true } },
+    },
+  });
+  if (!project) notFound();
 
   const range = monthGridRange(year, month1);
 
   const cards = await prisma.card.findMany({
     where: {
       workspaceId: ctx.workspaceId,
+      projectId: project.id,
       deletedAt: null,
       dueDate: { gte: range.start, lt: range.endExclusive },
-      project: {
-        deletedAt: null,
-        archivedAt: null,
-        ...(activeClient ? { clientId: activeClient.id } : {}),
-      },
     },
     orderBy: { dueDate: 'asc' },
     select: {
@@ -54,61 +57,53 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
       title: true,
       shortRef: true,
       dueDate: true,
-      project: {
-        select: {
-          id: true,
-          client: { select: { name: true, colorToken: true } },
-        },
-      },
       column: { select: { isBlockedSystem: true } },
     },
   });
 
   const items: CalendarCardItem[] = cards.map((c) => ({
     id: c.id,
-    projectId: c.project.id,
+    projectId: project.id,
     title: c.title,
     shortRef: c.shortRef,
     isoDate: c.dueDate ? c.dueDate.toISOString().slice(0, 10) : '',
-    clientColorToken: c.project.client.colorToken,
+    clientColorToken: project.client.colorToken,
     columnIsBlocked: c.column.isBlockedSystem,
   }));
 
-  // Dynamic legend: only the clients that actually have cards visible.
-  const legendMap = new Map<string, { name: string; colorToken: string }>();
-  for (const c of cards) {
-    legendMap.set(c.project.client.name, {
-      name: c.project.client.name,
-      colorToken: c.project.client.colorToken,
-    });
-  }
-  const legend = Array.from(legendMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+  // Project-scoped: legend only contains the project's client.
+  const legend = [{ name: project.client.name, colorToken: project.client.colorToken }];
 
   return (
     <div className="mx-auto max-w-[1400px]">
+      <nav className="mb-3 text-xs text-[color:var(--color-text-muted)]">
+        <Link href="/projects" className="underline">
+          ← Tous les projets
+        </Link>
+      </nav>
+
       <header className="mb-6 flex items-end justify-between gap-4">
         <div>
-          <h1 className="text-[34px] font-extrabold tracking-tight">
-            Échéances{' '}
+          <div className="mb-2 flex items-center gap-2 text-xs text-[color:var(--color-text-muted)]">
+            <span
+              aria-hidden="true"
+              className="inline-block h-2 w-2 rounded-full"
+              style={{ background: `var(--${project.client.colorToken})` }}
+            />
+            {project.client.name}
+          </div>
+          <h1 className="text-[32px] font-extrabold tracking-tight">
+            {project.name}{' '}
             <span
               className="bg-clip-text text-transparent"
               style={{ backgroundImage: 'var(--accent-gradient)' }}
             >
-              {activeClient ? `· ${activeClient.name}` : 'du mois'}
+              · calendrier
             </span>
           </h1>
-          <p className="mt-2 text-sm text-[color:var(--color-text-muted)]">
-            {items.length === 0
-              ? 'Aucune carte avec une date d’échéance ce mois.'
-              : `${items.length} carte${items.length > 1 ? 's' : ''} avec date d’échéance ce mois. Cliquez une tâche pour l’ouvrir.`}
-          </p>
         </div>
         <div className="view-toggle">
-          <Link
-            href={`/projects${activeClient ? `?client=${toClientSlug(activeClient.name)}` : ''}`}
-          >
-            ▦ Kanban
-          </Link>
+          <Link href={`/projects/${project.id}`}>▦ Kanban</Link>
           <Link href="" className="active" aria-current="page">
             ▭ Calendrier
           </Link>
@@ -119,8 +114,8 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
         year={year}
         month1={month1}
         cards={items}
-        basePath="/projects/calendar"
-        clientSlug={activeClient ? toClientSlug(activeClient.name) : null}
+        basePath={`/projects/${project.id}/calendar`}
+        clientSlug={null}
         legend={legend}
       />
     </div>

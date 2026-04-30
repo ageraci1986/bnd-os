@@ -105,30 +105,42 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
         </Link>
       </nav>
 
-      <header className="mb-6">
-        <div className="mb-2 flex items-center gap-2 text-xs text-[color:var(--color-text-muted)]">
-          <span
-            aria-hidden="true"
-            className="inline-block h-2 w-2 rounded-full"
-            style={{ background: `var(--${project.client.colorToken})` }}
-          />
-          {project.client.name}
-          {project.type ? (
+      <header className="mb-6 flex items-end justify-between gap-4">
+        <div>
+          <div className="mb-2 flex items-center gap-2 text-xs text-[color:var(--color-text-muted)]">
+            <span
+              aria-hidden="true"
+              className="inline-block h-2 w-2 rounded-full"
+              style={{ background: `var(--${project.client.colorToken})` }}
+            />
+            {project.client.name}
+            {project.type ? (
+              <span>
+                · {project.type.icon} {project.type.name}
+              </span>
+            ) : null}
             <span>
-              · {project.type.icon} {project.type.name}
+              ·{' '}
+              {cardCount === 0
+                ? 'aucune carte'
+                : cardCount === 1
+                  ? '1 carte'
+                  : `${cardCount} cartes`}
             </span>
+          </div>
+          <h1 className="text-[32px] font-extrabold tracking-tight">{project.name}</h1>
+          {project.description ? (
+            <p className="mt-1 max-w-3xl text-sm text-[color:var(--color-text-muted)]">
+              {project.description}
+            </p>
           ) : null}
-          <span>
-            ·{' '}
-            {cardCount === 0 ? 'aucune carte' : cardCount === 1 ? '1 carte' : `${cardCount} cartes`}
-          </span>
         </div>
-        <h1 className="text-[32px] font-extrabold tracking-tight">{project.name}</h1>
-        {project.description ? (
-          <p className="mt-1 max-w-3xl text-sm text-[color:var(--color-text-muted)]">
-            {project.description}
-          </p>
-        ) : null}
+        <div className="view-toggle">
+          <Link href="" className="active" aria-current="page">
+            ▦ Kanban
+          </Link>
+          <Link href={`/projects/${project.id}/calendar`}>▭ Calendrier</Link>
+        </div>
       </header>
 
       <KanbanBoard
