@@ -1197,6 +1197,214 @@
   font-family: inherit;
 }
 
+/* ---- Calendar view (mockup §05-calendar, faithful port) ------------ */
+.cal-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding: 14px 18px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: 14px;
+  box-shadow: var(--shadow-card);
+}
+.cal-nav {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.cal-nav-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--bg-hover);
+  color: var(--text-main);
+  display: grid;
+  place-items: center;
+  border: none;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background-color 0.15s,
+    color 0.15s;
+}
+.cal-nav-btn:hover {
+  background-image: var(--accent-gradient);
+  color: #fff;
+}
+.cal-month {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.6px;
+  padding: 0 6px;
+  text-transform: capitalize;
+}
+.cal-month span {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.cal-legend {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.cal-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+.cal-legend-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+}
+.cal-dow {
+  padding: 12px;
+  background: var(--color-bg-muted);
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+  border-right: 1px solid var(--border-soft);
+  border-bottom: 1px solid var(--border-light);
+}
+.cal-dow:nth-child(7) {
+  border-right: 0;
+}
+.cal-day {
+  min-height: 124px;
+  padding: 10px;
+  border-right: 1px solid var(--border-soft);
+  border-bottom: 1px solid var(--border-soft);
+  position: relative;
+  transition: background-color 0.15s;
+}
+.cal-day:hover {
+  background: var(--color-bg-muted);
+}
+.cal-day:nth-child(7n) {
+  border-right: 0;
+}
+.cal-day.muted {
+  background: var(--color-bg-muted);
+  opacity: 0.55;
+}
+.cal-day.today {
+  background-image: var(--accent-gradient-soft);
+}
+.cal-day.today .cal-date {
+  background-image: var(--accent-gradient);
+  color: #fff;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  margin-bottom: 6px;
+}
+.cal-date {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-main);
+  margin-bottom: 8px;
+}
+.cal-items {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.cal-item {
+  padding: 3px 7px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-decoration: none;
+  display: block;
+  transition: transform 0.12s;
+}
+.cal-item:hover {
+  transform: translateX(2px);
+}
+.cal-item.i-acme {
+  background: rgba(255, 42, 109, 0.12);
+  color: var(--c-acme);
+}
+.cal-item.i-tech {
+  background: rgba(37, 99, 235, 0.12);
+  color: var(--c-tech);
+}
+.cal-item.i-nova {
+  background: rgba(5, 150, 105, 0.12);
+  color: var(--c-nova);
+}
+.cal-item.i-lumen {
+  background: rgba(245, 158, 11, 0.12);
+  color: var(--c-lumen);
+}
+.cal-item.i-orbit {
+  background: rgba(139, 43, 226, 0.12);
+  color: var(--c-orbit);
+}
+.cal-item.blocked {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+  border: 1px solid var(--color-danger);
+}
+.cal-more {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--text-muted);
+  padding: 2px 7px;
+}
+
+.view-toggle {
+  display: inline-flex;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: 9999px;
+  padding: 4px;
+  box-shadow: var(--shadow-card);
+}
+.view-toggle a,
+.view-toggle button {
+  padding: 7px 16px;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 9999px;
+  color: var(--text-muted);
+  text-decoration: none;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition:
+    background-color 0.15s,
+    color 0.15s;
+}
+.view-toggle .active {
+  background-image: var(--accent-gradient);
+  color: #fff;
+}
+
 /* ---- Auth split layout ---------------------------------------------- */
 .auth {
   min-height: 100vh;

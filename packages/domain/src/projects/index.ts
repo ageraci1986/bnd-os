@@ -173,6 +173,84 @@ export function computeCardPosition(input: {
   return Math.floor((before + after) / 2);
 }
 
+// ---------- Calendar helpers (PRD §6 vue calendrier) -----------------------
+
+/** YYYY-MM format used in the URL `?month=` param. */
+export function formatYearMonth(year: number, month1: number): string {
+  return `${year.toString().padStart(4, '0')}-${month1.toString().padStart(2, '0')}`;
+}
+
+export function parseYearMonth(value: string | null | undefined): {
+  readonly year: number;
+  readonly month1: number;
+} | null {
+  if (!value) return null;
+  const m = /^(\d{4})-(\d{1,2})$/.exec(value);
+  if (!m) return null;
+  const year = Number(m[1]);
+  const month1 = Number(m[2]);
+  if (month1 < 1 || month1 > 12) return null;
+  return { year, month1 };
+}
+
+export function previousYearMonth(year: number, month1: number): { year: number; month1: number } {
+  if (month1 === 1) return { year: year - 1, month1: 12 };
+  return { year, month1: month1 - 1 };
+}
+
+export function nextYearMonth(year: number, month1: number): { year: number; month1: number } {
+  if (month1 === 12) return { year: year + 1, month1: 1 };
+  return { year, month1: month1 + 1 };
+}
+
+/**
+ * Build a 6×7 month grid (always 42 cells) starting on Monday. Every cell
+ * carries the JS Date for that day and a flag telling if it belongs to
+ * the visible month or to the leading/trailing filler weeks.
+ */
+export interface CalendarCell {
+  readonly date: Date;
+  readonly inMonth: boolean;
+  readonly isoDate: string;
+}
+
+export function buildMonthGrid(year: number, month1: number): readonly CalendarCell[] {
+  const firstOfMonth = new Date(Date.UTC(year, month1 - 1, 1));
+  // Mon=0 … Sun=6 (ISO Monday-first week).
+  const isoDow = (firstOfMonth.getUTCDay() + 6) % 7;
+  const start = new Date(firstOfMonth);
+  start.setUTCDate(start.getUTCDate() - isoDow);
+
+  const cells: CalendarCell[] = [];
+  for (let i = 0; i < 42; i++) {
+    const d = new Date(start);
+    d.setUTCDate(start.getUTCDate() + i);
+    cells.push({
+      date: d,
+      inMonth: d.getUTCMonth() === month1 - 1 && d.getUTCFullYear() === year,
+      isoDate: d.toISOString().slice(0, 10),
+    });
+  }
+  return cells;
+}
+
+/** Inclusive range covering every cell of the 6-week grid for that month. */
+export function monthGridRange(
+  year: number,
+  month1: number,
+): {
+  readonly start: Date;
+  readonly endExclusive: Date;
+} {
+  const firstOfMonth = new Date(Date.UTC(year, month1 - 1, 1));
+  const isoDow = (firstOfMonth.getUTCDay() + 6) % 7;
+  const start = new Date(firstOfMonth);
+  start.setUTCDate(start.getUTCDate() - isoDow);
+  const endExclusive = new Date(start);
+  endExclusive.setUTCDate(start.getUTCDate() + 42);
+  return { start, endExclusive };
+}
+
 export function buildProjectColumns(template: KanbanTemplate): readonly ProjectColumnSeed[] {
   // Sparse positions (1024-step) so columns can be reordered without rewriting.
   const userColumns = template.columns.map((name, idx) => ({

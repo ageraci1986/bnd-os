@@ -36,9 +36,13 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
     },
   });
 
+  const calendarHref = activeClient
+    ? `/projects/calendar?client=${activeClient.slug}`
+    : '/projects/calendar';
+
   return (
     <div className="mx-auto max-w-6xl">
-      <header className="mb-8 flex items-center justify-between">
+      <header className="mb-8 flex items-center justify-between gap-4">
         <div>
           <h1 className="text-[34px] font-extrabold tracking-tight">Projets</h1>
           <p className="mt-2 text-sm text-[color:var(--color-text-muted)]">
@@ -47,9 +51,17 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
               : 'Tous les projets actifs de votre espace.'}
           </p>
         </div>
-        <Link href="/projects/new" className="btn btn-primary">
-          + Nouveau projet
-        </Link>
+        <div className="flex items-center gap-3">
+          <div className="view-toggle">
+            <Link href="" className="active" aria-current="page">
+              ▦ Liste
+            </Link>
+            <Link href={calendarHref}>▭ Calendrier</Link>
+          </div>
+          <Link href="/projects/new" className="btn btn-primary">
+            + Nouveau projet
+          </Link>
+        </div>
       </header>
 
       {projects.length === 0 ? (

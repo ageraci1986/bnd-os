@@ -4,9 +4,15 @@ import {
   BLOCKED_COLUMN_POSITION,
   BUILTIN_PROJECT_TYPES,
   BUILTIN_TEMPLATES,
+  buildMonthGrid,
   buildProjectColumns,
   computeCardPosition,
   findTemplate,
+  formatYearMonth,
+  monthGridRange,
+  nextYearMonth,
+  parseYearMonth,
+  previousYearMonth,
   validateProjectDates,
   validateProjectName,
 } from './index';
@@ -167,5 +173,56 @@ describe('computeCardPosition', () => {
 
   it('falls back to first-1024 when the only sibling is at position 1', () => {
     expect(computeCardPosition({ orderedSiblingPositions: [1], targetIndex: 0 })).toBe(-1023);
+  });
+});
+
+describe('calendar helpers', () => {
+  it('formatYearMonth zero-pads the month', () => {
+    expect(formatYearMonth(2026, 4)).toBe('2026-04');
+    expect(formatYearMonth(2026, 12)).toBe('2026-12');
+  });
+
+  it('parseYearMonth accepts both 1- and 2-digit months and rejects junk', () => {
+    expect(parseYearMonth('2026-04')).toEqual({ year: 2026, month1: 4 });
+    expect(parseYearMonth('2026-4')).toEqual({ year: 2026, month1: 4 });
+    expect(parseYearMonth('2026-13')).toBeNull();
+    expect(parseYearMonth('foo')).toBeNull();
+    expect(parseYearMonth(null)).toBeNull();
+  });
+
+  it('previousYearMonth wraps January back to December', () => {
+    expect(previousYearMonth(2026, 1)).toEqual({ year: 2025, month1: 12 });
+    expect(previousYearMonth(2026, 6)).toEqual({ year: 2026, month1: 5 });
+  });
+
+  it('nextYearMonth wraps December to January', () => {
+    expect(nextYearMonth(2026, 12)).toEqual({ year: 2027, month1: 1 });
+    expect(nextYearMonth(2026, 6)).toEqual({ year: 2026, month1: 7 });
+  });
+
+  it('buildMonthGrid yields exactly 42 cells starting on a Monday', () => {
+    const cells = buildMonthGrid(2026, 4); // April 2026
+    expect(cells).toHaveLength(42);
+    // ISO Monday-first: every cell at index 0,7,14,21,28,35 is a Monday.
+    for (const i of [0, 7, 14, 21, 28, 35]) {
+      const d = cells[i]!.date;
+      expect((d.getUTCDay() + 6) % 7).toBe(0);
+    }
+  });
+
+  it('buildMonthGrid flags inMonth correctly across the boundary', () => {
+    const cells = buildMonthGrid(2026, 4);
+    // First cell is March 30 2026 (Monday) → not in April.
+    expect(cells[0]!.isoDate).toBe('2026-03-30');
+    expect(cells[0]!.inMonth).toBe(false);
+    // The 1st of April should be in month.
+    const apr1 = cells.find((c) => c.isoDate === '2026-04-01');
+    expect(apr1?.inMonth).toBe(true);
+  });
+
+  it('monthGridRange covers the same 42-day window as the grid', () => {
+    const range = monthGridRange(2026, 4);
+    const ms = (range.endExclusive.getTime() - range.start.getTime()) / (24 * 3600 * 1000);
+    expect(ms).toBe(42);
   });
 });
