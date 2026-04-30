@@ -5,6 +5,7 @@ import { prisma } from '@nexushub/db';
 import { monthGridRange, parseYearMonth } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
 import { CalendarView, type CalendarCardItem } from '@/features/projects/components/calendar-view';
+import { reconcileBeforeRead } from '@/features/projects/lib/reconcile';
 import { CalendarIcon, KanbanIcon } from '@/features/shell/components/icons';
 
 export const metadata: Metadata = { title: 'Calendrier · Projet' };
@@ -42,6 +43,10 @@ export default async function ProjectCalendarPage({
     },
   });
   if (!project) notFound();
+
+  // Reconcile-on-read (PRD §8.3 + ADR 0001 #2). Idempotent — converges
+  // before we fetch the cards so the calendar paints fresh state.
+  await reconcileBeforeRead(ctx.workspaceId, { projectIds: [project.id] });
 
   const range = monthGridRange(year, month1);
 

@@ -7,6 +7,7 @@ import { getCsrfTokenForForm } from '@/lib/csrf';
 import { KanbanBoard } from '@/features/projects/components/kanban-board';
 import { CardModal } from '@/features/projects/components/card-modal';
 import { listCustomCategories } from '@/features/projects/lib/categories';
+import { reconcileBeforeRead } from '@/features/projects/lib/reconcile';
 import { CalendarIcon, KanbanIcon } from '@/features/shell/components/icons';
 
 export const metadata: Metadata = { title: 'Projet' };
@@ -27,6 +28,11 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
   const { id } = await params;
   const sp = (await searchParams) ?? {};
   const openCardId = readParam(sp['card']);
+
+  // Reconcile-on-read: align overdue / restored / archived cards before
+  // rendering the board so the user always sees up-to-date state without
+  // a background cron.
+  await reconcileBeforeRead(ctx.workspaceId, { projectIds: [id] });
 
   // Single Promise.all so the modal data fetch doesn't sequentially block
   // the rest of the page (this used to add a visible delay on open/close).

@@ -6,6 +6,7 @@ import { MetricCard } from '@nexushub/ui';
 import { requireUser } from '@/lib/auth';
 import { getClientFilterFromSearchParams, resolveActiveClient } from '@/lib/client-filter/server';
 import { getOverviewMetrics } from '@/features/overview/lib/metrics';
+import { reconcileBeforeRead } from '@/features/projects/lib/reconcile';
 
 export const metadata: Metadata = {
   title: 'Tableau de bord',
@@ -19,6 +20,10 @@ export default async function OverviewPage({ searchParams }: OverviewPageProps) 
   const ctx = await requireUser();
   const sp = (await searchParams) ?? {};
   const filter = getClientFilterFromSearchParams(sp);
+
+  // Reconcile-on-read (PRD §8.3 + ADR 0001 #2) so the "Cartes bloquées"
+  // counter always reflects the rules at the moment the user looks.
+  await reconcileBeforeRead(ctx.workspaceId);
 
   const [profile, activeClient] = await Promise.all([
     prisma.user.findUniqueOrThrow({

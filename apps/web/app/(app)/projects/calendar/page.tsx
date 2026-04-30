@@ -9,6 +9,7 @@ import {
   clientSlug as toClientSlug,
 } from '@/lib/client-filter/server';
 import { CalendarView, type CalendarCardItem } from '@/features/projects/components/calendar-view';
+import { reconcileBeforeRead } from '@/features/projects/lib/reconcile';
 import { CalendarIcon, KanbanIcon } from '@/features/shell/components/icons';
 
 export const metadata: Metadata = { title: 'Calendrier · Projets' };
@@ -35,6 +36,10 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
 
   const filter = getClientFilterFromSearchParams(sp);
   const activeClient = await resolveActiveClient(filter, ctx.workspaceId);
+
+  // Reconcile-on-read (PRD §8.3 + ADR 0001 #2) for the workspace before
+  // pulling the visible cards.
+  await reconcileBeforeRead(ctx.workspaceId);
 
   const range = monthGridRange(year, month1);
 

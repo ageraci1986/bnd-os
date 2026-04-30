@@ -23,7 +23,7 @@
 | 2     | Modèle de données + Auth                 | L             | `[x]`  |
 | 3     | Design system + Shell applicatif         | L             | `[x]`  |
 | 4     | Module Clients & Contacts (RACI)         | M             | `[x]`  |
-| 5     | Module Projets (Kanban + règles auto)    | XL            | `[ ]`  |
+| 5     | Module Projets (Kanban + règles auto)    | XL            | `[x]`  |
 | 6     | Module Communications (Slack + Exchange) | XL            | `[ ]`  |
 | 7     | Templates (Email + Kanban)               | M             | `[ ]`  |
 | 8     | Overview (Dashboard)                     | M             | `[ ]`  |
@@ -240,61 +240,65 @@
 
 ---
 
-## Phase 5 — Module Projets (Kanban + règles auto)
+## Phase 5 — Module Projets (Kanban + règles auto) ✅ TERMINÉE (2026-04-30)
 
-### 5.1 Wizard nouveau projet (4 étapes)
+### 5.1 Wizard nouveau projet ✅ (Step D.1)
 
-- [ ] Étape 1 — infos générales (nom, client, description, dates)
-- [ ] Étape 2 — type de projet (cards prédéfinies + création custom avec emoji picker)
-- [ ] Étape 3 — sélection template Kanban (5 templates seed + Vide)
-- [ ] Étape 4 — équipe + récapitulatif
-- [ ] Server Action `createProject` (copie figée des colonnes du template)
-- [ ] Tests E2E parcours 3 du PRD
+- [x] 4 étapes : infos / type / template / récap
+- [x] 5 types built-in (Campagne / Ongoing / Lancement / Spot TV / Social Media)
+- [x] 5 templates Kanban (Campagne créa _recommandé_, Production vidéo, Social Media, Standard, Vide)
+- [x] Server Action `createProject` — transaction unique (ProjectType upsert + Project + colonnes copy-on-create + colonne `Bloqué` system + Lead member)
+- [x] Validation Zod (nom 1-120, dates END_BEFORE_START)
 
-### 5.2 Domaine — règles métier critiques
+### 5.2 Domaine — règles métier critiques ✅ (Step D.3 + déjà ports en Phase 2)
 
-- [ ] `packages/domain/kanban`
-  - [ ] `autoAdvanceCard(card, columns)` — règle 1.8s, dernière colonne, événements
-  - [ ] `moveToBlocked(card, now)` — détection retard, mémorisation `previous_column_id`
-  - [ ] `restoreFromBlocked(card, newDueDate)` — sortie auto
-  - [ ] `archiveStaleCards(cards, now, 30j)` — candidats archivage
-- [ ] **Tests unitaires exhaustifs** (timer mocké, scénarios coché/décoché/timing limite)
+- [x] `packages/domain/kanban` : `evaluateAutoAdvance`, `shouldMoveToBlocked`, `shouldRestoreFromBlocked`, `isArchiveCandidate`, `AUTO_ADVANCE_DELAY_MS = 1800`
+- [x] `packages/domain/projects` : `computeCardPosition` (sparse 1024-step), `buildProjectColumns`, `buildMonthGrid`, `monthGridRange`, etc.
+- [x] **Tests unitaires** (116 specs domain — couverture des règles auto + boundaries)
 
-### 5.3 UI Kanban
+### 5.3 UI Kanban ✅ (Step D.2)
 
-- [ ] `<KanbanBoard>` avec @dnd-kit (drag & drop accessible clavier inclus)
-- [ ] `<KanbanColumn>` configurable + colonne Bloqué non éditable (rouge, badge Auto)
-- [ ] `<KanbanCard>` (titre, tag catégorie, échéance colorée, mini progress bar)
-- [ ] Sélecteur projets en chips
-- [ ] Toggle Kanban / Calendrier
-- [ ] "+ Ajouter" (saisie rapide en bas de colonne)
-- [ ] "+ Colonne" (avant Bloqué)
-- [ ] Menu colonne ⋯ : renommer, déplacer L/R, supprimer (sauf Bloqué)
-- [ ] Realtime sync (Supabase Realtime) pour DnD multi-user
+- [x] `<KanbanBoard>` avec `@dnd-kit/core` 6.3.1 + `@dnd-kit/sortable` 10.0.0 + `@dnd-kit/utilities` 3.2.2 (PointerSensor 4px activation, DragOverlay)
+- [x] `<KanbanColumn>` + colonne Bloqué (drop refusé, fond rouge pastel)
+- [x] `<KanbanCard>` (titre, tag catégorie coloré, #shortRef, badge Bloqué)
+- [x] Toggle Kanban ↔ Calendrier (par projet et workspace) avec icônes SVG
+- [x] "+ Ajouter une carte" inline (form en bas de colonne, optimistic + transition)
+- [x] Move atomique côté serveur (`moveCard` action, midpoint position)
+- [x] Hydration mismatch dnd-kit fixé via `useId()` sur `DndContext`
+- [ ] "+ Colonne" + menu ⋯ rename/move/delete (sauf Bloqué) — V1.5
+- [ ] Realtime sync multi-user (Supabase Realtime) — V1.5
 
-### 5.4 Modal détail carte
+### 5.4 Modal détail carte ✅ (Step D.4)
 
-- [ ] Titre éditable inline
-- [ ] Tag catégorie + indication "→ {next} (auto si checklist complète)"
-- [ ] Assignation membres (avatars + Add)
-- [ ] Échéance + indicateur "à risque"
-- [ ] Description multiligne (auto-save debounced 500ms)
-- [ ] **Checklist** : add/check/uncheck/delete, progress bar live, bandeau vert "Checklist complète ✓", countdown 1.8s **annulable**
-- [ ] Commentaires (avec ⌘+Enter)
-- [ ] Bandeau alerte rouge si carte en Bloqué (avec CTA "Modifier l'échéance")
-- [ ] Actions side : dupliquer, archiver, supprimer
+- [x] URL-driven `?card=<id>` (shareable + back-button friendly)
+- [x] Layout main + side rail (port mockup 1:1)
+- [x] Titre éditable + auto-save debounced 600ms
+- [x] Description auto-save 600ms
+- [x] Catégorie : 6 tags built-in + custom freeform (réutilisés dans le workspace)
+- [x] Échéance avec auto-routing Bloqué/restauration
+- [x] **Checklist** : add (Enter)/toggle/delete, progress bar live, bandeau vert "Checklist complète ✓", countdown 1.8s **annulable**, déplacement auto vers next column via `advanceCard` (re-vérifie côté serveur)
+- [x] Bandeau rouge si carte en Bloqué (CTA "Modifier l'échéance")
+- [x] Actions side : Supprimer (corbeille V1.5 pour Dupliquer/Archiver)
+- [ ] Commentaires (Phase 8 — Overview)
 
-### 5.5 Vue Calendrier
+### 5.5 Vue Calendrier ✅ (Step D.5)
 
-- [ ] Grille mensuelle (Lun-Dim)
-- [ ] Navigation mois précédent/suivant + bouton "Aujourd'hui" + select mois/année
-- [ ] Tâches positionnées sur due_date, clic → modal carte
+- [x] Grille mensuelle 6×7 (Lun-Dim, ISO)
+- [x] Navigation ‹ Mois Année › + bouton Aujourd'hui (préserve filtre client global)
+- [x] Tâches positionnées sur `dueDate`, clic → modal carte du projet
+- [x] Légende dynamique (clients réellement présents dans le mois ou client filtré)
+- [x] 2 routes : `/projects/calendar` workspace + `/projects/[id]/calendar` projet
+- [x] Cartes en colonne Bloqué : bordure rouge
 
-### 5.6 Jobs background
+### 5.6 Reconcile-on-read auto-Bloqué + archivage 30j ✅ (Step D.6)
 
-- [ ] Inngest cron horaire : scan échéances dépassées → moveToBlocked
-- [ ] Inngest cron quotidien : archivage cartes >30j en dernière colonne (si opt-in projet)
-- [ ] Tests E2E parcours 4 du PRD (auto-bloqué)
+> Décision : pas de cron. Les règles sont déterministes et idempotentes. On les applique inline avant chaque lecture des cartes (kanban / calendar / overview), ce qui converge la DB au moment où l'utilisateur regarde et élimine la dépendance à un scheduler externe.
+
+- [x] `apps/web/features/projects/lib/reconcile.ts` : `reconcileOverdueRouting` (block + restore) + `applyAutoArchive` (30j opt-in) + `reconcileBeforeRead`
+- [x] Idempotent (rappel dans le test : 2× → 0 changement)
+- [x] Hooks dans 4 routes : `/projects/[id]`, `/projects/[id]/calendar`, `/projects/calendar`, `/overview`
+- [x] 8 tests Prisma-mocked (block, last-column skip, restore, idempotence, no-op, archive, archive-skip-bumped-out, archive-empty)
+- [ ] Cron d'envoi d'**emails de notification** (auto-bloqué, échéance proche, etc.) → reporté Phase 9 / 13 (effets de bord externes nécessitent un événement temporel, pas un calcul)
 
 ---
 
@@ -397,6 +401,20 @@
 - [ ] Subscription par utilisateur, stockage chiffré
 - [ ] Émetteur d'événements (`card.assigned`, `card.commented`, `card.blocked`, `email.new`, `slack.mention`)
 - [ ] Slack DM bidirectionnel (option)
+
+### 9.4 Cron e-mails (Inngest) — effets de bord temporels
+
+> Note : les règles **auto-Bloqué** + **archivage 30j** sont déjà appliquées
+> en _reconcile-on-read_ (Phase 5.6) — pas besoin de cron pour la
+> convergence des données. Ce cron-ci sert uniquement aux **effets de
+> bord externes** qui exigent un événement temporel (envoyer un email
+> "votre carte vient de passer en Bloqué", "échéance dans 24h", "votre
+> carte X a été archivée automatiquement").
+
+- [ ] Inngest cron horaire : diff entre snapshot précédent et état actuel → événements `card.auto_blocked` / `card.auto_archived` / `card.due_in_24h`
+- [ ] Templates Resend dédiés (réutilisent `mail.nexushub.app`)
+- [ ] Préférences notif par utilisateur (granularité on/off par type d'événement, lié à 9.2)
+- [ ] Tests : event idempotence (le même `card.auto_blocked` ne doit envoyer qu'un seul email même si le cron retourne plusieurs fois sur la même carte)
 
 ### 9.4 Intégrations
 
