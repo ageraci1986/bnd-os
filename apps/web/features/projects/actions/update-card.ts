@@ -9,6 +9,10 @@ import { requireUser } from '@/lib/auth';
 // Free-form so users can coin custom workspace-level categories.
 const CategorySchema = z.string().trim().min(1).max(32).nullable();
 
+// Each field is `.optional()` at the END of its chain so the parser leaves
+// `undefined` untouched (= "not provided, don't update") rather than running
+// the transform on undefined and producing `null`. This is what was nulling
+// the description every time we saved a different field.
 const UpdateCardSchema = z.object({
   cardId: z.string().uuid(),
   title: z
@@ -21,8 +25,8 @@ const UpdateCardSchema = z.object({
   description: z
     .string()
     .max(8000)
-    .optional()
-    .transform((v) => (v && v.trim().length > 0 ? v.trim() : null)),
+    .transform((v) => (v.trim().length > 0 ? v.trim() : null))
+    .optional(),
   categoryTag: CategorySchema.optional(),
 });
 

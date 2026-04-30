@@ -27,7 +27,9 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
   const sp = (await searchParams) ?? {};
   const openCardId = readParam(sp['card']);
 
-  const [csrf, workspace, project] = await Promise.all([
+  // Single Promise.all so the modal data fetch doesn't sequentially block
+  // the rest of the page (this used to add a visible delay on open/close).
+  const [csrf, workspace, project, openCard, customCategories] = await Promise.all([
     getCsrfTokenForForm(),
     prisma.workspace.findUniqueOrThrow({
       where: { id: ctx.workspaceId },
@@ -58,35 +60,42 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
         },
       },
     }),
+    openCardId
+      ? prisma.card.findFirst({
+          where: {
+            id: openCardId,
+            workspaceId: ctx.workspaceId,
+            deletedAt: null,
+          },
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            dueDate: true,
+            shortRef: true,
+            categoryTag: true,
+            column: { select: { name: true, isBlockedSystem: true } },
+            checklistItems: {
+              orderBy: { position: 'asc' },
+              select: { id: true, title: true, isChecked: true, position: true },
+            },
+          },
+        })
+      : Promise.resolve(null),
+    listCustomCategories(ctx.workspaceId),
   ]);
   if (!project) notFound();
 
-  // Optionally load the open card detail.
-  const openCard = openCardId
-    ? await prisma.card.findFirst({
-        where: {
-          id: openCardId,
-          projectId: project.id,
-          workspaceId: ctx.workspaceId,
-          deletedAt: null,
-        },
-        select: {
-          id: true,
-          title: true,
-          description: true,
-          dueDate: true,
-          shortRef: true,
-          categoryTag: true,
-          column: { select: { name: true, isBlockedSystem: true } },
-          checklistItems: {
-            orderBy: { position: 'asc' },
-            select: { id: true, title: true, isChecked: true, position: true },
-          },
-        },
-      })
-    : null;
-
   const cardCount = project.cards.length;
+
+  // Compute the next user column for the auto-advance bandeau message.
+  let nextColumnName: string | null = null;
+  if (openCard) {
+    const userCols = project.columns.filter((c) => !c.isBlockedSystem);
+    const idx = userCols.findIndex((c) => c.name === openCard.column.name);
+    nextColumnName =
+      idx >= 0 && idx < userCols.length - 1 ? (userCols[idx + 1]?.name ?? null) : null;
+  }
 
   return (
     <div className="mx-auto max-w-[1400px]">
@@ -130,69 +139,25 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
       />
 
       {openCard ? (
-        <CardModalShell
+        <CardModal
           csrfToken={csrf}
           workspaceName={workspace.name}
           projectName={project.name}
-          workspaceId={ctx.workspaceId}
-          openCard={openCard}
-          columns={project.columns}
+          customCategories={customCategories}
+          card={{
+            id: openCard.id,
+            title: openCard.title,
+            description: openCard.description,
+            dueDate: openCard.dueDate ? openCard.dueDate.toISOString() : null,
+            shortRef: openCard.shortRef,
+            columnName: openCard.column.name,
+            columnIsBlocked: openCard.column.isBlockedSystem,
+            nextColumnName,
+            categoryTag: openCard.categoryTag,
+            checklist: openCard.checklistItems,
+          }}
         />
       ) : null}
     </div>
-  );
-}
-
-async function CardModalShell({
-  csrfToken,
-  workspaceName,
-  projectName,
-  workspaceId,
-  openCard,
-  columns,
-}: {
-  csrfToken: string;
-  workspaceName: string;
-  projectName: string;
-  workspaceId: string;
-  openCard: {
-    id: string;
-    title: string;
-    description: string | null;
-    dueDate: Date | null;
-    shortRef: number;
-    categoryTag: string | null;
-    column: { name: string; isBlockedSystem: boolean };
-    checklistItems: readonly { id: string; title: string; isChecked: boolean; position: number }[];
-  };
-  columns: readonly { id: string; name: string; isBlockedSystem: boolean }[];
-}) {
-  const customCategories = await listCustomCategories(workspaceId);
-
-  // Compute the next user column for the auto-advance bandeau message.
-  const userCols = columns.filter((c) => !c.isBlockedSystem);
-  const idx = userCols.findIndex((c) => c.name === openCard.column.name);
-  const nextColumnName =
-    idx >= 0 && idx < userCols.length - 1 ? (userCols[idx + 1]?.name ?? null) : null;
-
-  return (
-    <CardModal
-      csrfToken={csrfToken}
-      workspaceName={workspaceName}
-      projectName={projectName}
-      customCategories={customCategories}
-      card={{
-        id: openCard.id,
-        title: openCard.title,
-        description: openCard.description,
-        dueDate: openCard.dueDate ? openCard.dueDate.toISOString() : null,
-        shortRef: openCard.shortRef,
-        columnName: openCard.column.name,
-        columnIsBlocked: openCard.column.isBlockedSystem,
-        nextColumnName,
-        categoryTag: openCard.categoryTag,
-        checklist: [...openCard.checklistItems],
-      }}
-    />
   );
 }

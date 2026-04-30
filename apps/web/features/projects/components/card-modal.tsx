@@ -441,29 +441,34 @@ function CategorySelector({
   initial: string | null;
   customCategories: readonly string[];
 }) {
-  const router = useRouter();
+  // Local list so a freshly-coined custom category is rendered as a quick
+  // pick immediately, without waiting for a server refresh.
   const [active, setActive] = useState<string | null>(initial);
+  const [extra, setExtra] = useState<readonly string[]>([]);
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState('');
 
   const pick = (next: string | null) => {
+    const previous = active;
     setActive(next);
-    void updateCard({ cardId, categoryTag: next })
-      .then(() => router.refresh())
-      .catch(() => setActive(initial));
+    void updateCard({ cardId, categoryTag: next }).catch(() => setActive(previous));
   };
 
   const submitCustom = (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = draft.trim();
     if (trimmed.length === 0 || trimmed.length > 32) return;
+    const previous = active;
     setActive(trimmed);
+    if (!customCategories.includes(trimmed) && !extra.includes(trimmed)) {
+      setExtra((prev) => [...prev, trimmed]);
+    }
     setAdding(false);
     setDraft('');
-    void updateCard({ cardId, categoryTag: trimmed })
-      .then(() => router.refresh())
-      .catch(() => setActive(initial));
+    void updateCard({ cardId, categoryTag: trimmed }).catch(() => setActive(previous));
   };
+
+  const allCustom = [...customCategories, ...extra.filter((t) => !customCategories.includes(t))];
 
   return (
     <div>
@@ -471,7 +476,9 @@ function CategorySelector({
         <button
           type="button"
           onClick={() => pick(null)}
-          className={`category-pick none${active === null ? 'active' : ''}`}
+          className={['category-pick', 'none', active === null && 'active']
+            .filter(Boolean)
+            .join(' ')}
         >
           Aucune
         </button>
@@ -480,7 +487,7 @@ function CategorySelector({
             key={c.id}
             type="button"
             onClick={() => pick(c.id)}
-            className={`category-pick${active === c.id ? 'active' : ''}`}
+            className={['category-pick', active === c.id && 'active'].filter(Boolean).join(' ')}
             aria-pressed={active === c.id}
           >
             <Tag variant={c.id as BuiltinCardCategoryId} size="sm">
@@ -488,12 +495,12 @@ function CategorySelector({
             </Tag>
           </button>
         ))}
-        {customCategories.map((label) => (
+        {allCustom.map((label) => (
           <button
             key={label}
             type="button"
             onClick={() => pick(label)}
-            className={`category-pick${active === label ? 'active' : ''}`}
+            className={['category-pick', active === label && 'active'].filter(Boolean).join(' ')}
             aria-pressed={active === label}
           >
             <Tag variant="primary" size="sm">
@@ -501,8 +508,7 @@ function CategorySelector({
             </Tag>
           </button>
         ))}
-        {/* Active custom tag not yet in the list (just-added on this card) */}
-        {active && !isBuiltinCardCategory(active) && !customCategories.includes(active) ? (
+        {active && !isBuiltinCardCategory(active) && !allCustom.includes(active) ? (
           <button
             type="button"
             className="category-pick active"
