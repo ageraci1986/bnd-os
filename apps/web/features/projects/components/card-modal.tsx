@@ -8,6 +8,7 @@ import {
   isBuiltinCardCategory,
   type BuiltinCardCategoryId,
 } from '@nexushub/domain';
+import { AssigneesSide, type CardAssignment, type WorkspaceMemberOption } from './assignees-side';
 import {
   createChecklistItem,
   deleteChecklistItem,
@@ -27,6 +28,7 @@ export interface CardModalProps {
   readonly customCategories: readonly string[];
   /** When true (i.e. ?new=1), the title input autofocuses + selects on mount. */
   readonly isNew: boolean;
+  readonly workspaceMembers: readonly WorkspaceMemberOption[];
   readonly card: {
     readonly id: string;
     readonly title: string;
@@ -38,6 +40,7 @@ export interface CardModalProps {
     readonly nextColumnName: string | null;
     readonly categoryTag: string | null;
     readonly checklist: readonly ChecklistItemDTO[];
+    readonly assignees: readonly CardAssignment[];
   };
 }
 
@@ -52,6 +55,7 @@ export function CardModal({
   projectName,
   customCategories,
   isNew,
+  workspaceMembers,
   card,
 }: CardModalProps) {
   const router = useRouter();
@@ -200,6 +204,15 @@ export function CardModal({
             </div>
 
             <div className="side-row">
+              <div className="side-label">Assignés{assignments(card.assignees)}</div>
+              <AssigneesSide
+                cardId={card.id}
+                assignments={card.assignees}
+                members={workspaceMembers}
+              />
+            </div>
+
+            <div className="side-row">
               <div className="side-label">Catégorie</div>
               <CategorySelector
                 cardId={card.id}
@@ -233,6 +246,10 @@ export function CardModal({
       </article>
     </>
   );
+}
+
+function assignments(list: readonly CardAssignment[]): string {
+  return list.length === 0 ? '' : ` · ${list.length}`;
 }
 
 // ---------- Title (debounced save) -----------------------------------------

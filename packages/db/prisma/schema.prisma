@@ -427,9 +427,13 @@ model Card {
   @@map("cards")
 }
 
+/// Internal-team RACI assignments on cards (PRD §6.6 applied to tasks). At
+/// most one Responsible / Accountable per card is enforced via partial
+/// unique indexes in migration; Consulted / Informed are unbounded.
 model CardAssignee {
   cardId    String   @map("card_id") @db.Uuid
   userId    String   @map("user_id") @db.Uuid
+  raci      RACI     @default(responsible)
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   card Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
@@ -437,6 +441,7 @@ model CardAssignee {
 
   @@id([cardId, userId])
   @@index([userId])
+  @@index([cardId, raci])
   @@map("card_assignees")
 }
 

@@ -37,61 +37,77 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
 
   // Single Promise.all so the modal data fetch doesn't sequentially block
   // the rest of the page (this used to add a visible delay on open/close).
-  const [csrf, workspace, project, openCard, customCategories] = await Promise.all([
-    getCsrfTokenForForm(),
-    prisma.workspace.findUniqueOrThrow({
-      where: { id: ctx.workspaceId },
-      select: { name: true },
-    }),
-    prisma.project.findFirst({
-      where: { id, workspaceId: ctx.workspaceId, deletedAt: null },
-      select: {
-        id: true,
-        name: true,
-        description: true,
-        client: { select: { id: true, name: true, colorToken: true } },
-        type: { select: { name: true, icon: true } },
-        columns: {
-          orderBy: { position: 'asc' },
-          select: { id: true, name: true, isBlockedSystem: true },
-        },
-        cards: {
-          where: { deletedAt: null },
-          orderBy: { position: 'asc' },
-          select: {
-            id: true,
-            columnId: true,
-            shortRef: true,
-            title: true,
-            categoryTag: true,
+  const [csrf, workspace, project, openCard, customCategories, workspaceMembers] =
+    await Promise.all([
+      getCsrfTokenForForm(),
+      prisma.workspace.findUniqueOrThrow({
+        where: { id: ctx.workspaceId },
+        select: { name: true },
+      }),
+      prisma.project.findFirst({
+        where: { id, workspaceId: ctx.workspaceId, deletedAt: null },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          client: { select: { id: true, name: true, colorToken: true } },
+          type: { select: { name: true, icon: true } },
+          columns: {
+            orderBy: { position: 'asc' },
+            select: { id: true, name: true, isBlockedSystem: true },
           },
-        },
-      },
-    }),
-    openCardId
-      ? prisma.card.findFirst({
-          where: {
-            id: openCardId,
-            workspaceId: ctx.workspaceId,
-            deletedAt: null,
-          },
-          select: {
-            id: true,
-            title: true,
-            description: true,
-            dueDate: true,
-            shortRef: true,
-            categoryTag: true,
-            column: { select: { name: true, isBlockedSystem: true } },
-            checklistItems: {
-              orderBy: { position: 'asc' },
-              select: { id: true, title: true, isChecked: true, position: true },
+          cards: {
+            where: { deletedAt: null },
+            orderBy: { position: 'asc' },
+            select: {
+              id: true,
+              columnId: true,
+              shortRef: true,
+              title: true,
+              categoryTag: true,
             },
           },
-        })
-      : Promise.resolve(null),
-    listCustomCategories(ctx.workspaceId),
-  ]);
+        },
+      }),
+      openCardId
+        ? prisma.card.findFirst({
+            where: {
+              id: openCardId,
+              workspaceId: ctx.workspaceId,
+              deletedAt: null,
+            },
+            select: {
+              id: true,
+              title: true,
+              description: true,
+              dueDate: true,
+              shortRef: true,
+              categoryTag: true,
+              column: { select: { name: true, isBlockedSystem: true } },
+              checklistItems: {
+                orderBy: { position: 'asc' },
+                select: { id: true, title: true, isChecked: true, position: true },
+              },
+              assignees: {
+                select: {
+                  userId: true,
+                  raci: true,
+                  user: { select: { firstName: true, lastName: true, email: true } },
+                },
+              },
+            },
+          })
+        : Promise.resolve(null),
+      listCustomCategories(ctx.workspaceId),
+      prisma.membership.findMany({
+        where: { workspaceId: ctx.workspaceId },
+        select: {
+          userId: true,
+          user: { select: { firstName: true, lastName: true, email: true } },
+        },
+        orderBy: { createdAt: 'asc' },
+      }),
+    ]);
   if (!project) notFound();
 
   const cardCount = project.cards.length;
@@ -167,6 +183,21 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
           projectName={project.name}
           customCategories={customCategories}
           isNew={isNew}
+          workspaceMembers={workspaceMembers.map((m) => {
+            const name =
+              [m.user.firstName, m.user.lastName].filter(Boolean).join(' ').trim() || m.user.email;
+            const initials =
+              [m.user.firstName?.[0], m.user.lastName?.[0]]
+                .filter(Boolean)
+                .join('')
+                .toUpperCase() || m.user.email.slice(0, 2).toUpperCase();
+            return {
+              userId: m.userId,
+              displayName: name,
+              initials,
+              email: m.user.email,
+            };
+          })}
           card={{
             id: openCard.id,
             title: openCard.title,
@@ -178,6 +209,22 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
             nextColumnName,
             categoryTag: openCard.categoryTag,
             checklist: openCard.checklistItems,
+            assignees: openCard.assignees.map((a) => {
+              const name =
+                [a.user.firstName, a.user.lastName].filter(Boolean).join(' ').trim() ||
+                a.user.email;
+              const initials =
+                [a.user.firstName?.[0], a.user.lastName?.[0]]
+                  .filter(Boolean)
+                  .join('')
+                  .toUpperCase() || a.user.email.slice(0, 2).toUpperCase();
+              return {
+                userId: a.userId,
+                displayName: name,
+                initials,
+                raci: a.raci,
+              };
+            }),
           }}
         />
       ) : null}
