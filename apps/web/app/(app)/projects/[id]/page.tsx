@@ -28,6 +28,7 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
   const { id } = await params;
   const sp = (await searchParams) ?? {};
   const openCardId = readParam(sp['card']);
+  const isNew = readParam(sp['new']) === '1';
 
   // Reconcile-on-read: align overdue / restored / archived cards before
   // rendering the board so the user always sees up-to-date state without
@@ -165,6 +166,7 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
           workspaceName={workspace.name}
           projectName={project.name}
           customCategories={customCategories}
+          isNew={isNew}
           card={{
             id: openCard.id,
             title: openCard.title,

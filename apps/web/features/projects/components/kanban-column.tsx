@@ -1,10 +1,13 @@
 'use client';
-import { useState, useTransition } from 'react';
+import { useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSRF_FIELD_NAME } from '@/lib/csrf/field';
 import { createCard } from '../actions/create-card';
 import { KanbanCard, type KanbanCardData } from './kanban-card';
+
+const PLACEHOLDER_TITLE = 'Nouvelle carte';
 
 export interface KanbanColumnData {
   readonly id: string;
@@ -20,7 +23,8 @@ export interface KanbanColumnProps {
 }
 
 export function KanbanColumn({ csrfToken, projectId, column, cards }: KanbanColumnProps) {
-  const [showAdder, setShowAdder] = useState(false);
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
 
   const { setNodeRef, isOver } = useDroppable({
     id: `col:${column.id}`,
@@ -30,6 +34,25 @@ export function KanbanColumn({ csrfToken, projectId, column, cards }: KanbanColu
 
   const colCls = ['column', column.isBlockedSystem && 'blocked'].filter(Boolean).join(' ');
   const cardsCls = ['col-cards', isOver && 'is-over'].filter(Boolean).join(' ');
+
+  const handleAdd = () => {
+    const fd = new FormData();
+    fd.set(CSRF_FIELD_NAME, csrfToken);
+    fd.set('projectId', projectId);
+    fd.set('columnId', column.id);
+    fd.set('title', PLACEHOLDER_TITLE);
+    startTransition(async () => {
+      const res = await createCard({ status: 'idle' }, fd);
+      if (res.status === 'success') {
+        // Open the modal directly with `new=1` so the title input
+        // autofocuses and selects the placeholder text.
+        const url = new URL(window.location.href);
+        url.searchParams.set('card', res.cardId);
+        url.searchParams.set('new', '1');
+        router.replace(url.pathname + url.search, { scroll: false });
+      }
+    });
+  };
 
   return (
     <section className={colCls}>
@@ -50,94 +73,16 @@ export function KanbanColumn({ csrfToken, projectId, column, cards }: KanbanColu
       </div>
 
       {!column.isBlockedSystem ? (
-        showAdder ? (
-          <AddCardForm
-            csrfToken={csrfToken}
-            projectId={projectId}
-            columnId={column.id}
-            onClose={() => setShowAdder(false)}
-          />
-        ) : (
-          <button
-            type="button"
-            className="add-card-btn"
-            onClick={() => setShowAdder(true)}
-            aria-label={`Ajouter une carte dans ${column.name}`}
-          >
-            + Ajouter une carte
-          </button>
-        )
+        <button
+          type="button"
+          className="add-card-btn"
+          onClick={handleAdd}
+          disabled={pending}
+          aria-label={`Ajouter une carte dans ${column.name}`}
+        >
+          {pending ? 'Création…' : '+ Ajouter une carte'}
+        </button>
       ) : null}
     </section>
-  );
-}
-
-function AddCardForm({
-  csrfToken,
-  projectId,
-  columnId,
-  onClose,
-}: {
-  csrfToken: string;
-  projectId: string;
-  columnId: string;
-  onClose: () => void;
-}) {
-  const [pending, startTransition] = useTransition();
-  const [title, setTitle] = useState('');
-  const [error, setError] = useState<string | null>(null);
-
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (title.trim().length === 0) return;
-    const fd = new FormData();
-    fd.set(CSRF_FIELD_NAME, csrfToken);
-    fd.set('projectId', projectId);
-    fd.set('columnId', columnId);
-    fd.set('title', title);
-    startTransition(async () => {
-      const res = await createCard({ status: 'idle' }, fd);
-      if (res.status === 'error') {
-        setError(res.message);
-        return;
-      }
-      setTitle('');
-      setError(null);
-      onClose();
-    });
-  };
-
-  return (
-    <form
-      onSubmit={submit}
-      className="rounded-xl border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] p-3"
-    >
-      <textarea
-        autoFocus
-        rows={2}
-        maxLength={160}
-        placeholder="Titre de la carte"
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        className="field-input"
-      />
-      {error ? (
-        <p role="alert" className="mt-1 text-xs text-[color:var(--color-danger)]">
-          {error}
-        </p>
-      ) : null}
-      <div className="mt-2 flex gap-2">
-        <button
-          type="submit"
-          className="btn btn-primary btn-sm"
-          disabled={pending || title.trim().length === 0}
-        >
-          {pending ? 'Ajout…' : 'Ajouter'}
-        </button>
-        <button type="button" onClick={onClose} className="btn btn-ghost btn-sm">
-          Annuler
-        </button>
-      </div>
-    </form>
   );
 }

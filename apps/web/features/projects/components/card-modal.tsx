@@ -25,6 +25,8 @@ export interface CardModalProps {
   readonly workspaceName: string;
   readonly projectName: string;
   readonly customCategories: readonly string[];
+  /** When true (i.e. ?new=1), the title input autofocuses + selects on mount. */
+  readonly isNew: boolean;
   readonly card: {
     readonly id: string;
     readonly title: string;
@@ -49,6 +51,7 @@ export function CardModal({
   workspaceName,
   projectName,
   customCategories,
+  isNew,
   card,
 }: CardModalProps) {
   const router = useRouter();
@@ -58,8 +61,19 @@ export function CardModal({
   const close = useCallback(() => {
     const url = new URL(window.location.href);
     url.searchParams.delete('card');
+    url.searchParams.delete('new');
     router.replace(url.pathname + (url.search ? url.search : ''), { scroll: false });
   }, [router]);
+
+  // Once mounted with `?new=1`, drop the param so a refresh / back nav
+  // doesn't keep re-selecting the title. Router included in deps — it's
+  // a stable reference from useRouter().
+  useEffect(() => {
+    if (!isNew) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete('new');
+    router.replace(url.pathname + (url.search ? url.search : ''), { scroll: false });
+  }, [isNew, router]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -90,7 +104,7 @@ export function CardModal({
               <span>/</span>
               <strong>Carte #{String(card.shortRef).padStart(3, '0')}</strong>
             </div>
-            <CardTitleInput cardId={card.id} initial={card.title} />
+            <CardTitleInput cardId={card.id} initial={card.title} autoSelect={isNew} />
             {card.columnIsBlocked ? (
               <BlockedBanner cardId={card.id} dueDate={card.dueDate} />
             ) : null}
@@ -223,9 +237,29 @@ export function CardModal({
 
 // ---------- Title (debounced save) -----------------------------------------
 
-function CardTitleInput({ cardId, initial }: { cardId: string; initial: string }) {
+function CardTitleInput({
+  cardId,
+  initial,
+  autoSelect,
+}: {
+  cardId: string;
+  initial: string;
+  autoSelect: boolean;
+}) {
   const [value, setValue] = useState(initial);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  // When the modal opens for a freshly-created card (`?new=1`), focus the
+  // title input and select the placeholder text so the user can just type
+  // to replace it.
+  useEffect(() => {
+    if (!autoSelect) return;
+    const el = inputRef.current;
+    if (!el) return;
+    el.focus();
+    el.select();
+  }, [autoSelect]);
 
   const flush = useCallback(
     (next: string) => {
@@ -238,6 +272,7 @@ function CardTitleInput({ cardId, initial }: { cardId: string; initial: string }
 
   return (
     <input
+      ref={inputRef}
       id="card-modal-title"
       type="text"
       maxLength={200}
