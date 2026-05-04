@@ -2,9 +2,30 @@
 import 'server-only';
 import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
-import { Prisma, prisma } from '@nexushub/db';
+import { prisma } from '@nexushub/db';
 import { NotFoundError, RACI_VALUES } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
+
+/**
+ * `instanceof Prisma.PrismaClientKnownRequestError` doesn't reliably hold
+ * across Turbopack's RSC module boundary (Prisma is loaded twice and the
+ * class identity diverges), so we sniff by error.code directly.
+ */
+function prismaErrorCode(err: unknown): string | null {
+  if (err && typeof err === 'object' && 'code' in err) {
+    const code = (err as { code: unknown }).code;
+    return typeof code === 'string' ? code : null;
+  }
+  return null;
+}
+
+function raciUniqueMessage(raci: (typeof RACI_VALUES)[number]): string {
+  return raci === 'responsible'
+    ? 'Une seule personne peut être Responsable. Réassignez le Responsable actuel d’abord.'
+    : raci === 'approver'
+      ? 'Une seule personne peut être Approbateur. Réassignez l’Approbateur actuel d’abord.'
+      : 'Conflit d’unicité.';
+}
 
 const RaciSchema = z.enum(RACI_VALUES);
 
@@ -69,14 +90,8 @@ export async function addCardAssignee(input: {
       update: { raci: parsed.data.raci },
     });
   } catch (err) {
-    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
-      return {
-        ok: false,
-        message:
-          parsed.data.raci === 'responsible'
-            ? 'Une seule personne peut être Responsable. Réassignez le Responsable actuel d’abord.'
-            : 'Une seule personne peut être Approbateur. Réassignez l’Approbateur actuel d’abord.',
-      };
+    if (prismaErrorCode(err) === 'P2002') {
+      return { ok: false, message: raciUniqueMessage(parsed.data.raci) };
     }
     throw err;
   }
@@ -104,18 +119,9 @@ export async function updateCardAssigneeRaci(input: {
       data: { raci: parsed.data.raci },
     });
   } catch (err) {
-    if (err instanceof Prisma.PrismaClientKnownRequestError) {
-      if (err.code === 'P2025') return { ok: false, message: 'Assignation introuvable.' };
-      if (err.code === 'P2002') {
-        return {
-          ok: false,
-          message:
-            parsed.data.raci === 'responsible'
-              ? 'Une seule personne peut être Responsable.'
-              : 'Une seule personne peut être Approbateur.',
-        };
-      }
-    }
+    const code = prismaErrorCode(err);
+    if (code === 'P2025') return { ok: false, message: 'Assignation introuvable.' };
+    if (code === 'P2002') return { ok: false, message: raciUniqueMessage(parsed.data.raci) };
     throw err;
   }
 
