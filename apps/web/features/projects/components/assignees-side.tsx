@@ -1,8 +1,7 @@
 'use client';
 import { useState, useTransition } from 'react';
-import { useRouter } from 'next/navigation';
 import { Avatar } from '@nexushub/ui';
-import { RACI_VALUES, raciLabelFr, raciTagVariant, type Raci } from '@nexushub/domain';
+import { RACI_VALUES, raciLabelFr, type Raci } from '@nexushub/domain';
 import {
   addCardAssignee,
   removeCardAssignee,
@@ -29,75 +28,101 @@ export interface AssigneesSideProps {
   readonly members: readonly WorkspaceMemberOption[];
 }
 
-export function AssigneesSide({ cardId, assignments, members }: AssigneesSideProps) {
-  const router = useRouter();
+const RACI_FULL_FR: Record<Raci, string> = {
+  responsible: 'Responsable',
+  approver: 'Approbateur',
+  consulted: 'Consulté',
+  informed: 'Informé',
+};
+
+const RACI_COLOR: Record<Raci, string> = {
+  responsible: 'var(--color-info)',
+  approver: 'var(--color-warning)',
+  consulted: 'var(--color-success)',
+  informed: 'var(--color-text-muted)',
+};
+
+export function AssigneesSide({ cardId, assignments: initial, members }: AssigneesSideProps) {
+  // Local optimistic copy so role/add/remove feel instant.
+  const [list, setList] = useState<readonly CardAssignment[]>(initial);
   const [adding, setAdding] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  const assignedIds = new Set(assignments.map((a) => a.userId));
+  const assignedIds = new Set(list.map((a) => a.userId));
   const availableMembers = members.filter((m) => !assignedIds.has(m.userId));
 
-  const handleAdd = (userId: string) => {
+  const handleAdd = (member: WorkspaceMemberOption) => {
     setError(null);
+    const optimistic: CardAssignment = {
+      userId: member.userId,
+      displayName: member.displayName,
+      initials: member.initials,
+      raci: 'responsible',
+    };
+    setList((prev) => [...prev, optimistic]);
+    setAdding(false);
     startTransition(async () => {
-      const res = await addCardAssignee({ cardId, userId, raci: 'responsible' });
+      const res = await addCardAssignee({
+        cardId,
+        userId: member.userId,
+        raci: 'responsible',
+      });
       if (!res.ok) {
+        // Roll back optimistic add and surface the message (e.g. "one
+        // Responsible per card" partial-unique).
+        setList((prev) => prev.filter((a) => a.userId !== member.userId));
         setError(res.message);
-        return;
       }
-      setAdding(false);
-      router.refresh();
     });
   };
 
   const handleRaciChange = (userId: string, raci: Raci) => {
     setError(null);
+    const previous = list.find((a) => a.userId === userId)?.raci;
+    setList((prev) => prev.map((a) => (a.userId === userId ? { ...a, raci } : a)));
     startTransition(async () => {
       const res = await updateCardAssigneeRaci({ cardId, userId, raci });
-      if (!res.ok) {
+      if (!res.ok && previous) {
+        setList((prev) => prev.map((a) => (a.userId === userId ? { ...a, raci: previous } : a)));
         setError(res.message);
-        return;
       }
-      router.refresh();
     });
   };
 
   const handleRemove = (userId: string) => {
     setError(null);
+    const removed = list.find((a) => a.userId === userId);
+    setList((prev) => prev.filter((a) => a.userId !== userId));
     startTransition(async () => {
       const res = await removeCardAssignee({ cardId, userId });
-      if (!res.ok) {
+      if (!res.ok && removed) {
+        setList((prev) => [...prev, removed]);
         setError(res.message);
-        return;
       }
-      router.refresh();
     });
   };
 
   return (
     <div>
-      {assignments.length === 0 ? (
+      {list.length === 0 ? (
         <p className="text-xs text-[color:var(--color-text-muted)]">Aucun assigné.</p>
       ) : (
-        <ul className="flex flex-col gap-2">
-          {assignments.map((a) => (
-            <li
-              key={a.userId}
-              className="flex items-center gap-2 rounded-lg border border-[color:var(--color-border-soft)] bg-[color:var(--color-bg-card)] px-2 py-1.5"
-            >
+        <ul className="flex flex-col gap-1.5">
+          {list.map((a) => (
+            <li key={a.userId} className="assignee-row">
               <Avatar initials={a.initials} variant="gradient" size="sm" />
-              <span className="flex-1 truncate text-xs font-bold">{a.displayName}</span>
-              <RaciSelect
+              <span className="assignee-name">{a.displayName}</span>
+              <RaciSwitch
                 value={a.raci}
                 disabled={pending}
                 onChange={(next) => handleRaciChange(a.userId, next)}
               />
               <button
                 type="button"
-                aria-label="Retirer"
+                aria-label={`Retirer ${a.displayName}`}
                 onClick={() => handleRemove(a.userId)}
-                className="text-xs text-[color:var(--color-text-muted)] hover:text-[color:var(--color-danger)]"
+                className="assignee-remove"
               >
                 ×
               </button>
@@ -113,20 +138,17 @@ export function AssigneesSide({ cardId, assignments, members }: AssigneesSidePro
               Tous les membres sont déjà assignés.
             </p>
           ) : (
-            <ul className="flex flex-col gap-1 rounded-lg border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] p-1">
+            <ul className="assignee-picker">
               {availableMembers.map((m) => (
                 <li key={m.userId}>
                   <button
                     type="button"
-                    onClick={() => handleAdd(m.userId)}
+                    onClick={() => handleAdd(m)}
                     disabled={pending}
-                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs hover:bg-[color:var(--color-bg-hover)]"
+                    className="assignee-picker-row"
                   >
                     <Avatar initials={m.initials} variant="gradient" size="sm" />
-                    <span className="flex-1 truncate font-bold">{m.displayName}</span>
-                    <span className="text-[10px] text-[color:var(--color-text-muted)]">
-                      {m.email}
-                    </span>
+                    <span className="flex-1 truncate">{m.displayName}</span>
                   </button>
                 </li>
               ))}
@@ -138,24 +160,13 @@ export function AssigneesSide({ cardId, assignments, members }: AssigneesSidePro
               setAdding(false);
               setError(null);
             }}
-            className="mt-1 text-xs text-[color:var(--color-text-muted)] underline"
+            className="assignee-cancel"
           >
             Annuler
           </button>
         </div>
       ) : (
-        <button
-          type="button"
-          onClick={() => setAdding(true)}
-          className="next-col mt-2"
-          style={{
-            background: 'transparent',
-            border: 'none',
-            cursor: 'pointer',
-            padding: 0,
-            textDecoration: 'underline',
-          }}
-        >
+        <button type="button" onClick={() => setAdding(true)} className="assignee-add-link">
           + Assigner un membre
         </button>
       )}
@@ -169,7 +180,7 @@ export function AssigneesSide({ cardId, assignments, members }: AssigneesSidePro
   );
 }
 
-function RaciSelect({
+function RaciSwitch({
   value,
   disabled,
   onChange,
@@ -179,72 +190,25 @@ function RaciSelect({
   onChange: (next: Raci) => void;
 }) {
   return (
-    <select
-      value={value}
-      disabled={disabled}
-      onChange={(e) => onChange(e.target.value as Raci)}
-      title="Rôle RACI"
-      className="rounded-full border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.5px]"
-      style={{ outline: 'none' }}
-    >
-      {RACI_VALUES.map((r) => (
-        <option key={r} value={r}>
-          {raciLabelFr(r)} · {raciFullLabelFr(r)}
-        </option>
-      ))}
-    </select>
-  );
-}
-
-function raciFullLabelFr(r: Raci): string {
-  switch (r) {
-    case 'responsible':
-      return 'Responsable';
-    case 'approver':
-      return 'Approbateur';
-    case 'consulted':
-      return 'Consulté';
-    case 'informed':
-      return 'Informé';
-  }
-}
-
-/** Compact badge used inside the kanban card preview. */
-export function AssigneeBadgeRow({ assignments }: { assignments: readonly CardAssignment[] }) {
-  if (assignments.length === 0) return null;
-  return (
-    <div className="kcard-assignees flex items-center gap-1">
-      {assignments.slice(0, 3).map((a) => (
-        <span
-          key={a.userId}
-          title={`${a.displayName} · ${raciFullLabelFr(a.raci)}`}
-          className="relative"
-        >
-          <Avatar initials={a.initials} variant="gradient" size="sm" />
-          <span
-            aria-hidden="true"
-            className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full px-1 text-[8px] font-bold uppercase"
-            style={{
-              background:
-                raciTagVariant(a.raci) === 'info'
-                  ? 'var(--color-info)'
-                  : raciTagVariant(a.raci) === 'warning'
-                    ? 'var(--color-warning)'
-                    : raciTagVariant(a.raci) === 'success'
-                      ? 'var(--color-success)'
-                      : 'var(--color-text-muted)',
-              color: '#fff',
-            }}
+    <div className="raci-switch" role="radiogroup" aria-label="Rôle RACI">
+      {RACI_VALUES.map((r) => {
+        const active = r === value;
+        return (
+          <button
+            key={r}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            disabled={disabled}
+            onClick={() => onChange(r)}
+            title={RACI_FULL_FR[r]}
+            className={['raci-pill', active && 'active'].filter(Boolean).join(' ')}
+            style={active ? { background: RACI_COLOR[r], color: '#fff' } : undefined}
           >
-            {raciLabelFr(a.raci)}
-          </span>
-        </span>
-      ))}
-      {assignments.length > 3 ? (
-        <span className="text-[10px] font-bold text-[color:var(--color-text-muted)]">
-          +{assignments.length - 3}
-        </span>
-      ) : null}
+            {raciLabelFr(r)}
+          </button>
+        );
+      })}
     </div>
   );
 }

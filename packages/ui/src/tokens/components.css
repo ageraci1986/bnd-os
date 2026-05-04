@@ -1415,6 +1415,135 @@
   color: #fff;
 }
 
+/* ---- Card modal: assignees side row -------------------------------- */
+.assignee-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-soft);
+}
+.assignee-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-main);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.assignee-remove {
+  background: transparent;
+  border: none;
+  color: var(--text-ghost);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+.assignee-remove:hover {
+  color: var(--color-danger);
+  background: var(--color-danger-bg);
+}
+
+.raci-switch {
+  display: inline-flex;
+  background: var(--color-bg-muted);
+  border-radius: 9999px;
+  padding: 2px;
+  gap: 1px;
+}
+.raci-pill {
+  width: 22px;
+  height: 22px;
+  border-radius: 9999px;
+  border: none;
+  background: transparent;
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  line-height: 1;
+  transition:
+    background-color 0.12s,
+    color 0.12s;
+}
+.raci-pill:hover:not(:disabled):not(.active) {
+  background: var(--bg-hover);
+  color: var(--text-main);
+}
+.raci-pill.active {
+  /* color comes from inline style for the per-RACI tint */
+}
+.raci-pill:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
+.assignee-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
+  padding: 4px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.assignee-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: left;
+  color: var(--text-main);
+}
+.assignee-picker-row:hover:not(:disabled) {
+  background: var(--bg-hover);
+}
+.assignee-picker-row:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
+.assignee-add-link {
+  margin-top: 8px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-accent-primary);
+  text-decoration: underline;
+}
+[data-theme='dark'] .assignee-add-link {
+  color: #c084fc;
+}
+.assignee-cancel {
+  margin-top: 6px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  font-size: 11px;
+  color: var(--text-muted);
+  text-decoration: underline;
+}
+
 /* ---- Auth split layout ---------------------------------------------- */
 .auth {
   min-height: 100vh;
