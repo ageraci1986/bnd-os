@@ -6,4 +6,5 @@ export * from './checklist/index';
 export * from './invitations/index';
 export * from './clients/index';
 export * from './projects/index';
+export * from './card-templates/index';
 export * as crypto from './crypto/index';

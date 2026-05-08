@@ -108,6 +108,7 @@ export default async function AppLayout({ children, searchParams }: AppLayoutPro
 
         <SidebarSection label="Atelier">
           <NavLink href="/clients" icon="◉" label="Clients" />
+          <NavLink href="/templates/cards" icon="▤" label="Templates cartes" />
           <NavLink href="/templates/email" icon="✎" label="Templates e-mail" />
           <NavLink href="/templates/kanban" icon="▦" label="Templates Kanban" />
           {isAdmin ? <NavLink href="/team" icon="⎔" label="Équipe" /> : null}
