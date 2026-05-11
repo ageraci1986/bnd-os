@@ -336,3 +336,98 @@ export function defaultLabelForItemType(type: CardTemplateItem['type']): string 
       return 'Description';
   }
 }
+
+// ---------- Items validator --------------------------------------------------
+
+const ITEMS_MAX = 60;
+const LABEL_MAX = 120;
+const ID_MAX = 64;
+const OPTIONS_MAX = 32;
+const OPTION_MAX = 80;
+const PLACEHOLDER_MAX = 200;
+
+const INPUT_TYPES: ReadonlySet<string> = new Set([
+  'text',
+  'longtext',
+  'select',
+  'link',
+  'checkbox',
+  'date',
+  'number',
+]);
+
+/**
+ * Validate the JSONB stored in `card_templates.items`.
+ * Returns `null` on the first invalid shape (caller logs / rejects).
+ */
+export function validateCardTemplateItems(value: unknown): readonly CardTemplateItem[] | null {
+  if (!Array.isArray(value)) return null;
+  if (value.length > ITEMS_MAX) return null;
+
+  const out: CardTemplateItem[] = [];
+  const seenIds = new Set<string>();
+  let seenDescription = false;
+
+  for (const raw of value) {
+    if (!raw || typeof raw !== 'object') return null;
+    const r = raw as Record<string, unknown>;
+    const id = r['id'];
+    const type = r['type'];
+
+    if (typeof id !== 'string' || id.length === 0 || id.length > ID_MAX) return null;
+    if (typeof type !== 'string') return null;
+
+    // description marker
+    if (type === 'description') {
+      if (id !== DESCRIPTION_ITEM_ID) return null;
+      if (seenDescription) return null;
+      seenDescription = true;
+      out.push({ id: DESCRIPTION_ITEM_ID, type: 'description' });
+      continue;
+    }
+
+    if (seenIds.has(id)) return null;
+    seenIds.add(id);
+
+    const label = r['label'];
+    if (typeof label !== 'string') return null;
+    const labelTrim = label.trim();
+    if (labelTrim.length === 0 || labelTrim.length > LABEL_MAX) return null;
+
+    if (type === 'section') {
+      out.push({ id, type: 'section', label: labelTrim });
+      continue;
+    }
+
+    if (!INPUT_TYPES.has(type)) return null;
+
+    const options = r['options'];
+    const placeholder = r['placeholder'];
+
+    if (type === 'select') {
+      if (!Array.isArray(options) || options.length === 0 || options.length > OPTIONS_MAX) {
+        return null;
+      }
+      if (options.some((o) => typeof o !== 'string' || o.length === 0 || o.length > OPTION_MAX)) {
+        return null;
+      }
+    } else if (options !== undefined) {
+      // options only valid on select
+      return null;
+    }
+
+    if (placeholder !== undefined) {
+      if (typeof placeholder !== 'string' || placeholder.length > PLACEHOLDER_MAX) return null;
+    }
+
+    out.push({
+      id,
+      type: type as CardTemplateInputType,
+      label: labelTrim,
+      ...(Array.isArray(options) ? { options: [...(options as string[])] } : {}),
+      ...(typeof placeholder === 'string' ? { placeholder } : {}),
+    });
+  }
+
+  return out;
+}
