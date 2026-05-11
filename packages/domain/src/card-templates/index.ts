@@ -432,3 +432,22 @@ export function validateCardTemplateItems(value: unknown): readonly CardTemplate
 
   return out;
 }
+
+/**
+ * Strip values keyed by ids that no longer exist or refer to non-input items
+ * (section / description don't store values). Keeps per-card storage clean.
+ */
+export function pruneFieldValuesByItems(
+  values: Record<string, unknown>,
+  items: readonly CardTemplateItem[],
+): Record<string, string> {
+  const inputIds = new Set<string>();
+  for (const it of items) {
+    if (it.type !== 'section' && it.type !== 'description') inputIds.add(it.id);
+  }
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(values)) {
+    if (inputIds.has(k) && typeof v === 'string') out[k] = v;
+  }
+  return out;
+}
