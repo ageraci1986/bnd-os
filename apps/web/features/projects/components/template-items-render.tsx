@@ -1,57 +1,48 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { CARD_FIELD_GROUPS, type CardFieldDef } from '@nexushub/domain';
+import type { CardTemplateItem, CardTemplateInputItem } from '@nexushub/domain';
 import { updateCardField } from '../actions/update-card-field';
+import { CardDescriptionInput } from './card-description-input';
 
-export interface TemplateFieldsSectionProps {
+export interface TemplateItemsRenderProps {
   readonly cardId: string;
-  readonly fields: readonly CardFieldDef[];
-  readonly initialValues: Record<string, string>;
+  readonly items: readonly CardTemplateItem[];
+  readonly fieldValues: Record<string, string>;
+  readonly description: string;
 }
 
-export function TemplateFieldsSection({
+export function TemplateItemsRender({
   cardId,
-  fields,
-  initialValues,
-}: TemplateFieldsSectionProps) {
-  if (fields.length === 0) return null;
-
-  // Group fields for visual sectioning, preserving the order within each group.
-  const grouped = new Map<string | undefined, CardFieldDef[]>();
-  for (const f of fields) {
-    const list = grouped.get(f.group);
-    if (list) list.push(f);
-    else grouped.set(f.group, [f]);
-  }
-  const groupOrder: (string | undefined)[] = [...CARD_FIELD_GROUPS.map((g) => g.id), undefined];
-
+  items,
+  fieldValues,
+  description,
+}: TemplateItemsRenderProps) {
+  if (items.length === 0) return null;
   return (
-    <div className="grid gap-4">
-      {groupOrder.map((g) => {
-        const list = grouped.get(g);
-        if (!list || list.length === 0) return null;
-        const groupLabel = CARD_FIELD_GROUPS.find((x) => x.id === g)?.label;
+    <>
+      {items.map((item) => {
+        if (item.type === 'section') {
+          return (
+            <section className="modal-section" key={item.id}>
+              <div className="section-label">{item.label}</div>
+            </section>
+          );
+        }
+        if (item.type === 'description') {
+          return (
+            <section className="modal-section" key={item.id}>
+              <div className="section-label">Description</div>
+              <CardDescriptionInput cardId={cardId} initial={description} />
+            </section>
+          );
+        }
         return (
-          <div key={g ?? 'misc'}>
-            {groupLabel ? (
-              <div className="mb-2 text-[10px] font-extrabold uppercase tracking-[1px] text-[color:var(--color-text-muted)]">
-                {groupLabel}
-              </div>
-            ) : null}
-            <div className="grid gap-2">
-              {list.map((f) => (
-                <FieldInput
-                  key={f.id}
-                  cardId={cardId}
-                  field={f}
-                  initial={initialValues[f.id] ?? ''}
-                />
-              ))}
-            </div>
-          </div>
+          <section className="modal-section" key={item.id}>
+            <FieldInput cardId={cardId} field={item} initial={fieldValues[item.id] ?? ''} />
+          </section>
         );
       })}
-    </div>
+    </>
   );
 }
 
@@ -61,7 +52,7 @@ function FieldInput({
   initial,
 }: {
   cardId: string;
-  field: CardFieldDef;
+  field: CardTemplateInputItem;
   initial: string;
 }) {
   const [value, setValue] = useState(initial);

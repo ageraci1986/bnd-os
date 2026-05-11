@@ -8,9 +8,9 @@ import {
   isBuiltinCardCategory,
   type BuiltinCardCategoryId,
 } from '@nexushub/domain';
-import type { CardFieldDef, CardTemplateDescriptionPosition } from '@nexushub/domain';
+import type { CardTemplateItem } from '@nexushub/domain';
 import { AssigneesSide, type CardAssignment, type WorkspaceMemberOption } from './assignees-side';
-import { TemplateFieldsSection } from './template-fields-section';
+import { TemplateItemsRender } from './template-items-render';
 import { TemplatePicker, type TemplateOption } from './template-picker';
 import {
   createChecklistItem,
@@ -45,9 +45,8 @@ export interface CardModalProps {
     readonly checklist: readonly ChecklistItemDTO[];
     readonly assignees: readonly CardAssignment[];
     readonly templateId: string | null;
-    readonly templateFields: readonly CardFieldDef[];
+    readonly templateItems: readonly CardTemplateItem[];
     readonly fieldValues: Record<string, string>;
-    readonly descriptionPosition: CardTemplateDescriptionPosition;
   };
   readonly availableTemplates: readonly TemplateOption[];
 }
@@ -136,30 +135,12 @@ export function CardModal({
 
         <div className="modal-body">
           <div className="modal-main">
-            {card.descriptionPosition === 'before-fields' ? (
-              <section className="modal-section">
-                <div className="section-label">Description</div>
-                <CardDescriptionInput cardId={card.id} initial={card.description ?? ''} />
-              </section>
-            ) : null}
-
-            {card.templateFields.length > 0 ? (
-              <section className="modal-section">
-                <div className="section-label">Brief</div>
-                <TemplateFieldsSection
-                  cardId={card.id}
-                  fields={card.templateFields}
-                  initialValues={card.fieldValues}
-                />
-              </section>
-            ) : null}
-
-            {card.descriptionPosition === 'after-fields' ? (
-              <section className="modal-section">
-                <div className="section-label">Description</div>
-                <CardDescriptionInput cardId={card.id} initial={card.description ?? ''} />
-              </section>
-            ) : null}
+            <TemplateItemsRender
+              cardId={card.id}
+              items={card.templateItems}
+              fieldValues={card.fieldValues}
+              description={card.description ?? ''}
+            />
 
             <section className="modal-section">
               <div className="checklist-meta">
@@ -346,33 +327,6 @@ function CardTitleInput({
       onBlur={() => {
         if (timer.current) clearTimeout(timer.current);
         if (value.trim().length > 0 && value !== initial) flush(value);
-      }}
-    />
-  );
-}
-
-// ---------- Description ----------------------------------------------------
-
-function CardDescriptionInput({ cardId, initial }: { cardId: string; initial: string }) {
-  const [value, setValue] = useState(initial);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  return (
-    <textarea
-      rows={4}
-      maxLength={8000}
-      placeholder="Notes, brief, contraintes…"
-      className="description-input"
-      value={value}
-      onChange={(e) => {
-        const next = e.target.value;
-        setValue(next);
-        if (timer.current) clearTimeout(timer.current);
-        timer.current = setTimeout(() => {
-          void updateCard({ cardId, description: next }).catch(() => {
-            // best-effort; the next save will overwrite
-          });
-        }, 600);
       }}
     />
   );
