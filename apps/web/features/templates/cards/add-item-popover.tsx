@@ -50,18 +50,18 @@ export function AddItemPopover({ hasDescription, onAdd }: AddItemPopoverProps) {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="w-full rounded-lg border border-dashed border-[color:var(--color-border)] px-3 py-2.5 text-sm text-[color:var(--color-text-muted)] hover:border-[color:var(--color-accent,#5b6cff)] hover:text-[color:var(--color-text)]"
+        className="w-full rounded-lg border border-dashed border-[color:var(--color-border-light)] px-3 py-2.5 text-sm text-[color:var(--color-text-muted)] hover:border-[color:var(--color-accent-primary)] hover:text-[color:var(--color-text-main)]"
       >
         + Ajouter un item
       </button>
       {open ? (
-        <div className="absolute left-0 right-0 z-20 mt-1 max-h-80 overflow-auto rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-1.5 shadow-lg">
+        <div className="absolute left-0 right-0 z-20 mt-1 max-h-80 overflow-auto rounded-xl border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] p-1.5 shadow-lg">
           {CARD_TEMPLATE_ITEM_TYPES.map((t, idx) => {
             const isSep = idx === 7; // after `number`, before `section`
             const disabled = t.id === 'description' && hasDescription;
             return (
               <div key={t.id}>
-                {isSep ? <div className="my-1 h-px bg-[color:var(--color-border)]" /> : null}
+                {isSep ? <div className="my-1 h-px bg-[color:var(--color-border-light)]" /> : null}
                 <button
                   type="button"
                   disabled={disabled}
@@ -69,10 +69,10 @@ export function AddItemPopover({ hasDescription, onAdd }: AddItemPopoverProps) {
                   className={`flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-sm ${
                     disabled
                       ? 'cursor-not-allowed text-[color:var(--color-text-muted)] opacity-50'
-                      : 'hover:bg-[color:var(--color-surface-2,#f6f7fb)]'
+                      : 'hover:bg-[color:var(--color-bg-muted)]'
                   }`}
                 >
-                  <span className="flex h-6 w-6 items-center justify-center rounded-md bg-[color:var(--color-surface-2,#f6f7fb)] text-xs">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-md bg-[color:var(--color-bg-muted)] text-xs">
                     {ICONS[t.id]}
                   </span>
                   <span className="flex-1">{t.label}</span>

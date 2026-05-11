@@ -9,7 +9,7 @@ export interface TemplatePreviewProps {
 
 export function TemplatePreview({ templateName, items }: TemplatePreviewProps) {
   return (
-    <aside className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-4">
+    <aside className="rounded-2xl border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] p-4">
       <header className="mb-4">
         <p className="text-[10px] font-extrabold uppercase tracking-[1px] text-[color:var(--color-text-muted)]">
           Aperçu

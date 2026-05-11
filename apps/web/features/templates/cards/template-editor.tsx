@@ -35,15 +35,15 @@ export function TemplateEditor({
   const hasDescription = items.some((i) => i.type === 'description');
 
   return (
-    <section className="flex h-full flex-col gap-4 rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-4">
-      <header className="flex items-center gap-3 border-b border-[color:var(--color-border)] pb-3">
+    <section className="flex h-full flex-col gap-4 rounded-2xl border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] p-4">
+      <header className="flex items-center gap-3 border-b border-[color:var(--color-border-light)] pb-3">
         <input
           type="text"
           value={name}
           maxLength={80}
           onChange={(e) => onRename(e.target.value)}
           placeholder="Nom du template"
-          className="flex-1 rounded-md border border-transparent px-2 py-1 text-xl font-bold focus:border-[color:var(--color-border)]"
+          className="flex-1 rounded-md border border-transparent px-2 py-1 text-xl font-bold focus:border-[color:var(--color-border-light)]"
         />
         {isDirty ? (
           <span className="text-[10px] uppercase tracking-wide text-[color:var(--color-text-muted)]">
@@ -54,7 +54,7 @@ export function TemplateEditor({
           type="button"
           onClick={onSave}
           disabled={!isDirty || isSaving}
-          className="rounded-md bg-[color:var(--color-accent,#5b6cff)] px-4 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+          className="rounded-md bg-[color:var(--color-accent-primary)] px-4 py-1.5 text-sm font-medium text-white disabled:opacity-50"
         >
           {isSaving ? 'Enregistrement…' : 'Enregistrer'}
         </button>
@@ -70,11 +70,11 @@ export function TemplateEditor({
 
       <AddItemPopover hasDescription={hasDescription} onAdd={onAddItem} />
 
-      <footer className="mt-4 flex justify-end border-t border-[color:var(--color-border)] pt-3">
+      <footer className="mt-4 flex justify-end border-t border-[color:var(--color-border-light)] pt-3">
         <button
           type="button"
           onClick={onDeleteTemplate}
-          className="rounded-md border border-[#e0506b] px-3 py-1 text-xs text-[#e0506b] hover:bg-[#e0506b] hover:text-white"
+          className="rounded-md border border-[color:var(--color-danger)] px-3 py-1 text-xs text-[color:var(--color-danger)] hover:bg-[color:var(--color-danger)] hover:text-white"
         >
           Supprimer ce template
         </button>

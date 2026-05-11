@@ -44,7 +44,7 @@ export function ItemsList({ items, editingItemId, onReorder, onEdit, onRemove }:
 
   if (items.length === 0) {
     return (
-      <p className="rounded-lg border border-dashed border-[color:var(--color-border)] px-3 py-6 text-center text-xs text-[color:var(--color-text-muted)]">
+      <p className="rounded-lg border border-dashed border-[color:var(--color-border-light)] px-3 py-6 text-center text-xs text-[color:var(--color-text-muted)]">
         Aucun item — utilise « + Ajouter un item » ci-dessous.
       </p>
     );

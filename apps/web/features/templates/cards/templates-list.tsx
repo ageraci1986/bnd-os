@@ -19,7 +19,7 @@ export function TemplatesList({
   onDelete,
 }: TemplatesListProps) {
   return (
-    <aside className="flex h-full flex-col gap-2 rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-3">
+    <aside className="flex h-full flex-col gap-2 rounded-2xl border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] p-3">
       <header className="flex items-center justify-between px-1">
         <p className="text-[10px] font-extrabold uppercase tracking-[1px] text-[color:var(--color-text-muted)]">
           Templates
@@ -34,7 +34,7 @@ export function TemplatesList({
               return;
             onCreate();
           }}
-          className="rounded-md border border-dashed border-[color:var(--color-border)] px-2 py-0.5 text-xs text-[color:var(--color-text-muted)] hover:text-[color:var(--color-text)]"
+          className="rounded-md border border-dashed border-[color:var(--color-border-light)] px-2 py-0.5 text-xs text-[color:var(--color-text-muted)] hover:text-[color:var(--color-text-main)]"
         >
           + Nouveau
         </button>
@@ -60,8 +60,8 @@ export function TemplatesList({
                 }}
                 className={`flex-1 truncate rounded-md px-2 py-1.5 text-left text-sm ${
                   selectedId === t.id
-                    ? 'bg-[color:var(--color-accent-soft,rgba(91,108,255,0.12))] font-medium text-[color:var(--color-text)]'
-                    : 'text-[color:var(--color-text-soft)] hover:bg-[color:var(--color-surface-2,#f6f7fb)]'
+                    ? 'bg-[rgba(139,43,226,0.12)] font-medium text-[color:var(--color-text-main)]'
+                    : 'text-[color:var(--color-text-soft)] hover:bg-[color:var(--color-bg-muted)]'
                 }`}
               >
                 {t.name || 'Sans titre'}
@@ -70,7 +70,7 @@ export function TemplatesList({
                 type="button"
                 aria-label={`Supprimer ${t.name}`}
                 onClick={() => onDelete(t.id, t.name)}
-                className="rounded-md px-1 text-sm text-[color:var(--color-text-muted)] opacity-0 hover:text-[color:#e0506b] group-hover:opacity-100"
+                className="rounded-md px-1 text-sm text-[color:var(--color-text-muted)] opacity-0 hover:text-[color:var(--color-danger)] group-hover:opacity-100"
               >
                 ×
               </button>

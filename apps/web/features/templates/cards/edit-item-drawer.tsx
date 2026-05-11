@@ -48,7 +48,7 @@ export function EditItemDrawer({
       : item.label || (item.type === 'section' ? 'Section' : 'Sans label');
 
   return (
-    <div className="absolute inset-0 z-30 flex flex-col gap-3 rounded-2xl border border-[color:var(--color-accent,#5b6cff)] bg-[color:var(--color-surface)] p-4 shadow-xl">
+    <div className="absolute inset-0 z-30 flex flex-col gap-3 overflow-hidden rounded-2xl border border-[color:var(--color-accent-primary)] bg-[color:var(--color-bg-card)] p-4 shadow-xl">
       <header className="flex items-start justify-between">
         <div>
           <p className="text-[10px] font-extrabold uppercase tracking-[1px] text-[color:var(--color-text-muted)]">
@@ -59,7 +59,7 @@ export function EditItemDrawer({
         <button
           type="button"
           onClick={onClose}
-          className="rounded-md border border-[color:var(--color-border)] px-2 py-0.5 text-xs text-[color:var(--color-text-muted)]"
+          className="rounded-md border border-[color:var(--color-border-light)] px-2 py-0.5 text-xs text-[color:var(--color-text-muted)]"
           aria-label="Fermer"
         >
           ×
@@ -67,7 +67,7 @@ export function EditItemDrawer({
       </header>
 
       {item.type === 'description' ? (
-        <p className="rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface-2,#f6f7fb)] px-3 py-2 text-xs text-[color:var(--color-text-muted)]">
+        <p className="rounded-lg border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-muted)] px-3 py-2 text-xs text-[color:var(--color-text-muted)]">
           Élément système. Sa position dans la carte est contrôlée par drag &amp; drop&nbsp;; aucun
           autre réglage.
         </p>
@@ -77,21 +77,21 @@ export function EditItemDrawer({
         <InputItemFields item={item} onUpdate={onUpdate} onConvertType={onConvertType} />
       )}
 
-      <footer className="mt-auto flex items-center justify-between border-t border-[color:var(--color-border)] pt-3">
+      <footer className="mt-auto flex items-center justify-between border-t border-[color:var(--color-border-light)] pt-3">
         <button
           type="button"
           onClick={() => {
             if (!window.confirm('Supprimer cet item ?')) return;
             onRemove(item.id);
           }}
-          className="text-xs text-[#e0506b] hover:underline"
+          className="text-xs text-[color:var(--color-danger)] hover:underline"
         >
           Supprimer
         </button>
         <button
           type="button"
           onClick={onClose}
-          className="rounded-md bg-[color:var(--color-accent,#5b6cff)] px-3 py-1 text-xs font-medium text-white"
+          className="rounded-md bg-[color:var(--color-accent-primary)] px-3 py-1 text-xs font-medium text-white"
         >
           Fermer
         </button>
@@ -226,7 +226,7 @@ function OptionsField({
             <button
               type="button"
               onClick={() => remove(idx)}
-              className="rounded border border-[color:var(--color-border)] px-2 py-0.5 text-xs text-[color:var(--color-text-muted)] hover:border-[#e0506b] hover:text-[#e0506b]"
+              className="rounded border border-[color:var(--color-border-light)] px-2 py-0.5 text-xs text-[color:var(--color-text-muted)] hover:border-[color:var(--color-danger)] hover:text-[color:var(--color-danger)]"
             >
               ×
             </button>
@@ -235,7 +235,7 @@ function OptionsField({
         <button
           type="button"
           onClick={add}
-          className="self-start rounded border border-dashed border-[color:var(--color-border)] px-2 py-1 text-xs text-[color:var(--color-text-muted)] hover:text-[color:var(--color-text)]"
+          className="self-start rounded border border-dashed border-[color:var(--color-border-light)] px-2 py-1 text-xs text-[color:var(--color-text-muted)] hover:text-[color:var(--color-text-main)]"
         >
           + Ajouter une option
         </button>

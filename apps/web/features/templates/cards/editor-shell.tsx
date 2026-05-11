@@ -173,7 +173,7 @@ export function EditorShell({ initialTemplates }: EditorShellProps) {
 
 function EmptyEditor() {
   return (
-    <section className="flex h-full items-center justify-center rounded-2xl border border-dashed border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-6 text-center text-sm text-[color:var(--color-text-muted)]">
+    <section className="flex h-full items-center justify-center rounded-2xl border border-dashed border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] p-6 text-center text-sm text-[color:var(--color-text-muted)]">
       Sélectionne un template à gauche, ou crée-en un nouveau.
     </section>
   );
