@@ -451,3 +451,33 @@ export function pruneFieldValuesByItems(
   }
   return out;
 }
+
+// ---------- Legacy migration helper ------------------------------------------
+
+/**
+ * One-shot migration: convert legacy (fields[], descriptionPosition) shape
+ * to the unified items[] shape. Pure function — used by the backfill script.
+ *
+ * Strips the `group` property from fields (legacy only) and inserts a
+ * description marker item at the appropriate position based on
+ * descriptionPosition.
+ */
+export function migrateFieldsToItems(
+  fields: readonly CardFieldDef[],
+  descriptionPosition: CardTemplateDescriptionPosition,
+): readonly CardTemplateItem[] {
+  const stripped: CardTemplateItem[] = fields.map((f) => {
+    const base: CardTemplateInputItem = { id: f.id, type: f.type, label: f.label };
+    return {
+      ...base,
+      ...(f.options ? { options: [...f.options] } : {}),
+      ...(f.placeholder !== undefined ? { placeholder: f.placeholder } : {}),
+    };
+  });
+
+  const marker: CardTemplateDescriptionItem = { id: DESCRIPTION_ITEM_ID, type: 'description' };
+
+  if (descriptionPosition === 'before-fields') return [marker, ...stripped];
+  if (descriptionPosition === 'after-fields') return [...stripped, marker];
+  return stripped;
+}
