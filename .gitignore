@@ -74,3 +74,4 @@ NOTES.local.md
 *.generated.ts
 *.generated.tsx
 .superpowers/
+.worktrees/
