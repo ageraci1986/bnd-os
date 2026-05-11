@@ -260,3 +260,79 @@ export function pruneFieldValues(
   }
   return out;
 }
+
+// ---------- New unified items model -----------------------------------------
+
+/** Singleton id for the description marker item. */
+export const DESCRIPTION_ITEM_ID = 'description';
+
+export type CardTemplateInputType =
+  | 'text'
+  | 'longtext'
+  | 'select'
+  | 'link'
+  | 'checkbox'
+  | 'date'
+  | 'number';
+
+export interface CardTemplateInputItem {
+  readonly id: string;
+  readonly type: CardTemplateInputType;
+  readonly label: string;
+  readonly options?: readonly string[];
+  readonly placeholder?: string;
+}
+
+export interface CardTemplateSectionItem {
+  readonly id: string;
+  readonly type: 'section';
+  readonly label: string;
+}
+
+export interface CardTemplateDescriptionItem {
+  readonly id: typeof DESCRIPTION_ITEM_ID;
+  readonly type: 'description';
+}
+
+export type CardTemplateItem =
+  | CardTemplateInputItem
+  | CardTemplateSectionItem
+  | CardTemplateDescriptionItem;
+
+/** Labels for the "+ Ajouter un item" popover. Order matters: it is the display order. */
+export const CARD_TEMPLATE_ITEM_TYPES: readonly { id: CardTemplateItem['type']; label: string }[] =
+  [
+    { id: 'text', label: 'Texte court' },
+    { id: 'longtext', label: 'Texte long' },
+    { id: 'select', label: 'Liste déroulante' },
+    { id: 'link', label: 'Lien URL' },
+    { id: 'checkbox', label: 'Case à cocher' },
+    { id: 'date', label: 'Date' },
+    { id: 'number', label: 'Nombre' },
+    { id: 'section', label: 'Section' },
+    { id: 'description', label: 'Description' },
+  ];
+
+/** Default label generated when the user adds a new item, by type. */
+export function defaultLabelForItemType(type: CardTemplateItem['type']): string {
+  switch (type) {
+    case 'text':
+      return 'Nouveau champ texte';
+    case 'longtext':
+      return 'Nouveau champ texte long';
+    case 'select':
+      return 'Nouvelle liste';
+    case 'link':
+      return 'Nouveau lien';
+    case 'checkbox':
+      return 'Nouvelle case à cocher';
+    case 'date':
+      return 'Nouvelle date';
+    case 'number':
+      return 'Nouveau nombre';
+    case 'section':
+      return 'Nouvelle section';
+    case 'description':
+      return 'Description';
+  }
+}
