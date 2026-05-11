@@ -128,6 +128,65 @@ function FieldInput({
     );
   }
 
+  if (field.type === 'checkbox') {
+    const checked = value === 'true';
+    return (
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={(e) => {
+            const next = e.target.checked ? 'true' : 'false';
+            setValue(next);
+            flush(next);
+          }}
+        />
+        <span className="font-bold">{field.label}</span>
+      </label>
+    );
+  }
+
+  if (field.type === 'date') {
+    return (
+      <label className="grid gap-1">
+        <span className="text-[11px] font-bold text-[color:var(--color-text-soft)]">
+          {field.label}
+        </span>
+        <input
+          type="date"
+          value={value}
+          onChange={(e) => {
+            // Date pickers are discrete — fire immediately.
+            const next = e.target.value;
+            setValue(next);
+            flush(next);
+          }}
+          className="field-input"
+          style={{ maxWidth: 200 }}
+        />
+      </label>
+    );
+  }
+
+  if (field.type === 'number') {
+    return (
+      <label className="grid gap-1">
+        <span className="text-[11px] font-bold text-[color:var(--color-text-soft)]">
+          {field.label}
+        </span>
+        <input
+          type="number"
+          inputMode="decimal"
+          placeholder={field.placeholder ?? ''}
+          value={value}
+          onChange={(e) => onChangeDebounced(e.target.value)}
+          className="field-input"
+          style={{ maxWidth: 200 }}
+        />
+      </label>
+    );
+  }
+
   // text + link share the same single-line input.
   return (
     <label className="grid gap-1">

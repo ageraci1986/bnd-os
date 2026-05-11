@@ -1,7 +1,15 @@
 'use client';
 import { useState, useTransition, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { CARD_FIELD_GROUPS, CARD_FIELD_PRESETS, type CardFieldDef } from '@nexushub/domain';
+import {
+  CARD_FIELD_GROUPS,
+  CARD_FIELD_PRESETS,
+  CARD_FIELD_TYPES,
+  generateCustomFieldId,
+  type CardFieldDef,
+  type CardFieldGroup,
+  type CardFieldType,
+} from '@nexushub/domain';
 import { createCardTemplate, deleteCardTemplate, updateCardTemplate } from './actions';
 
 export interface CardTemplateOption {
@@ -137,20 +145,22 @@ interface TemplateFormProps {
 function TemplateForm({ mode, initial, onSaved, onDeleted, onCancel }: TemplateFormProps) {
   const [name, setName] = useState(initial.name);
   const [body, setBody] = useState(initial.body);
-  const [fields, setFields] = useState<readonly CardFieldDef[]>(initial.fields);
+  const [fields, setFields] = useState<CardFieldDef[]>([...initial.fields]);
   const [checklist, setChecklist] = useState<string[]>([...initial.defaultChecklist]);
   const [isDefault, setIsDefault] = useState(initial.isDefault);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const initialId = initial.id;
   useEffect(() => {
     setName(initial.name);
     setBody(initial.body);
-    setFields(initial.fields);
+    setFields([...initial.fields]);
     setChecklist([...initial.defaultChecklist]);
     setIsDefault(initial.isDefault);
     setError(null);
+    setExpandedId(null);
   }, [
     initialId,
     initial.body,
@@ -167,8 +177,22 @@ function TemplateForm({ mode, initial, onSaved, onDeleted, onCancel }: TemplateF
     setFields((prev) => [...prev, preset]);
   };
 
+  const addCustom = (draft: { label: string; type: CardFieldType; group: CardFieldGroup }) => {
+    const id = generateCustomFieldId(draft.label, usedFieldIds);
+    const def: CardFieldDef = {
+      id,
+      label: draft.label.trim(),
+      type: draft.type,
+      group: draft.group,
+      ...(draft.type === 'select' ? { options: ['Option 1'] } : {}),
+    };
+    setFields((prev) => [...prev, def]);
+    setExpandedId(id);
+  };
+
   const removeField = (id: string) => {
     setFields((prev) => prev.filter((f) => f.id !== id));
+    if (expandedId === id) setExpandedId(null);
   };
 
   const moveField = (id: string, direction: -1 | 1) => {
@@ -184,17 +208,15 @@ function TemplateForm({ mode, initial, onSaved, onDeleted, onCancel }: TemplateF
     });
   };
 
+  const patchField = (id: string, patch: Partial<CardFieldDef>) => {
+    setFields((prev) => prev.map((f) => (f.id === id ? ({ ...f, ...patch } as CardFieldDef) : f)));
+  };
+
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     startTransition(async () => {
-      const payload = {
-        name,
-        body,
-        fields,
-        defaultChecklist: checklist,
-        isDefault,
-      };
+      const payload = { name, body, fields, defaultChecklist: checklist, isDefault };
       const editId = initial.id;
       const res =
         mode === 'create' || !editId
@@ -278,8 +300,7 @@ function TemplateForm({ mode, initial, onSaved, onDeleted, onCancel }: TemplateF
         </div>
       </div>
 
-      {/* Field list */}
-      <div className="grid gap-3 lg:grid-cols-[1fr_240px]">
+      <div className="grid gap-3 lg:grid-cols-[1fr_260px]">
         <section>
           <div className="field-label">Champs de la carte ({fields.length})</div>
           {fields.length === 0 ? (
@@ -291,43 +312,56 @@ function TemplateForm({ mode, initial, onSaved, onDeleted, onCancel }: TemplateF
               {fields.map((f, idx) => (
                 <li
                   key={f.id}
-                  className="grid grid-cols-[auto_1fr_auto_auto_auto] items-center gap-2 rounded-xl border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-muted)] p-3"
+                  className="rounded-xl border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-muted)]"
                 >
-                  <FieldTypeBadge type={f.type} />
-                  <div className="min-w-0">
-                    <div className="truncate text-sm font-bold">{f.label}</div>
-                    {f.options && f.options.length > 0 ? (
-                      <div className="mt-0.5 truncate text-[11px] text-[color:var(--color-text-muted)]">
-                        {f.options.join(' · ')}
-                      </div>
-                    ) : null}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => moveField(f.id, -1)}
-                    disabled={idx === 0}
-                    aria-label="Monter"
-                    className="rounded-md px-2 py-1 text-xs hover:bg-[color:var(--color-bg-hover)] disabled:opacity-30"
-                  >
-                    ↑
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => moveField(f.id, 1)}
-                    disabled={idx === fields.length - 1}
-                    aria-label="Descendre"
-                    className="rounded-md px-2 py-1 text-xs hover:bg-[color:var(--color-bg-hover)] disabled:opacity-30"
-                  >
-                    ↓
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => removeField(f.id)}
-                    aria-label={`Retirer ${f.label}`}
-                    className="rounded-md px-2 py-1 text-xs text-[color:var(--color-text-muted)] hover:bg-[color:var(--color-danger-bg)] hover:text-[color:var(--color-danger)]"
-                  >
-                    ×
-                  </button>
+                  <header className="grid grid-cols-[auto_auto_1fr_auto_auto_auto] items-center gap-2 p-3">
+                    <button
+                      type="button"
+                      onClick={() => setExpandedId(expandedId === f.id ? null : f.id)}
+                      aria-label={expandedId === f.id ? 'Réduire' : 'Modifier'}
+                      className="rounded-md px-1.5 py-0.5 text-xs text-[color:var(--color-text-muted)] hover:bg-[color:var(--color-bg-hover)]"
+                    >
+                      {expandedId === f.id ? '▾' : '▸'}
+                    </button>
+                    <FieldTypeBadge type={f.type} />
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-bold">{f.label}</div>
+                      {f.type === 'select' && f.options && f.options.length > 0 ? (
+                        <div className="mt-0.5 truncate text-[11px] text-[color:var(--color-text-muted)]">
+                          {f.options.join(' · ')}
+                        </div>
+                      ) : null}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => moveField(f.id, -1)}
+                      disabled={idx === 0}
+                      aria-label="Monter"
+                      className="rounded-md px-2 py-1 text-xs hover:bg-[color:var(--color-bg-hover)] disabled:opacity-30"
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => moveField(f.id, 1)}
+                      disabled={idx === fields.length - 1}
+                      aria-label="Descendre"
+                      className="rounded-md px-2 py-1 text-xs hover:bg-[color:var(--color-bg-hover)] disabled:opacity-30"
+                    >
+                      ↓
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeField(f.id)}
+                      aria-label={`Retirer ${f.label}`}
+                      className="rounded-md px-2 py-1 text-xs text-[color:var(--color-text-muted)] hover:bg-[color:var(--color-danger-bg)] hover:text-[color:var(--color-danger)]"
+                    >
+                      ×
+                    </button>
+                  </header>
+                  {expandedId === f.id ? (
+                    <FieldEditPanel field={f} onPatch={(p) => patchField(f.id, p)} />
+                  ) : null}
                 </li>
               ))}
             </ul>
@@ -335,9 +369,9 @@ function TemplateForm({ mode, initial, onSaved, onDeleted, onCancel }: TemplateF
         </section>
 
         <aside>
-          <div className="field-label">+ Ajouter un champ</div>
+          <div className="field-label">Quick add</div>
           <div className="flex flex-col gap-3">
-            {CARD_FIELD_GROUPS.map((group) => {
+            {CARD_FIELD_GROUPS.filter((g) => g.id !== 'custom').map((group) => {
               const presets = CARD_FIELD_PRESETS.filter((f) => f.group === group.id);
               return (
                 <div key={group.id}>
@@ -365,6 +399,10 @@ function TemplateForm({ mode, initial, onSaved, onDeleted, onCancel }: TemplateF
               );
             })}
           </div>
+
+          <div className="my-4 h-px bg-[color:var(--color-border-light)]" />
+
+          <CustomFieldForm onAdd={addCustom} />
         </aside>
       </div>
 
@@ -448,12 +486,299 @@ function TemplateForm({ mode, initial, onSaved, onDeleted, onCancel }: TemplateF
   );
 }
 
-function FieldTypeBadge({ type }: { type: CardFieldDef['type'] }) {
-  const map: Record<CardFieldDef['type'], { label: string; bg: string }> = {
+// ---------- Inline field editor ------------------------------------------
+
+function FieldEditPanel({
+  field,
+  onPatch,
+}: {
+  field: CardFieldDef;
+  onPatch: (patch: Partial<CardFieldDef>) => void;
+}) {
+  return (
+    <div className="grid gap-3 border-t border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] p-4">
+      <div className="grid gap-2 md:grid-cols-[1fr_180px]">
+        <label className="grid gap-1">
+          <span className="text-[11px] font-bold uppercase tracking-[0.5px] text-[color:var(--color-text-muted)]">
+            Libellé
+          </span>
+          <input
+            type="text"
+            maxLength={120}
+            value={field.label}
+            onChange={(e) => onPatch({ label: e.target.value })}
+            className="field-input"
+          />
+        </label>
+        <label className="grid gap-1">
+          <span className="text-[11px] font-bold uppercase tracking-[0.5px] text-[color:var(--color-text-muted)]">
+            Groupe
+          </span>
+          <select
+            value={field.group ?? 'custom'}
+            onChange={(e) => onPatch({ group: e.target.value as CardFieldGroup })}
+            className="field-select"
+          >
+            {CARD_FIELD_GROUPS.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      {field.type === 'select' ? <OptionsEditor field={field} onPatch={onPatch} /> : null}
+
+      {field.type === 'text' || field.type === 'longtext' || field.type === 'link' ? (
+        <label className="grid gap-1">
+          <span className="text-[11px] font-bold uppercase tracking-[0.5px] text-[color:var(--color-text-muted)]">
+            Placeholder (optionnel)
+          </span>
+          <input
+            type="text"
+            maxLength={200}
+            value={field.placeholder ?? ''}
+            onChange={(e) => onPatch({ placeholder: e.target.value })}
+            className="field-input"
+          />
+        </label>
+      ) : null}
+    </div>
+  );
+}
+
+function OptionsEditor({
+  field,
+  onPatch,
+}: {
+  field: CardFieldDef;
+  onPatch: (patch: Partial<CardFieldDef>) => void;
+}) {
+  const [draft, setDraft] = useState('');
+  const options = field.options ?? [];
+
+  const addOption = () => {
+    const trimmed = draft.trim();
+    if (trimmed.length === 0 || trimmed.length > 80) return;
+    if (options.includes(trimmed)) return;
+    onPatch({ options: [...options, trimmed] });
+    setDraft('');
+  };
+
+  const updateOption = (idx: number, next: string) => {
+    onPatch({
+      options: options.map((o, i) => (i === idx ? next : o)),
+    });
+  };
+
+  const removeOption = (idx: number) => {
+    onPatch({ options: options.filter((_, i) => i !== idx) });
+  };
+
+  const moveOption = (idx: number, direction: -1 | 1) => {
+    const target = idx + direction;
+    if (target < 0 || target >= options.length) return;
+    const next = [...options];
+    const [item] = next.splice(idx, 1);
+    if (item !== undefined) next.splice(target, 0, item);
+    onPatch({ options: next });
+  };
+
+  return (
+    <div>
+      <div className="text-[11px] font-bold uppercase tracking-[0.5px] text-[color:var(--color-text-muted)]">
+        Options ({options.length})
+      </div>
+      {options.length > 0 ? (
+        <ul className="mt-1 flex flex-col gap-1">
+          {options.map((opt, idx) => (
+            <li key={idx} className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-1.5">
+              <input
+                type="text"
+                maxLength={80}
+                value={opt}
+                onChange={(e) => updateOption(idx, e.target.value)}
+                className="field-input"
+              />
+              <button
+                type="button"
+                onClick={() => moveOption(idx, -1)}
+                disabled={idx === 0}
+                aria-label="Monter"
+                className="rounded-md px-2 py-1 text-xs hover:bg-[color:var(--color-bg-hover)] disabled:opacity-30"
+              >
+                ↑
+              </button>
+              <button
+                type="button"
+                onClick={() => moveOption(idx, 1)}
+                disabled={idx === options.length - 1}
+                aria-label="Descendre"
+                className="rounded-md px-2 py-1 text-xs hover:bg-[color:var(--color-bg-hover)] disabled:opacity-30"
+              >
+                ↓
+              </button>
+              <button
+                type="button"
+                onClick={() => removeOption(idx)}
+                aria-label="Retirer l'option"
+                className="rounded-md px-2 py-1 text-xs text-[color:var(--color-text-muted)] hover:bg-[color:var(--color-danger-bg)] hover:text-[color:var(--color-danger)]"
+              >
+                ×
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          addOption();
+        }}
+        className="mt-1.5 flex items-center gap-2"
+      >
+        <input
+          type="text"
+          maxLength={80}
+          placeholder="Nouvelle option…"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          className="field-input"
+        />
+        <button
+          type="submit"
+          disabled={draft.trim().length === 0}
+          className="btn btn-primary btn-sm"
+        >
+          + Ajouter
+        </button>
+      </form>
+    </div>
+  );
+}
+
+// ---------- Custom field creator ----------------------------------------
+
+function CustomFieldForm({
+  onAdd,
+}: {
+  onAdd: (draft: { label: string; type: CardFieldType; group: CardFieldGroup }) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [label, setLabel] = useState('');
+  const [type, setType] = useState<CardFieldType>('text');
+  const [group, setGroup] = useState<CardFieldGroup>('custom');
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = label.trim();
+    if (trimmed.length === 0) return;
+    onAdd({ label: trimmed, type, group });
+    setLabel('');
+    setType('text');
+    setGroup('custom');
+    setOpen(false);
+  };
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="w-full rounded-lg border border-dashed border-[color:var(--color-accent-primary)] bg-transparent py-2 text-xs font-bold text-[color:var(--color-accent-primary)] transition hover:bg-[image:var(--accent-gradient-soft)]"
+      >
+        + Champ personnalisé
+      </button>
+    );
+  }
+
+  return (
+    <form
+      onSubmit={submit}
+      className="grid gap-2 rounded-lg border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] p-3"
+    >
+      <div className="text-[10px] font-extrabold uppercase tracking-[1px] text-[color:var(--color-text-muted)]">
+        Nouveau champ
+      </div>
+      <input
+        autoFocus
+        type="text"
+        maxLength={120}
+        placeholder="Libellé (ex. Brand voice)"
+        value={label}
+        onChange={(e) => setLabel(e.target.value)}
+        className="field-input"
+      />
+      <div className="grid gap-1">
+        <span className="text-[10px] font-bold uppercase tracking-[0.5px] text-[color:var(--color-text-muted)]">
+          Type
+        </span>
+        <div className="flex flex-col gap-1">
+          {CARD_FIELD_TYPES.map((t) => (
+            <label key={t.id} className="flex items-center gap-2 text-xs">
+              <input
+                type="radio"
+                name="custom-field-type"
+                value={t.id}
+                checked={type === t.id}
+                onChange={() => setType(t.id)}
+              />
+              {t.label}
+            </label>
+          ))}
+        </div>
+      </div>
+      <label className="grid gap-1">
+        <span className="text-[10px] font-bold uppercase tracking-[0.5px] text-[color:var(--color-text-muted)]">
+          Groupe
+        </span>
+        <select
+          value={group}
+          onChange={(e) => setGroup(e.target.value as CardFieldGroup)}
+          className="field-select"
+        >
+          {CARD_FIELD_GROUPS.map((g) => (
+            <option key={g.id} value={g.id}>
+              {g.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <div className="flex gap-2">
+        <button
+          type="submit"
+          disabled={label.trim().length === 0}
+          className="btn btn-primary btn-sm"
+        >
+          Créer
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setOpen(false);
+            setLabel('');
+          }}
+          className="btn btn-ghost btn-sm"
+        >
+          Annuler
+        </button>
+      </div>
+    </form>
+  );
+}
+
+// ---------- Type badge --------------------------------------------------
+
+function FieldTypeBadge({ type }: { type: CardFieldType }) {
+  const map: Record<CardFieldType, { label: string; bg: string }> = {
     text: { label: 'Text', bg: 'var(--color-info-bg)' },
-    longtext: { label: 'Texte long', bg: 'var(--color-info-bg)' },
+    longtext: { label: 'Long', bg: 'var(--color-info-bg)' },
     select: { label: 'Select', bg: 'var(--color-warning-bg)' },
     link: { label: 'Lien', bg: 'var(--color-success-bg)' },
+    checkbox: { label: 'Bool', bg: 'var(--color-bg-hover)' },
+    date: { label: 'Date', bg: 'var(--color-info-bg)' },
+    number: { label: '123', bg: 'var(--color-bg-hover)' },
   };
   const { label, bg } = map[type];
   return (

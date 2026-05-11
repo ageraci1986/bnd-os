@@ -7,9 +7,16 @@
  * loses data.
  */
 
-export type CardFieldType = 'text' | 'longtext' | 'select' | 'link';
+export type CardFieldType =
+  | 'text'
+  | 'longtext'
+  | 'select'
+  | 'link'
+  | 'checkbox'
+  | 'date'
+  | 'number';
 
-export type CardFieldGroup = 'overview' | 'details' | 'notes';
+export type CardFieldGroup = 'overview' | 'details' | 'notes' | 'custom';
 
 export interface CardFieldDef {
   readonly id: string;
@@ -93,10 +100,57 @@ export const CARD_FIELD_GROUPS = [
   { id: 'overview' as const, label: 'Overview' },
   { id: 'details' as const, label: 'Details' },
   { id: 'notes' as const, label: 'Notes / Links' },
+  { id: 'custom' as const, label: 'Custom' },
+];
+
+export const CARD_FIELD_TYPES: readonly { id: CardFieldType; label: string }[] = [
+  { id: 'text', label: 'Texte court' },
+  { id: 'longtext', label: 'Texte long' },
+  { id: 'select', label: 'Liste déroulante' },
+  { id: 'checkbox', label: 'Case à cocher' },
+  { id: 'date', label: 'Date' },
+  { id: 'number', label: 'Nombre' },
+  { id: 'link', label: 'Lien URL' },
 ];
 
 export function getFieldPreset(id: string): CardFieldDef | undefined {
   return CARD_FIELD_PRESETS.find((f) => f.id === id);
+}
+
+/**
+ * Slugify a label down to an id stem (e.g. "Brand Voice" → "brand-voice"),
+ * stripping diacritics and non-alphanumeric. Used as the deterministic part
+ * of a custom field's id.
+ */
+export function slugifyFieldLabel(label: string): string {
+  return label
+    .normalize('NFD')
+    .replaceAll(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replaceAll(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48);
+}
+
+/**
+ * Generate a unique field id for a custom field, guaranteed not to collide
+ * with the existing ids in `taken` or with any preset id.
+ */
+export function generateCustomFieldId(label: string, taken: ReadonlySet<string>): string {
+  const stem = slugifyFieldLabel(label) || 'field';
+  const reserved = new Set([...taken, ...CARD_FIELD_PRESETS.map((f) => f.id)]);
+  let id = stem;
+  let suffix = 2;
+  while (reserved.has(id)) {
+    id = `${stem}-${suffix}`;
+    suffix++;
+    if (id.length > 64) {
+      // Fall back to a short random suffix; vanishingly unlikely.
+      id = `${stem.slice(0, 50)}-${Math.random().toString(36).slice(2, 8)}`;
+      if (!reserved.has(id)) break;
+    }
+  }
+  return id;
 }
 
 // ---------- Validation ------------------------------------------------------
@@ -133,11 +187,25 @@ export function validateCardFields(value: unknown): readonly CardFieldDef[] | nu
     if (typeof id !== 'string' || id.length === 0 || id.length > 64) return null;
     if (seenIds.has(id)) return null;
     seenIds.add(id);
-    if (type !== 'text' && type !== 'longtext' && type !== 'select' && type !== 'link') {
+    if (
+      type !== 'text' &&
+      type !== 'longtext' &&
+      type !== 'select' &&
+      type !== 'link' &&
+      type !== 'checkbox' &&
+      type !== 'date' &&
+      type !== 'number'
+    ) {
       return null;
     }
     if (typeof label !== 'string' || label.length === 0 || label.length > 120) return null;
-    if (group !== undefined && group !== 'overview' && group !== 'details' && group !== 'notes') {
+    if (
+      group !== undefined &&
+      group !== 'overview' &&
+      group !== 'details' &&
+      group !== 'notes' &&
+      group !== 'custom'
+    ) {
       return null;
     }
     if (options !== undefined) {

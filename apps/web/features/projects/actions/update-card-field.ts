@@ -44,9 +44,24 @@ export async function updateCardField(input: {
   if (!def) {
     return { ok: false, message: 'Ce champ n’existe pas dans le template de la carte.' };
   }
-  if (def.type === 'select' && parsed.data.value.length > 0) {
-    if (!def.options || !def.options.includes(parsed.data.value)) {
-      return { ok: false, message: 'Valeur invalide pour ce champ.' };
+  const v = parsed.data.value;
+  if (v.length > 0) {
+    if (def.type === 'select') {
+      if (!def.options || !def.options.includes(v)) {
+        return { ok: false, message: 'Valeur invalide pour ce champ.' };
+      }
+    } else if (def.type === 'checkbox') {
+      if (v !== 'true' && v !== 'false') {
+        return { ok: false, message: 'Valeur invalide pour une case à cocher.' };
+      }
+    } else if (def.type === 'date') {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(v) || Number.isNaN(new Date(v).getTime())) {
+        return { ok: false, message: 'Date invalide (AAAA-MM-JJ).' };
+      }
+    } else if (def.type === 'number') {
+      if (Number.isNaN(Number(v))) {
+        return { ok: false, message: 'Nombre invalide.' };
+      }
     }
   }
 
