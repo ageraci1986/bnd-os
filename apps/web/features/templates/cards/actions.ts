@@ -55,11 +55,16 @@ const FieldsSchema = z
     return validated;
   });
 
+const DescriptionPositionSchema = z
+  .enum(['before-fields', 'after-fields', 'hidden'])
+  .default('after-fields');
+
 const CreateSchema = z.object({
   name: NameSchema,
   body: BodySchema,
   fields: FieldsSchema,
   defaultChecklist: ChecklistSchema,
+  descriptionPosition: DescriptionPositionSchema,
   isDefault: z.boolean().default(false),
 });
 
@@ -75,6 +80,7 @@ export async function createCardTemplate(input: {
   body: string;
   fields: readonly CardFieldDef[];
   defaultChecklist: string[];
+  descriptionPosition: 'before-fields' | 'after-fields' | 'hidden';
   isDefault: boolean;
 }): Promise<TemplateMutationResult> {
   const ctx = await requireUser();
@@ -97,6 +103,7 @@ export async function createCardTemplate(input: {
         body: parsed.data.body,
         fields: parsed.data.fields as unknown as Prisma.InputJsonValue,
         defaultChecklist: parsed.data.defaultChecklist,
+        descriptionPosition: parsed.data.descriptionPosition,
         isDefault: parsed.data.isDefault,
       },
       select: { id: true },
@@ -117,6 +124,7 @@ export async function updateCardTemplate(input: {
   body: string;
   fields: readonly CardFieldDef[];
   defaultChecklist: string[];
+  descriptionPosition: 'before-fields' | 'after-fields' | 'hidden';
   isDefault: boolean;
 }): Promise<TemplateMutationResult> {
   const ctx = await requireUser();
@@ -150,6 +158,7 @@ export async function updateCardTemplate(input: {
         body: parsed.data.body,
         fields: parsed.data.fields as unknown as Prisma.InputJsonValue,
         defaultChecklist: parsed.data.defaultChecklist,
+        descriptionPosition: parsed.data.descriptionPosition,
         isDefault: parsed.data.isDefault,
       },
     });

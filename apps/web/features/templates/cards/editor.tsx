@@ -5,10 +5,12 @@ import {
   CARD_FIELD_GROUPS,
   CARD_FIELD_PRESETS,
   CARD_FIELD_TYPES,
+  DESCRIPTION_POSITIONS,
   generateCustomFieldId,
   type CardFieldDef,
   type CardFieldGroup,
   type CardFieldType,
+  type CardTemplateDescriptionPosition,
 } from '@nexushub/domain';
 import { createCardTemplate, deleteCardTemplate, updateCardTemplate } from './actions';
 
@@ -18,6 +20,7 @@ export interface CardTemplateOption {
   readonly body: string;
   readonly fields: readonly CardFieldDef[];
   readonly defaultChecklist: readonly string[];
+  readonly descriptionPosition: CardTemplateDescriptionPosition;
   readonly isDefault: boolean;
 }
 
@@ -29,8 +32,22 @@ export function CardTemplateEditor({ templates }: CardTemplateEditorProps) {
   const router = useRouter();
   const [selectedId, setSelectedId] = useState<string | null>(templates[0]?.id ?? null);
   const [creating, setCreating] = useState(false);
+  const [pending, startTransition] = useTransition();
 
   const selected = templates.find((t) => t.id === selectedId) ?? null;
+
+  const deleteFromList = (id: string, name: string) => {
+    if (!window.confirm(`Supprimer le template « ${name} » ?`)) return;
+    startTransition(async () => {
+      const res = await deleteCardTemplate({ id });
+      if (!res.ok) {
+        window.alert(res.message);
+        return;
+      }
+      if (selectedId === id) setSelectedId(null);
+      router.refresh();
+    });
+  };
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[280px_1fr]">
@@ -57,7 +74,7 @@ export function CardTemplateEditor({ templates }: CardTemplateEditorProps) {
         ) : (
           <ul className="flex flex-col gap-1">
             {templates.map((t) => (
-              <li key={t.id}>
+              <li key={t.id} className="group relative">
                 <button
                   type="button"
                   onClick={() => {
@@ -65,7 +82,7 @@ export function CardTemplateEditor({ templates }: CardTemplateEditorProps) {
                     setCreating(false);
                   }}
                   className={[
-                    'flex w-full items-center justify-between rounded-lg border px-3 py-2 text-left text-sm transition',
+                    'flex w-full items-center justify-between gap-2 rounded-lg border px-3 py-2 pr-9 text-left text-sm transition',
                     t.id === selectedId
                       ? 'border-[color:var(--color-accent-primary)] bg-[image:var(--accent-gradient-soft)] font-bold'
                       : 'border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] font-medium hover:border-[color:var(--color-accent-primary)]',
@@ -73,10 +90,19 @@ export function CardTemplateEditor({ templates }: CardTemplateEditorProps) {
                 >
                   <span className="truncate">{t.name}</span>
                   {t.isDefault ? (
-                    <span className="ml-2 rounded-full bg-[color:var(--color-accent-primary)] px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-[0.5px] text-white">
+                    <span className="rounded-full bg-[color:var(--color-accent-primary)] px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-[0.5px] text-white">
                       Défaut
                     </span>
                   ) : null}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => deleteFromList(t.id, t.name)}
+                  disabled={pending}
+                  aria-label={`Supprimer ${t.name}`}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-xs text-[color:var(--color-text-muted)] opacity-0 transition hover:bg-[color:var(--color-danger-bg)] hover:text-[color:var(--color-danger)] group-hover:opacity-100"
+                >
+                  ×
                 </button>
               </li>
             ))}
@@ -94,6 +120,7 @@ export function CardTemplateEditor({ templates }: CardTemplateEditorProps) {
               body: '',
               fields: [],
               defaultChecklist: [],
+              descriptionPosition: 'after-fields',
               isDefault: templates.length === 0,
             }}
             onSaved={(id) => {
@@ -135,6 +162,7 @@ interface TemplateFormProps {
     body: string;
     fields: readonly CardFieldDef[];
     defaultChecklist: readonly string[];
+    descriptionPosition: CardTemplateDescriptionPosition;
     isDefault: boolean;
   };
   onSaved: (id: string) => void;
@@ -147,6 +175,9 @@ function TemplateForm({ mode, initial, onSaved, onDeleted, onCancel }: TemplateF
   const [body, setBody] = useState(initial.body);
   const [fields, setFields] = useState<CardFieldDef[]>([...initial.fields]);
   const [checklist, setChecklist] = useState<string[]>([...initial.defaultChecklist]);
+  const [descriptionPosition, setDescriptionPosition] = useState<CardTemplateDescriptionPosition>(
+    initial.descriptionPosition,
+  );
   const [isDefault, setIsDefault] = useState(initial.isDefault);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -158,6 +189,7 @@ function TemplateForm({ mode, initial, onSaved, onDeleted, onCancel }: TemplateF
     setBody(initial.body);
     setFields([...initial.fields]);
     setChecklist([...initial.defaultChecklist]);
+    setDescriptionPosition(initial.descriptionPosition);
     setIsDefault(initial.isDefault);
     setError(null);
     setExpandedId(null);
@@ -165,6 +197,7 @@ function TemplateForm({ mode, initial, onSaved, onDeleted, onCancel }: TemplateF
     initialId,
     initial.body,
     initial.defaultChecklist,
+    initial.descriptionPosition,
     initial.fields,
     initial.isDefault,
     initial.name,
@@ -216,7 +249,14 @@ function TemplateForm({ mode, initial, onSaved, onDeleted, onCancel }: TemplateF
     e.preventDefault();
     setError(null);
     startTransition(async () => {
-      const payload = { name, body, fields, defaultChecklist: checklist, isDefault };
+      const payload = {
+        name,
+        body,
+        fields,
+        defaultChecklist: checklist,
+        descriptionPosition,
+        isDefault,
+      };
       const editId = initial.id;
       const res =
         mode === 'create' || !editId
@@ -406,21 +446,42 @@ function TemplateForm({ mode, initial, onSaved, onDeleted, onCancel }: TemplateF
         </aside>
       </div>
 
-      {/* Optional intro markdown */}
-      <div>
-        <label className="field-label" htmlFor="tpl-body">
-          Introduction (optionnel, markdown)
+      {/* Description block placement + optional intro markdown */}
+      <div className="grid gap-3 md:grid-cols-[1fr_240px]">
+        <div>
+          <label className="field-label" htmlFor="tpl-body">
+            Introduction (optionnel, markdown)
+          </label>
+          <textarea
+            id="tpl-body"
+            rows={3}
+            maxLength={8000}
+            placeholder="Texte affiché en haut du brief de la carte. Laissez vide pour ignorer."
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            className="field-input"
+            style={{ fontFamily: 'ui-monospace, monospace', fontSize: 12, lineHeight: 1.5 }}
+          />
+        </div>
+        <label className="grid gap-1">
+          <span className="field-label">Position de la description carte</span>
+          <select
+            value={descriptionPosition}
+            onChange={(e) =>
+              setDescriptionPosition(e.target.value as CardTemplateDescriptionPosition)
+            }
+            className="field-select"
+          >
+            {DESCRIPTION_POSITIONS.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.label}
+              </option>
+            ))}
+          </select>
+          <span className="text-[10px] text-[color:var(--color-text-muted)]">
+            Où afficher le champ Description de la carte par rapport aux champs structurés.
+          </span>
         </label>
-        <textarea
-          id="tpl-body"
-          rows={3}
-          maxLength={8000}
-          placeholder="Texte affiché en haut du brief de la carte. Laissez vide pour ignorer."
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          className="field-input"
-          style={{ fontFamily: 'ui-monospace, monospace', fontSize: 12, lineHeight: 1.5 }}
-        />
       </div>
 
       {/* Default checklist */}

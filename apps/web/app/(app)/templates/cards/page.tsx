@@ -1,6 +1,10 @@
 import type { Metadata } from 'next';
 import { prisma } from '@nexushub/db';
-import { validateCardFields } from '@nexushub/domain';
+import {
+  isDescriptionPosition,
+  validateCardFields,
+  type CardTemplateDescriptionPosition,
+} from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
 import { CardTemplateEditor, type CardTemplateOption } from '@/features/templates/cards/editor';
 
@@ -18,6 +22,7 @@ export default async function CardTemplatesPage() {
       body: true,
       fields: true,
       defaultChecklist: true,
+      descriptionPosition: true,
       isDefault: true,
     },
   });
@@ -28,6 +33,9 @@ export default async function CardTemplatesPage() {
     body: t.body,
     fields: validateCardFields(t.fields) ?? [],
     defaultChecklist: t.defaultChecklist,
+    descriptionPosition: isDescriptionPosition(t.descriptionPosition)
+      ? (t.descriptionPosition as CardTemplateDescriptionPosition)
+      : 'after-fields',
     isDefault: t.isDefault,
   }));
 

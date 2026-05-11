@@ -8,9 +8,10 @@ import {
   isBuiltinCardCategory,
   type BuiltinCardCategoryId,
 } from '@nexushub/domain';
-import type { CardFieldDef } from '@nexushub/domain';
+import type { CardFieldDef, CardTemplateDescriptionPosition } from '@nexushub/domain';
 import { AssigneesSide, type CardAssignment, type WorkspaceMemberOption } from './assignees-side';
 import { TemplateFieldsSection } from './template-fields-section';
+import { TemplatePicker, type TemplateOption } from './template-picker';
 import {
   createChecklistItem,
   deleteChecklistItem,
@@ -43,9 +44,12 @@ export interface CardModalProps {
     readonly categoryTag: string | null;
     readonly checklist: readonly ChecklistItemDTO[];
     readonly assignees: readonly CardAssignment[];
+    readonly templateId: string | null;
     readonly templateFields: readonly CardFieldDef[];
     readonly fieldValues: Record<string, string>;
+    readonly descriptionPosition: CardTemplateDescriptionPosition;
   };
+  readonly availableTemplates: readonly TemplateOption[];
 }
 
 /**
@@ -60,6 +64,7 @@ export function CardModal({
   customCategories,
   isNew,
   workspaceMembers,
+  availableTemplates,
   card,
 }: CardModalProps) {
   const router = useRouter();
@@ -131,6 +136,13 @@ export function CardModal({
 
         <div className="modal-body">
           <div className="modal-main">
+            {card.descriptionPosition === 'before-fields' ? (
+              <section className="modal-section">
+                <div className="section-label">Description</div>
+                <CardDescriptionInput cardId={card.id} initial={card.description ?? ''} />
+              </section>
+            ) : null}
+
             {card.templateFields.length > 0 ? (
               <section className="modal-section">
                 <div className="section-label">Brief</div>
@@ -142,10 +154,12 @@ export function CardModal({
               </section>
             ) : null}
 
-            <section className="modal-section">
-              <div className="section-label">Description</div>
-              <CardDescriptionInput cardId={card.id} initial={card.description ?? ''} />
-            </section>
+            {card.descriptionPosition === 'after-fields' ? (
+              <section className="modal-section">
+                <div className="section-label">Description</div>
+                <CardDescriptionInput cardId={card.id} initial={card.description ?? ''} />
+              </section>
+            ) : null}
 
             <section className="modal-section">
               <div className="checklist-meta">
@@ -239,6 +253,19 @@ export function CardModal({
             <div className="side-row">
               <div className="side-label">Échéance</div>
               <DueDateInput cardId={card.id} initial={card.dueDate} onAfterUpdate={close} />
+            </div>
+
+            <div className="side-row">
+              <div className="side-label">Template</div>
+              <TemplatePicker
+                cardId={card.id}
+                currentTemplateId={card.templateId}
+                templates={availableTemplates}
+              />
+              <p className="mt-1 text-[10px] text-[color:var(--color-text-muted)]">
+                Changer le template ré-organise les champs structurés. Les valeurs des champs
+                conservés sont préservées.
+              </p>
             </div>
 
             <div className="side-row">

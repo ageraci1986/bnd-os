@@ -18,6 +18,22 @@ export type CardFieldType =
 
 export type CardFieldGroup = 'overview' | 'details' | 'notes' | 'custom';
 
+/** Where the card description block sits relative to the structured fields. */
+export type CardTemplateDescriptionPosition = 'before-fields' | 'after-fields' | 'hidden';
+
+export const DESCRIPTION_POSITIONS: readonly {
+  id: CardTemplateDescriptionPosition;
+  label: string;
+}[] = [
+  { id: 'after-fields', label: 'Après les champs' },
+  { id: 'before-fields', label: 'Avant les champs' },
+  { id: 'hidden', label: 'Masquée' },
+];
+
+export function isDescriptionPosition(v: unknown): v is CardTemplateDescriptionPosition {
+  return v === 'before-fields' || v === 'after-fields' || v === 'hidden';
+}
+
 export interface CardFieldDef {
   readonly id: string;
   readonly type: CardFieldType;

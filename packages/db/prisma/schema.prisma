@@ -559,6 +559,9 @@ model CardTemplate {
   /// Array of CardFieldDef objects (validated client-side; stored as Json).
   fields           Json      @default("[]")
   defaultChecklist String[]  @default([]) @map("default_checklist")
+  /// Where the card's `description` block sits in the modal relative to
+  /// the structured fields: 'before-fields' | 'after-fields' | 'hidden'.
+  descriptionPosition String @default("after-fields") @map("description_position")
   /// Exactly 0 or 1 default per workspace, enforced by partial unique index.
   isDefault        Boolean   @default(false) @map("is_default")
   createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
