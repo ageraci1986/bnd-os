@@ -2,11 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { prisma } from '@nexushub/db';
-import {
-  isDescriptionPosition,
-  validateCardFields,
-  type CardTemplateDescriptionPosition,
-} from '@nexushub/domain';
+import { validateCardTemplateItems } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
 import { getCsrfTokenForForm } from '@/lib/csrf';
 import { KanbanBoard } from '@/features/projects/components/kanban-board';
@@ -109,7 +105,7 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
               },
             },
             templateId: true,
-            template: { select: { fields: true, descriptionPosition: true } },
+            template: { select: { items: true } },
           },
         })
       : Promise.resolve(null),
@@ -230,7 +226,7 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
             nextColumnName,
             categoryTag: openCard.categoryTag,
             templateId: openCard.templateId,
-            templateFields: validateCardFields(openCard.template?.fields ?? []) ?? [],
+            templateItems: validateCardTemplateItems(openCard.template?.items ?? []) ?? [],
             fieldValues: (() => {
               const raw = openCard.fieldValues;
               if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
@@ -239,10 +235,6 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
                 if (typeof v === 'string') out[k] = v;
               }
               return out;
-            })(),
-            descriptionPosition: ((): CardTemplateDescriptionPosition => {
-              const raw = openCard.template?.descriptionPosition;
-              return isDescriptionPosition(raw) ? raw : 'after-fields';
             })(),
             checklist: openCard.checklistItems,
             assignees: openCard.assignees.map((a) => {
