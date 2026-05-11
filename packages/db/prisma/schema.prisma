@@ -558,6 +558,9 @@ model CardTemplate {
   body             String    @default("")
   /// Array of CardFieldDef objects (validated client-side; stored as Json).
   fields           Json      @default("[]")
+  /// Unified ordered list of CardTemplateItem (input/section/description).
+  /// Replaces fields + descriptionPosition (kept dual-write during migration).
+  items            Json      @default("[]")
   defaultChecklist String[]  @default([]) @map("default_checklist")
   /// Where the card's `description` block sits in the modal relative to
   /// the structured fields: 'before-fields' | 'after-fields' | 'hidden'.
