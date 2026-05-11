@@ -544,11 +544,9 @@ model KanbanTemplateColumn {
 }
 
 /// Card scaffold reused at card creation (PRD §6.3 ext).
-///  - `fields` is the ordered list of structured field definitions
-///    rendered as inputs in the card modal (text / longtext / select /
-///    link). Each entry: `{ id, type, label, group?, options? }`.
-///  - `body` is an optional markdown intro shown above the structured
-///    fields (e.g. brief context).
+///  - `items` is the unified ordered list of CardTemplateItem objects
+///    (input / section / description) rendered in the card modal.
+///  - `body` is an optional markdown intro shown above the items.
 ///  - `defaultChecklist` seeds the card's checklist_items.
 model CardTemplate {
   id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
@@ -556,15 +554,9 @@ model CardTemplate {
   name             String
   /// Optional markdown intro displayed above the structured fields.
   body             String    @default("")
-  /// Array of CardFieldDef objects (validated client-side; stored as Json).
-  fields           Json      @default("[]")
   /// Unified ordered list of CardTemplateItem (input/section/description).
-  /// Replaces fields + descriptionPosition (kept dual-write during migration).
   items            Json      @default("[]")
   defaultChecklist String[]  @default([]) @map("default_checklist")
-  /// Where the card's `description` block sits in the modal relative to
-  /// the structured fields: 'before-fields' | 'after-fields' | 'hidden'.
-  descriptionPosition String @default("after-fields") @map("description_position")
   /// Exactly 0 or 1 default per workspace, enforced by partial unique index.
   isDefault        Boolean   @default(false) @map("is_default")
   createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
