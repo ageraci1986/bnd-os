@@ -631,29 +631,30 @@ function OptionsEditor({
           ))}
         </ul>
       ) : null}
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          addOption();
-        }}
-        className="mt-1.5 flex items-center gap-2"
-      >
+      <div className="mt-1.5 flex items-center gap-2">
         <input
           type="text"
           maxLength={80}
           placeholder="Nouvelle option…"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              addOption();
+            }
+          }}
           className="field-input"
         />
         <button
-          type="submit"
+          type="button"
+          onClick={addOption}
           disabled={draft.trim().length === 0}
           className="btn btn-primary btn-sm"
         >
           + Ajouter
         </button>
-      </form>
+      </div>
     </div>
   );
 }
@@ -670,8 +671,7 @@ function CustomFieldForm({
   const [type, setType] = useState<CardFieldType>('text');
   const [group, setGroup] = useState<CardFieldGroup>('custom');
 
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const submit = () => {
     const trimmed = label.trim();
     if (trimmed.length === 0) return;
     onAdd({ label: trimmed, type, group });
@@ -694,8 +694,15 @@ function CustomFieldForm({
   }
 
   return (
-    <form
-      onSubmit={submit}
+    <div
+      onKeyDown={(e) => {
+        // Enter on the label input → create (mirrors the form behaviour we
+        // can't use here, since this lives inside the outer TemplateForm).
+        if (e.key === 'Enter' && (e.target as HTMLElement).tagName === 'INPUT') {
+          e.preventDefault();
+          submit();
+        }
+      }}
       className="grid gap-2 rounded-lg border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] p-3"
     >
       <div className="text-[10px] font-extrabold uppercase tracking-[1px] text-[color:var(--color-text-muted)]">
@@ -747,7 +754,8 @@ function CustomFieldForm({
       </label>
       <div className="flex gap-2">
         <button
-          type="submit"
+          type="button"
+          onClick={submit}
           disabled={label.trim().length === 0}
           className="btn btn-primary btn-sm"
         >
@@ -764,7 +772,7 @@ function CustomFieldForm({
           Annuler
         </button>
       </div>
-    </form>
+    </div>
   );
 }
 
