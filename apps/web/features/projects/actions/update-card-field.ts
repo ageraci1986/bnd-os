@@ -3,7 +3,7 @@ import 'server-only';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { prisma } from '@nexushub/db';
-import { NotFoundError, validateCardFields } from '@nexushub/domain';
+import { NotFoundError, validateCardTemplateItems } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
 
 const Schema = z.object({
@@ -34,13 +34,15 @@ export async function updateCardField(input: {
       id: true,
       projectId: true,
       fieldValues: true,
-      template: { select: { fields: true } },
+      template: { select: { items: true } },
     },
   });
   if (!card) throw new NotFoundError('Card');
 
-  const fields = validateCardFields(card.template?.fields ?? []) ?? [];
-  const def = fields.find((f) => f.id === parsed.data.fieldId);
+  const items = validateCardTemplateItems(card.template?.items ?? []) ?? [];
+  const def = items.find(
+    (it) => it.id === parsed.data.fieldId && it.type !== 'section' && it.type !== 'description',
+  );
   if (!def) {
     return { ok: false, message: 'Ce champ n’existe pas dans le template de la carte.' };
   }
