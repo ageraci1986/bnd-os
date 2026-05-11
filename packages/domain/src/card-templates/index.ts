@@ -1,137 +1,10 @@
 /**
- * Card template field definitions (PRD §6.3 ext, user spec).
+ * Card template item definitions (PRD §6.3 ext, user spec).
  *
- * A template = an ordered list of structured fields that appear as
- * inputs in the card modal. The card stores the values keyed by field
- * id in `Card.fieldValues` so renaming / reordering a field never
- * loses data.
+ * A template = an ordered list of items (inputs, sections, and an optional
+ * description marker) that appear in the card modal. The card stores the
+ * values keyed by input id in `Card.fieldValues`.
  */
-
-export type CardFieldType =
-  | 'text'
-  | 'longtext'
-  | 'select'
-  | 'link'
-  | 'checkbox'
-  | 'date'
-  | 'number';
-
-export type CardFieldGroup = 'overview' | 'details' | 'notes' | 'custom';
-
-/** Where the card description block sits relative to the structured fields. */
-export type CardTemplateDescriptionPosition = 'before-fields' | 'after-fields' | 'hidden';
-
-export const DESCRIPTION_POSITIONS: readonly {
-  id: CardTemplateDescriptionPosition;
-  label: string;
-}[] = [
-  { id: 'after-fields', label: 'Après les champs' },
-  { id: 'before-fields', label: 'Avant les champs' },
-  { id: 'hidden', label: 'Masquée' },
-];
-
-export function isDescriptionPosition(v: unknown): v is CardTemplateDescriptionPosition {
-  return v === 'before-fields' || v === 'after-fields' || v === 'hidden';
-}
-
-export interface CardFieldDef {
-  readonly id: string;
-  readonly type: CardFieldType;
-  readonly label: string;
-  readonly group?: CardFieldGroup;
-  readonly options?: readonly string[];
-  readonly placeholder?: string;
-}
-
-/**
- * Preset fields the editor exposes as "+ Add field" quick picks.
- * Values are the user's spec verbatim. Custom fields (V1.5) will be
- * built on top of the same shape.
- */
-export const CARD_FIELD_PRESETS: readonly CardFieldDef[] = [
-  // — Overview ——————————————————————————————
-  {
-    id: 'objective',
-    type: 'longtext',
-    label: 'Objective',
-    group: 'overview',
-    placeholder: 'What is this card achieving?',
-  },
-  {
-    id: 'deliverable',
-    type: 'longtext',
-    label: 'Deliverable',
-    group: 'overview',
-    placeholder: 'What will be produced?',
-  },
-  {
-    id: 'outcome',
-    type: 'longtext',
-    label: 'Outcome / KPI',
-    group: 'overview',
-    placeholder: 'How is success measured?',
-  },
-
-  // — Details ———————————————————————————————
-  {
-    id: 'task-type',
-    type: 'select',
-    label: 'Task Type',
-    group: 'details',
-    options: ['Post', 'Video', 'Visual', 'Report', 'Event', 'Audit'],
-  },
-  {
-    id: 'platform',
-    type: 'select',
-    label: 'Platform',
-    group: 'details',
-    options: ['Instagram', 'Facebook', 'LinkedIn', 'TikTok', 'YouTube'],
-  },
-
-  // — Notes / Links ——————————————————————————
-  {
-    id: 'brief',
-    type: 'link',
-    label: 'Brief',
-    group: 'notes',
-    placeholder: 'https://… (or short summary)',
-  },
-  {
-    id: 'assets',
-    type: 'link',
-    label: 'Assets',
-    group: 'notes',
-    placeholder: 'https://…',
-  },
-  {
-    id: 'inspiration',
-    type: 'link',
-    label: 'Inspiration',
-    group: 'notes',
-    placeholder: 'https://…',
-  },
-];
-
-export const CARD_FIELD_GROUPS = [
-  { id: 'overview' as const, label: 'Overview' },
-  { id: 'details' as const, label: 'Details' },
-  { id: 'notes' as const, label: 'Notes / Links' },
-  { id: 'custom' as const, label: 'Custom' },
-];
-
-export const CARD_FIELD_TYPES: readonly { id: CardFieldType; label: string }[] = [
-  { id: 'text', label: 'Texte court' },
-  { id: 'longtext', label: 'Texte long' },
-  { id: 'select', label: 'Liste déroulante' },
-  { id: 'checkbox', label: 'Case à cocher' },
-  { id: 'date', label: 'Date' },
-  { id: 'number', label: 'Nombre' },
-  { id: 'link', label: 'Lien URL' },
-];
-
-export function getFieldPreset(id: string): CardFieldDef | undefined {
-  return CARD_FIELD_PRESETS.find((f) => f.id === id);
-}
 
 /**
  * Slugify a label down to an id stem (e.g. "Brand Voice" → "brand-voice"),
@@ -150,20 +23,19 @@ export function slugifyFieldLabel(label: string): string {
 
 /**
  * Generate a unique field id for a custom field, guaranteed not to collide
- * with the existing ids in `taken` or with any preset id.
+ * with the existing ids in `taken`.
  */
 export function generateCustomFieldId(label: string, taken: ReadonlySet<string>): string {
   const stem = slugifyFieldLabel(label) || 'field';
-  const reserved = new Set([...taken, ...CARD_FIELD_PRESETS.map((f) => f.id)]);
   let id = stem;
   let suffix = 2;
-  while (reserved.has(id)) {
+  while (taken.has(id)) {
     id = `${stem}-${suffix}`;
     suffix++;
     if (id.length > 64) {
       // Fall back to a short random suffix; vanishingly unlikely.
       id = `${stem.slice(0, 50)}-${Math.random().toString(36).slice(2, 8)}`;
-      if (!reserved.has(id)) break;
+      if (!taken.has(id)) break;
     }
   }
   return id;
@@ -180,85 +52,6 @@ export function validateCardTemplateName(
   if (value.length === 0) return { ok: false, code: 'EMPTY' };
   if (value.length > NAME_MAX) return { ok: false, code: 'TOO_LONG' };
   return { ok: true, value };
-}
-
-/**
- * Strict runtime check used at the action boundary so a malformed JSON
- * blob can't slip into the DB. Returns `null` on the first invalid
- * shape rather than partial data — the caller logs / rejects.
- */
-export function validateCardFields(value: unknown): readonly CardFieldDef[] | null {
-  if (!Array.isArray(value)) return null;
-  const out: CardFieldDef[] = [];
-  const seenIds = new Set<string>();
-  for (const raw of value) {
-    if (!raw || typeof raw !== 'object') return null;
-    const f = raw as Record<string, unknown>;
-    const id = f['id'];
-    const type = f['type'];
-    const label = f['label'];
-    const group = f['group'];
-    const options = f['options'];
-    const placeholder = f['placeholder'];
-    if (typeof id !== 'string' || id.length === 0 || id.length > 64) return null;
-    if (seenIds.has(id)) return null;
-    seenIds.add(id);
-    if (
-      type !== 'text' &&
-      type !== 'longtext' &&
-      type !== 'select' &&
-      type !== 'link' &&
-      type !== 'checkbox' &&
-      type !== 'date' &&
-      type !== 'number'
-    ) {
-      return null;
-    }
-    if (typeof label !== 'string' || label.length === 0 || label.length > 120) return null;
-    if (
-      group !== undefined &&
-      group !== 'overview' &&
-      group !== 'details' &&
-      group !== 'notes' &&
-      group !== 'custom'
-    ) {
-      return null;
-    }
-    if (options !== undefined) {
-      if (!Array.isArray(options) || options.length === 0 || options.length > 32) return null;
-      if (options.some((o) => typeof o !== 'string' || o.length === 0 || o.length > 80)) {
-        return null;
-      }
-    }
-    if (placeholder !== undefined) {
-      if (typeof placeholder !== 'string' || placeholder.length > 200) return null;
-    }
-    out.push({
-      id,
-      type,
-      label,
-      ...(group ? { group: group as CardFieldGroup } : {}),
-      ...(Array.isArray(options) ? { options: [...(options as string[])] } : {}),
-      ...(typeof placeholder === 'string' ? { placeholder } : {}),
-    });
-  }
-  return out;
-}
-
-/**
- * Strip values keyed by field ids that no longer exist (e.g. a field
- * was removed from the template). Keeps the per-card storage clean.
- */
-export function pruneFieldValues(
-  values: Record<string, unknown>,
-  fields: readonly CardFieldDef[],
-): Record<string, string> {
-  const known = new Set(fields.map((f) => f.id));
-  const out: Record<string, string> = {};
-  for (const [k, v] of Object.entries(values)) {
-    if (known.has(k) && typeof v === 'string') out[k] = v;
-  }
-  return out;
 }
 
 // ---------- New unified items model -----------------------------------------
@@ -450,34 +243,4 @@ export function pruneFieldValuesByItems(
     if (inputIds.has(k) && typeof v === 'string') out[k] = v;
   }
   return out;
-}
-
-// ---------- Legacy migration helper ------------------------------------------
-
-/**
- * One-shot migration: convert legacy (fields[], descriptionPosition) shape
- * to the unified items[] shape. Pure function — used by the backfill script.
- *
- * Strips the `group` property from fields (legacy only) and inserts a
- * description marker item at the appropriate position based on
- * descriptionPosition.
- */
-export function migrateFieldsToItems(
-  fields: readonly CardFieldDef[],
-  descriptionPosition: CardTemplateDescriptionPosition,
-): readonly CardTemplateItem[] {
-  const stripped: CardTemplateItem[] = fields.map((f) => {
-    const base: CardTemplateInputItem = { id: f.id, type: f.type, label: f.label };
-    return {
-      ...base,
-      ...(f.options ? { options: [...f.options] } : {}),
-      ...(f.placeholder !== undefined ? { placeholder: f.placeholder } : {}),
-    };
-  });
-
-  const marker: CardTemplateDescriptionItem = { id: DESCRIPTION_ITEM_ID, type: 'description' };
-
-  if (descriptionPosition === 'before-fields') return [marker, ...stripped];
-  if (descriptionPosition === 'after-fields') return [...stripped, marker];
-  return stripped;
 }
