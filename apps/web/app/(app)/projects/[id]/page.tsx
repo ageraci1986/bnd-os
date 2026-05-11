@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { prisma } from '@nexushub/db';
+import { validateCardFields } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
 import { getCsrfTokenForForm } from '@/lib/csrf';
 import { KanbanBoard } from '@/features/projects/components/kanban-board';
@@ -83,6 +84,8 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
               dueDate: true,
               shortRef: true,
               categoryTag: true,
+              fieldValues: true,
+              template: { select: { fields: true } },
               column: { select: { name: true, isBlockedSystem: true } },
               checklistItems: {
                 orderBy: { position: 'asc' },
@@ -208,6 +211,16 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
             columnIsBlocked: openCard.column.isBlockedSystem,
             nextColumnName,
             categoryTag: openCard.categoryTag,
+            templateFields: validateCardFields(openCard.template?.fields ?? []) ?? [],
+            fieldValues: (() => {
+              const raw = openCard.fieldValues;
+              if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+              const out: Record<string, string> = {};
+              for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+                if (typeof v === 'string') out[k] = v;
+              }
+              return out;
+            })(),
             checklist: openCard.checklistItems,
             assignees: openCard.assignees.map((a) => {
               const name =

@@ -1,13 +1,14 @@
 'use client';
-import { useState, useTransition, useRef, useEffect } from 'react';
+import { useState, useTransition, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { CARD_VARIABLE_GROUPS, CARD_VARIABLES, DEFAULT_CARD_TEMPLATE_BODY } from '@nexushub/domain';
+import { CARD_FIELD_GROUPS, CARD_FIELD_PRESETS, type CardFieldDef } from '@nexushub/domain';
 import { createCardTemplate, deleteCardTemplate, updateCardTemplate } from './actions';
 
 export interface CardTemplateOption {
   readonly id: string;
   readonly name: string;
   readonly body: string;
+  readonly fields: readonly CardFieldDef[];
   readonly defaultChecklist: readonly string[];
   readonly isDefault: boolean;
 }
@@ -43,7 +44,7 @@ export function CardTemplateEditor({ templates }: CardTemplateEditorProps) {
         </div>
         {templates.length === 0 && !creating ? (
           <p className="rounded-xl border border-dashed border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] p-4 text-xs text-[color:var(--color-text-muted)]">
-            Aucun template. Créez-en un pour pré-remplir le brief de vos cartes.
+            Aucun template. Créez-en un pour pré-configurer les champs de vos cartes.
           </p>
         ) : (
           <ul className="flex flex-col gap-1">
@@ -58,7 +59,7 @@ export function CardTemplateEditor({ templates }: CardTemplateEditorProps) {
                   className={[
                     'flex w-full items-center justify-between rounded-lg border px-3 py-2 text-left text-sm transition',
                     t.id === selectedId
-                      ? 'border-[color:var(--color-accent-primary)] bg-[color:var(--accent-gradient-soft)] font-bold'
+                      ? 'border-[color:var(--color-accent-primary)] bg-[image:var(--accent-gradient-soft)] font-bold'
                       : 'border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] font-medium hover:border-[color:var(--color-accent-primary)]',
                   ].join(' ')}
                 >
@@ -82,7 +83,8 @@ export function CardTemplateEditor({ templates }: CardTemplateEditorProps) {
             mode="create"
             initial={{
               name: '',
-              body: DEFAULT_CARD_TEMPLATE_BODY,
+              body: '',
+              fields: [],
               defaultChecklist: [],
               isDefault: templates.length === 0,
             }}
@@ -123,6 +125,7 @@ interface TemplateFormProps {
     id?: string;
     name: string;
     body: string;
+    fields: readonly CardFieldDef[];
     defaultChecklist: readonly string[];
     isDefault: boolean;
   };
@@ -134,41 +137,50 @@ interface TemplateFormProps {
 function TemplateForm({ mode, initial, onSaved, onDeleted, onCancel }: TemplateFormProps) {
   const [name, setName] = useState(initial.name);
   const [body, setBody] = useState(initial.body);
+  const [fields, setFields] = useState<readonly CardFieldDef[]>(initial.fields);
   const [checklist, setChecklist] = useState<string[]>([...initial.defaultChecklist]);
   const [isDefault, setIsDefault] = useState(initial.isDefault);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  const bodyRef = useRef<HTMLTextAreaElement | null>(null);
 
-  // Reset form when switching templates. We watch `initial.id` only —
-  // when the parent renders a different template, swap the local state.
   const initialId = initial.id;
   useEffect(() => {
     setName(initial.name);
     setBody(initial.body);
+    setFields(initial.fields);
     setChecklist([...initial.defaultChecklist]);
     setIsDefault(initial.isDefault);
     setError(null);
-  }, [initialId, initial.body, initial.defaultChecklist, initial.isDefault, initial.name]);
+  }, [
+    initialId,
+    initial.body,
+    initial.defaultChecklist,
+    initial.fields,
+    initial.isDefault,
+    initial.name,
+  ]);
 
-  const insertSnippet = (snippet: string) => {
-    const el = bodyRef.current;
-    if (!el) {
-      setBody((prev) => prev + (prev.endsWith('\n') || prev.length === 0 ? '' : '\n') + snippet);
-      return;
-    }
-    const start = el.selectionStart ?? body.length;
-    const end = el.selectionEnd ?? body.length;
-    const before = body.slice(0, start);
-    const after = body.slice(end);
-    const sep = before.length === 0 || before.endsWith('\n') ? '' : '\n';
-    const next = before + sep + snippet + after;
-    setBody(next);
-    // Reset cursor right after the inserted snippet on the next paint.
-    queueMicrotask(() => {
-      const pos = before.length + sep.length + snippet.length;
-      el.focus();
-      el.setSelectionRange(pos, pos);
+  const usedFieldIds = new Set(fields.map((f) => f.id));
+
+  const addPreset = (preset: CardFieldDef) => {
+    if (usedFieldIds.has(preset.id)) return;
+    setFields((prev) => [...prev, preset]);
+  };
+
+  const removeField = (id: string) => {
+    setFields((prev) => prev.filter((f) => f.id !== id));
+  };
+
+  const moveField = (id: string, direction: -1 | 1) => {
+    setFields((prev) => {
+      const idx = prev.findIndex((f) => f.id === id);
+      if (idx < 0) return prev;
+      const target = idx + direction;
+      if (target < 0 || target >= prev.length) return prev;
+      const next = [...prev];
+      const [item] = next.splice(idx, 1);
+      if (item) next.splice(target, 0, item);
+      return next;
     });
   };
 
@@ -179,6 +191,7 @@ function TemplateForm({ mode, initial, onSaved, onDeleted, onCancel }: TemplateF
       const payload = {
         name,
         body,
+        fields,
         defaultChecklist: checklist,
         isDefault,
       };
@@ -212,7 +225,7 @@ function TemplateForm({ mode, initial, onSaved, onDeleted, onCancel }: TemplateF
   return (
     <form
       onSubmit={submit}
-      className="grid gap-4 rounded-2xl border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] p-5 shadow-[var(--shadow-card)]"
+      className="grid gap-5 rounded-2xl border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] p-5 shadow-[var(--shadow-card)]"
     >
       <div className="grid gap-2 md:grid-cols-[1fr_auto_auto] md:items-end">
         <div>
@@ -265,45 +278,114 @@ function TemplateForm({ mode, initial, onSaved, onDeleted, onCancel }: TemplateF
         </div>
       </div>
 
-      <div className="grid gap-3 lg:grid-cols-[1fr_220px]">
-        <div>
-          <div className="field-label">Corps (markdown)</div>
-          <textarea
-            ref={bodyRef}
-            rows={18}
-            maxLength={16000}
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            className="field-input"
-            style={{ fontFamily: 'ui-monospace, monospace', fontSize: 12, lineHeight: 1.5 }}
-          />
-        </div>
+      {/* Field list */}
+      <div className="grid gap-3 lg:grid-cols-[1fr_240px]">
+        <section>
+          <div className="field-label">Champs de la carte ({fields.length})</div>
+          {fields.length === 0 ? (
+            <p className="rounded-xl border border-dashed border-[color:var(--color-border-light)] p-4 text-xs text-[color:var(--color-text-muted)]">
+              Aucun champ. Ajoutez-en depuis le panneau de droite.
+            </p>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {fields.map((f, idx) => (
+                <li
+                  key={f.id}
+                  className="grid grid-cols-[auto_1fr_auto_auto_auto] items-center gap-2 rounded-xl border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-muted)] p-3"
+                >
+                  <FieldTypeBadge type={f.type} />
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-bold">{f.label}</div>
+                    {f.options && f.options.length > 0 ? (
+                      <div className="mt-0.5 truncate text-[11px] text-[color:var(--color-text-muted)]">
+                        {f.options.join(' · ')}
+                      </div>
+                    ) : null}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => moveField(f.id, -1)}
+                    disabled={idx === 0}
+                    aria-label="Monter"
+                    className="rounded-md px-2 py-1 text-xs hover:bg-[color:var(--color-bg-hover)] disabled:opacity-30"
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => moveField(f.id, 1)}
+                    disabled={idx === fields.length - 1}
+                    aria-label="Descendre"
+                    className="rounded-md px-2 py-1 text-xs hover:bg-[color:var(--color-bg-hover)] disabled:opacity-30"
+                  >
+                    ↓
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => removeField(f.id)}
+                    aria-label={`Retirer ${f.label}`}
+                    className="rounded-md px-2 py-1 text-xs text-[color:var(--color-text-muted)] hover:bg-[color:var(--color-danger-bg)] hover:text-[color:var(--color-danger)]"
+                  >
+                    ×
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
         <aside>
-          <div className="field-label">+ Insérer une variable</div>
+          <div className="field-label">+ Ajouter un champ</div>
           <div className="flex flex-col gap-3">
-            {CARD_VARIABLE_GROUPS.map((group) => (
-              <div key={group.id}>
-                <div className="mb-1 text-[10px] font-extrabold uppercase tracking-[1px] text-[color:var(--color-text-muted)]">
-                  {group.label}
+            {CARD_FIELD_GROUPS.map((group) => {
+              const presets = CARD_FIELD_PRESETS.filter((f) => f.group === group.id);
+              return (
+                <div key={group.id}>
+                  <div className="mb-1 text-[10px] font-extrabold uppercase tracking-[1px] text-[color:var(--color-text-muted)]">
+                    {group.label}
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {presets.map((p) => {
+                      const used = usedFieldIds.has(p.id);
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          disabled={used}
+                          onClick={() => addPreset(p)}
+                          className="rounded-full border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] px-2.5 py-1 text-[11px] font-bold transition hover:border-[color:var(--color-accent-primary)] hover:text-[color:var(--color-accent-primary)] disabled:opacity-40"
+                          title={used ? 'Déjà ajouté' : `Ajouter ${p.label}`}
+                        >
+                          {p.label}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {CARD_VARIABLES.filter((v) => v.group === group.id).map((v) => (
-                    <button
-                      key={v.id}
-                      type="button"
-                      onClick={() => insertSnippet(v.snippet)}
-                      className="rounded-full border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] px-2.5 py-1 text-[11px] font-bold transition hover:border-[color:var(--color-accent-primary)] hover:text-[color:var(--color-accent-primary)]"
-                    >
-                      {v.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </aside>
       </div>
 
+      {/* Optional intro markdown */}
+      <div>
+        <label className="field-label" htmlFor="tpl-body">
+          Introduction (optionnel, markdown)
+        </label>
+        <textarea
+          id="tpl-body"
+          rows={3}
+          maxLength={8000}
+          placeholder="Texte affiché en haut du brief de la carte. Laissez vide pour ignorer."
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          className="field-input"
+          style={{ fontFamily: 'ui-monospace, monospace', fontSize: 12, lineHeight: 1.5 }}
+        />
+      </div>
+
+      {/* Default checklist */}
       <div>
         <div className="mb-1 flex items-center justify-between">
           <div className="field-label" style={{ marginBottom: 0 }}>
@@ -363,5 +445,23 @@ function TemplateForm({ mode, initial, onSaved, onDeleted, onCancel }: TemplateF
         </p>
       ) : null}
     </form>
+  );
+}
+
+function FieldTypeBadge({ type }: { type: CardFieldDef['type'] }) {
+  const map: Record<CardFieldDef['type'], { label: string; bg: string }> = {
+    text: { label: 'Text', bg: 'var(--color-info-bg)' },
+    longtext: { label: 'Texte long', bg: 'var(--color-info-bg)' },
+    select: { label: 'Select', bg: 'var(--color-warning-bg)' },
+    link: { label: 'Lien', bg: 'var(--color-success-bg)' },
+  };
+  const { label, bg } = map[type];
+  return (
+    <span
+      className="rounded-full px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-[0.5px]"
+      style={{ background: bg, color: 'var(--text-soft)' }}
+    >
+      {label}
+    </span>
   );
 }

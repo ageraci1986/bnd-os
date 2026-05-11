@@ -395,6 +395,9 @@ model Card {
   workspaceId      String    @map("workspace_id") @db.Uuid
   projectId        String    @map("project_id") @db.Uuid
   columnId         String    @map("column_id") @db.Uuid
+  /// When the card was created from a CardTemplate, this points to it so
+  /// the modal knows which structured fields to render.
+  templateId       String?   @map("template_id") @db.Uuid
   /// Mémorise la colonne avant Bloqué pour le retour automatique (PRD §8.3)
   previousColumnId String?   @map("previous_column_id") @db.Uuid
   /// Auto-incrémenté par trigger Postgres (#124, #089…). Default 0 lets
@@ -409,6 +412,9 @@ model Card {
   movedToLastAt    DateTime? @map("moved_to_last_at") @db.Timestamptz(6)
   /// Position dans sa colonne (sparse)
   position         Int
+  /// Values keyed by template-field id, e.g. `{ "objective": "...", "task-type": "Post" }`.
+  /// Decoupled from the template definition so renaming a field doesn't lose data.
+  fieldValues      Json      @default("{}") @map("field_values")
   archivedAt       DateTime? @map("archived_at") @db.Timestamptz(6)
   deletedAt        DateTime? @map("deleted_at") @db.Timestamptz(6)
   createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -416,6 +422,7 @@ model Card {
 
   project        Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
   column         Column          @relation(fields: [columnId], references: [id], onDelete: Restrict)
+  template       CardTemplate?   @relation(fields: [templateId], references: [id], onDelete: SetNull)
   assignees      CardAssignee[]
   checklistItems ChecklistItem[]
   comments       Comment[]
@@ -425,6 +432,7 @@ model Card {
   @@index([columnId, position])
   @@index([dueDate])
   @@index([workspaceId, deletedAt])
+  @@index([templateId])
   @@map("cards")
 }
 
@@ -535,15 +543,21 @@ model KanbanTemplateColumn {
   @@map("kanban_template_columns")
 }
 
-/// Card body + checklist scaffold reused at card creation (PRD §6.3 ext).
-/// Body is markdown with variable placeholders; defaultChecklist is the
-/// ordered list of titles to seed checklist_items from.
+/// Card scaffold reused at card creation (PRD §6.3 ext).
+///  - `fields` is the ordered list of structured field definitions
+///    rendered as inputs in the card modal (text / longtext / select /
+///    link). Each entry: `{ id, type, label, group?, options? }`.
+///  - `body` is an optional markdown intro shown above the structured
+///    fields (e.g. brief context).
+///  - `defaultChecklist` seeds the card's checklist_items.
 model CardTemplate {
   id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   workspaceId      String    @map("workspace_id") @db.Uuid
   name             String
-  /// Plain text or sanitized markdown — same security rule as email_templates.
+  /// Optional markdown intro displayed above the structured fields.
   body             String    @default("")
+  /// Array of CardFieldDef objects (validated client-side; stored as Json).
+  fields           Json      @default("[]")
   defaultChecklist String[]  @default([]) @map("default_checklist")
   /// Exactly 0 or 1 default per workspace, enforced by partial unique index.
   isDefault        Boolean   @default(false) @map("is_default")
@@ -552,6 +566,7 @@ model CardTemplate {
   deletedAt        DateTime? @map("deleted_at") @db.Timestamptz(6)
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  cards     Card[]
 
   @@unique([workspaceId, name])
   @@index([workspaceId, deletedAt])

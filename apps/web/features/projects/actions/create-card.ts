@@ -50,7 +50,7 @@ export async function createCard(
       deletedAt: null,
       ...(explicitTemplateId ? { id: explicitTemplateId } : { isDefault: true }),
     },
-    select: { body: true, defaultChecklist: true },
+    select: { id: true, body: true, defaultChecklist: true },
   });
 
   // Append at the bottom: read the max position in this column.
@@ -72,6 +72,7 @@ export async function createCard(
         columnId,
         title,
         position,
+        ...(template ? { templateId: template.id } : {}),
         ...(template && template.body.length > 0 ? { description: template.body } : {}),
       },
       select: { id: true },

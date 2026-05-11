@@ -2,11 +2,12 @@
 import 'server-only';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
-import { prisma } from '@nexushub/db';
+import { prisma, type Prisma } from '@nexushub/db';
 import {
   NotFoundError,
-  validateCardTemplateBody,
+  validateCardFields,
   validateCardTemplateName,
+  type CardFieldDef,
 } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
 
@@ -20,7 +21,7 @@ function prismaErrorCode(err: unknown): string | null {
 
 const NameSchema = z
   .string()
-  .max(120) // pre-trim guard
+  .max(120)
   .transform((raw) => validateCardTemplateName(raw))
   .superRefine((res, ctx) => {
     if (res.ok) return;
@@ -31,37 +32,38 @@ const NameSchema = z
   })
   .transform((res) => (res.ok ? res.value : ''));
 
-const BodySchema = z
-  .string()
-  .max(16_000)
-  .default('')
-  .transform((raw) => validateCardTemplateBody(raw))
-  .superRefine((res, ctx) => {
-    if (res.ok) return;
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: 'Contenu trop long',
-    });
-  })
-  .transform((res) => (res.ok ? res.value : ''));
-
+const BodySchema = z.string().max(8000).default('');
 const ChecklistSchema = z
   .array(z.string().max(200))
   .max(50)
   .default([])
   .transform((items) => items.map((s) => s.trim()).filter((s) => s.length > 0));
 
+const FieldsSchema = z
+  .array(z.unknown())
+  .max(40)
+  .default([])
+  .transform((arr, ctx) => {
+    const validated = validateCardFields(arr);
+    if (validated === null) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Définition de champs invalide.',
+      });
+      return [] as readonly CardFieldDef[];
+    }
+    return validated;
+  });
+
 const CreateSchema = z.object({
   name: NameSchema,
   body: BodySchema,
+  fields: FieldsSchema,
   defaultChecklist: ChecklistSchema,
   isDefault: z.boolean().default(false),
 });
 
-const UpdateSchema = CreateSchema.extend({
-  id: z.string().uuid(),
-});
-
+const UpdateSchema = CreateSchema.extend({ id: z.string().uuid() });
 const DeleteSchema = z.object({ id: z.string().uuid() });
 
 export type TemplateMutationResult =
@@ -71,6 +73,7 @@ export type TemplateMutationResult =
 export async function createCardTemplate(input: {
   name: string;
   body: string;
+  fields: readonly CardFieldDef[];
   defaultChecklist: string[];
   isDefault: boolean;
 }): Promise<TemplateMutationResult> {
@@ -82,7 +85,6 @@ export async function createCardTemplate(input: {
 
   try {
     if (parsed.data.isDefault) {
-      // Demote any existing default first.
       await prisma.cardTemplate.updateMany({
         where: { workspaceId: ctx.workspaceId, deletedAt: null, isDefault: true },
         data: { isDefault: false },
@@ -93,6 +95,7 @@ export async function createCardTemplate(input: {
         workspaceId: ctx.workspaceId,
         name: parsed.data.name,
         body: parsed.data.body,
+        fields: parsed.data.fields as unknown as Prisma.InputJsonValue,
         defaultChecklist: parsed.data.defaultChecklist,
         isDefault: parsed.data.isDefault,
       },
@@ -112,6 +115,7 @@ export async function updateCardTemplate(input: {
   id: string;
   name: string;
   body: string;
+  fields: readonly CardFieldDef[];
   defaultChecklist: string[];
   isDefault: boolean;
 }): Promise<TemplateMutationResult> {
@@ -144,6 +148,7 @@ export async function updateCardTemplate(input: {
       data: {
         name: parsed.data.name,
         body: parsed.data.body,
+        fields: parsed.data.fields as unknown as Prisma.InputJsonValue,
         defaultChecklist: parsed.data.defaultChecklist,
         isDefault: parsed.data.isDefault,
       },

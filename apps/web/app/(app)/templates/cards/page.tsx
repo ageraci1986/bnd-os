@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { prisma } from '@nexushub/db';
+import { validateCardFields } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
 import { CardTemplateEditor, type CardTemplateOption } from '@/features/templates/cards/editor';
 
@@ -15,6 +16,7 @@ export default async function CardTemplatesPage() {
       id: true,
       name: true,
       body: true,
+      fields: true,
       defaultChecklist: true,
       isDefault: true,
     },
@@ -24,6 +26,7 @@ export default async function CardTemplatesPage() {
     id: t.id,
     name: t.name,
     body: t.body,
+    fields: validateCardFields(t.fields) ?? [],
     defaultChecklist: t.defaultChecklist,
     isDefault: t.isDefault,
   }));

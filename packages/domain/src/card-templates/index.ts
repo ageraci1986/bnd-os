@@ -1,98 +1,107 @@
 /**
- * Card template variables (PRD §6.3 ext, user spec).
+ * Card template field definitions (PRD §6.3 ext, user spec).
  *
- * Pure-TS catalogue of the variable snippets the editor exposes as
- * "+ Insert" buttons. Each variable maps to a markdown chunk that gets
- * inserted at the cursor position in the template body.
+ * A template = an ordered list of structured fields that appear as
+ * inputs in the card modal. The card stores the values keyed by field
+ * id in `Card.fieldValues` so renaming / reordering a field never
+ * loses data.
  */
 
-export interface CardVariable {
+export type CardFieldType = 'text' | 'longtext' | 'select' | 'link';
+
+export type CardFieldGroup = 'overview' | 'details' | 'notes';
+
+export interface CardFieldDef {
   readonly id: string;
-  readonly group: 'overview' | 'details' | 'raci' | 'notes';
+  readonly type: CardFieldType;
   readonly label: string;
-  /** Markdown snippet inserted by the editor. Always ends with a newline. */
-  readonly snippet: string;
+  readonly group?: CardFieldGroup;
+  readonly options?: readonly string[];
+  readonly placeholder?: string;
 }
 
-export const CARD_VARIABLES: readonly CardVariable[] = [
+/**
+ * Preset fields the editor exposes as "+ Add field" quick picks.
+ * Values are the user's spec verbatim. Custom fields (V1.5) will be
+ * built on top of the same shape.
+ */
+export const CARD_FIELD_PRESETS: readonly CardFieldDef[] = [
   // — Overview ——————————————————————————————
-  { id: 'objective', group: 'overview', label: 'Objective', snippet: '**Objective:** \n' },
-  { id: 'deliverable', group: 'overview', label: 'Deliverable', snippet: '**Deliverable:** \n' },
+  {
+    id: 'objective',
+    type: 'longtext',
+    label: 'Objective',
+    group: 'overview',
+    placeholder: 'What is this card achieving?',
+  },
+  {
+    id: 'deliverable',
+    type: 'longtext',
+    label: 'Deliverable',
+    group: 'overview',
+    placeholder: 'What will be produced?',
+  },
   {
     id: 'outcome',
-    group: 'overview',
+    type: 'longtext',
     label: 'Outcome / KPI',
-    snippet: '**Outcome / KPI:** \n',
+    group: 'overview',
+    placeholder: 'How is success measured?',
   },
 
   // — Details ———————————————————————————————
   {
     id: 'task-type',
-    group: 'details',
+    type: 'select',
     label: 'Task Type',
-    snippet: '**Task Type:** [Post / Video / Visual / Report / Event / Audit]\n',
+    group: 'details',
+    options: ['Post', 'Video', 'Visual', 'Report', 'Event', 'Audit'],
   },
   {
     id: 'platform',
-    group: 'details',
+    type: 'select',
     label: 'Platform',
-    snippet: '**Platform:** [Instagram / Facebook / LinkedIn / TikTok / YouTube]\n',
+    group: 'details',
+    options: ['Instagram', 'Facebook', 'LinkedIn', 'TikTok', 'YouTube'],
   },
-  { id: 'due-date', group: 'details', label: 'Due date', snippet: '**Due date:** YYYY-MM-DD\n' },
-
-  // — RACI ——————————————————————————————————
-  {
-    id: 'raci-r',
-    group: 'raci',
-    label: 'Responsible',
-    snippet: '**Responsible (doer):** @\n',
-  },
-  {
-    id: 'raci-a',
-    group: 'raci',
-    label: 'Accountable',
-    snippet: '**Accountable (approver):** @\n',
-  },
-  { id: 'raci-c', group: 'raci', label: 'Consulted', snippet: '**Consulted:** @\n' },
-  { id: 'raci-i', group: 'raci', label: 'Informed', snippet: '**Informed:** @\n' },
 
   // — Notes / Links ——————————————————————————
-  { id: 'brief', group: 'notes', label: 'Brief', snippet: '**Brief:** [link or summary]\n' },
-  { id: 'assets', group: 'notes', label: 'Assets', snippet: '**Assets:** [link]\n' },
-  { id: 'inspiration', group: 'notes', label: 'Inspiration', snippet: '**Inspiration:** [link]\n' },
-] as const;
+  {
+    id: 'brief',
+    type: 'link',
+    label: 'Brief',
+    group: 'notes',
+    placeholder: 'https://… (or short summary)',
+  },
+  {
+    id: 'assets',
+    type: 'link',
+    label: 'Assets',
+    group: 'notes',
+    placeholder: 'https://…',
+  },
+  {
+    id: 'inspiration',
+    type: 'link',
+    label: 'Inspiration',
+    group: 'notes',
+    placeholder: 'https://…',
+  },
+];
 
-export const CARD_VARIABLE_GROUPS = [
+export const CARD_FIELD_GROUPS = [
   { id: 'overview' as const, label: 'Overview' },
   { id: 'details' as const, label: 'Details' },
-  { id: 'raci' as const, label: 'RACI' },
   { id: 'notes' as const, label: 'Notes / Links' },
 ];
 
-/** Reasonable starting body offered when the user creates a new template. */
-export const DEFAULT_CARD_TEMPLATE_BODY = `## Overview
-
-**Objective:**
-**Deliverable:**
-**Outcome / KPI:**
-
-## Details
-
-**Task Type:** [Post / Video / Visual / Report / Event / Audit]
-**Platform:** [Instagram / Facebook / LinkedIn / TikTok / YouTube]
-**Due date:** YYYY-MM-DD
-
-## Notes / Links
-
-**Brief:** [link or summary]
-**Assets:** [link]
-**Inspiration:** [link]
-`;
+export function getFieldPreset(id: string): CardFieldDef | undefined {
+  return CARD_FIELD_PRESETS.find((f) => f.id === id);
+}
 
 // ---------- Validation ------------------------------------------------------
 
 const NAME_MAX = 80;
-const BODY_MAX = 16_000;
 
 export function validateCardTemplateName(
   raw: string,
@@ -103,10 +112,67 @@ export function validateCardTemplateName(
   return { ok: true, value };
 }
 
-export function validateCardTemplateBody(
-  raw: string,
-): { ok: true; value: string } | { ok: false; code: 'TOO_LONG' } {
-  const value = raw;
-  if (value.length > BODY_MAX) return { ok: false, code: 'TOO_LONG' };
-  return { ok: true, value };
+/**
+ * Strict runtime check used at the action boundary so a malformed JSON
+ * blob can't slip into the DB. Returns `null` on the first invalid
+ * shape rather than partial data — the caller logs / rejects.
+ */
+export function validateCardFields(value: unknown): readonly CardFieldDef[] | null {
+  if (!Array.isArray(value)) return null;
+  const out: CardFieldDef[] = [];
+  const seenIds = new Set<string>();
+  for (const raw of value) {
+    if (!raw || typeof raw !== 'object') return null;
+    const f = raw as Record<string, unknown>;
+    const id = f['id'];
+    const type = f['type'];
+    const label = f['label'];
+    const group = f['group'];
+    const options = f['options'];
+    const placeholder = f['placeholder'];
+    if (typeof id !== 'string' || id.length === 0 || id.length > 64) return null;
+    if (seenIds.has(id)) return null;
+    seenIds.add(id);
+    if (type !== 'text' && type !== 'longtext' && type !== 'select' && type !== 'link') {
+      return null;
+    }
+    if (typeof label !== 'string' || label.length === 0 || label.length > 120) return null;
+    if (group !== undefined && group !== 'overview' && group !== 'details' && group !== 'notes') {
+      return null;
+    }
+    if (options !== undefined) {
+      if (!Array.isArray(options) || options.length === 0 || options.length > 32) return null;
+      if (options.some((o) => typeof o !== 'string' || o.length === 0 || o.length > 80)) {
+        return null;
+      }
+    }
+    if (placeholder !== undefined) {
+      if (typeof placeholder !== 'string' || placeholder.length > 200) return null;
+    }
+    out.push({
+      id,
+      type,
+      label,
+      ...(group ? { group: group as CardFieldGroup } : {}),
+      ...(Array.isArray(options) ? { options: [...(options as string[])] } : {}),
+      ...(typeof placeholder === 'string' ? { placeholder } : {}),
+    });
+  }
+  return out;
+}
+
+/**
+ * Strip values keyed by field ids that no longer exist (e.g. a field
+ * was removed from the template). Keeps the per-card storage clean.
+ */
+export function pruneFieldValues(
+  values: Record<string, unknown>,
+  fields: readonly CardFieldDef[],
+): Record<string, string> {
+  const known = new Set(fields.map((f) => f.id));
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(values)) {
+    if (known.has(k) && typeof v === 'string') out[k] = v;
+  }
+  return out;
 }

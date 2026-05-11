@@ -8,7 +8,9 @@ import {
   isBuiltinCardCategory,
   type BuiltinCardCategoryId,
 } from '@nexushub/domain';
+import type { CardFieldDef } from '@nexushub/domain';
 import { AssigneesSide, type CardAssignment, type WorkspaceMemberOption } from './assignees-side';
+import { TemplateFieldsSection } from './template-fields-section';
 import {
   createChecklistItem,
   deleteChecklistItem,
@@ -41,6 +43,8 @@ export interface CardModalProps {
     readonly categoryTag: string | null;
     readonly checklist: readonly ChecklistItemDTO[];
     readonly assignees: readonly CardAssignment[];
+    readonly templateFields: readonly CardFieldDef[];
+    readonly fieldValues: Record<string, string>;
   };
 }
 
@@ -127,6 +131,17 @@ export function CardModal({
 
         <div className="modal-body">
           <div className="modal-main">
+            {card.templateFields.length > 0 ? (
+              <section className="modal-section">
+                <div className="section-label">Brief</div>
+                <TemplateFieldsSection
+                  cardId={card.id}
+                  fields={card.templateFields}
+                  initialValues={card.fieldValues}
+                />
+              </section>
+            ) : null}
+
             <section className="modal-section">
               <div className="section-label">Description</div>
               <CardDescriptionInput cardId={card.id} initial={card.description ?? ''} />
