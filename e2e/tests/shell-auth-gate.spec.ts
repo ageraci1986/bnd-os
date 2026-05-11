@@ -18,6 +18,7 @@ const APP_ROUTES = [
   '/team',
   '/templates/email',
   '/templates/kanban',
+  '/templates/cards',
   '/integrations',
   '/settings',
 ];
