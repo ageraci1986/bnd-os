@@ -79,4 +79,8 @@ describe('validateCardTemplateItems', () => {
     }));
     expect(validateCardTemplateItems(items)).toBeNull();
   });
+
+  it('rejects a non-description item using the reserved description id', () => {
+    expect(validateCardTemplateItems([{ id: 'description', type: 'text', label: 'X' }])).toBeNull();
+  });
 });

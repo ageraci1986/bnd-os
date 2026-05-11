@@ -387,6 +387,7 @@ export function validateCardTemplateItems(value: unknown): readonly CardTemplate
     }
 
     if (seenIds.has(id)) return null;
+    if (id === DESCRIPTION_ITEM_ID) return null; // reserved id, only the singleton marker can use it
     seenIds.add(id);
 
     const label = r['label'];
