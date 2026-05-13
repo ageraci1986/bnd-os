@@ -4,6 +4,7 @@ import { prisma } from '@nexushub/db';
 import { requireUser } from '@/lib/auth';
 import { getClientFilterFromSearchParams, resolveActiveClient } from '@/lib/client-filter/server';
 import { CalendarIcon, KanbanIcon } from '@/features/shell/components/icons';
+import { DeleteProjectButton } from '@/features/projects/components/delete-project-button';
 
 export const metadata: Metadata = { title: 'Projets' };
 
@@ -82,10 +83,13 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
       ) : (
         <ul className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {projects.map((p) => (
-            <li key={p.id}>
+            <li key={p.id} className="relative">
+              <div className="absolute right-3 top-3 z-10">
+                <DeleteProjectButton projectId={p.id} projectName={p.name} size="sm" />
+              </div>
               <Link
                 href={`/projects/${p.id}`}
-                className="block rounded-2xl border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] p-5 shadow-[var(--shadow-card)] transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-hover)]"
+                className="block rounded-2xl border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] p-5 pr-16 shadow-[var(--shadow-card)] transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-hover)]"
               >
                 <div className="mb-2 flex items-center gap-2 text-xs text-[color:var(--color-text-muted)]">
                   <span

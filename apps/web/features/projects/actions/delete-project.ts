@@ -1,0 +1,40 @@
+'use server';
+import 'server-only';
+import { redirect } from 'next/navigation';
+import { revalidatePath } from 'next/cache';
+import { z } from 'zod';
+import { prisma } from '@nexushub/db';
+import { NotFoundError } from '@nexushub/domain';
+import { requireUser } from '@/lib/auth';
+
+const Schema = z.object({
+  projectId: z.string().uuid(),
+});
+
+/**
+ * Soft-delete a project (ADR 0001 #15: corbeille 30j, restore Admin V1.5).
+ * The DB row stays — we only flip `deletedAt`. Cards belonging to the
+ * project remain in DB; they're filtered out of every query by the
+ * existing `deletedAt: null` guards.
+ */
+export async function deleteProject(input: {
+  projectId: string;
+}): Promise<{ ok: true } | { ok: false; message: string }> {
+  const ctx = await requireUser();
+  const parsed = Schema.safeParse(input);
+  if (!parsed.success) return { ok: false, message: 'Identifiant projet invalide.' };
+
+  const project = await prisma.project.findFirst({
+    where: { id: parsed.data.projectId, workspaceId: ctx.workspaceId, deletedAt: null },
+    select: { id: true },
+  });
+  if (!project) throw new NotFoundError('Project');
+
+  await prisma.project.update({
+    where: { id: project.id },
+    data: { deletedAt: new Date() },
+  });
+
+  revalidatePath('/projects');
+  redirect('/projects');
+}

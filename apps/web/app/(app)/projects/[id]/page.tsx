@@ -7,6 +7,7 @@ import { requireUser } from '@/lib/auth';
 import { getCsrfTokenForForm } from '@/lib/csrf';
 import { KanbanBoard } from '@/features/projects/components/kanban-board';
 import { CardModal } from '@/features/projects/components/card-modal';
+import { DeleteProjectButton } from '@/features/projects/components/delete-project-button';
 import { listCustomCategories } from '@/features/projects/lib/categories';
 import { reconcileBeforeRead } from '@/features/projects/lib/reconcile';
 import { CalendarIcon, KanbanIcon } from '@/features/shell/components/icons';
@@ -175,13 +176,16 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
             </p>
           ) : null}
         </div>
-        <div className="view-toggle">
-          <Link href="" className="active" aria-current="page">
-            <KanbanIcon /> Kanban
-          </Link>
-          <Link href={`/projects/${project.id}/calendar`}>
-            <CalendarIcon /> Calendrier
-          </Link>
+        <div className="flex items-center gap-3">
+          <div className="view-toggle">
+            <Link href="" className="active" aria-current="page">
+              <KanbanIcon /> Kanban
+            </Link>
+            <Link href={`/projects/${project.id}/calendar`}>
+              <CalendarIcon /> Calendrier
+            </Link>
+          </div>
+          <DeleteProjectButton projectId={project.id} projectName={project.name} />
         </div>
       </header>
 
