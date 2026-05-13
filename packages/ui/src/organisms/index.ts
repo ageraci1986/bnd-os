@@ -5,6 +5,8 @@ export type {
   SidebarSectionProps,
   SidebarFooterProps,
 } from './Sidebar';
+export { SidebarSectionCollapsible } from './SidebarSectionCollapsible';
+export type { SidebarSectionCollapsibleProps } from './SidebarSectionCollapsible';
 export { Topbar } from './Topbar';
 export type { TopbarProps } from './Topbar';
 export { ContextBar } from './ContextBar';

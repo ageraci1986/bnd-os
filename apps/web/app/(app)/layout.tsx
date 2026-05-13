@@ -14,7 +14,7 @@ import {
   Sidebar,
   SidebarBrand,
   SidebarFooter,
-  SidebarSection,
+  SidebarSectionCollapsible,
   Topbar,
   SearchBar,
 } from '@nexushub/ui';
@@ -87,13 +87,13 @@ export default async function AppLayout({ children, searchParams }: AppLayoutPro
       <Sidebar>
         <SidebarBrand mark="N" name="NexusHub" subtitle={workspace.name} />
 
-        <SidebarSection label="Main menu">
+        <SidebarSectionCollapsible label="Main menu" storageKey="main-menu" defaultOpen>
           <NavLink href="/overview" icon="◈" label="Tableau de bord" />
           <NavLink href="/projects" icon="◱" label="Projets" count={projectsCount} />
           <NavLink href="/communications" icon="✉" label="Communications" />
-        </SidebarSection>
+        </SidebarSectionCollapsible>
 
-        <SidebarSection label="Clients actifs">
+        <SidebarSectionCollapsible label="Clients actifs" storageKey="clients-actifs">
           <AllClientsLink count={clients.length} />
           {clients.map((c) => (
             <ClientLink
@@ -104,9 +104,9 @@ export default async function AppLayout({ children, searchParams }: AppLayoutPro
               count={c._count.projects}
             />
           ))}
-        </SidebarSection>
+        </SidebarSectionCollapsible>
 
-        <SidebarSection label="Atelier">
+        <SidebarSectionCollapsible label="Atelier" storageKey="atelier">
           <NavLink href="/clients" icon="◉" label="Clients" />
           <NavLink href="/templates/cards" icon="▤" label="Templates cartes" />
           <NavLink href="/templates/email" icon="✎" label="Templates e-mail" />
@@ -114,7 +114,7 @@ export default async function AppLayout({ children, searchParams }: AppLayoutPro
           {isAdmin ? <NavLink href="/team" icon="⎔" label="Équipe" /> : null}
           <NavLink href="/integrations" icon="⟷" label="Intégrations" />
           <NavLink href="/settings" icon="⚙" label="Paramètres" />
-        </SidebarSection>
+        </SidebarSectionCollapsible>
 
         <SidebarFooter>
           <UserChip
