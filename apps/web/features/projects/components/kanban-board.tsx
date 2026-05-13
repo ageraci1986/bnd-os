@@ -14,6 +14,14 @@ import {
 import { moveCard } from '../actions/move-card';
 import { KanbanCard, type KanbanCardData } from './kanban-card';
 import { KanbanColumn, type KanbanColumnData } from './kanban-column';
+import {
+  CARD_CREATED_EVENT,
+  CARD_REMOVED_EVENT,
+  CARD_SHORTREF_RESOLVED_EVENT,
+  type CardCreatedEventDetail,
+  type CardRemovedEventDetail,
+  type CardShortRefResolvedEventDetail,
+} from './card-modal-controller';
 
 export interface KanbanBoardProps {
   readonly csrfToken: string;
@@ -42,6 +50,50 @@ export function KanbanBoard({ csrfToken, projectId, columns, cards }: KanbanBoar
   useEffect(() => {
     setLocalCards(cards);
   }, [incomingKey, cards]);
+
+  // Optimistic append + rollback + shortRef patch for the new-card flow.
+  // createCard no longer revalidates the route, so the board is patched
+  // entirely client-side.
+  useEffect(() => {
+    const onCreated = (e: Event) => {
+      const detail = (e as CustomEvent<CardCreatedEventDetail>).detail;
+      if (!detail || typeof detail.id !== 'string') return;
+      setLocalCards((prev) =>
+        prev.some((c) => c.id === detail.id)
+          ? prev
+          : [
+              ...prev,
+              {
+                id: detail.id,
+                columnId: detail.columnId,
+                shortRef: detail.shortRef,
+                title: detail.title,
+                categoryTag: detail.categoryTag,
+              },
+            ],
+      );
+    };
+    const onRemoved = (e: Event) => {
+      const detail = (e as CustomEvent<CardRemovedEventDetail>).detail;
+      if (!detail || typeof detail.id !== 'string') return;
+      setLocalCards((prev) => prev.filter((c) => c.id !== detail.id));
+    };
+    const onShortRef = (e: Event) => {
+      const detail = (e as CustomEvent<CardShortRefResolvedEventDetail>).detail;
+      if (!detail || typeof detail.id !== 'string') return;
+      setLocalCards((prev) =>
+        prev.map((c) => (c.id === detail.id ? { ...c, shortRef: detail.shortRef } : c)),
+      );
+    };
+    window.addEventListener(CARD_CREATED_EVENT, onCreated);
+    window.addEventListener(CARD_REMOVED_EVENT, onRemoved);
+    window.addEventListener(CARD_SHORTREF_RESOLVED_EVENT, onShortRef);
+    return () => {
+      window.removeEventListener(CARD_CREATED_EVENT, onCreated);
+      window.removeEventListener(CARD_REMOVED_EVENT, onRemoved);
+      window.removeEventListener(CARD_SHORTREF_RESOLVED_EVENT, onShortRef);
+    };
+  }, []);
 
   const cardsByColumn = useMemo(() => {
     const map = new Map<string, KanbanCardData[]>();

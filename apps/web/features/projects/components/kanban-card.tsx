@@ -1,9 +1,9 @@
 'use client';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { useRouter } from 'next/navigation';
 import { Tag, type TagVariant } from '@nexushub/ui';
 import { BUILTIN_CARD_CATEGORIES, isBuiltinCardCategory } from '@nexushub/domain';
+import { OPEN_CARD_EVENT, type OpenCardEventDetail } from './card-modal-controller';
 
 export interface KanbanCardData {
   readonly id: string;
@@ -24,7 +24,6 @@ export interface KanbanCardProps {
  * so each card is both a drag handle and a drop target.
  */
 export function KanbanCard({ card, blocked }: KanbanCardProps) {
-  const router = useRouter();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: card.id,
     data: { type: 'card', columnId: card.columnId },
@@ -41,12 +40,18 @@ export function KanbanCard({ card, blocked }: KanbanCardProps) {
 
   // Distinguish click-to-open from drag-start: dnd-kit's PointerSensor only
   // activates on 4px move, so a plain click fires onClick without dragging.
+  // The modal is opened by dispatching an event the CardModalController
+  // listens to — no router round-trip, no RSC refetch.
   const open = (e: React.MouseEvent) => {
     if (isDragging) return;
     e.stopPropagation();
-    const url = new URL(window.location.href);
-    url.searchParams.set('card', card.id);
-    router.replace(url.pathname + url.search, { scroll: false });
+    const detail: OpenCardEventDetail = {
+      id: card.id,
+      title: card.title,
+      shortRef: card.shortRef,
+      categoryTag: card.categoryTag,
+    };
+    window.dispatchEvent(new CustomEvent(OPEN_CARD_EVENT, { detail }));
   };
 
   const categoryLabel = card.categoryTag

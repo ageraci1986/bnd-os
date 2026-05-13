@@ -6,7 +6,8 @@ import { validateCardTemplateItems } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
 import { getCsrfTokenForForm } from '@/lib/csrf';
 import { KanbanBoard } from '@/features/projects/components/kanban-board';
-import { CardModal } from '@/features/projects/components/card-modal';
+import { CardModalController } from '@/features/projects/components/card-modal-controller';
+import type { CardModalData } from '@/features/projects/actions/get-card-modal-data';
 import { DeleteProjectButton } from '@/features/projects/components/delete-project-button';
 import { listCustomCategories } from '@/features/projects/lib/categories';
 import { reconcileBeforeRead } from '@/features/projects/lib/reconcile';
@@ -196,70 +197,70 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
         cards={project.cards}
       />
 
-      {openCard ? (
-        <CardModal
-          csrfToken={csrf}
-          workspaceName={workspace.name}
-          projectName={project.name}
-          customCategories={customCategories}
-          availableTemplates={availableTemplates}
-          isNew={isNew}
-          workspaceMembers={workspaceMembers.map((m) => {
-            const name =
-              [m.user.firstName, m.user.lastName].filter(Boolean).join(' ').trim() || m.user.email;
-            const initials =
-              [m.user.firstName?.[0], m.user.lastName?.[0]]
-                .filter(Boolean)
-                .join('')
-                .toUpperCase() || m.user.email.slice(0, 2).toUpperCase();
-            return {
-              userId: m.userId,
-              displayName: name,
-              initials,
-              email: m.user.email,
-            };
-          })}
-          card={{
-            id: openCard.id,
-            title: openCard.title,
-            description: openCard.description,
-            dueDate: openCard.dueDate ? openCard.dueDate.toISOString() : null,
-            shortRef: openCard.shortRef,
-            columnName: openCard.column.name,
-            columnIsBlocked: openCard.column.isBlockedSystem,
-            nextColumnName,
-            categoryTag: openCard.categoryTag,
-            templateId: openCard.templateId,
-            templateItems: validateCardTemplateItems(openCard.template?.items ?? []) ?? [],
-            fieldValues: (() => {
-              const raw = openCard.fieldValues;
-              if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
-              const out: Record<string, string> = {};
-              for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
-                if (typeof v === 'string') out[k] = v;
-              }
-              return out;
-            })(),
-            checklist: openCard.checklistItems,
-            assignees: openCard.assignees.map((a) => {
-              const name =
-                [a.user.firstName, a.user.lastName].filter(Boolean).join(' ').trim() ||
-                a.user.email;
-              const initials =
-                [a.user.firstName?.[0], a.user.lastName?.[0]]
-                  .filter(Boolean)
-                  .join('')
-                  .toUpperCase() || a.user.email.slice(0, 2).toUpperCase();
-              return {
-                userId: a.userId,
-                displayName: name,
-                initials,
-                raci: a.raci,
-              };
-            }),
-          }}
-        />
-      ) : null}
+      <CardModalController
+        csrfToken={csrf}
+        workspaceName={workspace.name}
+        projectName={project.name}
+        customCategories={customCategories}
+        availableTemplates={availableTemplates}
+        initialIsNew={isNew}
+        workspaceMembers={workspaceMembers.map((m) => {
+          const name =
+            [m.user.firstName, m.user.lastName].filter(Boolean).join(' ').trim() || m.user.email;
+          const initials =
+            [m.user.firstName?.[0], m.user.lastName?.[0]].filter(Boolean).join('').toUpperCase() ||
+            m.user.email.slice(0, 2).toUpperCase();
+          return {
+            userId: m.userId,
+            displayName: name,
+            initials,
+            email: m.user.email,
+          };
+        })}
+        initialCard={
+          openCard
+            ? ({
+                id: openCard.id,
+                title: openCard.title,
+                description: openCard.description,
+                dueDate: openCard.dueDate ? openCard.dueDate.toISOString() : null,
+                shortRef: openCard.shortRef,
+                columnName: openCard.column.name,
+                columnIsBlocked: openCard.column.isBlockedSystem,
+                nextColumnName,
+                categoryTag: openCard.categoryTag,
+                templateId: openCard.templateId,
+                templateItems: validateCardTemplateItems(openCard.template?.items ?? []) ?? [],
+                fieldValues: (() => {
+                  const raw = openCard.fieldValues;
+                  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+                  const out: Record<string, string> = {};
+                  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+                    if (typeof v === 'string') out[k] = v;
+                  }
+                  return out;
+                })(),
+                checklist: openCard.checklistItems,
+                assignees: openCard.assignees.map((a) => {
+                  const name =
+                    [a.user.firstName, a.user.lastName].filter(Boolean).join(' ').trim() ||
+                    a.user.email;
+                  const initials =
+                    [a.user.firstName?.[0], a.user.lastName?.[0]]
+                      .filter(Boolean)
+                      .join('')
+                      .toUpperCase() || a.user.email.slice(0, 2).toUpperCase();
+                  return {
+                    userId: a.userId,
+                    displayName: name,
+                    initials,
+                    raci: a.raci,
+                  };
+                }),
+              } satisfies CardModalData)
+            : null
+        }
+      />
     </div>
   );
 }

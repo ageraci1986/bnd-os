@@ -1,11 +1,19 @@
 'use client';
 import { useTransition } from 'react';
-import { useRouter } from 'next/navigation';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSRF_FIELD_NAME } from '@/lib/csrf/field';
 import { createCard } from '../actions/create-card';
 import { KanbanCard, type KanbanCardData } from './kanban-card';
+import {
+  CARD_CREATED_EVENT,
+  CARD_REMOVED_EVENT,
+  CARD_SHORTREF_RESOLVED_EVENT,
+  CLOSE_CARD_EVENT,
+  OPEN_CARD_EVENT,
+  type CardCreatedEventDetail,
+  type OpenCardEventDetail,
+} from './card-modal-controller';
 
 const PLACEHOLDER_TITLE = 'Nouvelle carte';
 
@@ -23,7 +31,6 @@ export interface KanbanColumnProps {
 }
 
 export function KanbanColumn({ csrfToken, projectId, column, cards }: KanbanColumnProps) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
 
   const { setNodeRef, isOver } = useDroppable({
@@ -36,20 +43,49 @@ export function KanbanColumn({ csrfToken, projectId, column, cards }: KanbanColu
   const cardsCls = ['col-cards', isOver && 'is-over'].filter(Boolean).join(' ');
 
   const handleAdd = () => {
+    // Optimistic UUID — same id used client-side and server-side so the
+    // modal can open BEFORE the round-trip finishes. shortRef stays 0
+    // until the server returns; the controller patches it in then.
+    const optimisticId = crypto.randomUUID();
+
+    const created: CardCreatedEventDetail = {
+      id: optimisticId,
+      columnId: column.id,
+      shortRef: 0,
+      title: PLACEHOLDER_TITLE,
+      categoryTag: null,
+    };
+    window.dispatchEvent(new CustomEvent(CARD_CREATED_EVENT, { detail: created }));
+
+    const open: OpenCardEventDetail = {
+      id: optimisticId,
+      title: PLACEHOLDER_TITLE,
+      shortRef: 0,
+      categoryTag: null,
+      isNew: true,
+    };
+    window.dispatchEvent(new CustomEvent(OPEN_CARD_EVENT, { detail: open }));
+
     const fd = new FormData();
     fd.set(CSRF_FIELD_NAME, csrfToken);
     fd.set('projectId', projectId);
     fd.set('columnId', column.id);
     fd.set('title', PLACEHOLDER_TITLE);
+    fd.set('proposedId', optimisticId);
     startTransition(async () => {
       const res = await createCard({ status: 'idle' }, fd);
-      if (res.status === 'success') {
-        // Open the modal directly with `new=1` so the title input
-        // autofocuses and selects the placeholder text.
-        const url = new URL(window.location.href);
-        url.searchParams.set('card', res.cardId);
-        url.searchParams.set('new', '1');
-        router.replace(url.pathname + url.search, { scroll: false });
+      if (res.status === 'error') {
+        // Rollback: take the optimistic row off the board + close modal.
+        window.dispatchEvent(new CustomEvent(CARD_REMOVED_EVENT, { detail: { id: optimisticId } }));
+        window.dispatchEvent(new CustomEvent(CLOSE_CARD_EVENT));
+        window.alert(res.message);
+      } else if (res.status === 'success' && res.shortRef !== 0) {
+        // Patch the optimistic row's shortRef now that the server assigned it.
+        window.dispatchEvent(
+          new CustomEvent(CARD_SHORTREF_RESOLVED_EVENT, {
+            detail: { id: res.cardId, shortRef: res.shortRef },
+          }),
+        );
       }
     });
   };

@@ -49,6 +49,12 @@ export interface CardModalProps {
     readonly fieldValues: Record<string, string>;
   };
   readonly availableTemplates: readonly TemplateOption[];
+  /**
+   * Optional close handler. When provided, the modal calls this instead
+   * of mutating the URL via router.replace — used by CardModalController
+   * which manages its own state + URL via history.replaceState.
+   */
+  readonly onClose?: () => void;
 }
 
 /**
@@ -65,27 +71,32 @@ export function CardModal({
   workspaceMembers,
   availableTemplates,
   card,
+  onClose,
 }: CardModalProps) {
   const router = useRouter();
   const [items, setItems] = useState<readonly ChecklistItemDTO[]>(card.checklist);
   const [_pending, startTransition] = useTransition();
 
   const close = useCallback(() => {
+    if (onClose) {
+      onClose();
+      return;
+    }
     const url = new URL(window.location.href);
     url.searchParams.delete('card');
     url.searchParams.delete('new');
     router.replace(url.pathname + (url.search ? url.search : ''), { scroll: false });
-  }, [router]);
+  }, [onClose, router]);
 
   // Once mounted with `?new=1`, drop the param so a refresh / back nav
-  // doesn't keep re-selecting the title. Router included in deps — it's
-  // a stable reference from useRouter().
+  // doesn't keep re-selecting the title. Skip when a controller manages
+  // the URL itself.
   useEffect(() => {
-    if (!isNew) return;
+    if (!isNew || onClose) return;
     const url = new URL(window.location.href);
     url.searchParams.delete('new');
     router.replace(url.pathname + (url.search ? url.search : ''), { scroll: false });
-  }, [isNew, router]);
+  }, [isNew, onClose, router]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

@@ -1,6 +1,5 @@
 'use server';
 import 'server-only';
-import { revalidatePath } from 'next/cache';
 import { prisma } from '@nexushub/db';
 import { NotFoundError, computeCardPosition } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
@@ -9,7 +8,12 @@ import { CreateCardSchema } from '../lib/card-schemas';
 
 export type CreateCardState =
   | { readonly status: 'idle' }
-  | { readonly status: 'success'; readonly cardId: string }
+  | {
+      readonly status: 'success';
+      readonly cardId: string;
+      readonly shortRef: number;
+      readonly title: string;
+    }
   | { readonly status: 'error'; readonly message: string };
 
 export async function createCard(
@@ -32,33 +36,44 @@ export async function createCard(
   const explicitTemplateId =
     typeof templateIdRaw === 'string' && templateIdRaw.length > 0 ? templateIdRaw : null;
 
-  // Defence in depth: project belongs to workspace, column belongs to project.
-  const column = await prisma.column.findFirst({
-    where: {
-      id: columnId,
-      project: { id: projectId, workspaceId: ctx.workspaceId, deletedAt: null },
-    },
-    select: { id: true },
-  });
+  // Client may provide the desired UUID so it can open the modal
+  // optimistically (same id on client + server, no waiting for round-trip).
+  const proposedIdRaw = formData.get('proposedId');
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const proposedId =
+    typeof proposedIdRaw === 'string' && UUID_RE.test(proposedIdRaw) ? proposedIdRaw : null;
+
+  // Three independent lookups in parallel — on remote Supabase each
+  // round-trip is ~50-200ms, so serialising them used to stack up to
+  // ~600ms before we even started the INSERT.
+  const [column, template, siblings] = await Promise.all([
+    // Defence in depth: project belongs to workspace, column belongs to project.
+    prisma.column.findFirst({
+      where: {
+        id: columnId,
+        project: { id: projectId, workspaceId: ctx.workspaceId, deletedAt: null },
+      },
+      select: { id: true },
+    }),
+    // Resolve the template to apply: explicit `?templateId=...` wins, otherwise
+    // fall back to the workspace default. Either may be null (no template).
+    prisma.cardTemplate.findFirst({
+      where: {
+        workspaceId: ctx.workspaceId,
+        deletedAt: null,
+        ...(explicitTemplateId ? { id: explicitTemplateId } : { isDefault: true }),
+      },
+      select: { id: true, body: true, defaultChecklist: true },
+    }),
+    // Append at the bottom: read the max position in this column.
+    prisma.card.findMany({
+      where: { columnId, deletedAt: null },
+      orderBy: { position: 'asc' },
+      select: { position: true },
+    }),
+  ]);
   if (!column) throw new NotFoundError('Column');
 
-  // Resolve the template to apply: explicit `?templateId=...` wins, otherwise
-  // fall back to the workspace default. Either may be null (no template).
-  const template = await prisma.cardTemplate.findFirst({
-    where: {
-      workspaceId: ctx.workspaceId,
-      deletedAt: null,
-      ...(explicitTemplateId ? { id: explicitTemplateId } : { isDefault: true }),
-    },
-    select: { id: true, body: true, defaultChecklist: true },
-  });
-
-  // Append at the bottom: read the max position in this column.
-  const siblings = await prisma.card.findMany({
-    where: { columnId, deletedAt: null },
-    orderBy: { position: 'asc' },
-    select: { position: true },
-  });
   const position = computeCardPosition({
     orderedSiblingPositions: siblings.map((s) => s.position),
     targetIndex: siblings.length,
@@ -67,6 +82,7 @@ export async function createCard(
   const created = await prisma.$transaction(async (tx) => {
     const card = await tx.card.create({
       data: {
+        ...(proposedId ? { id: proposedId } : {}),
         workspaceId: ctx.workspaceId,
         projectId,
         columnId,
@@ -75,7 +91,7 @@ export async function createCard(
         ...(template ? { templateId: template.id } : {}),
         ...(template && template.body.length > 0 ? { description: template.body } : {}),
       },
-      select: { id: true },
+      select: { id: true, shortRef: true, title: true },
     });
 
     if (template && template.defaultChecklist.length > 0) {
@@ -92,6 +108,13 @@ export async function createCard(
     return card;
   });
 
-  revalidatePath(`/projects/${projectId}`);
-  return { status: 'success', cardId: created.id };
+  // No revalidatePath: the client appends the new card to the board
+  // optimistically (nx:card-created event) and opens the modal directly
+  // — a full route re-render here would only delay the action response.
+  return {
+    status: 'success',
+    cardId: created.id,
+    shortRef: created.shortRef,
+    title: created.title,
+  };
 }
