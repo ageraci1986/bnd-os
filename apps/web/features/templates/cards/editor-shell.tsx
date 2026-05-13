@@ -116,7 +116,7 @@ export function EditorShell({ initialTemplates }: EditorShellProps) {
   };
 
   return (
-    <div className="grid h-[calc(100vh-180px)] grid-cols-[220px_minmax(420px,1fr)_minmax(320px,1fr)] gap-4">
+    <div className="grid h-[calc(100vh-180px)] grid-cols-[280px_minmax(360px,0.9fr)_minmax(360px,1.1fr)] gap-4">
       <div className="relative">
         <TemplatesList
           templates={state.templates}
