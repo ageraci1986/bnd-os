@@ -1,7 +1,6 @@
 'use server';
 import 'server-only';
 import { z } from 'zod';
-import { revalidatePath } from 'next/cache';
 import { prisma } from '@nexushub/db';
 import { NotFoundError, RACI_VALUES } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
@@ -96,7 +95,8 @@ export async function addCardAssignee(input: {
     throw err;
   }
 
-  revalidatePath(`/projects/${card.projectId}`);
+  // No revalidatePath: assignees only show in the modal side rail, not
+  // on the kanban card. The modal already updates optimistically.
   return { ok: true };
 }
 
@@ -125,7 +125,8 @@ export async function updateCardAssigneeRaci(input: {
     throw err;
   }
 
-  revalidatePath(`/projects/${card.projectId}`);
+  // No revalidatePath: assignees only show in the modal side rail, not
+  // on the kanban card. The modal already updates optimistically.
   return { ok: true };
 }
 
@@ -143,6 +144,7 @@ export async function removeCardAssignee(input: {
     where: { cardId: card.id, userId: parsed.data.userId },
   });
 
-  revalidatePath(`/projects/${card.projectId}`);
+  // No revalidatePath: assignees only show in the modal side rail, not
+  // on the kanban card. The modal already updates optimistically.
   return { ok: true };
 }

@@ -181,24 +181,42 @@ export function CardModal({
                     key={item.id}
                     item={item}
                     onToggle={(isChecked) => {
+                      // Optimistic: flip locally, fire-and-forget the save.
+                      // We do NOT overwrite from the server response — that
+                      // would race against subsequent quick toggles. Server
+                      // is the eventual source of truth; on error we revert.
                       setItems((prev) =>
                         prev.map((i) => (i.id === item.id ? { ...i, isChecked } : i)),
                       );
-                      startTransition(async () => {
-                        const res = await toggleChecklistItem({ itemId: item.id, isChecked });
-                        setItems(res.items);
+                      startTransition(() => {
+                        void toggleChecklistItem({ itemId: item.id, isChecked }).catch(() => {
+                          setItems((prev) =>
+                            prev.map((i) =>
+                              i.id === item.id ? { ...i, isChecked: !isChecked } : i,
+                            ),
+                          );
+                        });
                       });
                     }}
                     onDelete={() => {
-                      startTransition(async () => {
-                        const res = await deleteChecklistItem({ itemId: item.id });
-                        setItems(res.items);
+                      // Optimistic remove. On error, restore the original.
+                      const snapshot = items;
+                      setItems((prev) => prev.filter((i) => i.id !== item.id));
+                      startTransition(() => {
+                        void deleteChecklistItem({ itemId: item.id }).catch(() => {
+                          setItems(snapshot);
+                        });
                       });
                     }}
                   />
                 ))}
               </div>
-              <ChecklistAdder cardId={card.id} onAdd={(updated) => setItems(updated)} />
+              <ChecklistAdder
+                cardId={card.id}
+                onOptimisticAdd={(temp) => setItems((prev) => [...prev, temp])}
+                onConfirm={(updated) => setItems(updated)}
+                onError={(tempId) => setItems((prev) => prev.filter((i) => i.id !== tempId))}
+              />
             </section>
           </div>
 
@@ -432,21 +450,37 @@ function CheckRow({
 
 function ChecklistAdder({
   cardId,
-  onAdd,
+  onOptimisticAdd,
+  onConfirm,
+  onError,
 }: {
   cardId: string;
-  onAdd: (items: readonly ChecklistItemDTO[]) => void;
+  onOptimisticAdd: (temp: ChecklistItemDTO) => void;
+  onConfirm: (items: readonly ChecklistItemDTO[]) => void;
+  onError: (tempId: string) => void;
 }) {
   const [title, setTitle] = useState('');
-  const [pending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
 
   const submit = () => {
     const trimmed = title.trim();
     if (trimmed.length === 0) return;
-    startTransition(async () => {
-      const res = await createChecklistItem({ cardId, title: trimmed });
-      onAdd(res.items);
-      setTitle('');
+    // Optimistic: render the new item immediately with a temp id, clear the
+    // input so the user can chain Entrée. The server response replaces the
+    // whole list (real ids); on error we yank the temp item out.
+    const tempId = `tmp-${Math.random().toString(36).slice(2, 10)}`;
+    const optimistic: ChecklistItemDTO = {
+      id: tempId,
+      title: trimmed,
+      isChecked: false,
+      position: Number.MAX_SAFE_INTEGER,
+    };
+    onOptimisticAdd(optimistic);
+    setTitle('');
+    startTransition(() => {
+      void createChecklistItem({ cardId, title: trimmed })
+        .then((res) => onConfirm(res.items))
+        .catch(() => onError(tempId));
     });
   };
 
@@ -469,10 +503,9 @@ function ChecklistAdder({
         placeholder="Ajouter un élément… (Entrée pour valider)"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
-        disabled={pending}
       />
-      <button type="submit" disabled={pending || title.trim().length === 0}>
-        {pending ? 'Ajout…' : 'Ajouter'}
+      <button type="submit" disabled={title.trim().length === 0}>
+        Ajouter
       </button>
     </form>
   );

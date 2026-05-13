@@ -1,6 +1,5 @@
 'use server';
 import 'server-only';
-import { revalidatePath } from 'next/cache';
 import { prisma } from '@nexushub/db';
 import { NotFoundError } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
@@ -72,7 +71,9 @@ export async function createChecklistItem(input: {
     data: { cardId: card.id, title: parsed.data.title, position },
   });
 
-  revalidatePath(`/projects/${card.projectId}`);
+  // No revalidatePath: checklist items live only in the modal. The action
+  // returns the fresh list so the modal updates instantly; revalidating
+  // here would refetch the entire board for nothing visible there.
   return readChecklist(card.id);
 }
 
@@ -96,7 +97,9 @@ export async function toggleChecklistItem(input: {
     data: { isChecked: parsed.data.isChecked },
   });
 
-  revalidatePath(`/projects/${item.card.projectId}`);
+  // No revalidatePath: see createChecklistItem above. Auto-advance, when
+  // it fires after the last toggle, has its own revalidatePath because
+  // it actually moves the card across columns (board change).
   return readChecklist(item.cardId);
 }
 
@@ -115,6 +118,8 @@ export async function deleteChecklistItem(input: {
 
   await prisma.checklistItem.delete({ where: { id: item.id } });
 
-  revalidatePath(`/projects/${item.card.projectId}`);
+  // No revalidatePath: see createChecklistItem above. Auto-advance, when
+  // it fires after the last toggle, has its own revalidatePath because
+  // it actually moves the card across columns (board change).
   return readChecklist(item.cardId);
 }

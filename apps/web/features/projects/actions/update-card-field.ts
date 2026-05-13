@@ -1,6 +1,5 @@
 'use server';
 import 'server-only';
-import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { prisma } from '@nexushub/db';
 import { NotFoundError, validateCardTemplateItems } from '@nexushub/domain';
@@ -85,6 +84,9 @@ export async function updateCardField(input: {
     data: { fieldValues: next },
   });
 
-  revalidatePath(`/projects/${card.projectId}`);
+  // No revalidatePath: field values live in the modal only; the client
+  // already holds the new value optimistically. A page revalidation here
+  // would trigger a full board re-fetch on every keystroke (debounced),
+  // which makes the modal feel laggy.
   return { ok: true };
 }
