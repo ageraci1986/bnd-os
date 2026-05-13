@@ -130,6 +130,50 @@ export function KanbanIcon(p: Props) {
   );
 }
 
+export function StarIcon(p: Props) {
+  return (
+    <svg {...base} {...p}>
+      <path d="M12 2.5 14.7 8.6l6.6.6-5 4.5 1.5 6.4L12 16.8 6.2 20.1l1.5-6.4-5-4.5 6.6-.6L12 2.5z" />
+    </svg>
+  );
+}
+
+export function StarFilledIcon(p: Props) {
+  return (
+    <svg
+      {...base}
+      {...p}
+      fill="currentColor"
+      stroke="currentColor"
+      strokeLinejoin="round"
+      strokeWidth={1.5}
+    >
+      <path d="M12 2.5 14.7 8.6l6.6.6-5 4.5 1.5 6.4L12 16.8 6.2 20.1l1.5-6.4-5-4.5 6.6-.6L12 2.5z" />
+    </svg>
+  );
+}
+
+/**
+ * Same star path as StarFilledIcon but filled with the brand gradient
+ * via an inline <linearGradient> def — used wherever we want the accent
+ * gradient in places where a CSS background would be hard to apply
+ * (e.g. small inline status indicators).
+ */
+export function StarGradientIcon(p: Props) {
+  const gradientId = 'nx-star-gradient';
+  return (
+    <svg {...base} {...p} fill={`url(#${gradientId})`} stroke="none">
+      <defs>
+        <linearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#8b2be2" />
+          <stop offset="100%" stopColor="#ff2a6d" />
+        </linearGradient>
+      </defs>
+      <path d="M12 2.5 14.7 8.6l6.6.6-5 4.5 1.5 6.4L12 16.8 6.2 20.1l1.5-6.4-5-4.5 6.6-.6L12 2.5z" />
+    </svg>
+  );
+}
+
 export function TrashIcon(p: Props) {
   return (
     <svg {...base} {...p}>

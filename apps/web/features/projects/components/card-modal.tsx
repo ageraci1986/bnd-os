@@ -55,6 +55,12 @@ export interface CardModalProps {
    * which manages its own state + URL via history.replaceState.
    */
   readonly onClose?: () => void;
+  /**
+   * True while the full detail (description, fields, checklist, …) is
+   * still being fetched from the server. The header data (title, ref,
+   * category) is already meaningful; everything else renders a skeleton.
+   */
+  readonly isLoading?: boolean;
 }
 
 /**
@@ -72,6 +78,7 @@ export function CardModal({
   availableTemplates,
   card,
   onClose,
+  isLoading = false,
 }: CardModalProps) {
   const router = useRouter();
   const [items, setItems] = useState<readonly ChecklistItemDTO[]>(card.checklist);
@@ -146,14 +153,18 @@ export function CardModal({
 
         <div className="modal-body">
           <div className="modal-main">
-            <TemplateItemsRender
-              cardId={card.id}
-              items={card.templateItems}
-              fieldValues={card.fieldValues}
-              description={card.description ?? ''}
-            />
+            {isLoading ? (
+              <ModalBodySkeleton />
+            ) : (
+              <TemplateItemsRender
+                cardId={card.id}
+                items={card.templateItems}
+                fieldValues={card.fieldValues}
+                description={card.description ?? ''}
+              />
+            )}
 
-            <section className="modal-section">
+            <section className="modal-section" hidden={isLoading}>
               <div className="checklist-meta">
                 <div className="section-label" style={{ marginBottom: 0 }}>
                   Checklist
@@ -232,7 +243,8 @@ export function CardModal({
           </div>
 
           <aside className="modal-side">
-            <div className="side-row">
+            {isLoading ? <ModalSideSkeleton /> : null}
+            <div className="side-row" hidden={isLoading}>
               <div className="side-label">Colonne actuelle</div>
               <div className="col-current">
                 <span className="dot" /> {card.columnName}
@@ -242,7 +254,7 @@ export function CardModal({
               ) : null}
             </div>
 
-            <div className="side-row">
+            <div className="side-row" hidden={isLoading}>
               <div className="side-label">Assignés{assignments(card.assignees)}</div>
               <AssigneesSide
                 cardId={card.id}
@@ -251,7 +263,7 @@ export function CardModal({
               />
             </div>
 
-            <div className="side-row">
+            <div className="side-row" hidden={isLoading}>
               <div className="side-label">Catégorie</div>
               <CategorySelector
                 cardId={card.id}
@@ -260,12 +272,12 @@ export function CardModal({
               />
             </div>
 
-            <div className="side-row">
+            <div className="side-row" hidden={isLoading}>
               <div className="side-label">Échéance</div>
               <DueDateInput cardId={card.id} initial={card.dueDate} onAfterUpdate={close} />
             </div>
 
-            <div className="side-row">
+            <div className="side-row" hidden={isLoading}>
               <div className="side-label">Template</div>
               <TemplatePicker
                 cardId={card.id}
@@ -278,7 +290,7 @@ export function CardModal({
               </p>
             </div>
 
-            <div className="side-row">
+            <div className="side-row" hidden={isLoading}>
               <div className="side-label">Actions</div>
               <div className="side-actions">
                 <DeleteCardButton cardId={card.id} csrfToken={csrfToken} onDeleted={close} />
@@ -769,5 +781,49 @@ function DeleteCardButton({
         {pending ? 'Suppression…' : 'Supprimer la carte'}
       </button>
     </form>
+  );
+}
+
+// ---------- Skeleton placeholders -----------------------------------------
+// Rendered while the controller fetches the full card detail. The header
+// (title, ref, category) stays interactive — only the body that depends on
+// the server response is replaced by shimmer blocks.
+
+function ModalBodySkeleton() {
+  return (
+    <>
+      <section className="modal-section">
+        <div className="section-label">Description</div>
+        <div className="nx-skeleton" style={{ height: 14, marginBottom: 8 }} />
+        <div className="nx-skeleton" style={{ height: 14, marginBottom: 8, width: '92%' }} />
+        <div className="nx-skeleton" style={{ height: 14, width: '70%' }} />
+      </section>
+      <section className="modal-section">
+        <div className="section-label">Brief</div>
+        <div className="nx-skeleton" style={{ height: 36, marginBottom: 10 }} />
+        <div className="nx-skeleton" style={{ height: 36, marginBottom: 10 }} />
+        <div className="nx-skeleton" style={{ height: 36 }} />
+      </section>
+    </>
+  );
+}
+
+function ModalSideSkeleton() {
+  const rows = [
+    { labelW: 90, blockH: 18 },
+    { labelW: 70, blockH: 60 },
+    { labelW: 80, blockH: 28 },
+    { labelW: 80, blockH: 28 },
+    { labelW: 70, blockH: 36 },
+  ];
+  return (
+    <>
+      {rows.map((r, idx) => (
+        <div className="side-row" key={idx}>
+          <div className="nx-skeleton" style={{ height: 10, width: r.labelW, marginBottom: 8 }} />
+          <div className="nx-skeleton" style={{ height: r.blockH }} />
+        </div>
+      ))}
+    </>
   );
 }

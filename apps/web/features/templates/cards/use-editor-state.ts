@@ -18,6 +18,7 @@ export interface TemplateDTO {
 export interface EditorDraft {
   readonly name: string;
   readonly items: readonly CardTemplateItem[];
+  readonly isDefault: boolean;
 }
 
 export interface EditorState {
@@ -32,6 +33,7 @@ export type Action =
   | { type: 'selectTemplate'; id: string }
   | { type: 'deselect' }
   | { type: 'renameDraft'; name: string }
+  | { type: 'setDraftDefault'; isDefault: boolean }
   | { type: 'addItem'; itemType: CardTemplateItem['type'] }
   | { type: 'removeItem'; id: string }
   | { type: 'reorderItems'; from: number; to: number }
@@ -44,7 +46,21 @@ export type Action =
   | { type: 'deleted'; id: string };
 
 export function makeInitialState(templates: readonly TemplateDTO[]): EditorState {
-  return { templates, selectedId: null, draft: null, editingItemId: null, isDirty: false };
+  // Auto-select the workspace default template on first paint so the
+  // editor isn't blank when arriving on /templates/cards. If no default
+  // is set, fall back to the first template — there's always something
+  // to look at as long as the workspace has any template.
+  const auto = templates.find((t) => t.isDefault) ?? templates[0] ?? null;
+  if (!auto) {
+    return { templates, selectedId: null, draft: null, editingItemId: null, isDirty: false };
+  }
+  return {
+    templates,
+    selectedId: auto.id,
+    draft: { name: auto.name, items: auto.items, isDefault: auto.isDefault ?? false },
+    editingItemId: null,
+    isDirty: false,
+  };
 }
 
 function findItemIndex(items: readonly CardTemplateItem[], id: string): number {
@@ -63,7 +79,7 @@ export function reduceEditorState(state: EditorState, action: Action): EditorSta
       return {
         ...state,
         selectedId: tpl.id,
-        draft: { name: tpl.name, items: tpl.items },
+        draft: { name: tpl.name, items: tpl.items, isDefault: tpl.isDefault ?? false },
         editingItemId: null,
         isDirty: false,
       };
@@ -73,6 +89,9 @@ export function reduceEditorState(state: EditorState, action: Action): EditorSta
     case 'renameDraft':
       if (!state.draft) return state;
       return { ...state, draft: { ...state.draft, name: action.name }, isDirty: true };
+    case 'setDraftDefault':
+      if (!state.draft) return state;
+      return { ...state, draft: { ...state.draft, isDefault: action.isDefault }, isDirty: true };
     case 'addItem': {
       if (!state.draft) return state;
       if (action.itemType === 'description') {
@@ -162,18 +181,31 @@ export function reduceEditorState(state: EditorState, action: Action): EditorSta
     case 'closeItemDrawer':
       return { ...state, editingItemId: null };
     case 'saved': {
-      return {
-        ...state,
-        templates: state.templates.map((t) => (t.id === action.template.id ? action.template : t)),
-        isDirty: false,
-      };
+      // Same default-flip rule as 'created' — see comment there.
+      const newIsDefault = action.template.isDefault ?? false;
+      const next = state.templates.map((t) => {
+        if (t.id === action.template.id) return action.template;
+        if (newIsDefault && t.isDefault) return { ...t, isDefault: false };
+        return t;
+      });
+      return { ...state, templates: next, isDirty: false };
     }
     case 'created': {
+      // Promoting a template to default flips every other one to false
+      // (DB unique index allows at most one default per workspace).
+      const newIsDefault = action.template.isDefault ?? false;
+      const next = newIsDefault
+        ? state.templates.map((t) => (t.isDefault ? { ...t, isDefault: false } : t))
+        : state.templates;
       return {
         ...state,
-        templates: [...state.templates, action.template],
+        templates: [...next, action.template],
         selectedId: action.template.id,
-        draft: { name: action.template.name, items: action.template.items },
+        draft: {
+          name: action.template.name,
+          items: action.template.items,
+          isDefault: newIsDefault,
+        },
         editingItemId: null,
         isDirty: false,
       };

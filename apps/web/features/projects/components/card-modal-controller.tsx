@@ -131,26 +131,44 @@ export function CardModalController({
     (detail: OpenCardEventDetail) => {
       setState({ id: detail.id, skeleton: detail, data: null, isNew: detail.isNew ?? false });
       syncUrl(detail.id);
-      // For optimistic new-card opens, skip the immediate fetch: the card
-      // may not exist server-side yet (the createCard action is in flight
-      // in parallel). The user is editing a blank shell with autoselect
-      // on the title; the server save will succeed against the same id
-      // once the create resolves.
-      if (detail.isNew) return;
-      void getCardModalData({ cardId: detail.id })
-        .then((res) => {
-          if (!res.ok) {
-            window.alert(res.message);
+
+      // For optimistic new-card opens the row may not exist server-side
+      // yet (createCard is in flight). We still want to fetch the detail
+      // — that's how we pick up the default template's items + description
+      // — so we retry with a short backoff until the row materialises.
+      const maxAttempts = detail.isNew ? 8 : 1;
+      const baseDelayMs = detail.isNew ? 150 : 0;
+      let attempt = 0;
+      const tryFetch = (): void => {
+        void getCardModalData({ cardId: detail.id })
+          .then((res) => {
+            if (res.ok) {
+              setState((prev) =>
+                prev && prev.id === detail.id ? { ...prev, data: res.data } : prev,
+              );
+              return;
+            }
+            attempt++;
+            if (attempt >= maxAttempts) {
+              // Existing-card open: bubble up. New-card open: silently give
+              // up so the modal stays usable (user can still type the title;
+              // save will succeed once createCard lands).
+              if (!detail.isNew) {
+                window.alert(res.message);
+                setState(null);
+                syncUrl(null);
+              }
+              return;
+            }
+            setTimeout(tryFetch, baseDelayMs * Math.pow(1.5, attempt - 1));
+          })
+          .catch(() => {
             setState(null);
             syncUrl(null);
-            return;
-          }
-          setState((prev) => (prev && prev.id === detail.id ? { ...prev, data: res.data } : prev));
-        })
-        .catch(() => {
-          setState(null);
-          syncUrl(null);
-        });
+          });
+      };
+      if (baseDelayMs === 0) tryFetch();
+      else setTimeout(tryFetch, baseDelayMs);
     },
     [syncUrl],
   );
@@ -238,6 +256,7 @@ export function CardModalController({
       availableTemplates={availableTemplates}
       card={cardForModal}
       onClose={close}
+      isLoading={state.data === null}
     />
   );
 }

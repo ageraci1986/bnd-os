@@ -16,7 +16,11 @@ describe('reduceEditorState', () => {
     const initial = makeInitialState([baseTemplate]);
     const next = reduceEditorState(initial, { type: 'selectTemplate', id: 't1' });
     expect(next.selectedId).toBe('t1');
-    expect(next.draft).toEqual({ name: 'Tâche standard', items: baseTemplate.items });
+    expect(next.draft).toEqual({
+      name: 'Tâche standard',
+      items: baseTemplate.items,
+      isDefault: false,
+    });
     expect(next.isDirty).toBe(false);
   });
 

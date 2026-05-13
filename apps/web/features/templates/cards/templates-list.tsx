@@ -1,4 +1,5 @@
 'use client';
+import { StarGradientIcon } from '@/features/shell/components/icons';
 import type { TemplateDTO } from './use-editor-state';
 
 export interface TemplatesListProps {
@@ -58,13 +59,22 @@ export function TemplatesList({
                     return;
                   onSelect(t.id);
                 }}
-                className={`flex-1 truncate rounded-md px-2 py-1.5 text-left text-sm ${
+                className={`flex flex-1 items-center gap-2 truncate rounded-md px-2 py-1.5 text-left text-sm ${
                   selectedId === t.id
                     ? 'bg-[rgba(139,43,226,0.12)] font-medium text-[color:var(--color-text-main)]'
                     : 'text-[color:var(--color-text-soft)] hover:bg-[color:var(--color-bg-muted)]'
                 }`}
               >
-                {t.name || 'Sans titre'}
+                {t.isDefault ? (
+                  <span
+                    aria-label="Template par défaut"
+                    title="Template par défaut"
+                    className="inline-flex shrink-0"
+                  >
+                    <StarGradientIcon width={13} height={13} style={{ width: 13, height: 13 }} />
+                  </span>
+                ) : null}
+                <span className="flex-1 truncate">{t.name || 'Sans titre'}</span>
               </button>
               <button
                 type="button"

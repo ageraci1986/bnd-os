@@ -1746,3 +1746,25 @@
     display: none;
   }
 }
+
+/* ---- Skeleton loader ------------------------------------------------- */
+.nx-skeleton {
+  display: block;
+  background: linear-gradient(
+    90deg,
+    var(--color-bg-muted) 0%,
+    var(--color-bg-hover) 50%,
+    var(--color-bg-muted) 100%
+  );
+  background-size: 200% 100%;
+  border-radius: 8px;
+  animation: nx-skeleton-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes nx-skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}

@@ -51,7 +51,7 @@ export function EditorShell({ initialTemplates }: EditorShellProps) {
       }
       dispatch({
         type: 'created',
-        template: { id: res.id, name: 'Sans titre', items: [] },
+        template: { id: res.id, name: 'Sans titre', items: [], isDefault: false },
       });
       router.refresh();
     });
@@ -62,7 +62,6 @@ export function EditorShell({ initialTemplates }: EditorShellProps) {
     setError(null);
     const selectedId = state.selectedId;
     const draft = state.draft;
-    const isDefault = state.templates.find((t) => t.id === selectedId)?.isDefault ?? false;
     startTransition(async () => {
       const res = await updateCardTemplate({
         id: selectedId,
@@ -70,7 +69,7 @@ export function EditorShell({ initialTemplates }: EditorShellProps) {
         body: '',
         items: draft.items,
         defaultChecklist: [],
-        isDefault,
+        isDefault: draft.isDefault,
       });
       if (!res.ok) {
         setError(res.message);
@@ -78,7 +77,12 @@ export function EditorShell({ initialTemplates }: EditorShellProps) {
       }
       dispatch({
         type: 'saved',
-        template: { id: selectedId, name: draft.name, items: draft.items, isDefault },
+        template: {
+          id: selectedId,
+          name: draft.name,
+          items: draft.items,
+          isDefault: draft.isDefault,
+        },
       });
       router.refresh();
     });
@@ -141,15 +145,22 @@ export function EditorShell({ initialTemplates }: EditorShellProps) {
         <TemplateEditor
           name={state.draft.name}
           items={state.draft.items}
+          isDefault={state.draft.isDefault}
           isDirty={state.isDirty}
           isSaving={pending}
           editingItemId={state.editingItemId}
           onRename={(name) => dispatch({ type: 'renameDraft', name })}
+          onToggleDefault={(isDefault) => dispatch({ type: 'setDraftDefault', isDefault })}
           onAddItem={(type) => dispatch({ type: 'addItem', itemType: type })}
           onReorder={(from, to) => dispatch({ type: 'reorderItems', from, to })}
           onEditItem={(id) => dispatch({ type: 'openItemDrawer', id })}
           onRemoveItem={(id) => dispatch({ type: 'removeItem', id })}
           onSave={onSave}
+          onCancel={() =>
+            state.selectedId
+              ? dispatch({ type: 'selectTemplate', id: state.selectedId })
+              : undefined
+          }
           onDeleteTemplate={onDeleteTemplate}
         />
       ) : (
