@@ -165,18 +165,30 @@
   padding: 0 24px 28px;
 }
 .nav-section {
-  padding: 0 16px 20px;
+  padding: 0 16px 18px;
+  /* Subtle divider under each section so the groups read as distinct
+     blocks rather than one undifferentiated list. */
+  position: relative;
+}
+.nav-section + .nav-section::before {
+  content: '';
+  position: absolute;
+  top: -10px;
+  left: 24px;
+  right: 24px;
+  height: 1px;
+  background: var(--color-border-soft);
 }
 .nav-label {
-  font-size: 10px;
-  color: var(--text-muted);
+  font-size: 11px;
+  color: var(--text-soft);
   text-transform: uppercase;
-  letter-spacing: 1.5px;
-  margin-bottom: 10px;
+  letter-spacing: 1.3px;
+  margin-bottom: 8px;
   padding: 0 8px;
-  font-weight: 700;
+  font-weight: 800;
   display: flex;
-  justify-content: space-between;
+  gap: 8px;
   align-items: center;
 }
 .nav-label .pill-new {
@@ -222,15 +234,65 @@
   flex: 1 1 auto;
   min-width: 0;
 }
+.nav-label-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: var(--accent-gradient-soft, rgba(139, 43, 226, 0.08));
+  color: var(--color-accent-primary);
+  flex-shrink: 0;
+}
+.nav-label-icon svg {
+  width: 14px;
+  height: 14px;
+  stroke: currentColor;
+}
+.nav-label-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 9999px;
+  background: var(--color-bg-muted);
+  color: var(--text-soft);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+}
 .nav-label-caret {
   font-size: 9px;
   line-height: 1;
-  color: var(--text-muted);
-  margin-left: auto;
+  color: var(--text-ghost);
   transition: transform 140ms var(--ease-emphasized, ease-out);
 }
 .nav-label-caret.is-open {
   transform: rotate(90deg);
+}
+/* Collapsible body animation: grid-template-rows interpolates from 0fr
+   to 1fr smoothly — the inner div is set to overflow:hidden so the
+   content clips while the row resizes. Falls back to instant show/hide
+   on browsers that don't interpolate fr values (very rare in 2026). */
+.nav-section-body {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition:
+    grid-template-rows 220ms var(--ease-emphasized, ease-out),
+    opacity 180ms var(--ease-emphasized, ease-out);
+  opacity: 0;
+}
+.nav-section-body.is-open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+.nav-section-body-inner {
+  overflow: hidden;
+  min-height: 0;
 }
 .nav-item {
   display: flex;

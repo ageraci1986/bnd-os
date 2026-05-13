@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Tag } from '@nexushub/ui';
+import { customCategoryColor } from '../lib/custom-category-color';
 import {
   AUTO_ADVANCE_DELAY_MS,
   BUILTIN_CARD_CATEGORIES,
@@ -607,9 +608,7 @@ function CategorySelector({
             className={['category-pick', active === label && 'active'].filter(Boolean).join(' ')}
             aria-pressed={active === label}
           >
-            <Tag variant="primary" size="sm">
-              {label}
-            </Tag>
+            <CustomCategoryPill label={label} />
           </button>
         ))}
         {active && !isBuiltinCardCategory(active) && !allCustom.includes(active) ? (
@@ -620,9 +619,7 @@ function CategorySelector({
             onClick={() => pick(null)}
             title="Cliquer pour retirer"
           >
-            <Tag variant="primary" size="sm">
-              {active}
-            </Tag>
+            <CustomCategoryPill label={active} />
           </button>
         ) : null}
       </div>
@@ -825,5 +822,22 @@ function ModalSideSkeleton() {
         </div>
       ))}
     </>
+  );
+}
+
+/**
+ * Pill rendering for a workspace-defined (custom) category. The colour
+ * is derived deterministically from the label so the same name always
+ * renders the same hue.
+ */
+function CustomCategoryPill({ label }: { label: string }) {
+  const c = customCategoryColor(label);
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.5px]"
+      style={{ background: c.bg, color: c.fg }}
+    >
+      {label}
+    </span>
   );
 }

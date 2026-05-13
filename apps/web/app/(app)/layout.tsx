@@ -30,6 +30,7 @@ import { NavLink } from '@/features/shell/components/nav-link';
 import { ClientLink, AllClientsLink } from '@/features/shell/components/client-link';
 import { UserChip } from '@/features/shell/components/user-chip';
 import { ContextBarHost } from '@/features/shell/components/context-bar-host';
+import { DashboardIcon, ClientsIcon, GearIcon } from '@/features/shell/components/icons';
 
 interface AppLayoutProps {
   readonly children: React.ReactNode;
@@ -87,13 +88,23 @@ export default async function AppLayout({ children, searchParams }: AppLayoutPro
       <Sidebar>
         <SidebarBrand mark="N" name="NexusHub" subtitle={workspace.name} />
 
-        <SidebarSectionCollapsible label="Main menu" storageKey="main-menu" defaultOpen>
+        <SidebarSectionCollapsible
+          label="Main menu"
+          storageKey="main-menu"
+          defaultOpen
+          icon={<DashboardIcon />}
+        >
           <NavLink href="/overview" icon="◈" label="Tableau de bord" />
           <NavLink href="/projects" icon="◱" label="Projets" count={projectsCount} />
           <NavLink href="/communications" icon="✉" label="Communications" />
         </SidebarSectionCollapsible>
 
-        <SidebarSectionCollapsible label="Clients actifs" storageKey="clients-actifs">
+        <SidebarSectionCollapsible
+          label="Clients actifs"
+          storageKey="clients-actifs"
+          icon={<ClientsIcon />}
+          count={clients.length}
+        >
           <AllClientsLink count={clients.length} />
           {clients.map((c) => (
             <ClientLink
@@ -106,7 +117,7 @@ export default async function AppLayout({ children, searchParams }: AppLayoutPro
           ))}
         </SidebarSectionCollapsible>
 
-        <SidebarSectionCollapsible label="Atelier" storageKey="atelier">
+        <SidebarSectionCollapsible label="Atelier" storageKey="atelier" icon={<GearIcon />}>
           <NavLink href="/clients" icon="◉" label="Clients" />
           <NavLink href="/templates/cards" icon="▤" label="Templates cartes" />
           <NavLink href="/templates/email" icon="✎" label="Templates e-mail" />

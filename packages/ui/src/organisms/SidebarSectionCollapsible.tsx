@@ -10,6 +10,10 @@ export interface SidebarSectionCollapsibleProps {
   /** Initial open state before localStorage is read on hydration. */
   readonly defaultOpen?: boolean;
   readonly badge?: string;
+  /** Optional small icon shown left of the section label (e.g. <DashboardIcon />). */
+  readonly icon?: ReactNode;
+  /** Optional count shown right of the section label (e.g. number of items). */
+  readonly count?: number;
   readonly className?: string;
 }
 
@@ -25,6 +29,8 @@ export function SidebarSectionCollapsible({
   storageKey,
   defaultOpen = false,
   badge,
+  icon,
+  count,
   className,
 }: SidebarSectionCollapsibleProps) {
   const [open, setOpen] = useState(defaultOpen);
@@ -54,13 +60,21 @@ export function SidebarSectionCollapsible({
         aria-expanded={open}
         className="nav-label nav-label-toggle"
       >
+        {icon ? (
+          <span className="nav-label-icon" aria-hidden="true">
+            {icon}
+          </span>
+        ) : null}
         <span className="nav-label-text">{label}</span>
+        {typeof count === 'number' ? <span className="nav-label-count">{count}</span> : null}
         {badge ? <span className="pill-new">{badge}</span> : null}
         <span className={cn('nav-label-caret', open ? 'is-open' : undefined)} aria-hidden="true">
           ▸
         </span>
       </button>
-      <div hidden={!open}>{children}</div>
+      <div className={cn('nav-section-body', open ? 'is-open' : undefined)} aria-hidden={!open}>
+        <div className="nav-section-body-inner">{children}</div>
+      </div>
     </div>
   );
 }

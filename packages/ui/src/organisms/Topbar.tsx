@@ -17,7 +17,7 @@ export function Topbar({ left, right, className }: TopbarProps) {
   return (
     <header
       className={cn(
-        'sticky top-0 z-10 mb-5 flex items-center justify-between gap-6 border-b border-[color:var(--color-border-soft)] bg-[color:var(--glass-bg)] px-10 py-5 backdrop-blur',
+        'sticky top-0 z-10 mb-6 flex items-center justify-between gap-6 border-b border-[color:var(--color-border-soft)] bg-[color:var(--glass-bg)] px-10 py-7 backdrop-blur',
         className,
       )}
     >

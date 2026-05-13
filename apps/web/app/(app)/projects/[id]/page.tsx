@@ -141,8 +141,8 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
 
   return (
     <div className="mx-auto max-w-[1400px]">
-      <nav className="mb-3 text-xs text-[color:var(--color-text-muted)]">
-        <Link href="/projects" className="underline">
+      <nav className="mb-4">
+        <Link href="/projects" className="btn btn-ghost btn-sm">
           ← Tous les projets
         </Link>
       </nav>

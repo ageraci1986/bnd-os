@@ -103,7 +103,12 @@ export function KanbanColumn({ csrfToken, projectId, column, cards }: KanbanColu
       <div ref={setNodeRef} className={cardsCls}>
         <SortableContext items={cards.map((c) => c.id)} strategy={verticalListSortingStrategy}>
           {cards.map((card) => (
-            <KanbanCard key={card.id} card={card} blocked={column.isBlockedSystem} />
+            <KanbanCard
+              key={card.id}
+              card={card}
+              blocked={column.isBlockedSystem}
+              csrfToken={csrfToken}
+            />
           ))}
         </SortableContext>
       </div>

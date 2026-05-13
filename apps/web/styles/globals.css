@@ -2,6 +2,11 @@
 @import '../../../packages/ui/src/tokens/tokens.css';
 @import '../../../packages/ui/src/tokens/components.css';
 
+/* Tailwind v4 only auto-detects classes in the consuming app by default.
+   Include the shared UI package so utilities used inside @nexushub/ui
+   components (Topbar, Sidebar, …) are also generated. */
+@source '../../../packages/ui/src/**/*.{ts,tsx}';
+
 @layer base {
   html,
   body {
