@@ -40,6 +40,7 @@ export function TemplateEditor({
   onDeleteTemplate,
 }: TemplateEditorProps) {
   const hasDescription = items.some((i) => i.type === 'description');
+  const hasChecklist = items.some((i) => i.type === 'checklist');
 
   return (
     <section className="flex h-full flex-col gap-4 rounded-2xl border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] p-4">
@@ -102,7 +103,11 @@ export function TemplateEditor({
         onRemove={onRemoveItem}
       />
 
-      <AddItemPopover hasDescription={hasDescription} onAdd={onAddItem} />
+      <AddItemPopover
+        hasDescription={hasDescription}
+        hasChecklist={hasChecklist}
+        onAdd={onAddItem}
+      />
 
       <footer className="mt-auto flex items-center gap-2 border-t border-[color:var(--color-border-light)] pt-3">
         {isDirty ? (

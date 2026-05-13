@@ -33,6 +33,30 @@ export function PreviewCardBody({ items }: PreviewCardBodyProps) {
             </section>
           );
         }
+        if (item.type === 'checklist') {
+          return (
+            <section className="modal-section" key={item.id}>
+              <div className="section-label">Checklist</div>
+              {item.items.length === 0 ? (
+                <p className="text-xs italic text-[color:var(--color-text-muted)]">
+                  Section présente, pas d&apos;item par défaut.
+                </p>
+              ) : (
+                <ul className="grid gap-1.5">
+                  {item.items.map((label, idx) => (
+                    <li
+                      key={idx}
+                      className="flex items-center gap-2 text-xs text-[color:var(--color-text-soft)]"
+                    >
+                      <span className="inline-block h-3.5 w-3.5 shrink-0 rounded border border-[color:var(--color-border-light)]" />
+                      <span className="truncate">{label}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          );
+        }
         return <PreviewField key={item.id} field={item} />;
       })}
     </div>

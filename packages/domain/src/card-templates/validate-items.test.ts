@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { validateCardTemplateItems, DESCRIPTION_ITEM_ID } from './index';
+import { validateCardTemplateItems, DESCRIPTION_ITEM_ID, CHECKLIST_ITEM_ID } from './index';
 
 describe('validateCardTemplateItems', () => {
   it('returns [] for an empty array', () => {
@@ -82,5 +82,42 @@ describe('validateCardTemplateItems', () => {
 
   it('rejects a non-description item using the reserved description id', () => {
     expect(validateCardTemplateItems([{ id: 'description', type: 'text', label: 'X' }])).toBeNull();
+  });
+
+  it('accepts a checklist item with default items, trimmed', () => {
+    const items = [{ id: CHECKLIST_ITEM_ID, type: 'checklist', items: ['  Draft ', 'Review'] }];
+    expect(validateCardTemplateItems(items)).toEqual([
+      { id: CHECKLIST_ITEM_ID, type: 'checklist', items: ['Draft', 'Review'] },
+    ]);
+  });
+
+  it('accepts a checklist item with empty default list', () => {
+    expect(
+      validateCardTemplateItems([{ id: CHECKLIST_ITEM_ID, type: 'checklist', items: [] }]),
+    ).toEqual([{ id: CHECKLIST_ITEM_ID, type: 'checklist', items: [] }]);
+  });
+
+  it('rejects more than one checklist item', () => {
+    const items = [
+      { id: CHECKLIST_ITEM_ID, type: 'checklist', items: [] },
+      { id: CHECKLIST_ITEM_ID, type: 'checklist', items: [] },
+    ];
+    expect(validateCardTemplateItems(items)).toBeNull();
+  });
+
+  it('rejects a checklist item with wrong id', () => {
+    expect(validateCardTemplateItems([{ id: 'cl', type: 'checklist', items: [] }])).toBeNull();
+  });
+
+  it('rejects a checklist item with a non-string default', () => {
+    expect(
+      validateCardTemplateItems([{ id: CHECKLIST_ITEM_ID, type: 'checklist', items: ['ok', 42] }]),
+    ).toBeNull();
+  });
+
+  it('rejects a non-checklist item using the reserved checklist id', () => {
+    expect(
+      validateCardTemplateItems([{ id: CHECKLIST_ITEM_ID, type: 'text', label: 'X' }]),
+    ).toBeNull();
   });
 });

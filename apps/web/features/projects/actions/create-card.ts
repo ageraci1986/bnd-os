@@ -1,7 +1,7 @@
 'use server';
 import 'server-only';
 import { prisma } from '@nexushub/db';
-import { NotFoundError, computeCardPosition } from '@nexushub/domain';
+import { NotFoundError, computeCardPosition, validateCardTemplateItems } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
 import { assertCsrfFromFormData } from '@/lib/csrf';
 import { CreateCardSchema } from '../lib/card-schemas';
@@ -63,7 +63,7 @@ export async function createCard(
         deletedAt: null,
         ...(explicitTemplateId ? { id: explicitTemplateId } : { isDefault: true }),
       },
-      select: { id: true, body: true, defaultChecklist: true },
+      select: { id: true, body: true, defaultChecklist: true, items: true },
     }),
     // Append at the bottom: read the max position in this column.
     prisma.card.findMany({
@@ -94,9 +94,18 @@ export async function createCard(
       select: { id: true, shortRef: true, title: true },
     });
 
-    if (template && template.defaultChecklist.length > 0) {
+    // The new model stores the default checklist as a `checklist` item
+    // inside template.items. If the template does NOT include a
+    // checklist item, the card is created without a pre-filled checklist
+    // — the user explicitly opted out of it on this template.
+    const templateItems = template ? (validateCardTemplateItems(template.items) ?? []) : [];
+    const checklistItem = templateItems.find((it) => it.type === 'checklist');
+    const defaults: readonly string[] =
+      checklistItem && checklistItem.type === 'checklist' ? checklistItem.items : [];
+
+    if (defaults.length > 0) {
       await tx.checklistItem.createMany({
-        data: template.defaultChecklist.map((itemTitle, idx) => ({
+        data: defaults.map((itemTitle, idx) => ({
           cardId: card.id,
           title: itemTitle,
           position: (idx + 1) * 1024,

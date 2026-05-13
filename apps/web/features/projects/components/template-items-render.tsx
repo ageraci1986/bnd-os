@@ -36,6 +36,11 @@ export function TemplateItemsRender({
             </section>
           );
         }
+        // Checklist is rendered separately by CardModal (it owns the
+        // interactive checklist state); skip it here so we don't render
+        // twice. The presence of this item in the template still drives
+        // the visibility of CardModal's checklist section.
+        if (item.type === 'checklist') return null;
         return (
           <section className="modal-section" key={item.id}>
             <FieldInput cardId={cardId} field={item} initial={fieldValues[item.id] ?? ''} />

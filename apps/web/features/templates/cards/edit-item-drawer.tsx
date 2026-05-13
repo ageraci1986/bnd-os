@@ -45,7 +45,9 @@ export function EditItemDrawer({
   const itemLabel =
     item.type === 'description'
       ? 'Description'
-      : item.label || (item.type === 'section' ? 'Section' : 'Sans label');
+      : item.type === 'checklist'
+        ? 'Checklist'
+        : item.label || (item.type === 'section' ? 'Section' : 'Sans label');
 
   return (
     <div className="absolute inset-0 z-30 flex flex-col gap-3 overflow-hidden rounded-2xl border border-[color:var(--color-accent-primary)] bg-[color:var(--color-bg-card)] p-4 shadow-xl">
@@ -73,6 +75,11 @@ export function EditItemDrawer({
         </p>
       ) : item.type === 'section' ? (
         <LabelField value={item.label} onChange={(v) => onUpdate(item.id, { label: v })} />
+      ) : item.type === 'checklist' ? (
+        <ChecklistDefaultsField
+          items={item.items}
+          onChange={(items) => onUpdate(item.id, { items })}
+        />
       ) : (
         <InputItemFields item={item} onUpdate={onUpdate} onConvertType={onConvertType} />
       )}
@@ -238,6 +245,68 @@ function OptionsField({
           className="self-start rounded border border-dashed border-[color:var(--color-border-light)] px-2 py-1 text-xs text-[color:var(--color-text-muted)] hover:text-[color:var(--color-text-main)]"
         >
           + Ajouter une option
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ChecklistDefaultsField({
+  items,
+  onChange,
+}: {
+  items: readonly string[];
+  onChange: (items: string[]) => void;
+}) {
+  const update = (idx: number, value: string) => {
+    const next = [...items];
+    next[idx] = value;
+    onChange(next);
+  };
+  const remove = (idx: number) => onChange(items.filter((_, i) => i !== idx));
+  const add = () => onChange([...items, '']);
+
+  return (
+    <div className="grid gap-1">
+      <span className="text-[10px] font-extrabold uppercase tracking-[1px] text-[color:var(--color-text-muted)]">
+        Items par défaut
+      </span>
+      <p className="text-[11px] text-[color:var(--color-text-muted)]">
+        Ces items seront pré-remplis à la création d&apos;une carte basée sur ce template.
+        L&apos;utilisateur peut ensuite ajouter ou supprimer des items directement sur la carte.
+      </p>
+      <div className="mt-1 grid gap-1.5">
+        {items.length === 0 ? (
+          <p className="rounded-md border border-dashed border-[color:var(--color-border-light)] px-3 py-2 text-[11px] text-[color:var(--color-text-muted)]">
+            Aucun item par défaut — la section sera vide à la création.
+          </p>
+        ) : null}
+        {items.map((opt, idx) => (
+          <div key={idx} className="flex items-center gap-1.5">
+            <input
+              type="text"
+              value={opt}
+              maxLength={200}
+              placeholder="Tâche à cocher…"
+              onChange={(e) => update(idx, e.target.value)}
+              className="field-input flex-1"
+            />
+            <button
+              type="button"
+              onClick={() => remove(idx)}
+              aria-label="Supprimer cet item"
+              className="rounded border border-[color:var(--color-border-light)] px-2 py-0.5 text-xs text-[color:var(--color-text-muted)] hover:border-[color:var(--color-danger)] hover:text-[color:var(--color-danger)]"
+            >
+              ×
+            </button>
+          </div>
+        ))}
+        <button
+          type="button"
+          onClick={add}
+          className="self-start rounded border border-dashed border-[color:var(--color-border-light)] px-2 py-1 text-xs text-[color:var(--color-text-muted)] hover:text-[color:var(--color-text-main)]"
+        >
+          + Ajouter un item
         </button>
       </div>
     </div>

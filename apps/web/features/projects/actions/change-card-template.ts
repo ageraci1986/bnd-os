@@ -47,12 +47,22 @@ export async function changeCardTemplate(input: {
       : {};
   const prunedValues = pruneFieldValuesByItems(currentValues, newItems ?? []);
 
-  await prisma.card.update({
-    where: { id: card.id },
-    data: {
-      templateId: newTemplateId,
-      fieldValues: prunedValues,
-    },
+  // If the new template doesn't include a checklist item, the card's
+  // checklist becomes orphan and the modal would hide it anyway. Drop
+  // the rows so we don't leave dangling data in the DB.
+  const newHasChecklist = (newItems ?? []).some((it) => it.type === 'checklist');
+
+  await prisma.$transaction(async (tx) => {
+    await tx.card.update({
+      where: { id: card.id },
+      data: {
+        templateId: newTemplateId,
+        fieldValues: prunedValues,
+      },
+    });
+    if (!newHasChecklist) {
+      await tx.checklistItem.deleteMany({ where: { cardId: card.id } });
+    }
   });
 
   revalidatePath(`/projects/${card.projectId}`);

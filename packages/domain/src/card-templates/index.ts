@@ -58,6 +58,8 @@ export function validateCardTemplateName(
 
 /** Singleton id for the description marker item. */
 export const DESCRIPTION_ITEM_ID = 'description';
+/** Singleton id for the checklist marker item. */
+export const CHECKLIST_ITEM_ID = 'checklist';
 
 export type CardTemplateInputType =
   | 'text'
@@ -87,10 +89,19 @@ export interface CardTemplateDescriptionItem {
   readonly type: 'description';
 }
 
+export interface CardTemplateChecklistItem {
+  readonly id: typeof CHECKLIST_ITEM_ID;
+  readonly type: 'checklist';
+  /** Default checklist items copied into every new card based on this
+   *  template. Empty array = section is present but blank by default. */
+  readonly items: readonly string[];
+}
+
 export type CardTemplateItem =
   | CardTemplateInputItem
   | CardTemplateSectionItem
-  | CardTemplateDescriptionItem;
+  | CardTemplateDescriptionItem
+  | CardTemplateChecklistItem;
 
 /** Labels for the "+ Ajouter un item" popover. Order matters: it is the display order. */
 export const CARD_TEMPLATE_ITEM_TYPES: readonly { id: CardTemplateItem['type']; label: string }[] =
@@ -104,6 +115,7 @@ export const CARD_TEMPLATE_ITEM_TYPES: readonly { id: CardTemplateItem['type']; 
     { id: 'number', label: 'Nombre' },
     { id: 'section', label: 'Section' },
     { id: 'description', label: 'Description' },
+    { id: 'checklist', label: 'Checklist' },
   ];
 
 /** Default label generated when the user adds a new item, by type. */
@@ -127,6 +139,8 @@ export function defaultLabelForItemType(type: CardTemplateItem['type']): string 
       return 'Nouvelle section';
     case 'description':
       return 'Description';
+    case 'checklist':
+      return 'Checklist';
   }
 }
 
@@ -138,6 +152,8 @@ const ID_MAX = 64;
 const OPTIONS_MAX = 32;
 const OPTION_MAX = 80;
 const PLACEHOLDER_MAX = 200;
+const CHECKLIST_DEFAULTS_MAX = 50;
+const CHECKLIST_LABEL_MAX = 200;
 
 const INPUT_TYPES: ReadonlySet<string> = new Set([
   'text',
@@ -160,6 +176,7 @@ export function validateCardTemplateItems(value: unknown): readonly CardTemplate
   const out: CardTemplateItem[] = [];
   const seenIds = new Set<string>();
   let seenDescription = false;
+  let seenChecklist = false;
 
   for (const raw of value) {
     if (!raw || typeof raw !== 'object') return null;
@@ -179,8 +196,27 @@ export function validateCardTemplateItems(value: unknown): readonly CardTemplate
       continue;
     }
 
+    // checklist marker (singleton, with default items)
+    if (type === 'checklist') {
+      if (id !== CHECKLIST_ITEM_ID) return null;
+      if (seenChecklist) return null;
+      const itemsRaw = r['items'];
+      if (!Array.isArray(itemsRaw)) return null;
+      if (itemsRaw.length > CHECKLIST_DEFAULTS_MAX) return null;
+      const defaults: string[] = [];
+      for (const v of itemsRaw) {
+        if (typeof v !== 'string') return null;
+        const trimmed = v.trim();
+        if (trimmed.length === 0 || trimmed.length > CHECKLIST_LABEL_MAX) return null;
+        defaults.push(trimmed);
+      }
+      seenChecklist = true;
+      out.push({ id: CHECKLIST_ITEM_ID, type: 'checklist', items: defaults });
+      continue;
+    }
+
     if (seenIds.has(id)) return null;
-    if (id === DESCRIPTION_ITEM_ID) return null; // reserved id, only the singleton marker can use it
+    if (id === DESCRIPTION_ITEM_ID || id === CHECKLIST_ITEM_ID) return null; // reserved ids
     seenIds.add(id);
 
     const label = r['label'];
@@ -236,7 +272,9 @@ export function pruneFieldValuesByItems(
 ): Record<string, string> {
   const inputIds = new Set<string>();
   for (const it of items) {
-    if (it.type !== 'section' && it.type !== 'description') inputIds.add(it.id);
+    if (it.type !== 'section' && it.type !== 'description' && it.type !== 'checklist') {
+      inputIds.add(it.id);
+    }
   }
   const out: Record<string, string> = {};
   for (const [k, v] of Object.entries(values)) {

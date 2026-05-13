@@ -1,6 +1,7 @@
 'use client';
 import { useReducer, useMemo } from 'react';
 import {
+  CHECKLIST_ITEM_ID,
   DESCRIPTION_ITEM_ID,
   defaultLabelForItemType,
   generateCustomFieldId,
@@ -104,6 +105,20 @@ export function reduceEditorState(state: EditorState, action: Action): EditorSta
           isDirty: true,
         };
       }
+      if (action.itemType === 'checklist') {
+        if (state.draft.items.some((i) => i.type === 'checklist')) return state;
+        const newItem: CardTemplateItem = {
+          id: CHECKLIST_ITEM_ID,
+          type: 'checklist',
+          items: [],
+        };
+        return {
+          ...state,
+          draft: { ...state.draft, items: [...state.draft.items, newItem] },
+          editingItemId: newItem.id,
+          isDirty: true,
+        };
+      }
       const label = defaultLabelForItemType(action.itemType);
       const id = generateCustomFieldId(label, takenIds(state.draft.items));
       let newItem: CardTemplateItem;
@@ -147,6 +162,8 @@ export function reduceEditorState(state: EditorState, action: Action): EditorSta
       if (!state.draft) return state;
       const next = state.draft.items.map((it) => {
         if (it.id !== action.id) return it;
+        // description has no editable fields; checklist's only editable
+        // field is `items: string[]`, which is allowed through the patch.
         if (it.type === 'description') return it;
         return { ...it, ...action.patch } as CardTemplateItem;
       });
@@ -156,7 +173,8 @@ export function reduceEditorState(state: EditorState, action: Action): EditorSta
       if (!state.draft) return state;
       const next = state.draft.items.map((it) => {
         if (it.id !== action.id) return it;
-        if (it.type === 'description' || it.type === 'section') return it;
+        if (it.type === 'description' || it.type === 'section' || it.type === 'checklist')
+          return it;
         const toType = action.toType;
         const base = { id: it.id, label: it.label };
         const placeholder = 'placeholder' in it ? it.placeholder : undefined;

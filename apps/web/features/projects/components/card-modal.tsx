@@ -121,6 +121,12 @@ export function CardModal({
   const allChecked = items.length > 0 && items.every((i) => i.isChecked);
   const checked = items.filter((i) => i.isChecked).length;
   const progress = items.length === 0 ? 0 : Math.round((checked / items.length) * 100);
+  // The Checklist section only renders when the template explicitly
+  // includes a `checklist` item. Cards whose template has no checklist
+  // don't show the section even if legacy items remain in the DB — the
+  // user opted out of checklist for this template.
+  const templateHasChecklist = card.templateItems.some((i) => i.type === 'checklist');
+  const showChecklistSection = templateHasChecklist;
 
   return (
     <>
@@ -165,7 +171,7 @@ export function CardModal({
               />
             )}
 
-            <section className="modal-section" hidden={isLoading}>
+            <section className="modal-section" hidden={isLoading || !showChecklistSection}>
               <div className="checklist-meta">
                 <div className="section-label" style={{ marginBottom: 0 }}>
                   Checklist

@@ -142,33 +142,37 @@ export function EditorShell({ initialTemplates }: EditorShellProps) {
       </div>
 
       {state.draft && state.selectedId ? (
-        <TemplateEditor
-          name={state.draft.name}
-          items={state.draft.items}
-          isDefault={state.draft.isDefault}
-          isDirty={state.isDirty}
-          isSaving={pending}
-          editingItemId={state.editingItemId}
-          onRename={(name) => dispatch({ type: 'renameDraft', name })}
-          onToggleDefault={(isDefault) => dispatch({ type: 'setDraftDefault', isDefault })}
-          onAddItem={(type) => dispatch({ type: 'addItem', itemType: type })}
-          onReorder={(from, to) => dispatch({ type: 'reorderItems', from, to })}
-          onEditItem={(id) => dispatch({ type: 'openItemDrawer', id })}
-          onRemoveItem={(id) => dispatch({ type: 'removeItem', id })}
-          onSave={onSave}
-          onCancel={() =>
-            state.selectedId
-              ? dispatch({ type: 'selectTemplate', id: state.selectedId })
-              : undefined
-          }
-          onDeleteTemplate={onDeleteTemplate}
-        />
+        <div key={state.selectedId} className="nx-fade-in">
+          <TemplateEditor
+            name={state.draft.name}
+            items={state.draft.items}
+            isDefault={state.draft.isDefault}
+            isDirty={state.isDirty}
+            isSaving={pending}
+            editingItemId={state.editingItemId}
+            onRename={(name) => dispatch({ type: 'renameDraft', name })}
+            onToggleDefault={(isDefault) => dispatch({ type: 'setDraftDefault', isDefault })}
+            onAddItem={(type) => dispatch({ type: 'addItem', itemType: type })}
+            onReorder={(from, to) => dispatch({ type: 'reorderItems', from, to })}
+            onEditItem={(id) => dispatch({ type: 'openItemDrawer', id })}
+            onRemoveItem={(id) => dispatch({ type: 'removeItem', id })}
+            onSave={onSave}
+            onCancel={() =>
+              state.selectedId
+                ? dispatch({ type: 'selectTemplate', id: state.selectedId })
+                : undefined
+            }
+            onDeleteTemplate={onDeleteTemplate}
+          />
+        </div>
       ) : (
         <EmptyEditor />
       )}
 
       {state.draft ? (
-        <TemplatePreview templateName={state.draft.name} items={state.draft.items} />
+        <div key={state.selectedId} className="nx-fade-in">
+          <TemplatePreview templateName={state.draft.name} items={state.draft.items} />
+        </div>
       ) : (
         <div />
       )}

@@ -1830,3 +1830,21 @@
     background-position: -200% 0;
   }
 }
+
+/* ---- Fade-in helper ------------------------------------------------- */
+/* Used for in-app transitions (loading skeleton → real content, template
+   switch in /templates/cards, etc.). Pair with React `key` to re-trigger
+   the animation when the underlying entity changes. */
+.nx-fade-in {
+  animation: nx-fade-in 180ms var(--ease-emphasized, ease-out);
+}
+@keyframes nx-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

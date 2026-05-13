@@ -12,14 +12,16 @@ const ICONS: Record<CardTemplateItem['type'], string> = {
   number: '#',
   section: '§',
   description: '¶',
+  checklist: '☑',
 };
 
 export interface AddItemPopoverProps {
   readonly hasDescription: boolean;
+  readonly hasChecklist: boolean;
   readonly onAdd: (type: CardTemplateItem['type']) => void;
 }
 
-export function AddItemPopover({ hasDescription, onAdd }: AddItemPopoverProps) {
+export function AddItemPopover({ hasDescription, hasChecklist, onAdd }: AddItemPopoverProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
@@ -41,6 +43,7 @@ export function AddItemPopover({ hasDescription, onAdd }: AddItemPopoverProps) {
 
   const pick = (type: CardTemplateItem['type']) => {
     if (type === 'description' && hasDescription) return;
+    if (type === 'checklist' && hasChecklist) return;
     setOpen(false);
     onAdd(type);
   };
@@ -58,7 +61,8 @@ export function AddItemPopover({ hasDescription, onAdd }: AddItemPopoverProps) {
         <div className="absolute left-0 right-0 z-20 mt-1 max-h-80 overflow-auto rounded-xl border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] p-1.5 shadow-lg">
           {CARD_TEMPLATE_ITEM_TYPES.map((t, idx) => {
             const isSep = idx === 7; // after `number`, before `section`
-            const disabled = t.id === 'description' && hasDescription;
+            const disabled =
+              (t.id === 'description' && hasDescription) || (t.id === 'checklist' && hasChecklist);
             return (
               <div key={t.id}>
                 {isSep ? <div className="my-1 h-px bg-[color:var(--color-border-light)]" /> : null}

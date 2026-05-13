@@ -13,6 +13,7 @@ const TYPE_ICON: Record<CardTemplateItem['type'], string> = {
   number: '#',
   section: '§',
   description: '¶',
+  checklist: '☑',
 };
 
 const TYPE_LABEL: Record<CardTemplateItem['type'], string> = {
@@ -25,6 +26,7 @@ const TYPE_LABEL: Record<CardTemplateItem['type'], string> = {
   number: 'Nombre',
   section: 'Section',
   description: 'Description',
+  checklist: 'Checklist',
 };
 
 export interface ItemRowProps {
@@ -45,6 +47,7 @@ export function ItemRow({ item, isEditing, onEdit, onRemove }: ItemRowProps) {
   };
   const isSection = item.type === 'section';
   const isDesc = item.type === 'description';
+  const isChecklist = item.type === 'checklist';
 
   return (
     <li
@@ -56,7 +59,7 @@ export function ItemRow({ item, isEditing, onEdit, onRemove }: ItemRowProps) {
           ? 'border-[color:var(--color-accent-primary)] bg-[rgba(139,43,226,0.06)]'
           : isSection
             ? 'border-dashed border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)]'
-            : isDesc
+            : isDesc || isChecklist
               ? 'border-[color:var(--color-accent-primary)]/30 bg-[rgba(139,43,226,0.06)]/50'
               : 'border-[color:var(--color-border-light)] bg-[color:var(--color-bg-muted)]'
       }`}
@@ -74,7 +77,11 @@ export function ItemRow({ item, isEditing, onEdit, onRemove }: ItemRowProps) {
         {TYPE_ICON[item.type]}
       </span>
       <span className="flex-1 truncate font-medium">
-        {item.type === 'description' ? 'Description' : item.label}
+        {item.type === 'description'
+          ? 'Description'
+          : item.type === 'checklist'
+            ? `Checklist${item.items.length > 0 ? ` · ${item.items.length}` : ''}`
+            : item.label}
       </span>
       <span className="rounded-full border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] px-2 py-0.5 text-[10px] text-[color:var(--color-text-muted)]">
         {TYPE_LABEL[item.type]}
