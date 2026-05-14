@@ -132,15 +132,16 @@ enum AuditAction {
 /// Mirror of auth.users (Supabase). Synced via DB trigger (cf. 01_rls.sql).
 /// Contains app-side profile fields only. Auth fields stay in auth schema.
 model User {
-  id        String   @id @db.Uuid
-  email     String   @unique @db.Citext
-  firstName String?  @map("first_name")
-  lastName  String?  @map("last_name")
-  avatarUrl String?  @map("avatar_url")
-  locale    String   @default("fr") @db.VarChar(8)
-  timezone  String   @default("Europe/Paris") @db.VarChar(64)
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id           String   @id @db.Uuid
+  email        String   @unique @db.Citext
+  firstName    String?  @map("first_name")
+  lastName     String?  @map("last_name")
+  avatarUrl    String?  @map("avatar_url")
+  locale       String   @default("fr") @db.VarChar(8)
+  timezone     String   @default("Europe/Paris") @db.VarChar(64)
+  isSuperAdmin Boolean  @default(false) @map("is_super_admin")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   memberships        Membership[]
   invitationsCreated Invitation[]             @relation("InvitationCreatedBy")
