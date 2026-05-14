@@ -380,11 +380,17 @@ model Column {
   /// Sparse to allow reordering without renumbering
   position        Int
   isBlockedSystem Boolean  @default(false) @map("is_blocked_system")
+  /// Per-column step checklist (PRD §7.2 ext). Copied from the source
+  /// KanbanTemplateColumn at project creation. Each card that lands in
+  /// this column gets these items added to its checklist (tagged with
+  /// columnSourceId on ChecklistItem so the modal can group them).
+  stepChecklist String[] @default([]) @map("step_checklist")
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  cards   Card[]
+  project       Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  cards         Card[]
+  checklistItems ChecklistItem[] @relation("checklist_items_column_source")
 
   @@index([projectId, position])
   @@map("columns")
@@ -460,12 +466,19 @@ model ChecklistItem {
   title     String
   isChecked Boolean  @default(false) @map("is_checked")
   position  Int
+  /// When non-null, this item was seeded by the column it references
+  /// (the column's stepChecklist). The modal renders these items in a
+  /// separate "Step checklist" section that only shows when the card
+  /// is in that column; the checked state persists if the card returns.
+  columnSourceId String? @map("column_source_id") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  card Card @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  card         Card    @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  columnSource Column? @relation("checklist_items_column_source", fields: [columnSourceId], references: [id], onDelete: SetNull)
 
   @@index([cardId, position])
+  @@index([cardId, columnSourceId])
   @@map("checklist_items")
 }
 

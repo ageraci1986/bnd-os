@@ -22,6 +22,9 @@ export interface ChecklistItemDTO {
   readonly title: string;
   readonly isChecked: boolean;
   readonly position: number;
+  /** Set when the item was seeded by a column's step-checklist; null
+   *  for regular template-driven items owned by the card. */
+  readonly columnSourceId: string | null;
 }
 
 export interface ChecklistMutationResult {
@@ -44,7 +47,7 @@ async function readChecklist(cardId: string): Promise<ChecklistMutationResult> {
   const items = await prisma.checklistItem.findMany({
     where: { cardId },
     orderBy: { position: 'asc' },
-    select: { id: true, title: true, isChecked: true, position: true },
+    select: { id: true, title: true, isChecked: true, position: true, columnSourceId: true },
   });
   const allChecked = items.length > 0 && items.every((i) => i.isChecked);
   return { ok: true, items, allChecked };

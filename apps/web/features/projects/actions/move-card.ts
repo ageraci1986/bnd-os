@@ -36,7 +36,7 @@ export async function moveCard(input: {
 
   const targetColumn = await prisma.column.findFirst({
     where: { id: targetColumnId, projectId: card.projectId },
-    select: { id: true, isBlockedSystem: true },
+    select: { id: true, isBlockedSystem: true, stepChecklist: true },
   });
   if (!targetColumn) throw new NotFoundError('Column');
 
@@ -59,9 +59,38 @@ export async function moveCard(input: {
     targetIndex,
   });
 
-  await prisma.card.update({
-    where: { id: cardId },
-    data: { columnId: targetColumnId, position },
+  // Seed the new column's step checklist on this card if it hasn't
+  // already been visited (so we preserve the user's checked state when
+  // they bounce a card back and forth between two columns).
+  await prisma.$transaction(async (tx) => {
+    await tx.card.update({
+      where: { id: cardId },
+      data: { columnId: targetColumnId, position },
+    });
+
+    const step = targetColumn.stepChecklist;
+    if (step.length > 0) {
+      const existing = await tx.checklistItem.count({
+        where: { cardId, columnSourceId: targetColumn.id },
+      });
+      if (existing === 0) {
+        const lastPos = await tx.checklistItem.findFirst({
+          where: { cardId },
+          orderBy: { position: 'desc' },
+          select: { position: true },
+        });
+        const base = (lastPos?.position ?? 0) + 1024;
+        await tx.checklistItem.createMany({
+          data: step.map((title, idx) => ({
+            cardId,
+            title,
+            position: base + (idx + 1) * 1024,
+            isChecked: false,
+            columnSourceId: targetColumn.id,
+          })),
+        });
+      }
+    }
   });
 
   revalidatePath(`/projects/${card.projectId}`);

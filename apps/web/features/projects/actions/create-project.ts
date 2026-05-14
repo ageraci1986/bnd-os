@@ -4,11 +4,16 @@ import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { Prisma, prisma } from '@nexushub/db';
 import {
+  BLOCKED_COLUMN_NAME,
+  BLOCKED_COLUMN_POSITION,
   BUILTIN_PROJECT_TYPES,
   buildProjectColumns,
   findTemplate,
   NotFoundError,
 } from '@nexushub/domain';
+
+/** UUID v4 ↔ built-in id discriminator. */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 import { requireUser } from '@/lib/auth';
 import { assertCsrfFromFormData } from '@/lib/csrf';
 import { CreateProjectSchema } from '../lib/schemas';
@@ -58,12 +63,56 @@ export async function createProject(
   });
   if (!client) throw new NotFoundError('Client');
 
-  const template = findTemplate(data.templateId);
-  if (!template) {
-    return { status: 'error', message: 'Template Kanban inconnu.' };
+  // Templates are EITHER a hard-coded built-in (string id like 'creative')
+  // OR a workspace-defined DB template (UUID). Resolve to a uniform list
+  // of column seeds with optional stepChecklist.
+  interface ColumnSeed {
+    readonly name: string;
+    readonly position: number;
+    readonly isBlockedSystem: boolean;
+    readonly stepChecklist: readonly string[];
   }
+  let columnSeeds: readonly ColumnSeed[];
 
-  const columnSeeds = buildProjectColumns(template);
+  if (UUID_RE.test(data.templateId)) {
+    const dbTpl = await prisma.kanbanTemplate.findFirst({
+      where: { id: data.templateId, workspaceId: ctx.workspaceId },
+      select: {
+        id: true,
+        columns: {
+          orderBy: { position: 'asc' },
+          select: { name: true, stepChecklist: true },
+        },
+      },
+    });
+    if (!dbTpl) {
+      return { status: 'error', message: 'Template Kanban introuvable.' };
+    }
+    const userCols: ColumnSeed[] = dbTpl.columns.map((c, idx) => ({
+      name: c.name,
+      position: (idx + 1) * 1024,
+      isBlockedSystem: false,
+      stepChecklist: c.stepChecklist,
+    }));
+    columnSeeds = [
+      ...userCols,
+      {
+        name: BLOCKED_COLUMN_NAME,
+        position: BLOCKED_COLUMN_POSITION,
+        isBlockedSystem: true,
+        stepChecklist: [],
+      },
+    ];
+  } else {
+    const builtin = findTemplate(data.templateId);
+    if (!builtin) {
+      return { status: 'error', message: 'Template Kanban inconnu.' };
+    }
+    columnSeeds = buildProjectColumns(builtin).map((c) => ({
+      ...c,
+      stepChecklist: [],
+    }));
+  }
 
   let projectId: string;
   try {
@@ -111,13 +160,17 @@ export async function createProject(
         select: { id: true },
       });
 
-      // 3. Insert the columns (user columns + system Bloqué).
+      // 3. Insert the columns (user columns + system Bloqué). Step
+      //    checklists are copied as TEXT[] on the Column itself; cards
+      //    that later land in the column will get ChecklistItem rows
+      //    seeded from this list.
       await tx.column.createMany({
         data: columnSeeds.map((c) => ({
           projectId: project.id,
           name: c.name,
           position: c.position,
           isBlockedSystem: c.isBlockedSystem,
+          stepChecklist: [...c.stepChecklist],
         })),
       });
 

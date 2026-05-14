@@ -23,7 +23,11 @@ export interface CardModalData {
     readonly title: string;
     readonly isChecked: boolean;
     readonly position: number;
+    readonly columnSourceId: string | null;
   }[];
+  /** Column the card is currently in — used to filter the step-checklist
+   *  items (only the current column's are visible). */
+  readonly columnId: string;
   readonly assignees: readonly {
     readonly userId: string;
     readonly raci: Raci;
@@ -53,6 +57,7 @@ export async function getCardModalData(input: {
     select: {
       id: true,
       projectId: true,
+      columnId: true,
       title: true,
       description: true,
       dueDate: true,
@@ -62,7 +67,13 @@ export async function getCardModalData(input: {
       column: { select: { name: true, isBlockedSystem: true } },
       checklistItems: {
         orderBy: { position: 'asc' },
-        select: { id: true, title: true, isChecked: true, position: true },
+        select: {
+          id: true,
+          title: true,
+          isChecked: true,
+          position: true,
+          columnSourceId: true,
+        },
       },
       assignees: {
         select: {
@@ -109,6 +120,7 @@ export async function getCardModalData(input: {
       dueDate: card.dueDate ? card.dueDate.toISOString() : null,
       shortRef: card.shortRef,
       categoryTag: card.categoryTag,
+      columnId: card.columnId,
       columnName: card.column.name,
       columnIsBlocked: card.column.isBlockedSystem,
       nextColumnName,

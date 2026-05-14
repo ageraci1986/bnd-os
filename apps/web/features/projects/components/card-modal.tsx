@@ -39,6 +39,7 @@ export interface CardModalProps {
     readonly description: string | null;
     readonly dueDate: string | null;
     readonly shortRef: number;
+    readonly columnId: string;
     readonly columnName: string;
     readonly columnIsBlocked: boolean;
     readonly nextColumnName: string | null;
@@ -118,15 +119,26 @@ export function CardModal({
     setItems(card.checklist);
   }, [card.checklist]);
 
-  const allChecked = items.length > 0 && items.every((i) => i.isChecked);
-  const checked = items.filter((i) => i.isChecked).length;
-  const progress = items.length === 0 ? 0 : Math.round((checked / items.length) * 100);
-  // The Checklist section only renders when the template explicitly
-  // includes a `checklist` item. Cards whose template has no checklist
-  // don't show the section even if legacy items remain in the DB — the
-  // user opted out of checklist for this template.
+  // Split the card's checklist into the two surfaces:
+  //  - stepItems = items seeded by the current column's stepChecklist
+  //    (PRD §7.2 ext). Filtered to ONLY the current column so other
+  //    columns' step items stay hidden but persisted.
+  //  - ownItems = manually-added items + items seeded by the card's
+  //    template (no columnSourceId).
+  // Items belonging to OTHER columns are completely hidden but kept in
+  // DB so their checked state persists if the card returns to them.
+  const stepItems = items.filter((i) => i.columnSourceId === card.columnId);
+  const ownItems = items.filter((i) => i.columnSourceId === null);
+  const visibleItems = [...ownItems, ...stepItems];
+  const checked = visibleItems.filter((i) => i.isChecked).length;
+  const allChecked = visibleItems.length > 0 && checked === visibleItems.length;
+  const progress =
+    visibleItems.length === 0 ? 0 : Math.round((checked / visibleItems.length) * 100);
+  // The regular Checklist section only renders when the template
+  // explicitly includes a `checklist` item.
   const templateHasChecklist = card.templateItems.some((i) => i.type === 'checklist');
-  const showChecklistSection = templateHasChecklist;
+  const showOwnChecklist = templateHasChecklist;
+  const showStepChecklist = stepItems.length > 0;
 
   return (
     <>
@@ -171,49 +183,63 @@ export function CardModal({
               />
             )}
 
-            <section className="modal-section" hidden={isLoading || !showChecklistSection}>
-              <div className="checklist-meta">
-                <div className="section-label" style={{ marginBottom: 0 }}>
-                  Checklist
+            {/* Combined progress bar across step + own items, displayed
+                once above the two checklist sections. */}
+            {!isLoading && (showStepChecklist || showOwnChecklist) ? (
+              <section className="modal-section">
+                <div className="checklist-meta">
+                  <div className="section-label" style={{ marginBottom: 0 }}>
+                    Progression
+                  </div>
+                  <div className="checklist-count">
+                    {checked} / {visibleItems.length}
+                    {allChecked ? ' ✓' : ''}
+                  </div>
                 </div>
-                <div className="checklist-count">
-                  {checked} / {items.length}
-                  {allChecked ? ' ✓' : ''}
-                </div>
-              </div>
-              {items.length > 0 ? (
-                <p className="checklist-hint">
-                  Auto-progression active — la carte avance dès que tout est coché.
-                </p>
-              ) : null}
-              <div
-                style={{
-                  height: 4,
-                  background: 'var(--color-border-light)',
-                  borderRadius: 9999,
-                  margin: '10px 0 14px',
-                }}
-              >
+                {visibleItems.length > 0 ? (
+                  <p className="checklist-hint">
+                    Auto-progression — la carte avance dès que tout est coché (checklist + step).
+                  </p>
+                ) : null}
                 <div
                   style={{
-                    width: `${progress}%`,
-                    height: '100%',
-                    background: allChecked ? 'var(--color-success)' : 'var(--accent-gradient)',
+                    height: 4,
+                    background: 'var(--color-border-light)',
                     borderRadius: 9999,
-                    transition: 'width 0.25s',
+                    margin: '10px 0 0',
                   }}
-                />
+                >
+                  <div
+                    style={{
+                      width: `${progress}%`,
+                      height: '100%',
+                      background: allChecked ? 'var(--color-success)' : 'var(--accent-gradient)',
+                      borderRadius: 9999,
+                      transition: 'width 0.25s',
+                    }}
+                  />
+                </div>
+              </section>
+            ) : null}
+
+            <section className="modal-section" hidden={isLoading || !showStepChecklist}>
+              <div className="checklist-meta">
+                <div className="section-label" style={{ marginBottom: 0 }}>
+                  Step checklist
+                </div>
+                <div className="checklist-count">
+                  {stepItems.filter((i) => i.isChecked).length} / {stepItems.length}
+                </div>
               </div>
+              <p className="checklist-hint">
+                Étapes attendues dans la colonne « {card.columnName} ».
+              </p>
               <div>
-                {items.map((item) => (
+                {stepItems.map((item) => (
                   <CheckRow
                     key={item.id}
                     item={item}
                     onToggle={(isChecked) => {
-                      // Optimistic: flip locally, fire-and-forget the save.
-                      // We do NOT overwrite from the server response — that
-                      // would race against subsequent quick toggles. Server
-                      // is the eventual source of truth; on error we revert.
                       setItems((prev) =>
                         prev.map((i) => (i.id === item.id ? { ...i, isChecked } : i)),
                       );
@@ -228,7 +254,50 @@ export function CardModal({
                       });
                     }}
                     onDelete={() => {
-                      // Optimistic remove. On error, restore the original.
+                      // Step items are template-driven; user can delete
+                      // them locally on this card if irrelevant.
+                      const snapshot = items;
+                      setItems((prev) => prev.filter((i) => i.id !== item.id));
+                      startTransition(() => {
+                        void deleteChecklistItem({ itemId: item.id }).catch(() => {
+                          setItems(snapshot);
+                        });
+                      });
+                    }}
+                  />
+                ))}
+              </div>
+            </section>
+
+            <section className="modal-section" hidden={isLoading || !showOwnChecklist}>
+              <div className="checklist-meta">
+                <div className="section-label" style={{ marginBottom: 0 }}>
+                  Checklist
+                </div>
+                <div className="checklist-count">
+                  {ownItems.filter((i) => i.isChecked).length} / {ownItems.length}
+                </div>
+              </div>
+              <div>
+                {ownItems.map((item) => (
+                  <CheckRow
+                    key={item.id}
+                    item={item}
+                    onToggle={(isChecked) => {
+                      setItems((prev) =>
+                        prev.map((i) => (i.id === item.id ? { ...i, isChecked } : i)),
+                      );
+                      startTransition(() => {
+                        void toggleChecklistItem({ itemId: item.id, isChecked }).catch(() => {
+                          setItems((prev) =>
+                            prev.map((i) =>
+                              i.id === item.id ? { ...i, isChecked: !isChecked } : i,
+                            ),
+                          );
+                        });
+                      });
+                    }}
+                    onDelete={() => {
                       const snapshot = items;
                       setItems((prev) => prev.filter((i) => i.id !== item.id));
                       startTransition(() => {
@@ -504,6 +573,9 @@ function ChecklistAdder({
       title: trimmed,
       isChecked: false,
       position: Number.MAX_SAFE_INTEGER,
+      // Manual adds are always "own" items; the step-checklist comes from
+      // the column-source seeding done server-side.
+      columnSourceId: null,
     };
     onOptimisticAdd(optimistic);
     setTitle('');

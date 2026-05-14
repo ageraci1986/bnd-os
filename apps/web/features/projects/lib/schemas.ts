@@ -33,7 +33,17 @@ const DateSchema = z
     return Number.isNaN(d.getTime()) ? null : d;
   });
 
-const TemplateIdSchema = z.enum(BUILTIN_TEMPLATES.map((t) => t.id) as [string, ...string[]]);
+// The wizard accepts EITHER a hard-coded built-in template id (one of
+// BUILTIN_TEMPLATES) OR a workspace-defined Kanban template UUID. The
+// server action (createProject) discriminates between the two and
+// resolves the columns + step-checklists accordingly.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const BUILTIN_IDS = BUILTIN_TEMPLATES.map((t) => t.id);
+const TemplateIdSchema = z
+  .string()
+  .refine((value) => UUID_RE.test(value) || BUILTIN_IDS.includes(value), {
+    message: 'Template Kanban inconnu.',
+  });
 
 const TypeIdSchema = z
   .enum(BUILTIN_PROJECT_TYPES.map((t) => t.id) as [string, ...string[]])

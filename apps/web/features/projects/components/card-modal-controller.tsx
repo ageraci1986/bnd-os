@@ -234,6 +234,7 @@ export function CardModalController({
       description: null,
       dueDate: null,
       shortRef: state.skeleton?.shortRef ?? 0,
+      columnId: '',
       columnName: '',
       columnIsBlocked: false,
       nextColumnName: null,

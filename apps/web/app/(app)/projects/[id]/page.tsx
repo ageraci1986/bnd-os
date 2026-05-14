@@ -88,6 +88,7 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
           },
           select: {
             id: true,
+            columnId: true,
             title: true,
             description: true,
             dueDate: true,
@@ -97,7 +98,13 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
             column: { select: { name: true, isBlockedSystem: true } },
             checklistItems: {
               orderBy: { position: 'asc' },
-              select: { id: true, title: true, isChecked: true, position: true },
+              select: {
+                id: true,
+                title: true,
+                isChecked: true,
+                position: true,
+                columnSourceId: true,
+              },
             },
             assignees: {
               select: {
@@ -225,6 +232,7 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
                 description: openCard.description,
                 dueDate: openCard.dueDate ? openCard.dueDate.toISOString() : null,
                 shortRef: openCard.shortRef,
+                columnId: openCard.columnId,
                 columnName: openCard.column.name,
                 columnIsBlocked: openCard.column.isBlockedSystem,
                 nextColumnName,

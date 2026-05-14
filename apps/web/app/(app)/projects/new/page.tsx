@@ -8,12 +8,24 @@ export const metadata: Metadata = { title: 'Nouveau projet' };
 
 export default async function NewProjectPage() {
   const ctx = await requireUser();
-  const [csrf, clients] = await Promise.all([
+  const [csrf, clients, kanbanTemplates] = await Promise.all([
     getCsrfTokenForForm(),
     prisma.client.findMany({
       where: { workspaceId: ctx.workspaceId, deletedAt: null, archivedAt: null },
       orderBy: { name: 'asc' },
       select: { id: true, name: true },
+    }),
+    prisma.kanbanTemplate.findMany({
+      where: { workspaceId: ctx.workspaceId },
+      orderBy: [{ isBuiltin: 'desc' }, { name: 'asc' }],
+      select: {
+        id: true,
+        name: true,
+        columns: {
+          orderBy: { position: 'asc' },
+          select: { name: true, stepChecklist: true },
+        },
+      },
     }),
   ]);
 
@@ -32,5 +44,16 @@ export default async function NewProjectPage() {
     );
   }
 
-  return <ProjectWizard csrfToken={csrf} clients={clients} />;
+  return (
+    <ProjectWizard
+      csrfToken={csrf}
+      clients={clients}
+      workspaceTemplates={kanbanTemplates.map((t) => ({
+        id: t.id,
+        name: t.name,
+        columnNames: t.columns.map((c) => c.name),
+        hasStepChecklists: t.columns.some((c) => c.stepChecklist.length > 0),
+      }))}
+    />
+  );
 }

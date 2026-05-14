@@ -20,9 +20,17 @@ const STEPS = [
   { idx: '04', name: 'Récap' },
 ] as const;
 
+export interface WorkspaceKanbanTemplateOption {
+  readonly id: string;
+  readonly name: string;
+  readonly columnNames: readonly string[];
+  readonly hasStepChecklists: boolean;
+}
+
 export interface WizardProps {
   readonly csrfToken: string;
   readonly clients: readonly { readonly id: string; readonly name: string }[];
+  readonly workspaceTemplates: readonly WorkspaceKanbanTemplateOption[];
 }
 
 interface WizardState {
@@ -45,7 +53,7 @@ const EMPTY: WizardState = {
   templateId: 'creative',
 };
 
-export function ProjectWizard({ csrfToken, clients }: WizardProps) {
+export function ProjectWizard({ csrfToken, clients, workspaceTemplates }: WizardProps) {
   const router = useRouter();
   const [step, setStep] = useState(0);
   const [data, setData] = useState<WizardState>(EMPTY);
@@ -105,8 +113,17 @@ export function ProjectWizard({ csrfToken, clients }: WizardProps) {
       <div className="wiz-body">
         {step === 0 ? <Step1 data={data} setData={setData} clients={clients} /> : null}
         {step === 1 ? <Step2 data={data} setData={setData} /> : null}
-        {step === 2 ? <Step3 data={data} setData={setData} /> : null}
-        {step === 3 ? <Step4 data={data} clients={clients} error={actionState} /> : null}
+        {step === 2 ? (
+          <Step3 data={data} setData={setData} workspaceTemplates={workspaceTemplates} />
+        ) : null}
+        {step === 3 ? (
+          <Step4
+            data={data}
+            clients={clients}
+            workspaceTemplates={workspaceTemplates}
+            error={actionState}
+          />
+        ) : null}
       </div>
 
       <div className="wiz-foot">
@@ -312,33 +329,77 @@ function Step2({
 function Step3({
   data,
   setData,
+  workspaceTemplates,
 }: {
   data: WizardState;
   setData: React.Dispatch<React.SetStateAction<WizardState>>;
+  workspaceTemplates: readonly WorkspaceKanbanTemplateOption[];
 }) {
   return (
-    <div className="pickable-grid">
-      {BUILTIN_TEMPLATES.map((t) => (
-        <button
-          key={t.id}
-          type="button"
-          aria-pressed={data.templateId === t.id}
-          className={`pickable-card ${data.templateId === t.id ? 'active' : ''}`}
-          onClick={() => setData((d) => ({ ...d, templateId: t.id }))}
-        >
-          {t.recommended ? <span className="pc-recommended">Recommandé</span> : null}
-          <div className="pc-name">{t.name}</div>
-          <div className="pc-desc">{t.description}</div>
-          <div className="tpl-preview">
-            {t.columns.map((c) => (
-              <span key={c} className="tpl-pill">
-                {c}
-              </span>
-            ))}
-            <span className="tpl-pill blocked">Bloqué</span>
+    <div className="flex flex-col gap-6">
+      <div>
+        <div className="mb-3 text-[10px] font-extrabold uppercase tracking-[1px] text-[color:var(--color-text-muted)]">
+          ✦ Templates standard
+        </div>
+        <div className="pickable-grid">
+          {BUILTIN_TEMPLATES.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              aria-pressed={data.templateId === t.id}
+              className={`pickable-card ${data.templateId === t.id ? 'active' : ''}`}
+              onClick={() => setData((d) => ({ ...d, templateId: t.id }))}
+            >
+              {t.recommended ? <span className="pc-recommended">Recommandé</span> : null}
+              <div className="pc-name">{t.name}</div>
+              <div className="pc-desc">{t.description}</div>
+              <div className="tpl-preview">
+                {t.columns.map((c) => (
+                  <span key={c} className="tpl-pill">
+                    {c}
+                  </span>
+                ))}
+                <span className="tpl-pill blocked">Bloqué</span>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {workspaceTemplates.length > 0 ? (
+        <div>
+          <div className="mb-3 text-[10px] font-extrabold uppercase tracking-[1px] text-[color:var(--color-text-muted)]">
+            ★ Templates de l&apos;espace
           </div>
-        </button>
-      ))}
+          <div className="pickable-grid">
+            {workspaceTemplates.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                aria-pressed={data.templateId === t.id}
+                className={`pickable-card ${data.templateId === t.id ? 'active' : ''}`}
+                onClick={() => setData((d) => ({ ...d, templateId: t.id }))}
+              >
+                <div className="pc-name">{t.name}</div>
+                <div className="pc-desc">
+                  {t.columnNames.length === 0
+                    ? 'Aucune colonne — démarre vide'
+                    : `${t.columnNames.length} colonnes`}
+                  {t.hasStepChecklists ? ' · avec step-checklist' : ''}
+                </div>
+                <div className="tpl-preview">
+                  {t.columnNames.map((c, idx) => (
+                    <span key={`${c}-${idx}`} className="tpl-pill">
+                      {c}
+                    </span>
+                  ))}
+                  <span className="tpl-pill blocked">Bloqué</span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -346,15 +407,24 @@ function Step3({
 function Step4({
   data,
   clients,
+  workspaceTemplates,
   error,
 }: {
   data: WizardState;
   clients: readonly { readonly id: string; readonly name: string }[];
+  workspaceTemplates: readonly WorkspaceKanbanTemplateOption[];
   error: CreateProjectState;
 }) {
   const client = clients.find((c) => c.id === data.clientId);
   const type = BUILTIN_PROJECT_TYPES.find((t) => t.id === data.typeId);
-  const template = findTemplate(data.templateId);
+  const builtinTpl = findTemplate(data.templateId);
+  const dbTpl = workspaceTemplates.find((t) => t.id === data.templateId);
+  const templateColumnsCount = builtinTpl
+    ? builtinTpl.columns.length
+    : dbTpl
+      ? dbTpl.columnNames.length
+      : null;
+  const templateName = builtinTpl?.name ?? dbTpl?.name ?? null;
   const dateRange =
     data.startDate || data.endDate ? `${data.startDate || '?'} → ${data.endDate || '?'}` : '—';
 
@@ -380,11 +450,13 @@ function Step4({
         </div>
         <div className="recap-row">
           <span className="label">Template</span>
-          <span className="value">{template?.name ?? '—'}</span>
+          <span className="value">{templateName ?? '—'}</span>
         </div>
         <div className="recap-row">
           <span className="label">Colonnes</span>
-          <span className="value">{template ? `${template.columns.length} + Bloqué` : '—'}</span>
+          <span className="value">
+            {templateColumnsCount !== null ? `${templateColumnsCount} + Bloqué` : '—'}
+          </span>
         </div>
       </div>
       {error.status === 'error' ? (

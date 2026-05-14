@@ -53,7 +53,7 @@ export async function createCard(
         id: columnId,
         project: { id: projectId, workspaceId: ctx.workspaceId, deletedAt: null },
       },
-      select: { id: true },
+      select: { id: true, stepChecklist: true },
     }),
     // Resolve the template to apply: explicit `?templateId=...` wins, otherwise
     // fall back to the workspace default. Either may be null (no template).
@@ -110,6 +110,24 @@ export async function createCard(
           title: itemTitle,
           position: (idx + 1) * 1024,
           isChecked: false,
+        })),
+      });
+    }
+
+    // Step checklist (PRD §7.2 ext): if the destination column has a
+    // step checklist, seed it onto the card with columnSourceId set so
+    // the modal can group it under a "Step checklist" section and the
+    // auto-progression considers it.
+    const step = column.stepChecklist ?? [];
+    if (step.length > 0) {
+      const offset = (defaults.length + 1) * 1024;
+      await tx.checklistItem.createMany({
+        data: step.map((itemTitle, idx) => ({
+          cardId: card.id,
+          title: itemTitle,
+          position: offset + (idx + 1) * 1024,
+          isChecked: false,
+          columnSourceId: column.id,
         })),
       });
     }
