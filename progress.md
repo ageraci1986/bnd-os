@@ -25,7 +25,7 @@
 | 4     | Module Clients & Contacts (RACI)         | M             | `[x]`  |
 | 5     | Module Projets (Kanban + règles auto)    | XL            | `[x]`  |
 | 6     | Module Communications (Slack + Exchange) | XL            | `[ ]`  |
-| 7     | Templates (Email + Kanban)               | M             | `[ ]`  |
+| 7     | Templates (Email + Kanban)               | M             | `[~]`  |
 | 8     | Overview (Dashboard)                     | M             | `[ ]`  |
 | 9     | Équipe, Paramètres, Notifications        | M             | `[ ]`  |
 | 10    | i18n FR/EN                               | S             | `[ ]`  |
@@ -381,13 +381,16 @@
 - [ ] CRUD + duplication
 - [ ] Sécurité : interdit le HTML brut dans le corps (sanitize côté serveur)
 
-### 7.2 Templates Kanban
+### 7.2 Templates Kanban ✅ (2026-05-14)
 
-- [ ] Page `/templates/kanban`
-- [ ] Sélecteur + CRUD templates
-- [ ] Vue colonnes interactive (renommer inline, menu ⋯, +Colonne)
-- [ ] Colonne Bloqué fixe non éditable
-- [ ] **Test critique** : modifier un template **ne change pas** les projets existants
+- [x] Page `/templates/kanban` (KanbanEditorShell, toolbar + board)
+- [x] Sélecteur dropdown + CRUD (`createKanbanTemplate`, `updateKanbanTemplate`, `deleteKanbanTemplate`, `duplicateKanbanTemplate`)
+- [x] Vue colonnes interactive (renommer inline, drag horizontal `@dnd-kit/sortable`, menu ⋯, +Colonne)
+- [x] Édition du titre du template inline
+- [x] Step-checklist par colonne (modal portaled, max 20 items par colonne)
+- [s] Colonne Bloqué fixe non éditable → N/A ici : les templates Kanban sont user-facing uniquement, la colonne Bloqué est ajoutée au moment du `createProject` (system column, copy-on-create)
+- [x] **Test critique respecté** : un template est figé au moment de la création du projet (copy-on-create des colonnes vers le projet) — `createProject` accepte UUID (DB template) OU id built-in via `TemplateIdSchema.refine`
+- [x] Step-checklist se propage au projet : `KanbanTemplateColumn.stepChecklist` → `Column.stepChecklist` → semée comme items dans chaque carte de la colonne avec `columnSourceId` (préserve l'état coché si la carte revient via `moveCard` / `skipCardToNextColumn`)
 
 ---
 
