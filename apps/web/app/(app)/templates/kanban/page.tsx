@@ -1,14 +1,53 @@
 import type { Metadata } from 'next';
-import { ComingSoon } from '@/features/shell/components/coming-soon';
+import { prisma } from '@nexushub/db';
+import { requireUser } from '@/lib/auth';
+import { KanbanEditorShell } from '@/features/templates/kanban/editor-shell';
+import type { KanbanTemplateDTO } from '@/features/templates/kanban/use-editor-state';
 
 export const metadata: Metadata = { title: 'Templates Kanban' };
 
-export default function KanbanTemplatesPage() {
+export default async function KanbanTemplatesPage() {
+  const ctx = await requireUser();
+
+  const rows = await prisma.kanbanTemplate.findMany({
+    where: { workspaceId: ctx.workspaceId },
+    orderBy: [{ isBuiltin: 'desc' }, { name: 'asc' }],
+    select: {
+      id: true,
+      name: true,
+      isBuiltin: true,
+      columns: {
+        orderBy: { position: 'asc' },
+        select: { id: true, name: true, stepChecklist: true },
+      },
+    },
+  });
+
+  const templates: KanbanTemplateDTO[] = rows.map((t) => ({
+    id: t.id,
+    name: t.name,
+    isBuiltin: t.isBuiltin,
+    columns: t.columns.map((c) => ({
+      id: c.id,
+      name: c.name,
+      stepChecklist: c.stepChecklist,
+    })),
+  }));
+
   return (
-    <ComingSoon
-      title="Templates Kanban"
-      phase="Phase 7.2"
-      description="Éditeur de structures de colonnes (Campagne créa, Production vidéo, Social Media, Standard, Vide) — figés à la création de projet (PRD §7.2)."
-    />
+    <div className="mx-auto max-w-[1400px]">
+      <header className="mb-6">
+        <h1 className="text-[34px] font-extrabold tracking-tight">
+          Templates <span className="gradient-text">Kanban</span>
+        </h1>
+        <p className="mt-2 text-sm text-[color:var(--color-text-muted)]">
+          Définis des structures de colonnes prêtes à consommer lors de la création d&apos;un
+          projet. Chaque colonne peut avoir une step-checklist : ses items seront automatiquement
+          ajoutés à chaque carte qui passe dans la colonne.
+        </p>
+      </header>
+
+      <KanbanEditorShell initialTemplates={templates} />
+    </div>
   );
 }

@@ -7,4 +7,5 @@ export * from './invitations/index';
 export * from './clients/index';
 export * from './projects/index';
 export * from './card-templates/index';
+export * from './kanban-templates/index';
 export * as crypto from './crypto/index';

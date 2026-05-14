@@ -531,10 +531,14 @@ model KanbanTemplate {
 }
 
 model KanbanTemplateColumn {
-  id         String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  templateId String @map("template_id") @db.Uuid
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  templateId String   @map("template_id") @db.Uuid
   name       String
   position   Int
+  /// Per-column step checklist (PRD §7.2 ext). Copied onto each card
+  /// in this column at card creation / column move. Empty array = no
+  /// step checklist for this column.
+  stepChecklist String[] @default([]) @map("step_checklist")
 
   template KanbanTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
 
