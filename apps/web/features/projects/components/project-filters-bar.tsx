@@ -154,7 +154,9 @@ export function ProjectFiltersBar({
         <div ref={popRef} className="relative">
           <button
             type="button"
-            className={`nx-filter-trigger${open ? 'is-open' : ''}${count > 0 ? 'has-active' : ''}`}
+            className={['nx-filter-trigger', open && 'is-open', count > 0 && 'has-active']
+              .filter(Boolean)
+              .join(' ')}
             onClick={() => setOpen((o) => !o)}
             aria-haspopup="dialog"
             aria-expanded={open}
@@ -403,7 +405,7 @@ function DueChip({
     <button
       type="button"
       onClick={() => onClick(mode)}
-      className={`nx-filter-chip${active ? 'is-active' : ''}`}
+      className={['nx-filter-chip', active && 'is-active'].filter(Boolean).join(' ')}
     >
       {label}
     </button>
