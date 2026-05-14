@@ -1,6 +1,7 @@
 export const Roles = {
   Admin: 'admin',
-  Member: 'member',
+  User: 'user',
+  Viewer: 'viewer',
 } as const;
 
 export type Role = (typeof Roles)[keyof typeof Roles];
@@ -32,7 +33,7 @@ const CAPABILITY_MATRIX: Record<Role, ReadonlySet<Capability>> = {
     'integration.exchange.connect_self',
     'settings.update_own',
   ]),
-  [Roles.Member]: new Set<Capability>([
+  [Roles.User]: new Set<Capability>([
     'workspace.read',
     'project.crud',
     'client.crud',
@@ -40,6 +41,7 @@ const CAPABILITY_MATRIX: Record<Role, ReadonlySet<Capability>> = {
     'integration.exchange.connect_self',
     'settings.update_own',
   ]),
+  [Roles.Viewer]: new Set<Capability>(['workspace.read', 'settings.update_own']),
 };
 
 export function can(role: Role, capability: Capability): boolean {
@@ -48,7 +50,6 @@ export function can(role: Role, capability: Capability): boolean {
 
 export function assertCan(role: Role, capability: Capability): void {
   if (!can(role, capability)) {
-    // Use a string here to avoid circular import; callers should map to a typed error.
     throw new Error(`FORBIDDEN: role=${role} cannot ${capability}`);
   }
 }

@@ -37,7 +37,8 @@ beforeEach(() => {
   requireUserMock.mockResolvedValue({
     userId: 'user-1',
     workspaceId: 'ws-1',
-    role: 'member',
+    role: 'user',
+    isSuperAdmin: false,
   });
 });
 

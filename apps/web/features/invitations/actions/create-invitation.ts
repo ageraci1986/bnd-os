@@ -14,7 +14,7 @@ import { renderInvitationEmail } from '../email/templates';
 
 const CreateInvitationSchema = z.object({
   email: z.string().trim().toLowerCase().email().max(254),
-  role: z.enum([Roles.Admin, Roles.Member]).default(Roles.Member),
+  role: z.enum([Roles.Admin, Roles.User, Roles.Viewer]).default(Roles.User),
 });
 
 export type CreateInvitationState =
@@ -33,12 +33,21 @@ export async function createInvitation(
 
   const parsed = CreateInvitationSchema.safeParse({
     email: formData.get('email'),
-    role: formData.get('role') ?? Roles.Member,
+    role: formData.get('role') ?? Roles.User,
   });
   if (!parsed.success) {
     return { status: 'error', message: 'Adresse e-mail ou rôle invalide.' };
   }
   const { email, role } = parsed.data;
+
+  // Phase A: Viewer requires a scope picker (Phase B). The UI disables
+  // the option; this is the defence-in-depth.
+  if (role === Roles.Viewer) {
+    return {
+      status: 'error',
+      message: 'Le rôle Viewer sera disponible dans une prochaine mise à jour.',
+    };
+  }
 
   // Rate limit per Admin: 20 invitations / 24h
   const reqHeaders = await headers();

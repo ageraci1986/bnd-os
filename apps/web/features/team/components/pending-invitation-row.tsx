@@ -7,7 +7,7 @@ export interface PendingInvitationRowProps {
   readonly csrfToken: string;
   readonly invitationId: string;
   readonly email: string;
-  readonly role: 'admin' | 'member';
+  readonly role: 'admin' | 'user' | 'viewer';
   readonly expiresAtIso: string;
   readonly expiresLabel: string;
 }
@@ -22,7 +22,7 @@ export function PendingInvitationRow(props: PendingInvitationRowProps) {
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-bold">{props.email}</p>
         <p className="text-xs text-[color:var(--color-text-muted)]">
-          {props.role === 'admin' ? 'Admin' : 'Membre'} · expire{' '}
+          {roleLabel(props.role)} · expire{' '}
           <time dateTime={props.expiresAtIso}>{props.expiresLabel}</time>
         </p>
       </div>
@@ -45,4 +45,15 @@ export function PendingInvitationRow(props: PendingInvitationRowProps) {
       ) : null}
     </li>
   );
+}
+
+function roleLabel(role: 'admin' | 'user' | 'viewer'): string {
+  switch (role) {
+    case 'admin':
+      return 'Admin';
+    case 'user':
+      return 'User';
+    case 'viewer':
+      return 'Viewer';
+  }
 }

@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import { prisma } from '@nexushub/db';
-import { Roles } from '@nexushub/domain';
 import { MetricCard } from '@nexushub/ui';
 import { requireAdmin } from '@/lib/auth';
 import { getCsrfTokenForForm } from '@/lib/csrf';
@@ -30,7 +29,9 @@ export default async function TeamPage() {
         id: true,
         role: true,
         userId: true,
-        user: { select: { firstName: true, lastName: true, email: true } },
+        user: {
+          select: { firstName: true, lastName: true, email: true, isSuperAdmin: true },
+        },
       },
     }),
     prisma.invitation.findMany({
@@ -96,7 +97,8 @@ export default async function TeamPage() {
                   currentUserId={ctx.userId}
                   displayName={displayName}
                   email={m.user.email}
-                  role={m.role === Roles.Admin ? 'admin' : 'member'}
+                  role={m.role}
+                  isSuperAdmin={m.user.isSuperAdmin}
                 />
               );
             })}
@@ -126,7 +128,7 @@ export default async function TeamPage() {
                 csrfToken={csrf}
                 invitationId={inv.id}
                 email={inv.email}
-                role={inv.role === Roles.Admin ? 'admin' : 'member'}
+                role={inv.role}
                 expiresAtIso={inv.expiresAt.toISOString()}
                 expiresLabel={dateFormatterFr.format(inv.expiresAt)}
               />

@@ -12,7 +12,7 @@ import { getClientIp } from '@/lib/rate-limit';
 
 const Schema = z.object({
   membershipId: z.string().uuid(),
-  role: z.enum([Roles.Admin, Roles.Member]),
+  role: z.enum([Roles.Admin, Roles.User, Roles.Viewer]),
 });
 
 export type ChangeRoleState =
@@ -35,6 +35,13 @@ export async function changeMemberRole(
     return { status: 'error', message: 'Données invalides.' };
   }
   const { membershipId, role } = parsed.data;
+
+  if (role === Roles.Viewer) {
+    return {
+      status: 'error',
+      message: 'Le rôle Viewer sera disponible dans une prochaine mise à jour.',
+    };
+  }
 
   const target = await prisma.membership.findUnique({
     where: { id: membershipId },

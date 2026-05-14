@@ -80,9 +80,12 @@ export function InvitationForm({ csrfToken }: Props) {
           <label className="field-label" htmlFor="invite-role">
             Rôle
           </label>
-          <select id="invite-role" name="role" defaultValue="member" className="field-select">
-            <option value="member">Membre</option>
+          <select id="invite-role" name="role" defaultValue="user" className="field-select">
+            <option value="user">User</option>
             <option value="admin">Admin</option>
+            <option value="viewer" disabled title="Disponible bientôt (Phase B)">
+              Viewer (bientôt)
+            </option>
           </select>
         </div>
         <div className="flex items-end">

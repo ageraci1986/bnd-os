@@ -48,7 +48,12 @@ beforeEach(() => {
   requireUserMock.mockReset();
   revalidatePathMock.mockReset();
 
-  requireUserMock.mockResolvedValue({ userId: 'u1', workspaceId: 'ws-1', role: 'member' });
+  requireUserMock.mockResolvedValue({
+    userId: 'u1',
+    workspaceId: 'ws-1',
+    role: 'user',
+    isSuperAdmin: false,
+  });
   columnFindMany.mockResolvedValue(COLUMNS);
   cardFindMany.mockResolvedValue([{ position: 1024 }]); // siblings in target column
   cardUpdate.mockResolvedValue({ id: VALID_CARD });

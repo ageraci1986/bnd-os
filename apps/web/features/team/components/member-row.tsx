@@ -11,7 +11,8 @@ export interface MemberRowProps {
   readonly currentUserId: string;
   readonly displayName: string;
   readonly email: string;
-  readonly role: 'admin' | 'member';
+  readonly role: 'admin' | 'user' | 'viewer';
+  readonly isSuperAdmin: boolean;
 }
 
 const idleRole: ChangeRoleState = { status: 'idle' };
@@ -47,6 +48,15 @@ export function MemberRow(props: MemberRowProps) {
               Vous
             </span>
           ) : null}
+          {props.isSuperAdmin ? (
+            <span
+              className="ml-2 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.5px] text-white"
+              style={{ backgroundImage: 'var(--accent-gradient)' }}
+              title="Super-admin de la plateforme"
+            >
+              Super-admin
+            </span>
+          ) : null}
         </p>
         <p className="truncate text-xs text-[color:var(--color-text-muted)]">{props.email}</p>
       </div>
@@ -64,8 +74,11 @@ export function MemberRow(props: MemberRowProps) {
           disabled={rolePending}
           className="field-select w-32"
         >
-          <option value="member">Membre</option>
+          <option value="user">User</option>
           <option value="admin">Admin</option>
+          <option value="viewer" disabled title="Disponible bientôt (Phase B)">
+            Viewer (bientôt)
+          </option>
         </select>
         <button
           type="submit"

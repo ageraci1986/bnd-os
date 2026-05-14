@@ -64,6 +64,7 @@ beforeEach(() => {
     userId: 'user-1',
     workspaceId: 'ws-1',
     role: 'admin',
+    isSuperAdmin: false,
   });
   headersMock.mockResolvedValue(new Headers());
   clientIpMock.mockReturnValue('203.0.113.1');
