@@ -28,9 +28,18 @@ export interface KanbanColumnProps {
   readonly projectId: string;
   readonly column: KanbanColumnData;
   readonly cards: readonly KanbanCardData[];
+  /** True for the last user column — the advance shortcut is disabled
+   *  on cards living here (no destination to skip to). */
+  readonly isLastUserColumn?: boolean;
 }
 
-export function KanbanColumn({ csrfToken, projectId, column, cards }: KanbanColumnProps) {
+export function KanbanColumn({
+  csrfToken,
+  projectId,
+  column,
+  cards,
+  isLastUserColumn,
+}: KanbanColumnProps) {
   const [pending, startTransition] = useTransition();
 
   const { setNodeRef, isOver } = useDroppable({
@@ -107,6 +116,7 @@ export function KanbanColumn({ csrfToken, projectId, column, cards }: KanbanColu
               key={card.id}
               card={card}
               blocked={column.isBlockedSystem}
+              cannotAdvance={column.isBlockedSystem || isLastUserColumn === true}
               csrfToken={csrfToken}
             />
           ))}

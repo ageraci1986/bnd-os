@@ -15,9 +15,11 @@ import { moveCard } from '../actions/move-card';
 import { KanbanCard, type KanbanCardData } from './kanban-card';
 import { KanbanColumn, type KanbanColumnData } from './kanban-column';
 import {
+  CARD_ADVANCED_EVENT,
   CARD_CREATED_EVENT,
   CARD_REMOVED_EVENT,
   CARD_SHORTREF_RESOLVED_EVENT,
+  type CardAdvancedEventDetail,
   type CardCreatedEventDetail,
   type CardRemovedEventDetail,
   type CardShortRefResolvedEventDetail,
@@ -85,13 +87,22 @@ export function KanbanBoard({ csrfToken, projectId, columns, cards }: KanbanBoar
         prev.map((c) => (c.id === detail.id ? { ...c, shortRef: detail.shortRef } : c)),
       );
     };
+    const onAdvanced = (e: Event) => {
+      const detail = (e as CustomEvent<CardAdvancedEventDetail>).detail;
+      if (!detail || typeof detail.id !== 'string') return;
+      setLocalCards((prev) =>
+        prev.map((c) => (c.id === detail.id ? { ...c, columnId: detail.newColumnId } : c)),
+      );
+    };
     window.addEventListener(CARD_CREATED_EVENT, onCreated);
     window.addEventListener(CARD_REMOVED_EVENT, onRemoved);
     window.addEventListener(CARD_SHORTREF_RESOLVED_EVENT, onShortRef);
+    window.addEventListener(CARD_ADVANCED_EVENT, onAdvanced);
     return () => {
       window.removeEventListener(CARD_CREATED_EVENT, onCreated);
       window.removeEventListener(CARD_REMOVED_EVENT, onRemoved);
       window.removeEventListener(CARD_SHORTREF_RESOLVED_EVENT, onShortRef);
+      window.removeEventListener(CARD_ADVANCED_EVENT, onAdvanced);
     };
   }, []);
 
@@ -104,6 +115,14 @@ export function KanbanBoard({ csrfToken, projectId, columns, cards }: KanbanBoar
     }
     return map;
   }, [columns, localCards]);
+
+  // The last user column has no "next" — the advance shortcut is disabled
+  // on cards living there. Columns arrive pre-sorted by position; system
+  // "Bloqué" is excluded from the candidates.
+  const lastUserColumnId = useMemo(() => {
+    const userCols = columns.filter((c) => !c.isBlockedSystem);
+    return userCols[userCols.length - 1]?.id ?? null;
+  }, [columns]);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
@@ -193,6 +212,7 @@ export function KanbanBoard({ csrfToken, projectId, columns, cards }: KanbanBoar
             projectId={projectId}
             column={col}
             cards={cardsByColumn.get(col.id) ?? []}
+            isLastUserColumn={col.id === lastUserColumnId}
           />
         ))}
       </div>

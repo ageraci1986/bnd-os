@@ -4,6 +4,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { Tag, type TagVariant } from '@nexushub/ui';
 import { BUILTIN_CARD_CATEGORIES } from '@nexushub/domain';
 import { OPEN_CARD_EVENT, type OpenCardEventDetail } from './card-modal-controller';
+import { CardAdvanceCheckbox } from './card-advance-checkbox';
 import { DeleteKanbanCardButton } from './delete-kanban-card-button';
 import { customCategoryColor } from '../lib/custom-category-color';
 
@@ -19,6 +20,9 @@ export interface KanbanCardProps {
   readonly card: KanbanCardData;
   /** When true, renders a flat blocked variant (column.isBlockedSystem). */
   readonly blocked?: boolean;
+  /** When true, the advance checkbox is disabled (last user column or
+   *  blocked). The board computes this from the columns ordering. */
+  readonly cannotAdvance?: boolean;
   /** CSRF token forwarded to inline actions (delete). Omitted when used
    *  inside the dnd-kit <DragOverlay>, which is a transient render. */
   readonly csrfToken?: string;
@@ -28,7 +32,7 @@ export interface KanbanCardProps {
  * Sortable card. Wraps the visual `.kcard` block in dnd-kit's useSortable
  * so each card is both a drag handle and a drop target.
  */
-export function KanbanCard({ card, blocked, csrfToken }: KanbanCardProps) {
+export function KanbanCard({ card, blocked, cannotAdvance, csrfToken }: KanbanCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: card.id,
     data: { type: 'card', columnId: card.columnId },
@@ -78,15 +82,20 @@ export function KanbanCard({ card, blocked, csrfToken }: KanbanCardProps) {
       {...listeners}
     >
       {csrfToken ? (
-        <div
-          style={{ position: 'absolute', top: 8, right: 8, zIndex: 10 }}
-          className="pointer-events-none opacity-0 transition-opacity duration-150 focus-within:pointer-events-auto focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100"
-        >
-          <DeleteKanbanCardButton cardId={card.id} cardTitle={card.title} csrfToken={csrfToken} />
-        </div>
+        <>
+          <div style={{ position: 'absolute', top: 10, left: 12, zIndex: 10 }}>
+            <CardAdvanceCheckbox cardId={card.id} disabled={Boolean(blocked || cannotAdvance)} />
+          </div>
+          <div
+            style={{ position: 'absolute', top: 8, right: 8, zIndex: 10 }}
+            className="pointer-events-none opacity-0 transition-opacity duration-150 focus-within:pointer-events-auto focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100"
+          >
+            <DeleteKanbanCardButton cardId={card.id} cardTitle={card.title} csrfToken={csrfToken} />
+          </div>
+        </>
       ) : null}
       {categoryLabel ? (
-        <div className="kcard-tags">
+        <div className="kcard-tags" style={csrfToken ? { paddingLeft: 26 } : undefined}>
           {builtin ? (
             <Tag variant={card.categoryTag as TagVariant} size="sm">
               {categoryLabel}
@@ -104,7 +113,12 @@ export function KanbanCard({ card, blocked, csrfToken }: KanbanCardProps) {
           )}
         </div>
       ) : null}
-      <div className="kcard-ref">#{String(card.shortRef).padStart(3, '0')}</div>
+      <div
+        className="kcard-ref"
+        style={csrfToken && !categoryLabel ? { paddingLeft: 26 } : undefined}
+      >
+        #{String(card.shortRef).padStart(3, '0')}
+      </div>
       <div className="kcard-title">{card.title}</div>
     </article>
   );

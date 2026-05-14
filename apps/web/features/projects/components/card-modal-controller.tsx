@@ -64,6 +64,18 @@ export interface CardShortRefResolvedEventDetail {
   readonly shortRef: number;
 }
 
+/**
+ * Click-to-advance shortcut: a view-level component (kanban-board,
+ * list-view) listens and moves the card into the next user column in
+ * its local optimistic state. Server has already accepted the move.
+ */
+export const CARD_ADVANCED_EVENT = 'nx:card-advanced' as const;
+
+export interface CardAdvancedEventDetail {
+  readonly id: string;
+  readonly newColumnId: string;
+}
+
 export interface CardModalControllerProps {
   readonly csrfToken: string;
   readonly workspaceName: string;

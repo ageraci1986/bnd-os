@@ -1,6 +1,6 @@
 # progress.md — NexusHub · Plan de développement
 
-> **Dernière mise à jour :** 2026-04-27
+> **Dernière mise à jour :** 2026-05-14
 > **Référent produit :** Angelo L.
 > **Document maître produit :** [PRD-NexusHub.md](./PRD-NexusHub.md)
 > **Document maître technique :** [CLAUDE.md](./CLAUDE.md)
@@ -299,6 +299,37 @@
 - [x] Hooks dans 4 routes : `/projects/[id]`, `/projects/[id]/calendar`, `/projects/calendar`, `/overview`
 - [x] 8 tests Prisma-mocked (block, last-column skip, restore, idempotence, no-op, archive, archive-skip-bumped-out, archive-empty)
 - [ ] Cron d'envoi d'**emails de notification** (auto-bloqué, échéance proche, etc.) → reporté Phase 9 / 13 (effets de bord externes nécessitent un événement temporel, pas un calcul)
+
+### 5.7 Vue Liste — 3e vue projet ✅ (2026-05-14)
+
+- [x] Route `/projects/[id]/list` (page.tsx + loading.tsx skeleton)
+- [x] `<ViewToggle>` 3-options (Kanban / Liste / Calendrier) — actif dérivé du `usePathname`, préserve les params au switch
+- [x] Lignes-cards CSS-grid alignées sur un header de colonnes (Titre + colonnes optionnelles + delete trail)
+- [x] Picker « Colonnes (N) » : Colonne / Référence / Catégorie / Échéance / Assignés / Checklist / Template
+- [x] Préférence par-projet en localStorage (`nx:list-cols:<projectId>`)
+- [x] Groupement par colonne Kanban (sections), sections vides masquées
+- [x] Icône `ListIcon` ajoutée au shell
+
+### 5.8 Raccourci d'avancement carte ✅ (2026-05-14)
+
+- [x] Case à cocher 18×18 en haut-gauche de chaque card (Kanban + Liste)
+- [x] Server Action `skipCardToNextColumn` — bypasse la gate "checklist complète", même destinataire que `advanceCard` (next user-column, skip système Bloqué)
+- [x] Step-checklist de la colonne d'arrivée semée comme `moveCard` (first-visit only — état coché préservé sur retour)
+- [x] `movedToLastAt` stampé si dernière colonne user (cohérent avec archive 30j)
+- [x] Désactivée sur dernière colonne et sur colonne Bloqué
+- [x] Optimistic update via `CARD_ADVANCED_EVENT` (board + liste s'écoutent), `pointerdown` stoppé pour ne pas drag-start
+- [s] Calendrier — skippé : les chips 1-ligne n'ont pas la place
+
+### 5.9 Filtres projet ✅ (2026-05-14)
+
+- [x] Util `card-filter.ts` — parse / serialize URL params, build Prisma `where` (full + filterClauses only pour nested includes)
+- [x] `<ProjectFiltersBar>` : recherche debouncée 220ms + bouton « Filtres (N) » + popover + pills actifs (X par pill + « Tout effacer »)
+- [x] Sections popover : Colonne, Catégorie (built-in + custom merged), Assignés, Template, Échéance (chips : Toutes / En retard / Aujourd'hui / 7 jours / Sans échéance / Plage personnalisée)
+- [x] Sémantique : OR à l'intérieur d'une section, AND entre sections
+- [x] Recherche : `title` contains (insensitive) OR `shortRef` numérique
+- [x] URL params `?q=&col=&cat=&asg=&tpl=&due=` partageables, survivent au rafraîchissement
+- [x] Câblé dans les 3 vues (Kanban / Liste / Calendrier — calendrier intersect avec la plage du mois)
+- [x] `ViewToggle` préserve les params filtres + `?client=` global ; drop les params vue-spécifiques (`month`, `card`, `new`)
 
 ---
 

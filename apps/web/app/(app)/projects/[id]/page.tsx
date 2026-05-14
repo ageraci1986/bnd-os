@@ -9,9 +9,14 @@ import { KanbanBoard } from '@/features/projects/components/kanban-board';
 import { CardModalController } from '@/features/projects/components/card-modal-controller';
 import type { CardModalData } from '@/features/projects/actions/get-card-modal-data';
 import { DeleteProjectButton } from '@/features/projects/components/delete-project-button';
+import { ProjectFiltersBar } from '@/features/projects/components/project-filters-bar';
+import { ViewToggle } from '@/features/projects/components/view-toggle';
+import {
+  buildCardFilterClauses,
+  parseProjectCardFilter,
+} from '@/features/projects/lib/card-filter';
 import { listCustomCategories } from '@/features/projects/lib/categories';
 import { reconcileBeforeRead } from '@/features/projects/lib/reconcile';
-import { CalendarIcon, KanbanIcon } from '@/features/shell/components/icons';
 
 export const metadata: Metadata = { title: 'Projet' };
 
@@ -32,6 +37,8 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
   const sp = (await searchParams) ?? {};
   const openCardId = readParam(sp['card']);
   const isNew = readParam(sp['new']) === '1';
+  const filter = parseProjectCardFilter(sp);
+  const filterClauses = buildCardFilterClauses(filter);
 
   // Reconcile-on-read: align overdue / restored / archived cards before
   // rendering the board so the user always sees up-to-date state without
@@ -67,7 +74,7 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
           select: { id: true, name: true, isBlockedSystem: true },
         },
         cards: {
-          where: { deletedAt: null },
+          where: { deletedAt: null, ...filterClauses },
           orderBy: { position: 'asc' },
           select: {
             id: true,
@@ -137,6 +144,16 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
 
   const cardCount = project.cards.length;
 
+  const memberOptions = workspaceMembers.map((m) => {
+    const displayName =
+      [m.user.firstName, m.user.lastName].filter(Boolean).join(' ').trim() || m.user.email;
+    const initials =
+      [m.user.firstName?.[0], m.user.lastName?.[0]].filter(Boolean).join('').toUpperCase() ||
+      m.user.email.slice(0, 2).toUpperCase();
+    return { userId: m.userId, displayName, initials };
+  });
+  const filterColumns = project.columns.map((c) => ({ id: c.id, name: c.name }));
+
   // Compute the next user column for the auto-advance bandeau message.
   let nextColumnName: string | null = null;
   if (openCard) {
@@ -185,17 +202,17 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
           ) : null}
         </div>
         <div className="flex items-center gap-3">
-          <div className="view-toggle">
-            <Link href="" className="active" aria-current="page">
-              <KanbanIcon /> Kanban
-            </Link>
-            <Link href={`/projects/${project.id}/calendar`}>
-              <CalendarIcon /> Calendrier
-            </Link>
-          </div>
+          <ViewToggle projectId={project.id} />
           <DeleteProjectButton projectId={project.id} projectName={project.name} />
         </div>
       </header>
+
+      <ProjectFiltersBar
+        columns={filterColumns}
+        customCategories={customCategories}
+        members={memberOptions}
+        templates={availableTemplates}
+      />
 
       <KanbanBoard
         csrfToken={csrf}

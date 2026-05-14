@@ -23,6 +23,10 @@ export const AdvanceCardSchema = z.object({
   cardId: z.string().uuid(),
 });
 
+export const SkipCardSchema = z.object({
+  cardId: z.string().uuid(),
+});
+
 export const UpdateCardDueDateSchema = z.object({
   cardId: z.string().uuid(),
   /** Empty string clears the due date. */
