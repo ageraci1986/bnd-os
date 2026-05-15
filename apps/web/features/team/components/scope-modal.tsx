@@ -46,9 +46,13 @@ export function ScopeModal({
   }, [state.status, onClose]);
 
   // A project is "inherited" if its parent client is in clientIds — its
-  // checkbox is visually checked and disabled (can't toggle individually
-  // because the row stays out of the DB; ticking the client-as-a-whole
-  // already covers it).
+  // checkbox is visually checked because the client-as-a-whole covers it
+  // without a separate DB row. Unchecking an inherited project does an
+  // automatic drill-down: the client membership is replaced by explicit
+  // rows for the OTHER projects of that client (the unchecked one stays
+  // out). The user loses the "any future project of this client is auto-
+  // included" guarantee — this is the documented trade-off of the simple
+  // model (no exclusions in the DB).
   const clientIdsSet = useMemo(() => new Set(clientIds), [clientIds]);
   const inheritedProjectIds = useMemo(
     () => new Set(projectOptions.filter((p) => clientIdsSet.has(p.clientId)).map((p) => p.id)),
@@ -62,8 +66,31 @@ export function ScopeModal({
 
   const toggleClient = (id: string) =>
     setClientIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
-  const toggleProject = (id: string) =>
-    setProjectIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+
+  const toggleProject = (projectId: string) => {
+    const project = projectOptions.find((p) => p.id === projectId);
+    if (!project) return;
+    const inherited = clientIdsSet.has(project.clientId);
+    if (inherited) {
+      // Drill-down: replace the client grant with individual project rows
+      // (every sibling stays in, the toggled one drops out).
+      const siblingIds = projectOptions
+        .filter((p) => p.clientId === project.clientId && p.id !== projectId)
+        .map((p) => p.id);
+      setClientIds((prev) => prev.filter((c) => c !== project.clientId));
+      setProjectIds((prev) => {
+        const next = new Set(prev);
+        for (const id of siblingIds) next.add(id);
+        next.delete(projectId);
+        return [...next];
+      });
+      return;
+    }
+    // Plain explicit project toggle.
+    setProjectIds((prev) =>
+      prev.includes(projectId) ? prev.filter((x) => x !== projectId) : [...prev, projectId],
+    );
+  };
 
   return (
     <div
@@ -119,18 +146,11 @@ export function ScopeModal({
                   const checked = inherited || projectIds.includes(p.id);
                   return (
                     <li key={p.id}>
-                      <label
-                        className={
-                          inherited
-                            ? 'flex cursor-not-allowed items-center gap-2 rounded-md px-2 py-1.5 text-sm opacity-70'
-                            : 'flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-[color:var(--color-bg-muted)]'
-                        }
-                      >
+                      <label className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-[color:var(--color-bg-muted)]">
                         <input
                           type="checkbox"
                           checked={checked}
-                          disabled={inherited}
-                          onChange={() => (inherited ? undefined : toggleProject(p.id))}
+                          onChange={() => toggleProject(p.id)}
                           className="accent-[color:var(--color-accent-primary)]"
                         />
                         <span className="flex flex-col">
