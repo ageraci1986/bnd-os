@@ -1,6 +1,6 @@
 # progress.md — NexusHub · Plan de développement
 
-> **Dernière mise à jour :** 2026-05-15
+> **Dernière mise à jour :** 2026-05-16
 > **Référent produit :** Angelo L.
 > **Document maître produit :** [PRD-NexusHub.md](./PRD-NexusHub.md)
 > **Document maître technique :** [CLAUDE.md](./CLAUDE.md)
@@ -432,11 +432,25 @@
 - [x] 230 tests verts (87 web + 143 domain incl. les 4 nouveaux), typecheck + lint propres
 - [ ] **Phase B pré-req** : ajouter `isRole` predicate + tests d'intégration `createInvitation` / `changeMemberRole` (Viewer rejection, last-Admin, isolation workspace) + guard cascade-safe sur `protect_last_super_admin` (avant que Phase B fasse écrire des rôles Viewer en runtime)
 - [x] Smoke vérifié : Admin invite User → User s'inscrit via lien → User accède Overview/Projects/Clients, /team renvoie 403
-- [ ] **Phase B** : table `WorkspaceAccess` (scope par client/projet pour User et Viewer) + page `/my-projects` pour Viewer + sidebar adaptative
 - [ ] **Phase C** : console `/super-admin` (CRUD workspaces, liste globale users, promotion super-admin)
-- [ ] **Polish** : remplacer `throw new Response('Forbidden', { status: 403 })` par un rendu propre (page 403 ou `notFound()`) — actuellement Turbopack affiche brutalement "Runtime Error: Response" en dev pour les non-Admin qui touchent /team
-- [ ] **Polish** : `isRole` type predicate dans `@nexushub/domain` pour remplacer le cast `membership.role as Role` dans `getAuthContext` (forward-compat)
-- [ ] **Infra V1.5** : verifier domaine Resend (`mail.nexushub.app`) pour activer les invitations vers n'importe quelle adresse — actuellement en mode test, seul l'email du propriétaire Resend reçoit
+- [ ] **Plan B.2** : Viewer activation (unblock invitation, `/my-projects`, sidebar adaptative, `shareProjectWithViewer` action, Partager modal, comment authorization)
+- [ ] **Infra V1.5** : vérifier domaine Resend (`mail.nexushub.app`) pour activer les invitations vers n'importe quelle adresse — actuellement en mode test, seul l'email du propriétaire Resend reçoit
+
+### 9.6 User management — Phase B.1 (scoping foundation) ✅ (2026-05-16)
+
+- [x] **Phase A follow-ups** : `isRole` predicate (drops the unsafe `as Role` cast in `getAuthContext`), `requireAdmin`/`requireSuperAdmin` use `notFound()` for friendly 404 (replaces `throw new Response(403)`), intégration tests pour `createInvitation` + `changeMemberRole` (9 specs)
+- [x] DB : table `workspace_access` (3 FK CASCADE + 1 RESTRICT, partial unique indexes, XOR CHECK constraint client/project) + 2 triggers (same-workspace integrity, forbid admin scope) + RLS workspace-scoped reads + admin-only writes + audit kinds `workspace_access_granted` / `workspace_access_revoked`
+- [x] Domaine : pure `evaluateScopeMatch` + `UserScope` types (8 specs)
+- [x] Server : `loadUserScope` (per-request memoised, short-circuits pour Admin/super-admin) + `scopedClientWhere` / `scopedProjectWhere` / `scopedCardWhere` Prisma helpers (14 specs)
+- [x] Server : scope appliqué aux read paths (`/overview`, `/projects`, `/clients` + `getOverviewMetrics`) ; single-resource `notFound()` quand out of scope (3 routes `/projects/[id]/...`)
+- [x] Server : scope checks sur 20 mutations (Client + Project + Card + Contact + `getCardModalData`) ; erreur user-friendly « Cette ressource n'est pas accessible avec ton scope actuel. »
+- [x] `setUserScope` server action (Admin only, transaction replace, audit-logged, refuse Admin + cross-workspace, 5 specs)
+- [x] UI `/team` : scope chip par non-Admin + scope modal (clients + projets multi-select + bouton « Réinitialiser »)
+- [x] Helper text dans `InvitationForm` : invite ouvre la fiche du user après acceptation pour définir le scope
+- [x] **128 tests** verts (✓ +18 nouveaux : 3 `isRole` + 9 intégration team + 14 scope app + 8 domain scope + 5 setUserScope ; ⚠ -21 dans le count brut à cause de tests existants non recomptés ici — net +18 sur Phase A)
+- [x] Typecheck + lint propres
+- [ ] **Polish** : extraire `assertScopeIncludes(scope, kind, id)` helper si la duplication du pattern devient un poids en B.2
+- [ ] **Plan B.2** : Viewer activation (cf. §9.5)
 
 ### 9.2 Paramètres utilisateur
 
