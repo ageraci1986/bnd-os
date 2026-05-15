@@ -13,7 +13,7 @@
  *  - We always join via `Membership.workspace_id`; never trust a workspace_id sent by the client.
  */
 import 'server-only';
-import { redirect } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { prisma } from '@nexushub/db';
 import { isRole, Roles, type Role } from '@nexushub/domain';
 import { createSupabaseServer } from '../supabase/server';
@@ -81,7 +81,7 @@ export async function requireUser(): Promise<AuthContext> {
 export async function requireAdmin(): Promise<AuthContext> {
   const ctx = await requireUser();
   if (ctx.role !== Roles.Admin && !ctx.isSuperAdmin) {
-    throw new Response('Forbidden', { status: 403 });
+    notFound();
   }
   return ctx;
 }
@@ -90,7 +90,7 @@ export async function requireAdmin(): Promise<AuthContext> {
 export async function requireSuperAdmin(): Promise<AuthContext> {
   const ctx = await requireUser();
   if (!ctx.isSuperAdmin) {
-    throw new Response('Forbidden', { status: 403 });
+    notFound();
   }
   return ctx;
 }
