@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { prisma } from '@nexushub/db';
 import { requireUser } from '@/lib/auth';
+import { loadUserScope } from '@/lib/auth/scope';
 import { getCsrfTokenForForm } from '@/lib/csrf';
 import { ProjectWizard } from '@/features/projects/components/wizard';
 
@@ -8,10 +9,20 @@ export const metadata: Metadata = { title: 'Nouveau projet' };
 
 export default async function NewProjectPage() {
   const ctx = await requireUser();
+  const scope = await loadUserScope(ctx);
+  // The createProject server action checks scope.clientIds (not project
+  // ids) — a User with only project-level scope cannot create new
+  // projects. The wizard's client picker mirrors that contract.
+  const clientFilter = scope.kind === 'restricted' ? { id: { in: [...scope.clientIds] } } : {};
   const [csrf, clients, kanbanTemplates] = await Promise.all([
     getCsrfTokenForForm(),
     prisma.client.findMany({
-      where: { workspaceId: ctx.workspaceId, deletedAt: null, archivedAt: null },
+      where: {
+        workspaceId: ctx.workspaceId,
+        deletedAt: null,
+        archivedAt: null,
+        ...clientFilter,
+      },
       orderBy: { name: 'asc' },
       select: { id: true, name: true },
     }),

@@ -33,6 +33,8 @@ export default async function ProjectListPage({ params, searchParams }: ProjectL
 
   await reconcileBeforeRead(ctx.workspaceId, { projectIds: [id] });
 
+  const scope = await loadUserScope(ctx);
+
   const [csrf, workspace, project, customCategories, workspaceMembers, availableTemplates] =
     await Promise.all([
       getCsrfTokenForForm(),
@@ -77,7 +79,7 @@ export default async function ProjectListPage({ params, searchParams }: ProjectL
           },
         },
       }),
-      listCustomCategories(ctx.workspaceId),
+      listCustomCategories(ctx.workspaceId, scope),
       prisma.membership.findMany({
         where: { workspaceId: ctx.workspaceId },
         select: {
@@ -94,7 +96,6 @@ export default async function ProjectListPage({ params, searchParams }: ProjectL
     ]);
   if (!project) notFound();
 
-  const scope = await loadUserScope(ctx);
   if (scope.kind === 'restricted') {
     const allowed =
       scope.projectIds.includes(project.id) || scope.clientIds.includes(project.client.id);

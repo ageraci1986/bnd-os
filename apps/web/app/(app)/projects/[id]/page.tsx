@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation';
 import { prisma } from '@nexushub/db';
 import { validateCardTemplateItems } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
-import { loadUserScope } from '@/lib/auth/scope';
+import { loadUserScope, scopedProjectWhere } from '@/lib/auth/scope';
 import { getCsrfTokenForForm } from '@/lib/csrf';
 import { KanbanBoard } from '@/features/projects/components/kanban-board';
 import { CardModalController } from '@/features/projects/components/card-modal-controller';
@@ -40,6 +40,11 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
   const isNew = readParam(sp['new']) === '1';
   const filter = parseProjectCardFilter(sp);
   const filterClauses = buildCardFilterClauses(filter);
+
+  // Load scope eagerly so the parallel openCard fetch can scope-gate its
+  // own query (?card=<id> must not leak data from an out-of-scope card
+  // even if it happens to live in this same workspace).
+  const scope = await loadUserScope(ctx);
 
   // Reconcile-on-read: align overdue / restored / archived cards before
   // rendering the board so the user always sees up-to-date state without
@@ -93,6 +98,10 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
             id: openCardId,
             workspaceId: ctx.workspaceId,
             deletedAt: null,
+            // Forbid `?card=<id>` from leaking a card whose project is
+            // outside the current scope, even if it lives in the same
+            // workspace.
+            project: scopedProjectWhere(scope),
           },
           select: {
             id: true,
@@ -126,7 +135,7 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
           },
         })
       : Promise.resolve(null),
-    listCustomCategories(ctx.workspaceId),
+    listCustomCategories(ctx.workspaceId, scope),
     prisma.membership.findMany({
       where: { workspaceId: ctx.workspaceId },
       select: {
@@ -143,7 +152,6 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
   ]);
   if (!project) notFound();
 
-  const scope = await loadUserScope(ctx);
   if (scope.kind === 'restricted') {
     const allowed =
       scope.projectIds.includes(project.id) || scope.clientIds.includes(project.client.id);

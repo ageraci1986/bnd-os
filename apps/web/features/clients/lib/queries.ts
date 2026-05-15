@@ -9,7 +9,7 @@ import 'server-only';
 import { prisma } from '@nexushub/db';
 import { type UserScope } from '@nexushub/domain';
 import { clientSlug } from '@/lib/client-filter/server';
-import { scopedClientWhere } from '@/lib/auth/scope';
+import { scopedClientWhere, scopedProjectWhere } from '@/lib/auth/scope';
 
 export interface ClientListRow {
   readonly id: string;
@@ -41,7 +41,13 @@ export async function listClients(
       _count: {
         select: {
           contacts: { where: { deletedAt: null } },
-          projects: { where: { deletedAt: null, archivedAt: null } },
+          projects: {
+            where: {
+              deletedAt: null,
+              archivedAt: null,
+              ...(scope ? scopedProjectWhere(scope) : {}),
+            },
+          },
         },
       },
     },
@@ -127,7 +133,13 @@ export async function getClientBySlug(
       },
     }),
     prisma.project.count({
-      where: { workspaceId, clientId: match.id, deletedAt: null, archivedAt: null },
+      where: {
+        workspaceId,
+        clientId: match.id,
+        deletedAt: null,
+        archivedAt: null,
+        ...(scope ? scopedProjectWhere(scope) : {}),
+      },
     }),
   ]);
 

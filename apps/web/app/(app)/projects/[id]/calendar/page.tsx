@@ -99,7 +99,7 @@ export default async function ProjectCalendarPage({
         column: { select: { isBlockedSystem: true } },
       },
     }),
-    listCustomCategories(ctx.workspaceId),
+    listCustomCategories(ctx.workspaceId, scope),
     prisma.membership.findMany({
       where: { workspaceId: ctx.workspaceId },
       select: {

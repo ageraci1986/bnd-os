@@ -66,7 +66,14 @@ export default async function AppLayout({ children, searchParams }: AppLayoutPro
         name: true,
         colorToken: true,
         _count: {
-          select: { projects: { where: { deletedAt: null, archivedAt: null } } },
+          select: {
+            // Scope-aware count: for a project-scoped User whose access to
+            // this client only comes from a single project, the sidebar
+            // pill must show 1, not the workspace-wide project count.
+            projects: {
+              where: { deletedAt: null, archivedAt: null, ...scopedProjectWhere(scope) },
+            },
+          },
         },
       },
     }),
