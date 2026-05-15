@@ -5,6 +5,7 @@ const {
   cardUpdate,
   cardFindMany,
   columnFindMany,
+  workspaceAccessFindMany,
   requireUserMock,
   revalidatePathMock,
 } = vi.hoisted(() => ({
@@ -12,6 +13,7 @@ const {
   cardUpdate: vi.fn(),
   cardFindMany: vi.fn(),
   columnFindMany: vi.fn(),
+  workspaceAccessFindMany: vi.fn(),
   requireUserMock: vi.fn(),
   revalidatePathMock: vi.fn(),
 }));
@@ -20,6 +22,7 @@ vi.mock('@nexushub/db', () => ({
   prisma: {
     card: { findFirst: cardFindFirst, update: cardUpdate, findMany: cardFindMany },
     column: { findMany: columnFindMany },
+    workspaceAccess: { findMany: workspaceAccessFindMany },
   },
 }));
 vi.mock('@/lib/auth', () => ({ requireUser: requireUserMock }));
@@ -45,6 +48,7 @@ beforeEach(() => {
   cardUpdate.mockReset();
   cardFindMany.mockReset();
   columnFindMany.mockReset();
+  workspaceAccessFindMany.mockReset();
   requireUserMock.mockReset();
   revalidatePathMock.mockReset();
 
@@ -57,6 +61,8 @@ beforeEach(() => {
   columnFindMany.mockResolvedValue(COLUMNS);
   cardFindMany.mockResolvedValue([{ position: 1024 }]); // siblings in target column
   cardUpdate.mockResolvedValue({ id: VALID_CARD });
+  // Empty array → scopeFromRows([]) → { kind: 'workspace' } → no-op for scope check.
+  workspaceAccessFindMany.mockResolvedValue([]);
 });
 
 describe('updateCardDueDate (PRD §8.3 auto-routing)', () => {
@@ -68,11 +74,13 @@ describe('updateCardDueDate (PRD §8.3 auto-routing)', () => {
       previousColumnId: null,
       dueDate: null,
       archivedAt: null,
+      project: { clientId: 'c1' },
     });
     const futureIso = new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString().slice(0, 10);
 
     const result = await updateCardDueDate({ cardId: VALID_CARD, dueDate: futureIso });
 
+    if (!result.ok) throw new Error(`Expected ok result, got: ${result.message}`);
     expect(result.autoBlocked).toBe(false);
     expect(result.autoUnblocked).toBe(false);
     expect(result.newColumnId).toBe(DOING);
@@ -88,11 +96,13 @@ describe('updateCardDueDate (PRD §8.3 auto-routing)', () => {
       previousColumnId: null,
       dueDate: null,
       archivedAt: null,
+      project: { clientId: 'c1' },
     });
     const pastIso = '2020-01-01';
 
     const result = await updateCardDueDate({ cardId: VALID_CARD, dueDate: pastIso });
 
+    if (!result.ok) throw new Error(`Expected ok result, got: ${result.message}`);
     expect(result.autoBlocked).toBe(true);
     expect(result.newColumnId).toBe(BLOCKED);
     // Two updates: persist the date, then move to Bloqué.
@@ -113,8 +123,10 @@ describe('updateCardDueDate (PRD §8.3 auto-routing)', () => {
       previousColumnId: null,
       dueDate: null,
       archivedAt: null,
+      project: { clientId: 'c1' },
     });
     const result = await updateCardDueDate({ cardId: VALID_CARD, dueDate: '2020-01-01' });
+    if (!result.ok) throw new Error(`Expected ok result, got: ${result.message}`);
     expect(result.autoBlocked).toBe(false);
     expect(result.newColumnId).toBe(DONE);
   });
@@ -127,10 +139,12 @@ describe('updateCardDueDate (PRD §8.3 auto-routing)', () => {
       previousColumnId: DOING,
       dueDate: new Date('2020-01-01'),
       archivedAt: null,
+      project: { clientId: 'c1' },
     });
 
     const result = await updateCardDueDate({ cardId: VALID_CARD, dueDate: null });
 
+    if (!result.ok) throw new Error(`Expected ok result, got: ${result.message}`);
     expect(result.autoUnblocked).toBe(true);
     expect(result.newColumnId).toBe(DOING);
     expect(cardUpdate).toHaveBeenCalledTimes(2);
@@ -149,11 +163,13 @@ describe('updateCardDueDate (PRD §8.3 auto-routing)', () => {
       previousColumnId: TODO,
       dueDate: new Date('2020-01-01'),
       archivedAt: null,
+      project: { clientId: 'c1' },
     });
     const futureIso = new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString().slice(0, 10);
 
     const result = await updateCardDueDate({ cardId: VALID_CARD, dueDate: futureIso });
 
+    if (!result.ok) throw new Error(`Expected ok result, got: ${result.message}`);
     expect(result.autoUnblocked).toBe(true);
     expect(result.newColumnId).toBe(TODO);
   });

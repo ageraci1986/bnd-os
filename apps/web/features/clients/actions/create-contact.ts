@@ -4,7 +4,9 @@ import { revalidatePath } from 'next/cache';
 import { prisma } from '@nexushub/db';
 import { NotFoundError } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
+import { loadUserScope } from '@/lib/auth/scope';
 import { assertCsrfFromFormData } from '@/lib/csrf';
+import { SCOPE_ERROR_MESSAGE } from '@/features/projects/lib/scope-error';
 import { CreateContactSchema } from '../lib/schemas';
 
 export type CreateContactState =
@@ -45,6 +47,12 @@ export async function createContact(
     select: { id: true },
   });
   if (!client) throw new NotFoundError('Client');
+
+  const scope = await loadUserScope(ctx);
+  if (scope.kind === 'restricted') {
+    const allowed = scope.clientIds.includes(data.clientId);
+    if (!allowed) return { status: 'error', message: SCOPE_ERROR_MESSAGE };
+  }
 
   const created = await prisma.contact.create({
     data: {

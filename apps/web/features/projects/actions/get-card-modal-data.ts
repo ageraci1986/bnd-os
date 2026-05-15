@@ -4,6 +4,8 @@ import { z } from 'zod';
 import { prisma } from '@nexushub/db';
 import { validateCardTemplateItems, type CardTemplateItem, type Raci } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
+import { loadUserScope } from '@/lib/auth/scope';
+import { SCOPE_ERROR_MESSAGE } from '../lib/scope-error';
 
 const Schema = z.object({ cardId: z.string().uuid() });
 
@@ -84,9 +86,17 @@ export async function getCardModalData(input: {
       },
       templateId: true,
       template: { select: { items: true } },
+      project: { select: { clientId: true } },
     },
   });
   if (!card) return { ok: false, message: 'Carte introuvable.' };
+
+  const scope = await loadUserScope(ctx);
+  if (scope.kind === 'restricted') {
+    const allowed =
+      scope.projectIds.includes(card.projectId) || scope.clientIds.includes(card.project.clientId);
+    if (!allowed) return { ok: false, message: SCOPE_ERROR_MESSAGE };
+  }
 
   // Lookup the project's user-columns to compute the next-column hint
   // shown by the auto-advance bandeau (PRD §8.2). System "Bloqué" excluded.

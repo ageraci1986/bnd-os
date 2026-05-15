@@ -3,6 +3,8 @@ import 'server-only';
 import { prisma } from '@nexushub/db';
 import { NotFoundError } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
+import { loadUserScope } from '@/lib/auth/scope';
+import { SCOPE_ERROR_MESSAGE } from '../lib/scope-error';
 import {
   CreateChecklistItemSchema,
   DeleteChecklistItemSchema,
@@ -37,7 +39,7 @@ export interface ChecklistMutationResult {
 async function loadCardOrThrow(workspaceId: string, cardId: string) {
   const card = await prisma.card.findFirst({
     where: { id: cardId, workspaceId, deletedAt: null },
-    select: { id: true, projectId: true },
+    select: { id: true, projectId: true, project: { select: { clientId: true } } },
   });
   if (!card) throw new NotFoundError('Card');
   return card;
@@ -62,6 +64,13 @@ export async function createChecklistItem(input: {
   if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? 'Données invalides.');
 
   const card = await loadCardOrThrow(ctx.workspaceId, parsed.data.cardId);
+
+  const scope = await loadUserScope(ctx);
+  if (scope.kind === 'restricted') {
+    const allowed =
+      scope.projectIds.includes(card.projectId) || scope.clientIds.includes(card.project.clientId);
+    if (!allowed) throw new Error(SCOPE_ERROR_MESSAGE);
+  }
 
   const last = await prisma.checklistItem.findFirst({
     where: { cardId: card.id },
@@ -91,9 +100,21 @@ export async function toggleChecklistItem(input: {
   // Workspace-scoped lookup via the card join.
   const item = await prisma.checklistItem.findFirst({
     where: { id: parsed.data.itemId, card: { workspaceId: ctx.workspaceId, deletedAt: null } },
-    select: { id: true, cardId: true, card: { select: { projectId: true } } },
+    select: {
+      id: true,
+      cardId: true,
+      card: { select: { projectId: true, project: { select: { clientId: true } } } },
+    },
   });
   if (!item) throw new NotFoundError('ChecklistItem');
+
+  const scope = await loadUserScope(ctx);
+  if (scope.kind === 'restricted') {
+    const allowed =
+      scope.projectIds.includes(item.card.projectId) ||
+      scope.clientIds.includes(item.card.project.clientId);
+    if (!allowed) throw new Error(SCOPE_ERROR_MESSAGE);
+  }
 
   await prisma.checklistItem.update({
     where: { id: item.id },
@@ -115,9 +136,21 @@ export async function deleteChecklistItem(input: {
 
   const item = await prisma.checklistItem.findFirst({
     where: { id: parsed.data.itemId, card: { workspaceId: ctx.workspaceId, deletedAt: null } },
-    select: { id: true, cardId: true, card: { select: { projectId: true } } },
+    select: {
+      id: true,
+      cardId: true,
+      card: { select: { projectId: true, project: { select: { clientId: true } } } },
+    },
   });
   if (!item) throw new NotFoundError('ChecklistItem');
+
+  const scope = await loadUserScope(ctx);
+  if (scope.kind === 'restricted') {
+    const allowed =
+      scope.projectIds.includes(item.card.projectId) ||
+      scope.clientIds.includes(item.card.project.clientId);
+    if (!allowed) throw new Error(SCOPE_ERROR_MESSAGE);
+  }
 
   await prisma.checklistItem.delete({ where: { id: item.id } });
 

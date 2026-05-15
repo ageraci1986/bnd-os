@@ -3,7 +3,9 @@ import 'server-only';
 import { revalidatePath } from 'next/cache';
 import { Prisma, prisma } from '@nexushub/db';
 import { requireUser } from '@/lib/auth';
+import { loadUserScope } from '@/lib/auth/scope';
 import { assertCsrfFromFormData } from '@/lib/csrf';
+import { SCOPE_ERROR_MESSAGE } from '@/features/projects/lib/scope-error';
 import { CreateClientSchema } from '../lib/schemas';
 
 export type CreateClientState =
@@ -32,6 +34,12 @@ export async function createClient(
     };
   }
   const data = parsed.data;
+
+  const scope = await loadUserScope(ctx);
+  if (scope.kind === 'restricted') {
+    // Restricted users cannot create top-level resources outside their scope.
+    return { status: 'error', message: SCOPE_ERROR_MESSAGE };
+  }
 
   try {
     const created = await prisma.client.create({

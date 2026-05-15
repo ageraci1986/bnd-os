@@ -4,11 +4,14 @@ import { revalidatePath } from 'next/cache';
 import { prisma } from '@nexushub/db';
 import { NotFoundError, computeCardPosition } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
+import { loadUserScope } from '@/lib/auth/scope';
+import { SCOPE_ERROR_MESSAGE } from '../lib/scope-error';
 import { SkipCardSchema } from '../lib/checklist-schemas';
 
 export type SkipCardResult =
   | { readonly ok: true; readonly moved: false; readonly reason: string }
-  | { readonly ok: true; readonly moved: true; readonly newColumnId: string };
+  | { readonly ok: true; readonly moved: true; readonly newColumnId: string }
+  | { readonly ok: false; readonly message: string };
 
 /**
  * Click-to-advance shortcut: moves a card to the next user column without
@@ -27,9 +30,18 @@ export async function skipCardToNextColumn(input: { cardId: string }): Promise<S
 
   const card = await prisma.card.findFirst({
     where: { id: parsed.data.cardId, workspaceId: ctx.workspaceId, deletedAt: null },
-    select: { id: true, projectId: true, columnId: true },
+    select: { id: true, projectId: true, columnId: true, project: { select: { clientId: true } } },
   });
   if (!card) throw new NotFoundError('Card');
+
+  const scope = await loadUserScope(ctx);
+  if (scope.kind === 'restricted') {
+    const allowed =
+      scope.projectIds.includes(card.projectId) || scope.clientIds.includes(card.project.clientId);
+    if (!allowed) {
+      return { ok: false, message: SCOPE_ERROR_MESSAGE };
+    }
+  }
 
   const columns = await prisma.column.findMany({
     where: { projectId: card.projectId },

@@ -4,6 +4,8 @@ import { z } from 'zod';
 import { prisma } from '@nexushub/db';
 import { NotFoundError, RACI_VALUES } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
+import { loadUserScope } from '@/lib/auth/scope';
+import { SCOPE_ERROR_MESSAGE } from '../lib/scope-error';
 
 /**
  * `instanceof Prisma.PrismaClientKnownRequestError` doesn't reliably hold
@@ -48,10 +50,23 @@ const RemoveSchema = z.object({
 async function loadCardOrThrow(workspaceId: string, cardId: string) {
   const card = await prisma.card.findFirst({
     where: { id: cardId, workspaceId, deletedAt: null },
-    select: { id: true, projectId: true },
+    select: { id: true, projectId: true, project: { select: { clientId: true } } },
   });
   if (!card) throw new NotFoundError('Card');
   return card;
+}
+
+async function checkCardScope(
+  ctx: Awaited<ReturnType<typeof requireUser>>,
+  card: { projectId: string; project: { clientId: string } },
+): Promise<{ ok: false; message: string } | null> {
+  const scope = await loadUserScope(ctx);
+  if (scope.kind === 'restricted') {
+    const allowed =
+      scope.projectIds.includes(card.projectId) || scope.clientIds.includes(card.project.clientId);
+    if (!allowed) return { ok: false, message: SCOPE_ERROR_MESSAGE };
+  }
+  return null;
 }
 
 /**
@@ -70,6 +85,9 @@ export async function addCardAssignee(input: {
   if (!parsed.success) return { ok: false, message: 'Données invalides.' };
 
   const card = await loadCardOrThrow(ctx.workspaceId, parsed.data.cardId);
+
+  const scopeErr = await checkCardScope(ctx, card);
+  if (scopeErr) return scopeErr;
 
   // Defence in depth: only members of this workspace can be assigned.
   const member = await prisma.membership.findFirst({
@@ -111,6 +129,9 @@ export async function updateCardAssigneeRaci(input: {
 
   const card = await loadCardOrThrow(ctx.workspaceId, parsed.data.cardId);
 
+  const scopeErr = await checkCardScope(ctx, card);
+  if (scopeErr) return scopeErr;
+
   try {
     await prisma.cardAssignee.update({
       where: {
@@ -139,6 +160,9 @@ export async function removeCardAssignee(input: {
   if (!parsed.success) return { ok: false, message: 'Données invalides.' };
 
   const card = await loadCardOrThrow(ctx.workspaceId, parsed.data.cardId);
+
+  const scopeErr = await checkCardScope(ctx, card);
+  if (scopeErr) return scopeErr;
 
   await prisma.cardAssignee.deleteMany({
     where: { cardId: card.id, userId: parsed.data.userId },

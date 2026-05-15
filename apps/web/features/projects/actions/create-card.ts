@@ -3,7 +3,9 @@ import 'server-only';
 import { prisma } from '@nexushub/db';
 import { NotFoundError, computeCardPosition, validateCardTemplateItems } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
+import { loadUserScope } from '@/lib/auth/scope';
 import { assertCsrfFromFormData } from '@/lib/csrf';
+import { SCOPE_ERROR_MESSAGE } from '../lib/scope-error';
 import { CreateCardSchema } from '../lib/card-schemas';
 
 export type CreateCardState =
@@ -32,6 +34,20 @@ export async function createCard(
     return { status: 'error', message: parsed.error.issues[0]?.message ?? 'Données invalides.' };
   }
   const { projectId, columnId, title } = parsed.data;
+
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, workspaceId: ctx.workspaceId, deletedAt: null },
+    select: { id: true, clientId: true },
+  });
+  if (!project) return { status: 'error', message: 'Projet introuvable.' };
+
+  const scope = await loadUserScope(ctx);
+  if (scope.kind === 'restricted') {
+    const allowed =
+      scope.projectIds.includes(project.id) || scope.clientIds.includes(project.clientId);
+    if (!allowed) return { status: 'error', message: SCOPE_ERROR_MESSAGE };
+  }
+
   const templateIdRaw = formData.get('templateId');
   const explicitTemplateId =
     typeof templateIdRaw === 'string' && templateIdRaw.length > 0 ? templateIdRaw : null;

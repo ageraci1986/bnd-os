@@ -15,7 +15,9 @@ import {
 /** UUID v4 ↔ built-in id discriminator. */
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 import { requireUser } from '@/lib/auth';
+import { loadUserScope } from '@/lib/auth/scope';
 import { assertCsrfFromFormData } from '@/lib/csrf';
+import { SCOPE_ERROR_MESSAGE } from '../lib/scope-error';
 import { CreateProjectSchema } from '../lib/schemas';
 
 export type CreateProjectState =
@@ -55,6 +57,14 @@ export async function createProject(
     };
   }
   const data = parsed.data;
+
+  const scope = await loadUserScope(ctx);
+  if (scope.kind === 'restricted') {
+    const allowed = scope.clientIds.includes(data.clientId);
+    if (!allowed) {
+      return { status: 'error', message: SCOPE_ERROR_MESSAGE };
+    }
+  }
 
   // Defence in depth: confirm the client belongs to this workspace.
   const client = await prisma.client.findFirst({

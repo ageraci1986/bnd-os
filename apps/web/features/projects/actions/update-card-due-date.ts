@@ -11,15 +11,19 @@ import {
   type Column as DomainColumn,
 } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
+import { loadUserScope } from '@/lib/auth/scope';
+import { SCOPE_ERROR_MESSAGE } from '../lib/scope-error';
 import { UpdateCardDueDateSchema } from '../lib/checklist-schemas';
 
-export interface UpdateDueDateResult {
-  readonly ok: true;
-  readonly autoBlocked: boolean;
-  readonly autoUnblocked: boolean;
-  readonly newColumnId: string;
-  readonly newDueDate: string | null;
-}
+export type UpdateDueDateResult =
+  | {
+      readonly ok: true;
+      readonly autoBlocked: boolean;
+      readonly autoUnblocked: boolean;
+      readonly newColumnId: string;
+      readonly newDueDate: string | null;
+    }
+  | { readonly ok: false; readonly message: string };
 
 /**
  * Set or clear the due date on a card and apply the auto-routing rules
@@ -54,9 +58,19 @@ export async function updateCardDueDate(input: {
       previousColumnId: true,
       dueDate: true,
       archivedAt: true,
+      project: { select: { clientId: true } },
     },
   });
   if (!card) throw new NotFoundError('Card');
+
+  const scope = await loadUserScope(ctx);
+  if (scope.kind === 'restricted') {
+    const allowed =
+      scope.projectIds.includes(card.projectId) || scope.clientIds.includes(card.project.clientId);
+    if (!allowed) {
+      return { ok: false, message: SCOPE_ERROR_MESSAGE };
+    }
+  }
 
   const newDueDate = parsed.data.dueDate;
 

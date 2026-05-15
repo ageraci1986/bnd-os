@@ -6,9 +6,11 @@ import { redirect } from 'next/navigation';
 import { prisma } from '@nexushub/db';
 import { canDeleteClient } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
+import { loadUserScope } from '@/lib/auth/scope';
 import { assertCsrfFromFormData } from '@/lib/csrf';
 import { recordAudit } from '@/lib/audit';
 import { getClientIp } from '@/lib/rate-limit';
+import { SCOPE_ERROR_MESSAGE } from '@/features/projects/lib/scope-error';
 import { DeleteClientSchema } from '../lib/schemas';
 
 export type DeleteClientState =
@@ -44,6 +46,12 @@ export async function deleteClient(
   });
   if (!client) {
     return { status: 'error', message: 'Client introuvable.' };
+  }
+
+  const scope = await loadUserScope(ctx);
+  if (scope.kind === 'restricted') {
+    const allowed = scope.clientIds.includes(clientId);
+    if (!allowed) return { status: 'error', message: SCOPE_ERROR_MESSAGE };
   }
 
   const guard = canDeleteClient({ activeProjectsCount: client._count.projects });

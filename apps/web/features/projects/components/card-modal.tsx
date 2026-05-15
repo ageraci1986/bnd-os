@@ -467,6 +467,10 @@ function DueDateInput({
   const save = (next: string | null) => {
     startTransition(async () => {
       const res = await updateCardDueDate({ cardId, dueDate: next });
+      if (!res.ok) {
+        window.alert(res.message);
+        return;
+      }
       if (res.autoBlocked) {
         window.alert('Échéance dépassée — la carte a été déplacée vers Bloqué.');
         onAfterUpdate();

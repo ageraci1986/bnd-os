@@ -1,18 +1,26 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
-const { clientFindFirst, contactCreate, requireUserMock, assertCsrfMock, revalidatePathMock } =
-  vi.hoisted(() => ({
-    clientFindFirst: vi.fn(),
-    contactCreate: vi.fn(),
-    requireUserMock: vi.fn(),
-    assertCsrfMock: vi.fn(),
-    revalidatePathMock: vi.fn(),
-  }));
+const {
+  clientFindFirst,
+  contactCreate,
+  workspaceAccessFindMany,
+  requireUserMock,
+  assertCsrfMock,
+  revalidatePathMock,
+} = vi.hoisted(() => ({
+  clientFindFirst: vi.fn(),
+  contactCreate: vi.fn(),
+  workspaceAccessFindMany: vi.fn(),
+  requireUserMock: vi.fn(),
+  assertCsrfMock: vi.fn(),
+  revalidatePathMock: vi.fn(),
+}));
 
 vi.mock('@nexushub/db', () => ({
   prisma: {
     client: { findFirst: clientFindFirst },
     contact: { create: contactCreate },
+    workspaceAccess: { findMany: workspaceAccessFindMany },
   },
 }));
 vi.mock('@/lib/auth', () => ({ requireUser: requireUserMock }));
@@ -27,6 +35,7 @@ const VALID_CLIENT = '11111111-1111-4111-8111-111111111111';
 beforeEach(() => {
   clientFindFirst.mockReset();
   contactCreate.mockReset();
+  workspaceAccessFindMany.mockReset();
   requireUserMock.mockReset();
   assertCsrfMock.mockReset();
   revalidatePathMock.mockReset();
@@ -36,6 +45,8 @@ beforeEach(() => {
     role: 'user',
     isSuperAdmin: false,
   });
+  // Empty array → scopeFromRows([]) → { kind: 'workspace' } → no-op for scope check.
+  workspaceAccessFindMany.mockResolvedValue([]);
 });
 
 interface ContactFormOverrides {

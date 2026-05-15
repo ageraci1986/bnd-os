@@ -1,25 +1,33 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
-const { clientCreate, requireUserMock, assertCsrfMock, revalidatePathMock, FakePrismaP2002 } =
-  vi.hoisted(() => {
-    class FakePrismaP2002 extends Error {
-      override readonly name = 'PrismaClientKnownRequestError';
-      readonly code = 'P2002';
-      readonly clientVersion = 'test';
-      readonly meta = { target: ['workspace_id', 'name'] };
-    }
-    return {
-      clientCreate: vi.fn(),
-      requireUserMock: vi.fn(),
-      assertCsrfMock: vi.fn(),
-      revalidatePathMock: vi.fn(),
-      FakePrismaP2002,
-    };
-  });
+const {
+  clientCreate,
+  workspaceAccessFindMany,
+  requireUserMock,
+  assertCsrfMock,
+  revalidatePathMock,
+  FakePrismaP2002,
+} = vi.hoisted(() => {
+  class FakePrismaP2002 extends Error {
+    override readonly name = 'PrismaClientKnownRequestError';
+    readonly code = 'P2002';
+    readonly clientVersion = 'test';
+    readonly meta = { target: ['workspace_id', 'name'] };
+  }
+  return {
+    clientCreate: vi.fn(),
+    workspaceAccessFindMany: vi.fn(),
+    requireUserMock: vi.fn(),
+    assertCsrfMock: vi.fn(),
+    revalidatePathMock: vi.fn(),
+    FakePrismaP2002,
+  };
+});
 
 vi.mock('@nexushub/db', () => ({
   prisma: {
     client: { create: clientCreate },
+    workspaceAccess: { findMany: workspaceAccessFindMany },
   },
   Prisma: { PrismaClientKnownRequestError: FakePrismaP2002 },
 }));
@@ -31,6 +39,7 @@ import { createClient } from './create-client';
 
 beforeEach(() => {
   clientCreate.mockReset();
+  workspaceAccessFindMany.mockReset();
   requireUserMock.mockReset();
   assertCsrfMock.mockReset();
   revalidatePathMock.mockReset();
@@ -40,6 +49,8 @@ beforeEach(() => {
     role: 'user',
     isSuperAdmin: false,
   });
+  // Empty array → scopeFromRows([]) → { kind: 'workspace' } → no-op for scope check.
+  workspaceAccessFindMany.mockResolvedValue([]);
 });
 
 interface ClientFormOverrides {

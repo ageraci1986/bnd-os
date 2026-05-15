@@ -10,11 +10,14 @@ import {
   type Column as DomainColumn,
 } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
+import { loadUserScope } from '@/lib/auth/scope';
+import { SCOPE_ERROR_MESSAGE } from '../lib/scope-error';
 import { AdvanceCardSchema } from '../lib/checklist-schemas';
 
 export type AdvanceCardResult =
   | { readonly ok: true; readonly moved: false; readonly reason: string }
-  | { readonly ok: true; readonly moved: true; readonly newColumnId: string };
+  | { readonly ok: true; readonly moved: true; readonly newColumnId: string }
+  | { readonly ok: false; readonly message: string };
 
 /**
  * Called by the modal carte after the 1.8s timer fires (PRD §8.2). Re-runs
@@ -40,9 +43,19 @@ export async function advanceCard(input: { cardId: string }): Promise<AdvanceCar
       dueDate: true,
       archivedAt: true,
       _count: { select: { checklistItems: true } },
+      project: { select: { clientId: true } },
     },
   });
   if (!card) throw new NotFoundError('Card');
+
+  const scope = await loadUserScope(ctx);
+  if (scope.kind === 'restricted') {
+    const allowed =
+      scope.projectIds.includes(card.projectId) || scope.clientIds.includes(card.project.clientId);
+    if (!allowed) {
+      return { ok: false, message: SCOPE_ERROR_MESSAGE };
+    }
+  }
 
   const [columns, checklistDoneCount] = await Promise.all([
     prisma.column.findMany({

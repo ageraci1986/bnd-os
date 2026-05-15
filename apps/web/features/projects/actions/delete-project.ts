@@ -6,6 +6,8 @@ import { z } from 'zod';
 import { prisma } from '@nexushub/db';
 import { NotFoundError } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
+import { loadUserScope } from '@/lib/auth/scope';
+import { SCOPE_ERROR_MESSAGE } from '../lib/scope-error';
 
 const Schema = z.object({
   projectId: z.string().uuid(),
@@ -26,9 +28,16 @@ export async function deleteProject(input: {
 
   const project = await prisma.project.findFirst({
     where: { id: parsed.data.projectId, workspaceId: ctx.workspaceId, deletedAt: null },
-    select: { id: true },
+    select: { id: true, clientId: true },
   });
   if (!project) throw new NotFoundError('Project');
+
+  const scope = await loadUserScope(ctx);
+  if (scope.kind === 'restricted') {
+    const allowed =
+      scope.projectIds.includes(project.id) || scope.clientIds.includes(project.clientId);
+    if (!allowed) return { ok: false, message: SCOPE_ERROR_MESSAGE };
+  }
 
   await prisma.project.update({
     where: { id: project.id },

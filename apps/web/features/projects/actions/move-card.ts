@@ -4,6 +4,8 @@ import { revalidatePath } from 'next/cache';
 import { prisma } from '@nexushub/db';
 import { NotFoundError, computeCardPosition } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
+import { loadUserScope } from '@/lib/auth/scope';
+import { SCOPE_ERROR_MESSAGE } from '../lib/scope-error';
 import { MoveCardSchema } from '../lib/card-schemas';
 
 /**
@@ -30,9 +32,18 @@ export async function moveCard(input: {
 
   const card = await prisma.card.findFirst({
     where: { id: cardId, workspaceId: ctx.workspaceId, deletedAt: null },
-    select: { id: true, projectId: true, columnId: true },
+    select: { id: true, projectId: true, columnId: true, project: { select: { clientId: true } } },
   });
   if (!card) throw new NotFoundError('Card');
+
+  const scope = await loadUserScope(ctx);
+  if (scope.kind === 'restricted') {
+    const allowed =
+      scope.projectIds.includes(card.projectId) || scope.clientIds.includes(card.project.clientId);
+    if (!allowed) {
+      return { ok: false, message: SCOPE_ERROR_MESSAGE };
+    }
+  }
 
   const targetColumn = await prisma.column.findFirst({
     where: { id: targetColumnId, projectId: card.projectId },

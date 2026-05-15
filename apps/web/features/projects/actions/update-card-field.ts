@@ -4,6 +4,8 @@ import { z } from 'zod';
 import { prisma } from '@nexushub/db';
 import { NotFoundError, validateCardTemplateItems } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
+import { loadUserScope } from '@/lib/auth/scope';
+import { SCOPE_ERROR_MESSAGE } from '../lib/scope-error';
 
 const Schema = z.object({
   cardId: z.string().uuid(),
@@ -34,9 +36,17 @@ export async function updateCardField(input: {
       projectId: true,
       fieldValues: true,
       template: { select: { items: true } },
+      project: { select: { clientId: true } },
     },
   });
   if (!card) throw new NotFoundError('Card');
+
+  const scope = await loadUserScope(ctx);
+  if (scope.kind === 'restricted') {
+    const allowed =
+      scope.projectIds.includes(card.projectId) || scope.clientIds.includes(card.project.clientId);
+    if (!allowed) return { ok: false, message: SCOPE_ERROR_MESSAGE };
+  }
 
   const items = validateCardTemplateItems(card.template?.items ?? []) ?? [];
   const def = items.find(

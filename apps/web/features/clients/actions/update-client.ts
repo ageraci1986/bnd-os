@@ -4,7 +4,9 @@ import { revalidatePath } from 'next/cache';
 import { Prisma, prisma } from '@nexushub/db';
 import { NotFoundError } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
+import { loadUserScope } from '@/lib/auth/scope';
 import { assertCsrfFromFormData } from '@/lib/csrf';
+import { SCOPE_ERROR_MESSAGE } from '@/features/projects/lib/scope-error';
 import { UpdateClientSchema } from '../lib/schemas';
 
 export type UpdateClientState =
@@ -34,6 +36,12 @@ export async function updateClient(
     };
   }
   const data = parsed.data;
+
+  const scope = await loadUserScope(ctx);
+  if (scope.kind === 'restricted') {
+    const allowed = scope.clientIds.includes(data.clientId);
+    if (!allowed) return { status: 'error', message: SCOPE_ERROR_MESSAGE };
+  }
 
   try {
     const updated = await prisma.client.update({

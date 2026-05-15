@@ -5,6 +5,8 @@ import { z } from 'zod';
 import { prisma } from '@nexushub/db';
 import { NotFoundError } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
+import { loadUserScope } from '@/lib/auth/scope';
+import { SCOPE_ERROR_MESSAGE } from '../lib/scope-error';
 
 // Free-form so users can coin custom workspace-level categories.
 const CategorySchema = z.string().trim().min(1).max(32).nullable();
@@ -30,9 +32,9 @@ const UpdateCardSchema = z.object({
   categoryTag: CategorySchema.optional(),
 });
 
-export interface UpdateCardResult {
-  readonly ok: true;
-}
+export type UpdateCardResult =
+  | { readonly ok: true }
+  | { readonly ok: false; readonly message: string };
 
 export async function updateCard(input: {
   cardId: string;
@@ -48,9 +50,18 @@ export async function updateCard(input: {
 
   const card = await prisma.card.findFirst({
     where: { id: parsed.data.cardId, workspaceId: ctx.workspaceId, deletedAt: null },
-    select: { id: true, projectId: true },
+    select: { id: true, projectId: true, project: { select: { clientId: true } } },
   });
   if (!card) throw new NotFoundError('Card');
+
+  const scope = await loadUserScope(ctx);
+  if (scope.kind === 'restricted') {
+    const allowed =
+      scope.projectIds.includes(card.projectId) || scope.clientIds.includes(card.project.clientId);
+    if (!allowed) {
+      return { ok: false, message: SCOPE_ERROR_MESSAGE };
+    }
+  }
 
   const data: { title?: string; description?: string | null; categoryTag?: string | null } = {};
   if (parsed.data.title !== undefined) data.title = parsed.data.title;
