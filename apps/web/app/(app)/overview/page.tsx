@@ -26,13 +26,13 @@ export default async function OverviewPage({ searchParams }: OverviewPageProps) 
   // counter always reflects the rules at the moment the user looks.
   await reconcileBeforeRead(ctx.workspaceId);
 
-  const [profile, activeClient, scope] = await Promise.all([
+  const scope = await loadUserScope(ctx);
+  const [profile, activeClient] = await Promise.all([
     prisma.user.findUniqueOrThrow({
       where: { id: ctx.userId },
       select: { firstName: true, email: true },
     }),
-    resolveActiveClient(filter, ctx.workspaceId),
-    loadUserScope(ctx),
+    resolveActiveClient(filter, ctx.workspaceId, scope),
   ]);
 
   const metrics = await getOverviewMetrics({

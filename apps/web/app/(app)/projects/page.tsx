@@ -17,10 +17,8 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
   const ctx = await requireUser();
   const sp = (await searchParams) ?? {};
   const filter = getClientFilterFromSearchParams(sp);
-  const [activeClient, scope] = await Promise.all([
-    resolveActiveClient(filter, ctx.workspaceId),
-    loadUserScope(ctx),
-  ]);
+  const scope = await loadUserScope(ctx);
+  const activeClient = await resolveActiveClient(filter, ctx.workspaceId, scope);
 
   const projects = await prisma.project.findMany({
     where: {

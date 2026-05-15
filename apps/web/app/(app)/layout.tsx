@@ -20,6 +20,7 @@ import {
 } from '@nexushub/ui';
 
 import { requireUser } from '@/lib/auth';
+import { loadUserScope, scopedClientWhere, scopedProjectWhere } from '@/lib/auth/scope';
 import {
   getClientFilterFromSearchParams,
   resolveActiveClient,
@@ -41,6 +42,7 @@ export default async function AppLayout({ children, searchParams }: AppLayoutPro
   const ctx = await requireUser();
   const sp = (await searchParams) ?? {};
   const filter = getClientFilterFromSearchParams(sp);
+  const scope = await loadUserScope(ctx);
 
   const [workspace, profile, clients, projectsCount, activeClient] = await Promise.all([
     prisma.workspace.findUniqueOrThrow({
@@ -52,7 +54,12 @@ export default async function AppLayout({ children, searchParams }: AppLayoutPro
       select: { firstName: true, lastName: true, email: true },
     }),
     prisma.client.findMany({
-      where: { workspaceId: ctx.workspaceId, deletedAt: null, archivedAt: null },
+      where: {
+        workspaceId: ctx.workspaceId,
+        deletedAt: null,
+        archivedAt: null,
+        ...scopedClientWhere(scope),
+      },
       orderBy: { name: 'asc' },
       select: {
         id: true,
@@ -64,9 +71,14 @@ export default async function AppLayout({ children, searchParams }: AppLayoutPro
       },
     }),
     prisma.project.count({
-      where: { workspaceId: ctx.workspaceId, deletedAt: null, archivedAt: null },
+      where: {
+        workspaceId: ctx.workspaceId,
+        deletedAt: null,
+        archivedAt: null,
+        ...scopedProjectWhere(scope),
+      },
     }),
-    resolveActiveClient(filter, ctx.workspaceId),
+    resolveActiveClient(filter, ctx.workspaceId, scope),
   ]);
 
   const displayName =

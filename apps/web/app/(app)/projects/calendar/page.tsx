@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { prisma } from '@nexushub/db';
 import { monthGridRange, parseYearMonth } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
+import { loadUserScope, scopedProjectWhere } from '@/lib/auth/scope';
 import {
   getClientFilterFromSearchParams,
   resolveActiveClient,
@@ -35,7 +36,8 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
   const month1 = parsed?.month1 ?? now.getUTCMonth() + 1;
 
   const filter = getClientFilterFromSearchParams(sp);
-  const activeClient = await resolveActiveClient(filter, ctx.workspaceId);
+  const scope = await loadUserScope(ctx);
+  const activeClient = await resolveActiveClient(filter, ctx.workspaceId, scope);
 
   // Reconcile-on-read (PRD §8.3 + ADR 0001 #2) for the workspace before
   // pulling the visible cards.
@@ -51,6 +53,7 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
       project: {
         deletedAt: null,
         archivedAt: null,
+        ...scopedProjectWhere(scope),
         ...(activeClient ? { clientId: activeClient.id } : {}),
       },
     },

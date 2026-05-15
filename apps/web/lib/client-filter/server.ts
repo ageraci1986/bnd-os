@@ -13,7 +13,8 @@
  */
 import 'server-only';
 import { prisma } from '@nexushub/db';
-import { fromQueryParam, type ClientFilter } from '@nexushub/domain';
+import { fromQueryParam, type ClientFilter, type UserScope } from '@nexushub/domain';
+import { scopedClientWhere } from '@/lib/auth/scope';
 
 export interface ResolvedClient {
   readonly id: string;
@@ -51,13 +52,18 @@ export function getClientFilterFromSearchParams(
 export async function resolveActiveClient(
   filter: ClientFilter,
   workspaceId: string,
+  scope?: UserScope,
 ): Promise<ResolvedClient | null> {
   if (filter.mode !== 'single') return null;
 
   const wanted = filter.clientId.toLowerCase();
 
   const candidates = await prisma.client.findMany({
-    where: { workspaceId, deletedAt: null },
+    where: {
+      workspaceId,
+      deletedAt: null,
+      ...(scope ? scopedClientWhere(scope) : {}),
+    },
     select: { id: true, name: true, colorToken: true },
   });
 
