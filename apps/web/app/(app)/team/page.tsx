@@ -51,7 +51,7 @@ export default async function TeamPage() {
     prisma.project.findMany({
       where: { workspaceId: ctx.workspaceId, deletedAt: null },
       orderBy: { name: 'asc' },
-      select: { id: true, name: true, client: { select: { name: true } } },
+      select: { id: true, name: true, clientId: true, client: { select: { name: true } } },
     }),
   ]);
 
@@ -66,6 +66,7 @@ export default async function TeamPage() {
   const projectOptionsShaped = projectOptions.map((p) => ({
     id: p.id,
     name: p.name,
+    clientId: p.clientId,
     clientName: p.client.name,
   }));
 

@@ -19,7 +19,12 @@ export interface MemberRowProps {
   /** undefined for Admin (no scope possible). Otherwise the current scope. */
   readonly scope?: UserScope;
   readonly clientOptions: readonly { id: string; name: string }[];
-  readonly projectOptions: readonly { id: string; name: string; clientName: string }[];
+  readonly projectOptions: readonly {
+    id: string;
+    name: string;
+    clientId: string;
+    clientName: string;
+  }[];
 }
 
 const idleRole: ChangeRoleState = { status: 'idle' };

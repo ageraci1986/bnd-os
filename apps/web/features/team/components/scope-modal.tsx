@@ -1,5 +1,5 @@
 'use client';
-import { useActionState, useEffect, useState } from 'react';
+import { useActionState, useEffect, useMemo, useState } from 'react';
 import { CSRF_FIELD_NAME } from '@/lib/csrf/field';
 import { setUserScope, type SetScopeState } from '../actions/set-user-scope';
 
@@ -10,6 +10,7 @@ interface ClientOption {
 interface ProjectOption {
   readonly id: string;
   readonly name: string;
+  readonly clientId: string;
   readonly clientName: string;
 }
 
@@ -43,6 +44,21 @@ export function ScopeModal({
   useEffect(() => {
     if (state.status === 'success') onClose();
   }, [state.status, onClose]);
+
+  // A project is "inherited" if its parent client is in clientIds — its
+  // checkbox is visually checked and disabled (can't toggle individually
+  // because the row stays out of the DB; ticking the client-as-a-whole
+  // already covers it).
+  const clientIdsSet = useMemo(() => new Set(clientIds), [clientIds]);
+  const inheritedProjectIds = useMemo(
+    () => new Set(projectOptions.filter((p) => clientIdsSet.has(p.clientId)).map((p) => p.id)),
+    [projectOptions, clientIdsSet],
+  );
+  // Total visible projects = explicit picks + everything inherited via clients.
+  const visibleProjectsCount = useMemo(() => {
+    const explicit = projectIds.filter((id) => !inheritedProjectIds.has(id));
+    return explicit.length + inheritedProjectIds.size;
+  }, [projectIds, inheritedProjectIds]);
 
   const toggleClient = (id: string) =>
     setClientIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -95,27 +111,39 @@ export function ScopeModal({
 
             <section>
               <h3 className="mb-2 text-[11px] font-extrabold uppercase tracking-[1px] text-[color:var(--color-text-muted)]">
-                Projets spécifiques ({projectIds.length})
+                Projets visibles ({visibleProjectsCount})
               </h3>
               <ul className="max-h-72 overflow-y-auto rounded-xl border border-[color:var(--color-border-light)] p-2">
-                {projectOptions.map((p) => (
-                  <li key={p.id}>
-                    <label className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-[color:var(--color-bg-muted)]">
-                      <input
-                        type="checkbox"
-                        checked={projectIds.includes(p.id)}
-                        onChange={() => toggleProject(p.id)}
-                        className="accent-[color:var(--color-accent-primary)]"
-                      />
-                      <span className="flex flex-col">
-                        <span>{p.name}</span>
-                        <span className="text-[10px] text-[color:var(--color-text-muted)]">
-                          {p.clientName}
+                {projectOptions.map((p) => {
+                  const inherited = inheritedProjectIds.has(p.id);
+                  const checked = inherited || projectIds.includes(p.id);
+                  return (
+                    <li key={p.id}>
+                      <label
+                        className={
+                          inherited
+                            ? 'flex cursor-not-allowed items-center gap-2 rounded-md px-2 py-1.5 text-sm opacity-70'
+                            : 'flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-[color:var(--color-bg-muted)]'
+                        }
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          disabled={inherited}
+                          onChange={() => (inherited ? undefined : toggleProject(p.id))}
+                          className="accent-[color:var(--color-accent-primary)]"
+                        />
+                        <span className="flex flex-col">
+                          <span>{p.name}</span>
+                          <span className="text-[10px] text-[color:var(--color-text-muted)]">
+                            {p.clientName}
+                            {inherited ? ' · inclus via le client' : null}
+                          </span>
                         </span>
-                      </span>
-                    </label>
-                  </li>
-                ))}
+                      </label>
+                    </li>
+                  );
+                })}
               </ul>
             </section>
           </div>
