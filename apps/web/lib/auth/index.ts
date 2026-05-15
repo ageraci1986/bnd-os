@@ -3,8 +3,9 @@
  *
  * `getUser()` — anonymous-friendly: returns `null` when not signed in.
  * `requireUser()` — throws `RedirectToLogin` for unauthenticated requests.
- * `requireAdmin()` — throws `Forbidden` if the user is not Admin in the workspace.
- * `requireSuperAdmin()` — throws `Forbidden` if the user is not a platform super-admin.
+ * `requireAdmin()` — renders the 404 page if the user is not Admin in the workspace
+ *   (super-admin always passes).
+ * `requireSuperAdmin()` — renders the 404 page if the user is not a platform super-admin.
  *
  * SECURITY:
  *  - `supabase.auth.getUser()` validates the JWT against Supabase (network call).

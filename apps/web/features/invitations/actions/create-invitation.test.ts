@@ -80,7 +80,7 @@ describe('createInvitation', () => {
     const res = await createInvitation({ status: 'idle' }, fd('user'));
     expect(res.status).toBe('success');
     expect(mocks.invitationCreate).toHaveBeenCalledOnce();
-    const args = mocks.invitationCreate.mock.calls[0][0];
+    const args = mocks.invitationCreate.mock.calls[0]![0];
     expect(args.data.role).toBe('user');
     expect(args.data.workspaceId).toBe('ws-1');
   });
@@ -88,7 +88,7 @@ describe('createInvitation', () => {
   it('accepts role=admin', async () => {
     const res = await createInvitation({ status: 'idle' }, fd('admin'));
     expect(res.status).toBe('success');
-    const args = mocks.invitationCreate.mock.calls[0][0];
+    const args = mocks.invitationCreate.mock.calls[0]![0];
     expect(args.data.role).toBe('admin');
   });
 
