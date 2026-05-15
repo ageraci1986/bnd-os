@@ -21,7 +21,7 @@ export default async function TeamPage() {
   const ctx = await requireAdmin();
   const csrf = await getCsrfTokenForForm();
 
-  const [members, invitations] = await Promise.all([
+  const [members, invitations, accessRows, clientOptions, projectOptions] = await Promise.all([
     prisma.membership.findMany({
       where: { workspaceId: ctx.workspaceId },
       orderBy: [{ role: 'asc' }, { createdAt: 'asc' }],
@@ -39,7 +39,35 @@ export default async function TeamPage() {
       orderBy: { createdAt: 'desc' },
       select: { id: true, email: true, role: true, expiresAt: true },
     }),
+    prisma.workspaceAccess.findMany({
+      where: { workspaceId: ctx.workspaceId },
+      select: { membershipId: true, clientId: true, projectId: true },
+    }),
+    prisma.client.findMany({
+      where: { workspaceId: ctx.workspaceId, deletedAt: null },
+      orderBy: { name: 'asc' },
+      select: { id: true, name: true },
+    }),
+    prisma.project.findMany({
+      where: { workspaceId: ctx.workspaceId, deletedAt: null },
+      orderBy: { name: 'asc' },
+      select: { id: true, name: true, client: { select: { name: true } } },
+    }),
   ]);
+
+  const scopeByMembership = new Map<string, { clientIds: string[]; projectIds: string[] }>();
+  for (const r of accessRows) {
+    const cur = scopeByMembership.get(r.membershipId) ?? { clientIds: [], projectIds: [] };
+    if (r.clientId) cur.clientIds.push(r.clientId);
+    if (r.projectId) cur.projectIds.push(r.projectId);
+    scopeByMembership.set(r.membershipId, cur);
+  }
+
+  const projectOptionsShaped = projectOptions.map((p) => ({
+    id: p.id,
+    name: p.name,
+    clientName: p.client.name,
+  }));
 
   const fmt = (n: number): string => n.toString().padStart(2, '0');
   const isAlone = members.length <= 1;
@@ -88,6 +116,18 @@ export default async function TeamPage() {
                   .filter((s): s is string => Boolean(s))
                   .join(' ')
                   .trim() || m.user.email;
+              const memberScope =
+                m.role === 'admin'
+                  ? undefined
+                  : (() => {
+                      const rows = scopeByMembership.get(m.id);
+                      if (!rows) return { kind: 'workspace' as const };
+                      return {
+                        kind: 'restricted' as const,
+                        clientIds: rows.clientIds,
+                        projectIds: rows.projectIds,
+                      };
+                    })();
               return (
                 <MemberRow
                   key={m.id}
@@ -99,6 +139,9 @@ export default async function TeamPage() {
                   email={m.user.email}
                   role={m.role}
                   isSuperAdmin={m.user.isSuperAdmin}
+                  {...(memberScope !== undefined ? { scope: memberScope } : {})}
+                  clientOptions={clientOptions}
+                  projectOptions={projectOptionsShaped}
                 />
               );
             })}

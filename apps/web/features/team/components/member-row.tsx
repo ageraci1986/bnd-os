@@ -1,8 +1,11 @@
 'use client';
-import { useActionState } from 'react';
+import { useActionState, useState } from 'react';
+import type { UserScope } from '@nexushub/domain';
 import { CSRF_FIELD_NAME } from '@/lib/csrf/field';
 import { changeMemberRole, type ChangeRoleState } from '../actions/change-member-role';
 import { removeMember, type RemoveMemberState } from '../actions/remove-member';
+import { ScopeChip } from './scope-chip';
+import { ScopeModal } from './scope-modal';
 
 export interface MemberRowProps {
   readonly csrfToken: string;
@@ -13,6 +16,10 @@ export interface MemberRowProps {
   readonly email: string;
   readonly role: 'admin' | 'user' | 'viewer';
   readonly isSuperAdmin: boolean;
+  /** undefined for Admin (no scope possible). Otherwise the current scope. */
+  readonly scope?: UserScope;
+  readonly clientOptions: readonly { id: string; name: string }[];
+  readonly projectOptions: readonly { id: string; name: string; clientName: string }[];
 }
 
 const idleRole: ChangeRoleState = { status: 'idle' };
@@ -21,6 +28,7 @@ const idleRemove: RemoveMemberState = { status: 'idle' };
 export function MemberRow(props: MemberRowProps) {
   const [roleState, roleAction, rolePending] = useActionState(changeMemberRole, idleRole);
   const [removeState, removeAction, removePending] = useActionState(removeMember, idleRemove);
+  const [scopeModalOpen, setScopeModalOpen] = useState(false);
   const isSelf = props.userId === props.currentUserId;
 
   const initials =
@@ -60,6 +68,10 @@ export function MemberRow(props: MemberRowProps) {
         </p>
         <p className="truncate text-xs text-[color:var(--color-text-muted)]">{props.email}</p>
       </div>
+
+      {props.scope ? (
+        <ScopeChip scope={props.scope} onClick={() => setScopeModalOpen(true)} />
+      ) : null}
 
       <form action={roleAction} className="flex items-center gap-2">
         <input type="hidden" name={CSRF_FIELD_NAME} value={props.csrfToken} />
@@ -109,6 +121,19 @@ export function MemberRow(props: MemberRowProps) {
           {roleState.status === 'error' ? roleState.message : null}
           {removeState.status === 'error' ? removeState.message : null}
         </p>
+      ) : null}
+
+      {scopeModalOpen ? (
+        <ScopeModal
+          csrfToken={props.csrfToken}
+          membershipId={props.membershipId}
+          memberName={props.displayName}
+          initialClientIds={props.scope?.kind === 'restricted' ? props.scope.clientIds : []}
+          initialProjectIds={props.scope?.kind === 'restricted' ? props.scope.projectIds : []}
+          clientOptions={props.clientOptions}
+          projectOptions={props.projectOptions}
+          onClose={() => setScopeModalOpen(false)}
+        />
       ) : null}
     </li>
   );
