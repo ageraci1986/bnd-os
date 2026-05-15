@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { prisma } from '@nexushub/db';
 import { validateCardTemplateItems } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
+import { loadUserScope } from '@/lib/auth/scope';
 import { getCsrfTokenForForm } from '@/lib/csrf';
 import { KanbanBoard } from '@/features/projects/components/kanban-board';
 import { CardModalController } from '@/features/projects/components/card-modal-controller';
@@ -141,6 +142,13 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
     }),
   ]);
   if (!project) notFound();
+
+  const scope = await loadUserScope(ctx);
+  if (scope.kind === 'restricted') {
+    const allowed =
+      scope.projectIds.includes(project.id) || scope.clientIds.includes(project.client.id);
+    if (!allowed) notFound();
+  }
 
   const cardCount = project.cards.length;
 

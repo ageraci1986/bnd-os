@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { prisma } from '@nexushub/db';
 import { monthGridRange, parseYearMonth } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
+import { loadUserScope } from '@/lib/auth/scope';
 import { CalendarView, type CalendarCardItem } from '@/features/projects/components/calendar-view';
 import { reconcileBeforeRead } from '@/features/projects/lib/reconcile';
 import { ProjectFiltersBar } from '@/features/projects/components/project-filters-bar';
@@ -48,7 +49,7 @@ export default async function ProjectCalendarPage({
     select: {
       id: true,
       name: true,
-      client: { select: { name: true, colorToken: true } },
+      client: { select: { id: true, name: true, colorToken: true } },
       columns: {
         orderBy: { position: 'asc' },
         select: { id: true, name: true, isBlockedSystem: true },
@@ -56,6 +57,13 @@ export default async function ProjectCalendarPage({
     },
   });
   if (!project) notFound();
+
+  const scope = await loadUserScope(ctx);
+  if (scope.kind === 'restricted') {
+    const allowed =
+      scope.projectIds.includes(project.id) || scope.clientIds.includes(project.client.id);
+    if (!allowed) notFound();
+  }
 
   // Reconcile-on-read (PRD §8.3 + ADR 0001 #2). Idempotent — converges
   // before we fetch the cards so the calendar paints fresh state.

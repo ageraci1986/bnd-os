@@ -9,9 +9,16 @@
  *
  * Soft-deleted (`deletedAt`) and archived (`archivedAt`) rows are excluded
  * everywhere so the metrics line up with what the sidebar actually shows.
+ *
+ * An optional `scope` narrows the workspace-wide path to only the projects
+ * and clients the current user is allowed to see (WorkspaceAccess rows).
+ * For Admins and full-workspace Members, `scope` returns {} so there is no
+ * overhead.
  */
 import 'server-only';
 import { prisma } from '@nexushub/db';
+import { type UserScope } from '@nexushub/domain';
+import { scopedClientWhere, scopedProjectWhere, scopedCardWhere } from '@/lib/auth/scope';
 
 export interface OverviewMetrics {
   readonly clients: number;
@@ -24,25 +31,34 @@ export interface OverviewMetricsOptions {
   readonly workspaceId: string;
   /** When set, all counters are scoped to that client. */
   readonly clientId?: string;
+  /** When set, further restricts to only the resources visible to the user. */
+  readonly scope?: UserScope;
 }
 
 export async function getOverviewMetrics({
   workspaceId,
   clientId,
+  scope,
 }: OverviewMetricsOptions): Promise<OverviewMetrics> {
+  const scopeProjectWhere = scope ? scopedProjectWhere(scope) : {};
+  const scopeClientWhere = scope ? scopedClientWhere(scope) : {};
+  const scopeCardWhere = scope ? scopedCardWhere(scope) : {};
+
   const projectScope = {
     workspaceId,
     deletedAt: null,
     archivedAt: null,
+    ...scopeProjectWhere,
     ...(clientId ? { clientId } : {}),
-  } as const;
+  };
 
   const blockedCardWhere = {
     workspaceId,
     deletedAt: null,
     column: { isBlockedSystem: true },
+    ...scopeCardWhere,
     ...(clientId ? { project: { clientId } } : {}),
-  } as const;
+  };
 
   if (clientId) {
     // Scoped: members = distinct users on this client's projects.
@@ -66,7 +82,7 @@ export async function getOverviewMetrics({
 
   const [clients, projects, members, blockedCards] = await prisma.$transaction([
     prisma.client.count({
-      where: { workspaceId, deletedAt: null, archivedAt: null },
+      where: { workspaceId, deletedAt: null, archivedAt: null, ...scopeClientWhere },
     }),
     prisma.project.count({ where: projectScope }),
     prisma.membership.count({ where: { workspaceId } }),

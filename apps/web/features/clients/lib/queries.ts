@@ -7,7 +7,9 @@
  */
 import 'server-only';
 import { prisma } from '@nexushub/db';
+import { type UserScope } from '@nexushub/domain';
 import { clientSlug } from '@/lib/client-filter/server';
+import { scopedClientWhere } from '@/lib/auth/scope';
 
 export interface ClientListRow {
   readonly id: string;
@@ -19,9 +21,17 @@ export interface ClientListRow {
   readonly projectsCount: number;
 }
 
-export async function listClients(workspaceId: string): Promise<readonly ClientListRow[]> {
+export async function listClients(
+  workspaceId: string,
+  scope?: UserScope,
+): Promise<readonly ClientListRow[]> {
   const rows = await prisma.client.findMany({
-    where: { workspaceId, deletedAt: null, archivedAt: null },
+    where: {
+      workspaceId,
+      deletedAt: null,
+      archivedAt: null,
+      ...(scope ? scopedClientWhere(scope) : {}),
+    },
     orderBy: { name: 'asc' },
     select: {
       id: true,
@@ -76,11 +86,17 @@ export interface ClientDetail {
 export async function getClientBySlug(
   workspaceId: string,
   slug: string,
+  scope?: UserScope,
 ): Promise<ClientDetail | null> {
   const lowered = slug.toLowerCase();
 
   const candidates = await prisma.client.findMany({
-    where: { workspaceId, deletedAt: null, archivedAt: null },
+    where: {
+      workspaceId,
+      deletedAt: null,
+      archivedAt: null,
+      ...(scope ? scopedClientWhere(scope) : {}),
+    },
     orderBy: { name: 'asc' },
     select: {
       id: true,

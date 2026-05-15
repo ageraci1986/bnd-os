@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { requireUser } from '@/lib/auth';
 import { getCsrfTokenForForm } from '@/lib/csrf';
 import { listClients, getClientBySlug } from '@/features/clients/lib/queries';
+import { loadUserScope } from '@/lib/auth/scope';
 import { ClientCard } from '@/features/clients/components/client-card';
 import { ClientForm } from '@/features/clients/components/client-form';
 import { ClientDetailPanel } from '@/features/clients/components/client-detail-panel';
@@ -20,15 +21,16 @@ function readParam(value: string | string[] | undefined): string | null {
 
 export default async function ClientsPage({ searchParams }: ClientsPageProps) {
   const ctx = await requireUser();
+  const scope = await loadUserScope(ctx);
   const csrf = await getCsrfTokenForForm();
   const sp = (await searchParams) ?? {};
   const selectedSlug = readParam(sp['selected']);
   const editing = readParam(sp['edit']) === '1';
 
-  const clients = await listClients(ctx.workspaceId);
+  const clients = await listClients(ctx.workspaceId, scope);
   const detail =
     selectedSlug && selectedSlug.length > 0
-      ? await getClientBySlug(ctx.workspaceId, selectedSlug)
+      ? await getClientBySlug(ctx.workspaceId, selectedSlug, scope)
       : null;
 
   return (

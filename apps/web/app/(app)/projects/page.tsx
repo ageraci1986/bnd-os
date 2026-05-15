@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { prisma } from '@nexushub/db';
 import { requireUser } from '@/lib/auth';
 import { getClientFilterFromSearchParams, resolveActiveClient } from '@/lib/client-filter/server';
+import { loadUserScope, scopedProjectWhere } from '@/lib/auth/scope';
 import { CalendarIcon, KanbanIcon } from '@/features/shell/components/icons';
 import { DeleteProjectButton } from '@/features/projects/components/delete-project-button';
 
@@ -16,13 +17,17 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
   const ctx = await requireUser();
   const sp = (await searchParams) ?? {};
   const filter = getClientFilterFromSearchParams(sp);
-  const activeClient = await resolveActiveClient(filter, ctx.workspaceId);
+  const [activeClient, scope] = await Promise.all([
+    resolveActiveClient(filter, ctx.workspaceId),
+    loadUserScope(ctx),
+  ]);
 
   const projects = await prisma.project.findMany({
     where: {
       workspaceId: ctx.workspaceId,
       deletedAt: null,
       archivedAt: null,
+      ...scopedProjectWhere(scope),
       ...(activeClient ? { clientId: activeClient.id } : {}),
     },
     orderBy: { updatedAt: 'desc' },

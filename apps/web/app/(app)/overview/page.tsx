@@ -7,6 +7,7 @@ import { requireUser } from '@/lib/auth';
 import { getClientFilterFromSearchParams, resolveActiveClient } from '@/lib/client-filter/server';
 import { getOverviewMetrics } from '@/features/overview/lib/metrics';
 import { reconcileBeforeRead } from '@/features/projects/lib/reconcile';
+import { loadUserScope } from '@/lib/auth/scope';
 
 export const metadata: Metadata = {
   title: 'Tableau de bord',
@@ -25,16 +26,18 @@ export default async function OverviewPage({ searchParams }: OverviewPageProps) 
   // counter always reflects the rules at the moment the user looks.
   await reconcileBeforeRead(ctx.workspaceId);
 
-  const [profile, activeClient] = await Promise.all([
+  const [profile, activeClient, scope] = await Promise.all([
     prisma.user.findUniqueOrThrow({
       where: { id: ctx.userId },
       select: { firstName: true, email: true },
     }),
     resolveActiveClient(filter, ctx.workspaceId),
+    loadUserScope(ctx),
   ]);
 
   const metrics = await getOverviewMetrics({
     workspaceId: ctx.workspaceId,
+    scope,
     ...(activeClient ? { clientId: activeClient.id } : {}),
   });
 

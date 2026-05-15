@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { prisma } from '@nexushub/db';
 import { requireUser } from '@/lib/auth';
+import { loadUserScope } from '@/lib/auth/scope';
 import { getCsrfTokenForForm } from '@/lib/csrf';
 import { reconcileBeforeRead } from '@/features/projects/lib/reconcile';
 import { listCustomCategories } from '@/features/projects/lib/categories';
@@ -92,6 +93,13 @@ export default async function ProjectListPage({ params, searchParams }: ProjectL
       }),
     ]);
   if (!project) notFound();
+
+  const scope = await loadUserScope(ctx);
+  if (scope.kind === 'restricted') {
+    const allowed =
+      scope.projectIds.includes(project.id) || scope.clientIds.includes(project.client.id);
+    if (!allowed) notFound();
+  }
 
   // Map cards to the ListView shape. Counts are filtered the same way
   // the modal does it (other columns' step items are hidden).
