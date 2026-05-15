@@ -244,12 +244,15 @@ export function CardModal({
                         prev.map((i) => (i.id === item.id ? { ...i, isChecked } : i)),
                       );
                       startTransition(() => {
-                        void toggleChecklistItem({ itemId: item.id, isChecked }).catch(() => {
-                          setItems((prev) =>
-                            prev.map((i) =>
-                              i.id === item.id ? { ...i, isChecked: !isChecked } : i,
-                            ),
-                          );
+                        void toggleChecklistItem({ itemId: item.id, isChecked }).then((res) => {
+                          if (!res.ok) {
+                            window.alert(res.message);
+                            setItems((prev) =>
+                              prev.map((i) =>
+                                i.id === item.id ? { ...i, isChecked: !isChecked } : i,
+                              ),
+                            );
+                          }
                         });
                       });
                     }}
@@ -259,8 +262,11 @@ export function CardModal({
                       const snapshot = items;
                       setItems((prev) => prev.filter((i) => i.id !== item.id));
                       startTransition(() => {
-                        void deleteChecklistItem({ itemId: item.id }).catch(() => {
-                          setItems(snapshot);
+                        void deleteChecklistItem({ itemId: item.id }).then((res) => {
+                          if (!res.ok) {
+                            window.alert(res.message);
+                            setItems(snapshot);
+                          }
                         });
                       });
                     }}
@@ -288,12 +294,15 @@ export function CardModal({
                         prev.map((i) => (i.id === item.id ? { ...i, isChecked } : i)),
                       );
                       startTransition(() => {
-                        void toggleChecklistItem({ itemId: item.id, isChecked }).catch(() => {
-                          setItems((prev) =>
-                            prev.map((i) =>
-                              i.id === item.id ? { ...i, isChecked: !isChecked } : i,
-                            ),
-                          );
+                        void toggleChecklistItem({ itemId: item.id, isChecked }).then((res) => {
+                          if (!res.ok) {
+                            window.alert(res.message);
+                            setItems((prev) =>
+                              prev.map((i) =>
+                                i.id === item.id ? { ...i, isChecked: !isChecked } : i,
+                              ),
+                            );
+                          }
                         });
                       });
                     }}
@@ -301,8 +310,11 @@ export function CardModal({
                       const snapshot = items;
                       setItems((prev) => prev.filter((i) => i.id !== item.id));
                       startTransition(() => {
-                        void deleteChecklistItem({ itemId: item.id }).catch(() => {
-                          setItems(snapshot);
+                        void deleteChecklistItem({ itemId: item.id }).then((res) => {
+                          if (!res.ok) {
+                            window.alert(res.message);
+                            setItems(snapshot);
+                          }
                         });
                       });
                     }}
@@ -584,9 +596,14 @@ function ChecklistAdder({
     onOptimisticAdd(optimistic);
     setTitle('');
     startTransition(() => {
-      void createChecklistItem({ cardId, title: trimmed })
-        .then((res) => onConfirm(res.items))
-        .catch(() => onError(tempId));
+      void createChecklistItem({ cardId, title: trimmed }).then((res) => {
+        if (!res.ok) {
+          window.alert(res.message);
+          onError(tempId);
+        } else {
+          onConfirm(res.items);
+        }
+      });
     });
   };
 

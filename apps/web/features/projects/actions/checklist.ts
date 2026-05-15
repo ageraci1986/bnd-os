@@ -29,12 +29,17 @@ export interface ChecklistItemDTO {
   readonly columnSourceId: string | null;
 }
 
-export interface ChecklistMutationResult {
-  readonly ok: true;
-  readonly items: readonly ChecklistItemDTO[];
-  /** True when every item is checked AND the list is non-empty. */
-  readonly allChecked: boolean;
-}
+export type ChecklistMutationResult =
+  | {
+      readonly ok: true;
+      readonly items: readonly ChecklistItemDTO[];
+      /** True when every item is checked AND the list is non-empty. */
+      readonly allChecked: boolean;
+    }
+  | {
+      readonly ok: false;
+      readonly message: string;
+    };
 
 async function loadCardOrThrow(workspaceId: string, cardId: string) {
   const card = await prisma.card.findFirst({
@@ -69,7 +74,7 @@ export async function createChecklistItem(input: {
   if (scope.kind === 'restricted') {
     const allowed =
       scope.projectIds.includes(card.projectId) || scope.clientIds.includes(card.project.clientId);
-    if (!allowed) throw new Error(SCOPE_ERROR_MESSAGE);
+    if (!allowed) return { ok: false, message: SCOPE_ERROR_MESSAGE };
   }
 
   const last = await prisma.checklistItem.findFirst({
@@ -113,7 +118,7 @@ export async function toggleChecklistItem(input: {
     const allowed =
       scope.projectIds.includes(item.card.projectId) ||
       scope.clientIds.includes(item.card.project.clientId);
-    if (!allowed) throw new Error(SCOPE_ERROR_MESSAGE);
+    if (!allowed) return { ok: false, message: SCOPE_ERROR_MESSAGE };
   }
 
   await prisma.checklistItem.update({
@@ -149,7 +154,7 @@ export async function deleteChecklistItem(input: {
     const allowed =
       scope.projectIds.includes(item.card.projectId) ||
       scope.clientIds.includes(item.card.project.clientId);
-    if (!allowed) throw new Error(SCOPE_ERROR_MESSAGE);
+    if (!allowed) return { ok: false, message: SCOPE_ERROR_MESSAGE };
   }
 
   await prisma.checklistItem.delete({ where: { id: item.id } });
