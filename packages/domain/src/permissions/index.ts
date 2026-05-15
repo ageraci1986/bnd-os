@@ -54,4 +54,18 @@ export function assertCan(role: Role, capability: Capability): void {
   }
 }
 
-export { isRole } from './is-role';
+const KNOWN_ROLES: ReadonlySet<string> = new Set([Roles.Admin, Roles.User, Roles.Viewer]);
+
+/**
+ * Type predicate that narrows an unknown value (typically `Membership.role`
+ * read from the DB) to a known `Role`. Returns false for legacy strings
+ * (`'member'`) or unexpected enum extensions, so the caller can fall back
+ * to a safe state instead of trusting a stale type cast.
+ *
+ * Lives in this file (not a sibling) to avoid an import cycle:
+ * `is-role` consuming `Roles` from index while index re-exports `isRole`
+ * causes a TDZ ReferenceError under Turbopack module evaluation.
+ */
+export function isRole(value: unknown): value is Role {
+  return typeof value === 'string' && KNOWN_ROLES.has(value);
+}

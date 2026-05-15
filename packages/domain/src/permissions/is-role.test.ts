@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isRole } from './is-role';
+import { isRole } from './index';
 
 describe('isRole', () => {
   it('accepts the three valid role strings', () => {
