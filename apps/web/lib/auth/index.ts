@@ -15,7 +15,7 @@
 import 'server-only';
 import { redirect } from 'next/navigation';
 import { prisma } from '@nexushub/db';
-import { Roles, type Role } from '@nexushub/domain';
+import { isRole, Roles, type Role } from '@nexushub/domain';
 import { createSupabaseServer } from '../supabase/server';
 
 export interface AuthContext {
@@ -53,11 +53,17 @@ export async function getAuthContext(): Promise<AuthContext | null> {
   const membership = user.memberships[0];
   if (!membership) return null;
 
+  if (!isRole(membership.role)) {
+    // DB has a value we don't recognise (e.g. enum extended without code
+    // update). Treat as not-signed-in so we redirect to /login rather than
+    // hand back an unsafe context.
+    return null;
+  }
   return {
     userId: data.user.id,
     email: data.user.email ?? '',
     workspaceId: membership.workspaceId,
-    role: membership.role as Role,
+    role: membership.role,
     isSuperAdmin: user.isSuperAdmin,
   };
 }

@@ -53,3 +53,5 @@ export function assertCan(role: Role, capability: Capability): void {
     throw new Error(`FORBIDDEN: role=${role} cannot ${capability}`);
   }
 }
+
+export { isRole } from './is-role';
