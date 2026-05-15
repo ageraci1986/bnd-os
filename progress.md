@@ -425,11 +425,12 @@
 - [x] DB : `Role` enum étendu à `admin | user | viewer` via in-place RENAME + ADD VALUE (4 migrations séquentielles)
 - [x] DB : colonne `users.is_super_admin` BOOLEAN + index partiel + Angelo (`ageraci.finance@gmail.com`) bootstrappé via migration
 - [x] DB : trigger `protect_last_super_admin` miroir de `protect_last_admin` (P0001 errcode `LAST_SUPER_ADMIN_PROTECTED`)
-- [x] Domaine : `Roles = { Admin, User, Viewer }` + capability matrix couvrant les 3 rôles (3 specs `permissions.test.ts`)
+- [x] Domaine : `Roles = { Admin, User, Viewer }` + capability matrix couvrant les 3 rôles (4 specs `permissions.test.ts`)
 - [x] Auth : `requireSuperAdmin()` ajouté ; `AuthContext.isSuperAdmin` exposé ; `requireAdmin()` autorise aussi le super-admin
 - [x] Server actions : `createInvitation` + `changeMemberRole` acceptent les 3 rôles, rejettent `Viewer` avec message "Disponible dans une prochaine mise à jour" (Phase B unlock)
 - [x] UI `/team` : dropdown 3-options (Viewer disabled), badge **Super-admin** (gradient violet/rose) dans les member rows
-- [x] 230 tests verts (87 web + 143 domain incl. les 3 nouveaux), typecheck + lint propres
+- [x] 230 tests verts (87 web + 143 domain incl. les 4 nouveaux), typecheck + lint propres
+- [ ] **Phase B pré-req** : ajouter `isRole` predicate + tests d'intégration `createInvitation` / `changeMemberRole` (Viewer rejection, last-Admin, isolation workspace) + guard cascade-safe sur `protect_last_super_admin` (avant que Phase B fasse écrire des rôles Viewer en runtime)
 - [x] Smoke vérifié : Admin invite User → User s'inscrit via lien → User accède Overview/Projects/Clients, /team renvoie 403
 - [ ] **Phase B** : table `WorkspaceAccess` (scope par client/projet pour User et Viewer) + page `/my-projects` pour Viewer + sidebar adaptative
 - [ ] **Phase C** : console `/super-admin` (CRUD workspaces, liste globale users, promotion super-admin)
