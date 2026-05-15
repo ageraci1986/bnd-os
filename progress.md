@@ -1,6 +1,6 @@
 # progress.md — NexusHub · Plan de développement
 
-> **Dernière mise à jour :** 2026-05-14
+> **Dernière mise à jour :** 2026-05-15
 > **Référent produit :** Angelo L.
 > **Document maître produit :** [PRD-NexusHub.md](./PRD-NexusHub.md)
 > **Document maître technique :** [CLAUDE.md](./CLAUDE.md)
@@ -419,6 +419,23 @@
 - [x] Audit log : `invitation_created`, `invitation_accepted`, `invitation_revoked`, `member_removed`, `member_role_changed`
 - [ ] Refonte UI complète (avatars, table moderne) en Phase 3 design system
 - [ ] Tests E2E Playwright (login → invite → accept → remove) en Phase 11
+
+### 9.5 User management — Phase A (rôles + super-admin) ✅ (2026-05-15)
+
+- [x] DB : `Role` enum étendu à `admin | user | viewer` via in-place RENAME + ADD VALUE (4 migrations séquentielles)
+- [x] DB : colonne `users.is_super_admin` BOOLEAN + index partiel + Angelo (`ageraci.finance@gmail.com`) bootstrappé via migration
+- [x] DB : trigger `protect_last_super_admin` miroir de `protect_last_admin` (P0001 errcode `LAST_SUPER_ADMIN_PROTECTED`)
+- [x] Domaine : `Roles = { Admin, User, Viewer }` + capability matrix couvrant les 3 rôles (3 specs `permissions.test.ts`)
+- [x] Auth : `requireSuperAdmin()` ajouté ; `AuthContext.isSuperAdmin` exposé ; `requireAdmin()` autorise aussi le super-admin
+- [x] Server actions : `createInvitation` + `changeMemberRole` acceptent les 3 rôles, rejettent `Viewer` avec message "Disponible dans une prochaine mise à jour" (Phase B unlock)
+- [x] UI `/team` : dropdown 3-options (Viewer disabled), badge **Super-admin** (gradient violet/rose) dans les member rows
+- [x] 230 tests verts (87 web + 143 domain incl. les 3 nouveaux), typecheck + lint propres
+- [x] Smoke vérifié : Admin invite User → User s'inscrit via lien → User accède Overview/Projects/Clients, /team renvoie 403
+- [ ] **Phase B** : table `WorkspaceAccess` (scope par client/projet pour User et Viewer) + page `/my-projects` pour Viewer + sidebar adaptative
+- [ ] **Phase C** : console `/super-admin` (CRUD workspaces, liste globale users, promotion super-admin)
+- [ ] **Polish** : remplacer `throw new Response('Forbidden', { status: 403 })` par un rendu propre (page 403 ou `notFound()`) — actuellement Turbopack affiche brutalement "Runtime Error: Response" en dev pour les non-Admin qui touchent /team
+- [ ] **Polish** : `isRole` type predicate dans `@nexushub/domain` pour remplacer le cast `membership.role as Role` dans `getAuthContext` (forward-compat)
+- [ ] **Infra V1.5** : verifier domaine Resend (`mail.nexushub.app`) pour activer les invitations vers n'importe quelle adresse — actuellement en mode test, seul l'email du propriétaire Resend reçoit
 
 ### 9.2 Paramètres utilisateur
 
