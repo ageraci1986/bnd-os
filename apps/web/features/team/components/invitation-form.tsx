@@ -102,7 +102,8 @@ export function InvitationForm({ csrfToken }: Props) {
 
       <p className="mt-3 text-xs text-[color:var(--color-text-muted)]">
         L&apos;invitation envoie un lien à usage unique valide 72h. La personne définira son mot de
-        passe en arrivant sur NexusHub.
+        passe en arrivant sur NexusHub. Pour restreindre son accès à certains clients ou projets,
+        ouvre sa fiche dans la liste après acceptation.
       </p>
     </form>
   );
