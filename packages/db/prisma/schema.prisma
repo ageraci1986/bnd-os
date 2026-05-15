@@ -124,6 +124,8 @@ enum AuditAction {
   project_restored
   card_deleted
   encryption_key_rotated
+  workspace_access_granted
+  workspace_access_revoked
 }
 
 // =====================================================================
@@ -144,17 +146,18 @@ model User {
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  memberships        Membership[]
-  invitationsCreated Invitation[]             @relation("InvitationCreatedBy")
-  pushSubscriptions  PushSubscription[]
-  notificationPrefs  NotificationPreference[]
-  notificationsTo    Notification[]
-  activityActor      ActivityEvent[]
-  auditEvents        AuditLog[]
-  cardAssignments    CardAssignee[]
-  comments           Comment[]
-  projectMemberships ProjectMember[]
-  ownedIntegrations  Integration[]            @relation("IntegrationOwner")
+  memberships            Membership[]
+  invitationsCreated     Invitation[]             @relation("InvitationCreatedBy")
+  pushSubscriptions      PushSubscription[]
+  notificationPrefs      NotificationPreference[]
+  notificationsTo        Notification[]
+  activityActor          ActivityEvent[]
+  auditEvents            AuditLog[]
+  cardAssignments        CardAssignee[]
+  comments               Comment[]
+  projectMemberships     ProjectMember[]
+  ownedIntegrations      Integration[]            @relation("IntegrationOwner")
+  workspaceAccessCreated WorkspaceAccess[]        @relation("WorkspaceAccessCreatedBy")
 
   @@index([email])
   @@map("users")
@@ -169,20 +172,21 @@ model Workspace {
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  memberships     Membership[]
-  invitations     Invitation[]
-  clients         Client[]
-  projectTypes    ProjectType[]
-  projects        Project[]
-  emailTemplates  EmailTemplate[]
-  kanbanTemplates KanbanTemplate[]
-  cardTemplates   CardTemplate[]
-  integrations    Integration[]
-  activityEvents  ActivityEvent[]
-  auditLogs       AuditLog[]
-  notifications   Notification[]
-  emailMessages   EmailMessage[]
-  slackMessages   SlackMessage[]
+  memberships      Membership[]
+  invitations      Invitation[]
+  clients          Client[]
+  projectTypes     ProjectType[]
+  projects         Project[]
+  emailTemplates   EmailTemplate[]
+  kanbanTemplates  KanbanTemplate[]
+  cardTemplates    CardTemplate[]
+  integrations     Integration[]
+  activityEvents   ActivityEvent[]
+  auditLogs        AuditLog[]
+  notifications    Notification[]
+  emailMessages    EmailMessage[]
+  slackMessages    SlackMessage[]
+  workspaceAccess  WorkspaceAccess[]
 
   @@map("workspaces")
 }
@@ -195,13 +199,34 @@ model Membership {
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace       Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspaceAccess WorkspaceAccess[]
 
   @@unique([workspaceId, userId])
   @@index([workspaceId])
   @@index([userId])
   @@map("memberships")
+}
+
+model WorkspaceAccess {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId  String   @map("workspace_id") @db.Uuid
+  membershipId String   @map("membership_id") @db.Uuid
+  clientId     String?  @map("client_id") @db.Uuid
+  projectId    String?  @map("project_id") @db.Uuid
+  createdById  String   @map("created_by_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  workspace  Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  membership Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  client     Client?    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  project    Project?   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy  User       @relation("WorkspaceAccessCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([workspaceId])
+  @@index([membershipId])
+  @@map("workspace_access")
 }
 
 /// Custom invitation flow (HMAC-signed token, 72h expiry, single-use).
@@ -248,12 +273,13 @@ model Client {
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  workspace       Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  contacts        Contact[]
-  projects        Project[]
-  channelMappings ClientChannelMapping[]
-  emailMessages   EmailMessage[]
-  slackMessages   SlackMessage[]
+  workspace        Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  contacts         Contact[]
+  projects         Project[]
+  channelMappings  ClientChannelMapping[]
+  emailMessages    EmailMessage[]
+  slackMessages    SlackMessage[]
+  workspaceAccess  WorkspaceAccess[]
 
   @@unique([workspaceId, name])
   @@index([workspaceId])
@@ -344,12 +370,13 @@ model Project {
   createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  workspace Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  client    Client          @relation(fields: [clientId], references: [id], onDelete: Restrict)
-  type      ProjectType?    @relation(fields: [typeId], references: [id], onDelete: SetNull)
-  members   ProjectMember[]
-  columns   Column[]
-  cards     Card[]
+  workspace       Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  client          Client            @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  type            ProjectType?      @relation(fields: [typeId], references: [id], onDelete: SetNull)
+  members         ProjectMember[]
+  columns         Column[]
+  cards           Card[]
+  workspaceAccess WorkspaceAccess[]
 
   @@unique([workspaceId, name])
   @@index([workspaceId])
