@@ -190,6 +190,8 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
         scope.projectIds.includes(project.id) ||
         scope.clientIds.includes(project.client.id)));
 
+  const canDelete = canShare;
+
   const cardCount = project.cards.length;
 
   const memberOptions = workspaceMembers.map((m) => {
@@ -259,7 +261,9 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
               viewers={viewerOptions}
             />
           ) : null}
-          <DeleteProjectButton projectId={project.id} projectName={project.name} />
+          {canDelete ? (
+            <DeleteProjectButton projectId={project.id} projectName={project.name} />
+          ) : null}
         </div>
       </header>
 

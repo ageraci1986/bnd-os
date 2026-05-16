@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { prisma } from '@nexushub/db';
-import { NotFoundError } from '@nexushub/domain';
+import { NotFoundError, Roles } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
 import { loadUserScope } from '@/lib/auth/scope';
 import { SCOPE_ERROR_MESSAGE } from '../lib/scope-error';
@@ -23,6 +23,9 @@ export async function deleteProject(input: {
   projectId: string;
 }): Promise<{ ok: true } | { ok: false; message: string }> {
   const ctx = await requireUser();
+  if (ctx.role === Roles.Viewer) {
+    return { ok: false, message: 'Action réservée aux Admins et Users.' };
+  }
   const parsed = Schema.safeParse(input);
   if (!parsed.success) return { ok: false, message: 'Identifiant projet invalide.' };
 

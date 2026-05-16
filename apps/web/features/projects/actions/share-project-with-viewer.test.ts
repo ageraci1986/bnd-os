@@ -50,6 +50,7 @@ beforeEach(() => {
   mocks.projectFindFirst.mockResolvedValue({ id: PROJECT_ID, clientId: 'c-1' });
   mocks.membershipFindUnique.mockResolvedValue({ workspaceId: 'ws-1', role: 'viewer' });
   mocks.workspaceAccessFindMany.mockResolvedValue([]);
+  mocks.waDeleteMany.mockResolvedValue({ count: 1 });
 });
 
 describe('shareProjectWithViewer', () => {
@@ -109,5 +110,30 @@ describe('shareProjectWithViewer', () => {
     expect(res).toEqual({ ok: true });
     expect(mocks.waDeleteMany).toHaveBeenCalledOnce();
     expect(mocks.waCreate).not.toHaveBeenCalled();
+  });
+
+  it('share is idempotent: existing row → no create, no audit', async () => {
+    mocks.waFindFirst.mockResolvedValueOnce({ id: 'wa-existing' });
+    const res = await shareProjectWithViewer({
+      projectId: PROJECT_ID,
+      membershipId: MEMBERSHIP_ID,
+      mode: 'share',
+      csrfToken: 'tok',
+    });
+    expect(res).toEqual({ ok: true });
+    expect(mocks.waCreate).not.toHaveBeenCalled();
+    expect(mocks.recordAudit).not.toHaveBeenCalled();
+  });
+
+  it('unshare with no rows to delete → no audit', async () => {
+    mocks.waDeleteMany.mockResolvedValueOnce({ count: 0 });
+    const res = await shareProjectWithViewer({
+      projectId: PROJECT_ID,
+      membershipId: MEMBERSHIP_ID,
+      mode: 'unshare',
+      csrfToken: 'tok',
+    });
+    expect(res).toEqual({ ok: true });
+    expect(mocks.recordAudit).not.toHaveBeenCalled();
   });
 });

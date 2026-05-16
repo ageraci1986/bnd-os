@@ -103,35 +103,37 @@ export async function shareProjectWithViewer(input: {
           createdById: ctx.userId,
         },
       });
+      await recordAudit({
+        action: 'workspace_access_granted',
+        workspaceId: ctx.workspaceId,
+        actorId: ctx.userId,
+        subjectType: 'membership',
+        subjectId: parsed.data.membershipId,
+        data: { projectId: parsed.data.projectId },
+        ip,
+        userAgent: ua,
+      });
     }
-    await recordAudit({
-      action: 'workspace_access_granted',
-      workspaceId: ctx.workspaceId,
-      actorId: ctx.userId,
-      subjectType: 'membership',
-      subjectId: parsed.data.membershipId,
-      data: { projectId: parsed.data.projectId },
-      ip,
-      userAgent: ua,
-    });
   } else {
-    await prisma.workspaceAccess.deleteMany({
+    const { count } = await prisma.workspaceAccess.deleteMany({
       where: {
         workspaceId: ctx.workspaceId,
         membershipId: parsed.data.membershipId,
         projectId: parsed.data.projectId,
       },
     });
-    await recordAudit({
-      action: 'workspace_access_revoked',
-      workspaceId: ctx.workspaceId,
-      actorId: ctx.userId,
-      subjectType: 'membership',
-      subjectId: parsed.data.membershipId,
-      data: { projectId: parsed.data.projectId },
-      ip,
-      userAgent: ua,
-    });
+    if (count > 0) {
+      await recordAudit({
+        action: 'workspace_access_revoked',
+        workspaceId: ctx.workspaceId,
+        actorId: ctx.userId,
+        subjectType: 'membership',
+        subjectId: parsed.data.membershipId,
+        data: { projectId: parsed.data.projectId },
+        ip,
+        userAgent: ua,
+      });
+    }
   }
 
   revalidatePath(`/projects/${parsed.data.projectId}`);

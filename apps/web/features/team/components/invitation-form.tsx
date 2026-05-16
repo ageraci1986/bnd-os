@@ -32,6 +32,9 @@ export function InvitationForm({ csrfToken, clientOptions, projectOptions }: Pro
     projectOptions.filter((p) => clientIdsSet.has(p.clientId)).map((p) => p.id),
   );
 
+  const hasScope = clientIds.length > 0 || projectIds.length > 0;
+  const viewerScopeMissing = role === 'viewer' && !hasScope;
+
   const toggleClient = (id: string) =>
     setClientIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
@@ -138,8 +141,13 @@ export function InvitationForm({ csrfToken, clientOptions, projectOptions }: Pro
           <button
             type="submit"
             className="btn btn-primary w-full md:w-auto"
-            disabled={isPending}
+            disabled={isPending || viewerScopeMissing}
             aria-busy={isPending || undefined}
+            title={
+              viewerScopeMissing
+                ? 'Sélectionne au moins un client ou un projet pour ce Viewer.'
+                : undefined
+            }
           >
             {isPending ? 'Envoi…' : 'Inviter'}
           </button>
@@ -153,7 +161,9 @@ export function InvitationForm({ csrfToken, clientOptions, projectOptions }: Pro
               Scope {role === 'viewer' ? '· requis' : '· optionnel'}
             </h3>
             <span className="text-[10px] text-[color:var(--color-text-muted)]">
-              Aucune coche = accès à tout le workspace
+              {role === 'viewer'
+                ? 'Au moins un client ou un projet est requis'
+                : 'Aucune coche = accès à tout le workspace'}
             </span>
           </div>
           <input type="hidden" name="scopeClientIds" value={clientIds.join(',')} />
