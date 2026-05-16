@@ -236,6 +236,8 @@ model Invitation {
   workspaceId      String           @map("workspace_id") @db.Uuid
   email            String           @db.Citext
   role             Role             @default(user)
+  scopeClientIds   String[]         @default([]) @map("scope_client_ids") @db.Uuid
+  scopeProjectIds  String[]         @default([]) @map("scope_project_ids") @db.Uuid
   tokenHash        String           @unique @map("token_hash") @db.VarChar(64) // sha256 hex
   expiresAt        DateTime         @map("expires_at") @db.Timestamptz(6)
   status           InvitationStatus @default(pending)
