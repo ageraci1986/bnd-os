@@ -67,13 +67,36 @@ beforeEach(() => {
 });
 
 describe('createInvitation', () => {
-  it('rejects role=viewer in Phase A (Phase B.2 unlocks it)', async () => {
-    const res = await createInvitation({ status: 'idle' }, fd('viewer'));
+  it('rejects role=viewer with no scope', async () => {
+    const f = fd('viewer');
+    const res = await createInvitation({ status: 'idle' }, f);
     expect(res).toEqual({
       status: 'error',
-      message: 'Le rôle Viewer sera disponible dans une prochaine mise à jour.',
+      message: 'Un Viewer doit avoir au moins un client ou un projet dans son scope.',
     });
     expect(mocks.invitationCreate).not.toHaveBeenCalled();
+  });
+
+  it('accepts role=viewer with at least one client in scope', async () => {
+    const f = fd('viewer');
+    f.set('scopeClientIds', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa');
+    const res = await createInvitation({ status: 'idle' }, f);
+    expect(res.status).toBe('success');
+    const args = mocks.invitationCreate.mock.calls[0]![0];
+    expect(args.data.role).toBe('viewer');
+    expect(args.data.scopeClientIds).toEqual(['aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa']);
+    expect(args.data.scopeProjectIds).toEqual([]);
+  });
+
+  it('drops malformed scope UUIDs from the CSV silently', async () => {
+    const f = fd('viewer');
+    f.set('scopeClientIds', 'not-a-uuid,also-bad');
+    f.set('scopeProjectIds', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb');
+    const res = await createInvitation({ status: 'idle' }, f);
+    expect(res.status).toBe('success');
+    const args = mocks.invitationCreate.mock.calls[0]![0];
+    expect(args.data.scopeClientIds).toEqual([]);
+    expect(args.data.scopeProjectIds).toEqual(['bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb']);
   });
 
   it('accepts role=user and writes the invitation', async () => {

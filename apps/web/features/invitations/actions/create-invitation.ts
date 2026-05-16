@@ -12,9 +12,21 @@ import { recordAudit } from '@/lib/audit';
 import { getEmail } from '@/lib/email';
 import { renderInvitationEmail } from '../email/templates';
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function parseUuidCsv(raw: string | undefined): string[] {
+  if (!raw) return [];
+  return raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => UUID_RE.test(s));
+}
+
 const CreateInvitationSchema = z.object({
   email: z.string().trim().toLowerCase().email().max(254),
   role: z.enum([Roles.Admin, Roles.User, Roles.Viewer]).default(Roles.User),
+  scopeClientIds: z.string().optional(),
+  scopeProjectIds: z.string().optional(),
 });
 
 export type CreateInvitationState =
@@ -34,18 +46,26 @@ export async function createInvitation(
   const parsed = CreateInvitationSchema.safeParse({
     email: formData.get('email'),
     role: formData.get('role') ?? Roles.User,
+    scopeClientIds: formData.get('scopeClientIds') ?? undefined,
+    scopeProjectIds: formData.get('scopeProjectIds') ?? undefined,
   });
   if (!parsed.success) {
     return { status: 'error', message: 'Adresse e-mail ou rôle invalide.' };
   }
-  const { email, role } = parsed.data;
+  const {
+    email,
+    role,
+    scopeClientIds: scopeClientCsv,
+    scopeProjectIds: scopeProjectCsv,
+  } = parsed.data;
 
-  // Phase A: Viewer requires a scope picker (Phase B). The UI disables
-  // the option; this is the defence-in-depth.
-  if (role === Roles.Viewer) {
+  const scopeClientIds = parseUuidCsv(scopeClientCsv);
+  const scopeProjectIds = parseUuidCsv(scopeProjectCsv);
+
+  if (role === Roles.Viewer && scopeClientIds.length === 0 && scopeProjectIds.length === 0) {
     return {
       status: 'error',
-      message: 'Le rôle Viewer sera disponible dans une prochaine mise à jour.',
+      message: 'Un Viewer doit avoir au moins un client ou un projet dans son scope.',
     };
   }
 
@@ -108,6 +128,8 @@ export async function createInvitation(
       workspaceId: ctx.workspaceId,
       email,
       role,
+      scopeClientIds,
+      scopeProjectIds,
       tokenHash: token.hash,
       expiresAt,
       status: 'pending',

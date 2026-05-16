@@ -36,13 +36,6 @@ export async function changeMemberRole(
   }
   const { membershipId, role } = parsed.data;
 
-  if (role === Roles.Viewer) {
-    return {
-      status: 'error',
-      message: 'Le rôle Viewer sera disponible dans une prochaine mise à jour.',
-    };
-  }
-
   const target = await prisma.membership.findUnique({
     where: { id: membershipId },
     select: { workspaceId: true, role: true, userId: true },
@@ -52,6 +45,18 @@ export async function changeMemberRole(
   }
   if (target.role === role) {
     return { status: 'success' };
+  }
+
+  if (role === Roles.Viewer) {
+    const accessCount = await prisma.workspaceAccess.count({
+      where: { workspaceId: ctx.workspaceId, membershipId },
+    });
+    if (accessCount === 0) {
+      return {
+        status: 'error',
+        message: "Définis d'abord un scope pour ce membre avant de le passer en Viewer.",
+      };
+    }
   }
 
   const reqHeaders = await headers();

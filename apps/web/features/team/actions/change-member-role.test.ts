@@ -3,6 +3,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 const mocks = vi.hoisted(() => ({
   membershipFindUnique: vi.fn(),
   membershipUpdate: vi.fn(),
+  workspaceAccessCount: vi.fn(),
   requireAdmin: vi.fn(),
   assertCsrf: vi.fn(),
   recordAudit: vi.fn(),
@@ -19,6 +20,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@nexushub/db', () => ({
   prisma: {
     membership: { findUnique: mocks.membershipFindUnique, update: mocks.membershipUpdate },
+    workspaceAccess: { count: mocks.workspaceAccessCount },
   },
   Prisma: { PrismaClientKnownRequestError: mocks.PrismaP0001 },
 }));
@@ -52,19 +54,31 @@ beforeEach(() => {
     role: 'user',
     userId: 'other-user',
   });
+  mocks.workspaceAccessCount.mockResolvedValue(0);
 });
 
 describe('changeMemberRole', () => {
-  it('rejects role=viewer in Phase A', async () => {
+  it('refuses to promote to viewer when the member has no scope rows', async () => {
+    mocks.workspaceAccessCount.mockResolvedValueOnce(0);
     const res = await changeMemberRole(
       { status: 'idle' },
       fd('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'viewer'),
     );
     expect(res).toEqual({
       status: 'error',
-      message: 'Le rôle Viewer sera disponible dans une prochaine mise à jour.',
+      message: "Définis d'abord un scope pour ce membre avant de le passer en Viewer.",
     });
     expect(mocks.membershipUpdate).not.toHaveBeenCalled();
+  });
+
+  it('promotes to viewer when scope rows already exist', async () => {
+    mocks.workspaceAccessCount.mockResolvedValueOnce(2);
+    const res = await changeMemberRole(
+      { status: 'idle' },
+      fd('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'viewer'),
+    );
+    expect(res.status).toBe('success');
+    expect(mocks.membershipUpdate).toHaveBeenCalledOnce();
   });
 
   it('updates role=admin for a member in the same workspace', async () => {

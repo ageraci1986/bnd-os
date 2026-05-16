@@ -82,10 +82,13 @@ export async function acceptInvitation(
         id: true,
         email: true,
         role: true,
+        scopeClientIds: true,
+        scopeProjectIds: true,
         expiresAt: true,
         consumedAt: true,
         status: true,
         workspaceId: true,
+        createdById: true,
       },
     });
     if (!inv) return null;
@@ -120,27 +123,51 @@ export async function acceptInvitation(
 
   // Mark invitation consumed + create membership + update profile in one tx.
   // The DB trigger `handle_new_auth_user` already inserted public.users for us.
-  await prisma.$transaction([
-    prisma.invitation.update({
+  await prisma.$transaction(async (tx) => {
+    await tx.invitation.update({
       where: { id: consumed.id },
       data: {
         status: 'accepted',
         consumedAt: new Date(),
         consumedByUserId: newUserId,
       },
-    }),
-    prisma.user.update({
+    });
+    await tx.user.update({
       where: { id: newUserId },
       data: { firstName, lastName },
-    }),
-    prisma.membership.create({
+    });
+    const newMembership = await tx.membership.create({
       data: {
         workspaceId: consumed.workspaceId,
         userId: newUserId,
         role: consumed.role,
       },
-    }),
-  ]);
+      select: { id: true },
+    });
+
+    // Materialise the persisted scope as WorkspaceAccess rows. Empty arrays
+    // = no restriction (the default for User). Viewer always has at least
+    // one row because createInvitation refused otherwise.
+    const accessRows = [
+      ...consumed.scopeClientIds.map((clientId) => ({
+        workspaceId: consumed.workspaceId,
+        membershipId: newMembership.id,
+        clientId,
+        projectId: null,
+        createdById: consumed.createdById,
+      })),
+      ...consumed.scopeProjectIds.map((projectId) => ({
+        workspaceId: consumed.workspaceId,
+        membershipId: newMembership.id,
+        clientId: null,
+        projectId,
+        createdById: consumed.createdById,
+      })),
+    ];
+    if (accessRows.length > 0) {
+      await tx.workspaceAccess.createMany({ data: accessRows });
+    }
+  });
 
   await recordAudit({
     action: 'invitation_accepted',
