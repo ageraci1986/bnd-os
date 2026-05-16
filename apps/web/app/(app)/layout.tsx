@@ -32,6 +32,7 @@ import { ClientLink, AllClientsLink } from '@/features/shell/components/client-l
 import { UserChip } from '@/features/shell/components/user-chip';
 import { ContextBarHost } from '@/features/shell/components/context-bar-host';
 import { DashboardIcon, ClientsIcon, GearIcon } from '@/features/shell/components/icons';
+import { SidebarViewer } from '@/features/shell/components/sidebar-viewer';
 
 interface AppLayoutProps {
   readonly children: React.ReactNode;
@@ -101,59 +102,68 @@ export default async function AppLayout({ children, searchParams }: AppLayoutPro
       .toUpperCase() || profile.email.slice(0, 2).toUpperCase();
 
   const isAdmin = ctx.role === Roles.Admin;
+  const isViewer = ctx.role === Roles.Viewer;
 
   return (
     <div className="grid min-h-screen grid-cols-[260px_1fr]">
-      <Sidebar>
-        <SidebarBrand mark="N" name="NexusHub" subtitle={workspace.name} />
+      {isViewer ? (
+        <SidebarViewer
+          workspaceName={workspace.name}
+          displayName={displayName}
+          initials={initials}
+        />
+      ) : (
+        <Sidebar>
+          <SidebarBrand mark="N" name="NexusHub" subtitle={workspace.name} />
 
-        <SidebarSectionCollapsible
-          label="Main menu"
-          storageKey="main-menu"
-          defaultOpen
-          icon={<DashboardIcon />}
-        >
-          <NavLink href="/overview" icon="◈" label="Tableau de bord" />
-          <NavLink href="/projects" icon="◱" label="Projets" count={projectsCount} />
-          <NavLink href="/communications" icon="✉" label="Communications" />
-        </SidebarSectionCollapsible>
+          <SidebarSectionCollapsible
+            label="Main menu"
+            storageKey="main-menu"
+            defaultOpen
+            icon={<DashboardIcon />}
+          >
+            <NavLink href="/overview" icon="◈" label="Tableau de bord" />
+            <NavLink href="/projects" icon="◱" label="Projets" count={projectsCount} />
+            <NavLink href="/communications" icon="✉" label="Communications" />
+          </SidebarSectionCollapsible>
 
-        <SidebarSectionCollapsible
-          label="Clients actifs"
-          storageKey="clients-actifs"
-          icon={<ClientsIcon />}
-          count={clients.length}
-        >
-          <AllClientsLink count={clients.length} />
-          {clients.map((c) => (
-            <ClientLink
-              key={c.id}
-              slug={clientSlug(c.name)}
-              name={c.name}
-              colorToken={c.colorToken}
-              count={c._count.projects}
+          <SidebarSectionCollapsible
+            label="Clients actifs"
+            storageKey="clients-actifs"
+            icon={<ClientsIcon />}
+            count={clients.length}
+          >
+            <AllClientsLink count={clients.length} />
+            {clients.map((c) => (
+              <ClientLink
+                key={c.id}
+                slug={clientSlug(c.name)}
+                name={c.name}
+                colorToken={c.colorToken}
+                count={c._count.projects}
+              />
+            ))}
+          </SidebarSectionCollapsible>
+
+          <SidebarSectionCollapsible label="Atelier" storageKey="atelier" icon={<GearIcon />}>
+            <NavLink href="/clients" icon="◉" label="Clients" />
+            <NavLink href="/templates/cards" icon="▤" label="Templates cartes" />
+            <NavLink href="/templates/email" icon="✎" label="Templates e-mail" />
+            <NavLink href="/templates/kanban" icon="▦" label="Templates Kanban" />
+            {isAdmin ? <NavLink href="/team" icon="⎔" label="Équipe" /> : null}
+            <NavLink href="/integrations" icon="⟷" label="Intégrations" />
+            <NavLink href="/settings" icon="⚙" label="Paramètres" />
+          </SidebarSectionCollapsible>
+
+          <SidebarFooter>
+            <UserChip
+              displayName={displayName}
+              initials={initials}
+              role={isAdmin ? 'Admin' : 'Membre'}
             />
-          ))}
-        </SidebarSectionCollapsible>
-
-        <SidebarSectionCollapsible label="Atelier" storageKey="atelier" icon={<GearIcon />}>
-          <NavLink href="/clients" icon="◉" label="Clients" />
-          <NavLink href="/templates/cards" icon="▤" label="Templates cartes" />
-          <NavLink href="/templates/email" icon="✎" label="Templates e-mail" />
-          <NavLink href="/templates/kanban" icon="▦" label="Templates Kanban" />
-          {isAdmin ? <NavLink href="/team" icon="⎔" label="Équipe" /> : null}
-          <NavLink href="/integrations" icon="⟷" label="Intégrations" />
-          <NavLink href="/settings" icon="⚙" label="Paramètres" />
-        </SidebarSectionCollapsible>
-
-        <SidebarFooter>
-          <UserChip
-            displayName={displayName}
-            initials={initials}
-            role={isAdmin ? 'Admin' : 'Membre'}
-          />
-        </SidebarFooter>
-      </Sidebar>
+          </SidebarFooter>
+        </Sidebar>
+      )}
 
       <div className="flex min-w-0 flex-col overflow-x-hidden bg-[color:var(--color-bg-app)]">
         <Topbar

@@ -3,7 +3,7 @@ import { signOut } from '@/features/auth/actions/sign-out';
 export interface UserChipProps {
   readonly displayName: string;
   readonly initials: string;
-  readonly role: 'Admin' | 'Membre';
+  readonly role: 'Admin' | 'Membre' | 'Viewer';
 }
 
 /**
