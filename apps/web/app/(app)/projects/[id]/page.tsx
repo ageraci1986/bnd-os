@@ -11,6 +11,7 @@ import { CardModalController } from '@/features/projects/components/card-modal-c
 import type { CardModalData } from '@/features/projects/actions/get-card-modal-data';
 import { DeleteProjectButton } from '@/features/projects/components/delete-project-button';
 import { ProjectFiltersBar } from '@/features/projects/components/project-filters-bar';
+import { ShareProjectButton } from '@/features/projects/components/share-project-button';
 import { ViewToggle } from '@/features/projects/components/view-toggle';
 import {
   buildCardFilterClauses,
@@ -61,6 +62,7 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
     customCategories,
     workspaceMembers,
     availableTemplates,
+    viewers,
   ] = await Promise.all([
     getCsrfTokenForForm(),
     prisma.workspace.findUniqueOrThrow({
@@ -149,6 +151,17 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
       orderBy: [{ isDefault: 'desc' }, { name: 'asc' }],
       select: { id: true, name: true },
     }),
+    prisma.membership.findMany({
+      where: { workspaceId: ctx.workspaceId, role: 'viewer' },
+      select: {
+        id: true,
+        user: { select: { firstName: true, lastName: true, email: true } },
+        workspaceAccess: {
+          where: { projectId: id },
+          select: { id: true },
+        },
+      },
+    }),
   ]);
   if (!project) notFound();
 
@@ -157,6 +170,25 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
       scope.projectIds.includes(project.id) || scope.clientIds.includes(project.client.id);
     if (!allowed) notFound();
   }
+
+  const viewerOptions = viewers.map((v) => {
+    const displayName =
+      [v.user.firstName, v.user.lastName].filter(Boolean).join(' ').trim() || v.user.email;
+    return {
+      membershipId: v.id,
+      displayName,
+      email: v.user.email,
+      hasAccess: v.workspaceAccess.length > 0,
+    };
+  });
+
+  const canShare =
+    ctx.isSuperAdmin ||
+    ctx.role === 'admin' ||
+    (ctx.role === 'user' &&
+      (scope.kind === 'workspace' ||
+        scope.projectIds.includes(project.id) ||
+        scope.clientIds.includes(project.client.id)));
 
   const cardCount = project.cards.length;
 
@@ -219,6 +251,14 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
         </div>
         <div className="flex items-center gap-3">
           <ViewToggle projectId={project.id} />
+          {canShare ? (
+            <ShareProjectButton
+              projectId={project.id}
+              projectName={project.name}
+              csrfToken={csrf}
+              viewers={viewerOptions}
+            />
+          ) : null}
           <DeleteProjectButton projectId={project.id} projectName={project.name} />
         </div>
       </header>
