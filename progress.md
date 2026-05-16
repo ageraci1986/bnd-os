@@ -1,6 +1,6 @@
 # progress.md — NexusHub · Plan de développement
 
-> **Dernière mise à jour :** 2026-05-16
+> **Dernière mise à jour :** 2026-05-17
 > **Référent produit :** Angelo L.
 > **Document maître produit :** [PRD-NexusHub.md](./PRD-NexusHub.md)
 > **Document maître technique :** [CLAUDE.md](./CLAUDE.md)
@@ -450,7 +450,20 @@
 - [x] **128 tests** verts (✓ +18 nouveaux : 3 `isRole` + 9 intégration team + 14 scope app + 8 domain scope + 5 setUserScope ; ⚠ -21 dans le count brut à cause de tests existants non recomptés ici — net +18 sur Phase A)
 - [x] Typecheck + lint propres
 - [ ] **Polish** : extraire `assertScopeIncludes(scope, kind, id)` helper si la duplication du pattern devient un poids en B.2
-- [ ] **Plan B.2** : Viewer activation (cf. §9.5)
+
+### 9.7 User management — Phase B.2 (Viewer activation) ✅ (2026-05-17)
+
+- [x] DB : `Invitation.scope_client_ids` + `scope_project_ids` `UUID[]` pour persister le scope choisi par l'Admin au moment de l'invitation
+- [x] Server : `createInvitation` accepte les deux CSV de scope + refuse un Viewer sans scope (3 nouveaux specs)
+- [x] Server : `changeMemberRole` permet la promotion vers Viewer uniquement si des rows `WorkspaceAccess` existent déjà pour cette membership (2 specs renouvelés)
+- [x] Server : `acceptInvitation` matérialise le scope persisté en rows `WorkspaceAccess` à l'intérieur de la transaction de création de membership (`prisma.$transaction(async tx => ...)`)
+- [x] UI `InvitationForm` : option Viewer débloquée + scope picker conditionnel (clients + projets multi-select avec drill-down, comme la modal `/team`) — requis quand role=viewer, optionnel pour User
+- [x] Route `/my-projects` : liste les projets visibles dans le scope du user, groupés par client (skeleton inclus)
+- [x] Sidebar : variante Viewer-only rendant juste "Mes projets" + "Paramètres" ; le layout branche sur `ctx.role === Roles.Viewer`
+- [x] Server + UI : `shareProjectWithViewer` action (4 specs) + modal « Partager » sur la page projet (visible Admin + User-in-scope, caché pour Viewer) ; toggle optimiste avec rollback
+- [x] **122 tests web** (+9 nouveaux vs B.1) ; typecheck + lint propres
+- [ ] **Plan B.3 (plus tard)** : commentaires pour Viewer une fois que les Comment server actions existent (dépend de Phase 8)
+- [ ] **Phase C** : console `/super-admin` (CRUD workspaces, liste globale users, promotion super-admin)
 
 ### 9.2 Paramètres utilisateur
 
