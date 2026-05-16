@@ -92,7 +92,11 @@ export default async function TeamPage() {
       </div>
 
       <section aria-label="Inviter une personne" className="mb-10">
-        <InvitationForm csrfToken={csrf} />
+        <InvitationForm
+          csrfToken={csrf}
+          clientOptions={clientOptions}
+          projectOptions={projectOptionsShaped}
+        />
       </section>
 
       <section
