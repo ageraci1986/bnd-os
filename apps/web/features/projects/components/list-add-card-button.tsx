@@ -19,19 +19,30 @@ export interface ListAddCardButtonProps {
   readonly columnId: string;
   readonly columnName: string;
   readonly csrfToken: string;
+  /**
+   * - `dashed` (default): full-width dashed pill matching the Kanban
+   *   column's `add-card-btn`. Rendered below the cards of a section.
+   * - `primary`: filled gradient pill, intended for a single
+   *   prominent top-of-page CTA.
+   */
+  readonly variant?: 'dashed' | 'primary';
+  /** Override the default label (esp. for the primary CTA). */
+  readonly label?: string;
 }
 
 /**
- * Compact per-column "+ Ajouter" button rendered next to each list-view
- * section header. Mirrors the Kanban column's add flow: same optimistic
- * UUID, same modal open + rollback events, just rendered inline in the
- * list rather than as the full pill button at the bottom of a column.
+ * Per-column "+ Ajouter une carte" button used in the list view. Same
+ * optimistic UUID + modal-open + rollback flow as the Kanban column
+ * add button, just with a style hook that adapts the visual depending
+ * on placement.
  */
 export function ListAddCardButton({
   projectId,
   columnId,
   columnName,
   csrfToken,
+  variant = 'dashed',
+  label,
 }: ListAddCardButtonProps) {
   const [pending, startTransition] = useTransition();
 
@@ -79,15 +90,17 @@ export function ListAddCardButton({
     });
   };
 
+  const className = variant === 'primary' ? 'btn btn-primary' : 'add-card-btn';
+  const defaultLabel = variant === 'primary' ? '+ Nouvelle carte' : '+ Ajouter une carte';
   return (
     <button
       type="button"
       onClick={handleAdd}
       disabled={pending}
-      className="ml-auto rounded-md px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-[1px] text-[color:var(--color-text-muted)] transition hover:bg-[color:var(--color-bg-hover)] hover:text-[color:var(--color-text-main)] disabled:opacity-50"
+      className={className}
       aria-label={`Ajouter une carte dans ${columnName}`}
     >
-      {pending ? '…' : '+ Ajouter'}
+      {pending ? 'Création…' : (label ?? defaultLabel)}
     </button>
   );
 }

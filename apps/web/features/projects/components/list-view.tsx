@@ -146,14 +146,30 @@ export function ListView({
     '40px',
   ].join(' ');
 
+  // The top-level "+ Nouvelle carte" primary CTA drops the new card in
+  // the first user column — same default as opening a fresh Kanban from
+  // the left-most column. The user can drag/skip from there.
+  const firstUserColumn = columns.find((c) => !c.isBlockedSystem) ?? null;
+
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <p className="text-xs text-[color:var(--color-text-muted)]">
           {localCards.length} {localCards.length <= 1 ? 'carte' : 'cartes'} · clic sur une carte
           pour l&apos;ouvrir
         </p>
-        <ColumnPicker selected={selected} onToggle={toggle} onReset={reset} />
+        <div className="flex items-center gap-2">
+          <ColumnPicker selected={selected} onToggle={toggle} onReset={reset} />
+          {firstUserColumn && !isReadOnly ? (
+            <ListAddCardButton
+              projectId={projectId}
+              columnId={firstUserColumn.id}
+              columnName={firstUserColumn.name}
+              csrfToken={csrfToken}
+              variant="primary"
+            />
+          ) : null}
+        </div>
       </div>
 
       {orderedColumns.length === 0 ? (
@@ -187,14 +203,6 @@ export function ListView({
                   <span className="text-[10px] text-[color:var(--color-text-ghost)]">
                     {rows.length}
                   </span>
-                  {!col.isBlockedSystem && !isReadOnly ? (
-                    <ListAddCardButton
-                      projectId={projectId}
-                      columnId={col.id}
-                      columnName={col.name}
-                      csrfToken={csrfToken}
-                    />
-                  ) : null}
                 </header>
                 <ul className="flex flex-col gap-2">
                   {rows.map((card) => {
@@ -215,6 +223,15 @@ export function ListView({
                     );
                   })}
                 </ul>
+                {!col.isBlockedSystem && !isReadOnly ? (
+                  <ListAddCardButton
+                    projectId={projectId}
+                    columnId={col.id}
+                    columnName={col.name}
+                    csrfToken={csrfToken}
+                    variant="dashed"
+                  />
+                ) : null}
               </section>
             );
           })}
