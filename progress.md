@@ -441,7 +441,7 @@
 - [x] Smoke vérifié : Admin invite User → User s'inscrit via lien → User accède Overview/Projects/Clients, /team renvoie 403
 - [ ] **Phase C** : console `/super-admin` (CRUD workspaces, liste globale users, promotion super-admin)
 - [ ] **Plan B.2** : Viewer activation (unblock invitation, `/my-projects`, sidebar adaptative, `shareProjectWithViewer` action, Partager modal, comment authorization)
-- [ ] **Infra V1.5** : vérifier domaine Resend (`mail.nexushub.app`) pour activer les invitations vers n'importe quelle adresse — actuellement en mode test, seul l'email du propriétaire Resend reçoit
+- [ ] **Infra Resend** : vérifier le domaine `mail.nexushub.app` pour sortir du mode test. Étapes détaillées dans [`docs/runbooks/resend-domain-setup.md`](./docs/runbooks/resend-domain-setup.md). État au 2026-05-18 : compte actif, seul `lleva.io` vérifié (autre projet) ; NexusHub envoie en mode test, donc seul l'email du propriétaire Resend reçoit. À débloquer avant ouverture aux premiers utilisateurs externes. Action requise utilisateur : (1) acquérir `nexushub.app`, (2) ajouter `mail.nexushub.app` à Resend (manuel ou via MCP), (3) poser les DNS chez le registrar, (4) verify, (5) màj `RESEND_FROM_EMAIL` sur Vercel.
 
 ### 9.6 User management — Phase B.1 (scoping foundation) ✅ (2026-05-16)
 
