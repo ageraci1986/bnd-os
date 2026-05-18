@@ -120,9 +120,13 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   const isProd = process.env['NODE_ENV'] === 'production';
   const supabaseHost = supabaseUrl ? new URL(supabaseUrl).host : '*.supabase.co';
 
+  // `'strict-dynamic'` is required so that the nonced framework scripts
+  // can in turn load Next.js's chunk files without each one needing its
+  // own nonce. Without it, the bootstrap nonce only covers the inline
+  // tags themselves and every dynamic import is rejected by the browser.
   const csp = [
     `default-src 'self'`,
-    `script-src 'self' 'nonce-${nonce}' ${isProd ? '' : "'unsafe-eval'"}`.trim(),
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' ${isProd ? '' : "'unsafe-eval'"}`.trim(),
     `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`,
     `img-src 'self' data: blob: https:`,
     `font-src 'self' https://fonts.gstatic.com`,
@@ -134,6 +138,12 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
     `upgrade-insecure-requests`,
   ].join('; ');
 
+  // Set CSP on BOTH request and response headers. Next.js 15 reads the
+  // CSP from the request headers (alongside x-nonce) to know it must
+  // stamp `nonce="..."` on every inline script it generates. Setting it
+  // only on the response is not enough — the framework ignores the
+  // response-side CSP for its own rendering decisions.
+  requestHeaders.set('Content-Security-Policy', csp);
   response.headers.set('Content-Security-Policy', csp);
   response.headers.set('x-nonce', nonce);
   return response;
