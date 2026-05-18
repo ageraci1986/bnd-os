@@ -93,9 +93,7 @@ export function MemberRow(props: MemberRowProps) {
         >
           <option value="user">User</option>
           <option value="admin">Admin</option>
-          <option value="viewer" disabled title="Disponible bientôt (Phase B)">
-            Viewer (bientôt)
-          </option>
+          <option value="viewer">Viewer</option>
         </select>
         <button
           type="submit"
