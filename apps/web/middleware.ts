@@ -33,8 +33,16 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   const nonce = crypto.randomUUID().replaceAll('-', '');
 
   // Build the response we will mutate (cookies + headers) along the way.
+  // IMPORTANT: the nonce MUST be set on the *request* headers (not just the
+  // response) so Next.js's RSC streaming + <Script> components can read it
+  // via `headers()` and stamp `nonce="..."` on every inline bootstrap script
+  // they generate. Without this, the browser CSP rejects the framework's
+  // own __next_f data scripts in production.
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set('x-nonce', nonce);
+
   let response = NextResponse.next({
-    request: { headers: new Headers(request.headers) },
+    request: { headers: requestHeaders },
   });
 
   // ---- CSRF cookie (mint if absent; only place allowed to set it) ---------------
@@ -42,7 +50,7 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   if (!existingCsrf || existingCsrf.length < 32) {
     const csrf = randomCsrfToken();
     request.cookies.set(CSRF_COOKIE, csrf);
-    response = NextResponse.next({ request });
+    response = NextResponse.next({ request: { headers: requestHeaders } });
     response.cookies.set(CSRF_COOKIE, csrf, {
       httpOnly: true,
       secure: process.env['NODE_ENV'] === 'production',
@@ -70,7 +78,7 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
           for (const { name, value } of cookiesToSet) {
             request.cookies.set(name, value);
           }
-          response = NextResponse.next({ request });
+          response = NextResponse.next({ request: { headers: requestHeaders } });
           for (const { name, value, options } of cookiesToSet) {
             response.cookies.set(name, value, options);
           }
