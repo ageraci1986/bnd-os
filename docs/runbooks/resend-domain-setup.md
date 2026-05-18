@@ -4,148 +4,166 @@
 > compte reçoit) pour permettre les invitations et alertes vers
 > n'importe quelle adresse.
 >
-> **Domaine cible (CLAUDE.md §2)** : `mail.nexushub.app` (sous-domaine
-> dédié à l'envoi — le domaine racine `nexushub.app` reste libre pour
-> autre chose).
+> **Domaine sender retenu** : `brandnewday.agency` (racine), avec
+> expéditeur final `app@brandnewday.agency`. Le domaine est hébergé
+> chez OVH.
 >
 > **Région Resend** : `eu-west-1` (cohérent avec Supabase staging EU).
 
 ---
 
-## 0. Pré-requis
+## 0. Pré-requis (déjà OK ici)
 
-- [ ] Acquérir le domaine racine (`nexushub.app` ou alternative) chez
-      un registrar (Gandi, OVH, Cloudflare Registrar, Vercel Domains…).
-- [ ] Avoir accès à la zone DNS de ce domaine (où on ajoutera les
-      enregistrements SPF / DKIM / DMARC / return-path).
-- [ ] Avoir accès au dashboard Resend (compte propriétaire actuel).
+- [x] Domaine `brandnewday.agency` possédé et géré chez OVH.
+- [x] Accès à la zone DNS OVH (espace client → Domaines → zone DNS).
+- [x] Compte Resend actif avec accès API.
 
-> Tant que le pré-requis 1 n'est pas rempli, **rester en mode test** :
-> l'application fonctionne, les invitations sont envoyées à l'email
-> propriétaire du compte Resend, le reste tombe dans la console dev
-> (cf. `EmailAdapter.devFallback`).
-
----
-
-## 1. Créer le domaine côté Resend
-
-Deux options équivalentes :
-
-**A. Via le dashboard Resend** (https://resend.com/domains)
-
-1. Clique « Add Domain »
-2. Nom : `mail.nexushub.app`
-3. Région : `Europe (Ireland)` / `eu-west-1`
-4. TLS : `Opportunistic` (défaut)
-5. Custom Return-Path : laisser `send` (défaut)
-6. Resend affiche la liste des enregistrements DNS à ajouter — **copie-les**
-
-**B. Via le MCP Resend (Claude)**
-
-- Dis-moi « crée le domaine Resend `mail.nexushub.app` en eu-west-1 »
-- J'utilise `mcp__resend__create-domain` et je te restitue la liste DNS
-
-Tu obtiendras typiquement 4 enregistrements :
-
-- 1 × **MX** sur `send.mail.nexushub.app` → `feedback-smtp.eu-west-1.amazonses.com` (priorité 10) — return-path
-- 1 × **TXT** sur `send.mail.nexushub.app` → `v=spf1 include:amazonses.com ~all` — SPF
-- 1 × **TXT** sur `resend._domainkey.mail.nexushub.app` → clé publique DKIM (longue chaîne)
-- 1 × **TXT** sur `_dmarc.mail.nexushub.app` → `v=DMARC1; p=none;` — DMARC
-
-> Le nom exact dépend de Resend ; respecte **strictement** ce qu'il
-> affiche (sous-domaine + valeur).
+> Constat DNS au 2026-05-18 (avant intervention) : le domaine racine a
+> déjà des MX OVH (`mx{0..4}.mail.ovh.net`) + une SPF
+> `v=spf1 include:mx.ovh.com ~all`. **Pas besoin d'y toucher** : Resend
+> publie sa SPF sur le sous-domaine `send.brandnewday.agency`
+> (return-path), pas sur la racine. Ta config mail OVH existante reste
+> intacte.
 
 ---
 
-## 2. Configurer la DNS
+## 1. Domaine créé côté Resend ✅
 
-Dans ta zone DNS (Cloudflare / OVH / Gandi / Vercel DNS / autre) :
+Création effectuée via MCP le 2026-05-18 :
 
-1. Crée chaque enregistrement Resend tel quel.
-2. **TTL** : 300s (5 min) le temps de la vérif ; tu repasseras à 3600s
-   après.
-3. **Cloudflare uniquement** : mets ces enregistrements en mode
-   « DNS only » (nuage gris), surtout PAS « Proxied » — Resend ne peut
-   pas vérifier à travers le proxy CDN.
-4. Attends la propagation : 5 à 30 minutes en général. Pour vérifier :
+```
+Name:   brandnewday.agency
+Region: eu-west-1
+TLS:    opportunistic (défaut)
+Custom Return-Path: send (défaut)
+Status: not_started → en attente DNS
+```
+
+---
+
+## 2. DNS à poser chez OVH
+
+Espace client OVH → **Domaines** → `brandnewday.agency` → onglet
+**« Zone DNS »** → bouton **« Ajouter une entrée »**.
+
+> OVH demande les valeurs TXT **sans guillemets** (il les ajoute
+> lui-même). Le champ « Sous-domaine » se remplit avec le préfixe
+> seul, pas le FQDN complet.
+
+### Records obligatoires (3)
+
+| #   | Type    | Sous-domaine        | Cible / Valeur                                                                                                                                                                                                               | TTL | Prio |
+| --- | ------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --- | ---- |
+| 1   | **TXT** | `resend._domainkey` | `p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQC5uWKxQknsOHvSiYkilRJwfNchdwkT/mwg5vIcFGXqi2bIqWg8I78MlYQljBuEzHtWThMRtVOIklzQQsZPkSyTkduQe2eNT3xfzZq7FlRSifztQkxGmWlMXeDR/teH9s/zySr5AjT1xHjJnSNzTWnuXP8XphjGXqxS6d1PjYg5LQIDAQAB` | 300 | —    |
+| 2   | **MX**  | `send`              | `feedback-smtp.eu-west-1.amazonses.com.`                                                                                                                                                                                     | 300 | 10   |
+| 3   | **TXT** | `send`              | `v=spf1 include:amazonses.com ~all`                                                                                                                                                                                          | 300 | —    |
+
+### Record recommandé (DMARC, optionnel mais conseillé)
+
+| #   | Type    | Sous-domaine | Valeur                                                   | TTL |
+| --- | ------- | ------------ | -------------------------------------------------------- | --- |
+| 4   | **TXT** | `_dmarc`     | `v=DMARC1; p=none; rua=mailto:ageraci.finance@gmail.com` | 300 |
+
+> `p=none` = mode rapport uniquement, n'impacte pas la délivrabilité.
+> Permet de recevoir les rapports DMARC chez l'admin. Tu pourras
+> passer à `p=quarantine` puis `p=reject` après quelques semaines
+> d'observation.
+
+> ⚠️ Si tu modifies l'enregistrement TXT racine existant
+> (`v=spf1 include:mx.ovh.com ~all`), **stop**. Ne le touche pas.
+> Cette config Resend ne nécessite **aucun changement** sur la SPF
+> racine — la SPF Resend va sur `send`, séparée.
+
+---
+
+## 3. Vérification de la propagation
+
+Attends 5 à 30 minutes après création des records, puis :
 
 ```bash
-dig +short TXT send.mail.nexushub.app
-dig +short TXT resend._domainkey.mail.nexushub.app
-dig +short TXT _dmarc.mail.nexushub.app
-dig +short MX  send.mail.nexushub.app
+dig +short TXT resend._domainkey.brandnewday.agency
+# attendu : la longue chaîne commençant par "p=MIG..."
+
+dig +short MX  send.brandnewday.agency
+# attendu : "10 feedback-smtp.eu-west-1.amazonses.com."
+
+dig +short TXT send.brandnewday.agency
+# attendu : "v=spf1 include:amazonses.com ~all"
+
+dig +short TXT _dmarc.brandnewday.agency  # si DMARC posé
+# attendu : "v=DMARC1; p=none; ..."
 ```
 
-Si une des sorties est vide, la propagation n'est pas terminée — patience.
+Si une sortie est vide ou ancienne (cache), retente après 5 min ou
+force le résolveur Google : `dig @8.8.8.8 +short TXT send.brandnewday.agency`.
 
 ---
 
-## 3. Déclencher la vérification
+## 4. Déclencher la vérification Resend
 
-**A. Via le dashboard** : sur la page du domaine, clique « Verify DNS records ».
+**Via Claude** : dis-moi « vérifie le domaine Resend `brandnewday.agency` »
+et j'appelle `mcp__resend__verify-domain` (id `98abe860-de97-4655-8ea6-fd57768776f4`).
 
-**B. Via le MCP Resend (Claude)** : dis-moi « vérifie le domaine
-Resend `mail.nexushub.app` » et j'appelle `mcp__resend__verify-domain`.
+**Via dashboard** : https://resend.com/domains → `brandnewday.agency`
+→ bouton « Verify DNS records ».
 
-Statut attendu : `verified` (peut prendre 1 à 5 minutes). Si ça reste
-en `pending` ou `failed`, repasse à l'étape 2 (probablement un
-enregistrement mal saisi ou un proxy DNS qui filtre).
+Statut attendu : `verified` (1 à 5 min). Si `pending` ou `failed`,
+relis l'étape 2 — typiquement un copier-coller incomplet sur le DKIM
+ou un préfixe « send » mal saisi.
 
 ---
 
-## 4. Mettre à jour les variables d'env
+## 5. Mettre à jour les variables d'env
 
-**Local (`.env.local`)** :
+**`.env.local`** (à la racine du repo et dans `apps/web/.env.local`) :
 
 ```
-RESEND_FROM_EMAIL=invitations@mail.nexushub.app
+RESEND_FROM_EMAIL=app@brandnewday.agency
 RESEND_FROM_NAME=NexusHub
 ```
 
-**Vercel (Project Settings → Environment Variables)** pour
-`Production` et `Preview` :
+**Vercel** → Project Settings → Environment Variables → `Production`
+ET `Preview` :
 
-- `RESEND_API_KEY` → ta clé prod Resend
-- `RESEND_FROM_EMAIL` → `invitations@mail.nexushub.app`
+- `RESEND_API_KEY` → clé prod (Resend → API Keys → Create)
+- `RESEND_FROM_EMAIL` → `app@brandnewday.agency`
 - `RESEND_FROM_NAME` → `NexusHub`
 
-> Le code (`apps/web/lib/email/index.ts`) lit ces 3 variables au boot
-> et tombe en console-fallback en dev si la clé manque. En production
-> une clé manquante throw à la première utilisation.
+> `apps/web/lib/email/index.ts` lit ces 3 variables et cache le client
+> au boot. Après changement, **redémarre `pnpm dev`**.
 
 ---
 
-## 5. Test end-to-end
+## 6. Smoke test end-to-end
 
-1. Redémarre `pnpm dev` (le mécanisme `let _email` cache le client).
-2. Connecte-toi en Admin sur `/team`.
-3. Invite une adresse externe (pas la tienne).
+1. `pnpm dev` (relance complète, pas juste un HMR)
+2. Connecte-toi en Admin sur `/team`
+3. Invite une adresse externe (pas la tienne)
 4. Vérifie :
-   - L'email arrive bien dans la boîte de l'invité (pas en spam).
-   - L'expéditeur affiché est `NexusHub <invitations@mail.nexushub.app>`.
-   - Le lien d'acceptation pointe vers le bon `NEXT_PUBLIC_APP_URL`.
-5. Ouvre le dashboard Resend → onglet « Logs » → l'envoi doit être
-   `Delivered` (pas `Queued`).
+   - Le mail arrive (vérifier aussi le dossier spam au premier envoi)
+   - Expéditeur affiché : `NexusHub <app@brandnewday.agency>`
+   - Le lien d'acceptation pointe vers le bon `NEXT_PUBLIC_APP_URL`
+5. Dashboard Resend → **Logs** → l'envoi doit être `Delivered`
+   (pas `Queued` ni `Bounced`)
 
 ---
 
-## 6. Rollback / dégradation
+## 7. Rollback / dégradation
 
 Si une régression sort des mails illégitimes ou que le domaine est
 compromis :
 
-1. Dashboard Resend → ce domaine → « Suspend sending »
-2. Régénérer la clé API (« API Keys » → l'ancienne → « Delete »)
-3. Pousser une nouvelle `RESEND_API_KEY` sur Vercel (déclenche un
-   redeploy auto)
+1. Dashboard Resend → `brandnewday.agency` → « Suspend sending »
+2. Régénérer la clé API (API Keys → l'ancienne → Delete)
+3. Pousser une nouvelle `RESEND_API_KEY` sur Vercel (redeploy auto)
 4. Mettre à jour ce runbook avec ce qui s'est passé
 
 ---
 
-## 7. Documentation associée
+## 8. Documentation associée
 
 - Décision de la stack : `CLAUDE.md` §2 (Backend & data > Resend)
 - Code consommateur : `apps/web/lib/email/index.ts`, adapter dans
   `packages/integrations/email`
 - Template HTML : `apps/web/features/invitations/email/templates.ts`
-- Plan rotation secrets : `docs/runbooks/secret-rotation.md`
+- Rotation des secrets : `docs/runbooks/secret-rotation.md`
