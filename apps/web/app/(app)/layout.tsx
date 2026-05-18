@@ -33,6 +33,7 @@ import { UserChip } from '@/features/shell/components/user-chip';
 import { ContextBarHost } from '@/features/shell/components/context-bar-host';
 import { DashboardIcon, ClientsIcon, GearIcon } from '@/features/shell/components/icons';
 import { SidebarViewer } from '@/features/shell/components/sidebar-viewer';
+import { Toaster } from '@/features/shell/components/toaster';
 
 interface AppLayoutProps {
   readonly children: React.ReactNode;
@@ -192,6 +193,7 @@ export default async function AppLayout({ children, searchParams }: AppLayoutPro
           {children}
         </div>
       </div>
+      <Toaster />
     </div>
   );
 }

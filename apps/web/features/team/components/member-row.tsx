@@ -1,9 +1,10 @@
 'use client';
-import { useActionState, useEffect, useState } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import type { UserScope } from '@nexushub/domain';
 import { CSRF_FIELD_NAME } from '@/lib/csrf/field';
-import { changeMemberRole, type ChangeRoleState } from '../actions/change-member-role';
-import { removeMember, type RemoveMemberState } from '../actions/remove-member';
+import { changeMemberRole } from '../actions/change-member-role';
+import { removeMember } from '../actions/remove-member';
+import { notify } from '@/features/shell/components/toaster';
 import { ScopeChip } from './scope-chip';
 import { ScopeModal } from './scope-modal';
 
@@ -27,22 +28,26 @@ export interface MemberRowProps {
   }[];
 }
 
-const idleRole: ChangeRoleState = { status: 'idle' };
-const idleRemove: RemoveMemberState = { status: 'idle' };
-
 export function MemberRow(props: MemberRowProps) {
-  const [roleState, roleAction, rolePending] = useActionState(changeMemberRole, idleRole);
-  const [removeState, removeAction, removePending] = useActionState(removeMember, idleRemove);
+  const [rolePending, startRoleTransition] = useTransition();
+  const [removePending, startRemoveTransition] = useTransition();
   const [scopeModalOpen, setScopeModalOpen] = useState(false);
-  // Controlled mirror of `props.role`. React 19 form-actions reset
-  // uncontrolled inputs after submit, which would visually snap the
-  // <select> back to its initial `defaultValue` before revalidatePath
-  // pushes the fresh role from the server. Mirroring into state and
-  // re-syncing via useEffect keeps the displayed value coherent.
-  const [selectedRole, setSelectedRole] = useState<MemberRowProps['role']>(props.role);
+
+  // Optimistic role: filled the moment the user clicks OK, dropped once
+  // `props.role` from revalidatePath catches up. Display always falls
+  // back to the canonical server value when no submission is in flight.
+  // We deliberately do NOT use React 19's <form action={...}> protocol
+  // because it can race with revalidatePath and reset controlled fields
+  // visually before the new prop lands.
+  const [optimisticRole, setOptimisticRole] = useState<MemberRowProps['role'] | null>(null);
+  const displayRole: MemberRowProps['role'] = optimisticRole ?? props.role;
+
   useEffect(() => {
-    setSelectedRole(props.role);
-  }, [props.role]);
+    if (optimisticRole !== null && optimisticRole === props.role) {
+      setOptimisticRole(null);
+    }
+  }, [props.role, optimisticRole]);
+
   const isSelf = props.userId === props.currentUserId;
 
   const initials =
@@ -87,7 +92,25 @@ export function MemberRow(props: MemberRowProps) {
         <ScopeChip scope={props.scope} onClick={() => setScopeModalOpen(true)} />
       ) : null}
 
-      <form action={roleAction} className="flex items-center gap-2">
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          const fd = new FormData(e.currentTarget);
+          const picked = fd.get('role') as MemberRowProps['role'] | null;
+          if (!picked) return;
+          setOptimisticRole(picked);
+          startRoleTransition(async () => {
+            const result = await changeMemberRole({ status: 'idle' }, fd);
+            if (result.status === 'error') {
+              setOptimisticRole(null);
+              notify({ tone: 'error', message: result.message });
+            } else if (result.status === 'success') {
+              notify({ tone: 'success', message: `Rôle mis à jour : ${picked}.` });
+            }
+          });
+        }}
+        className="flex items-center gap-2"
+      >
         <input type="hidden" name={CSRF_FIELD_NAME} value={props.csrfToken} />
         <input type="hidden" name="membershipId" value={props.membershipId} />
         <label className="sr-only" htmlFor={`role-${props.membershipId}`}>
@@ -96,8 +119,8 @@ export function MemberRow(props: MemberRowProps) {
         <select
           id={`role-${props.membershipId}`}
           name="role"
-          value={selectedRole}
-          onChange={(e) => setSelectedRole(e.target.value as MemberRowProps['role'])}
+          value={displayRole}
+          onChange={(e) => setOptimisticRole(e.target.value as MemberRowProps['role'])}
           disabled={rolePending}
           className="field-select w-32"
         >
@@ -108,14 +131,27 @@ export function MemberRow(props: MemberRowProps) {
         <button
           type="submit"
           className="btn btn-ghost btn-sm"
-          disabled={rolePending}
+          disabled={rolePending || displayRole === props.role}
           aria-busy={rolePending || undefined}
         >
           {rolePending ? '…' : 'OK'}
         </button>
       </form>
 
-      <form action={removeAction}>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          const fd = new FormData(e.currentTarget);
+          startRemoveTransition(async () => {
+            const result = await removeMember({ status: 'idle' }, fd);
+            if (result.status === 'error') {
+              notify({ tone: 'error', message: result.message });
+            } else if (result.status === 'success') {
+              notify({ tone: 'success', message: `${props.displayName} retiré du workspace.` });
+            }
+          });
+        }}
+      >
         <input type="hidden" name={CSRF_FIELD_NAME} value={props.csrfToken} />
         <input type="hidden" name="membershipId" value={props.membershipId} />
         <button
@@ -128,13 +164,6 @@ export function MemberRow(props: MemberRowProps) {
           {removePending ? '…' : 'Retirer'}
         </button>
       </form>
-
-      {roleState.status === 'error' || removeState.status === 'error' ? (
-        <p role="alert" className="basis-full text-xs font-medium text-[color:var(--color-danger)]">
-          {roleState.status === 'error' ? roleState.message : null}
-          {removeState.status === 'error' ? removeState.message : null}
-        </p>
-      ) : null}
 
       {scopeModalOpen ? (
         <ScopeModal
