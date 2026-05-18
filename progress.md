@@ -441,10 +441,11 @@
 - [x] Smoke vérifié : Admin invite User → User s'inscrit via lien → User accède Overview/Projects/Clients, /team renvoie 403
 - [ ] **Phase C** : console `/super-admin` (CRUD workspaces, liste globale users, promotion super-admin)
 - [ ] **Plan B.2** : Viewer activation (unblock invitation, `/my-projects`, sidebar adaptative, `shareProjectWithViewer` action, Partager modal, comment authorization)
-- [x] **Infra Resend** ✅ (2026-05-18) — domaine `brandnewday.agency` vérifié (DKIM + SPF MX + SPF TXT tous `verified`, sending `enabled`). DNS posés chez OVH (4 entrées dans la zone DNS, SPF racine OVH **intacte**), vérification déclenchée via MCP. Reste à faire côté env :
+- [x] **Infra Resend** ✅ (2026-05-18) — domaine `brandnewday.agency` vérifié sur la **team NexusHub** (isolée de la team lleva qui sert un autre projet). DNS posés chez OVH (4 entrées dans la zone DNS, SPF racine OVH **intacte**). MCP `resend-nexushub` ajouté en scope local au repo (`claude mcp add -s local`) pour que les futures ops Resend ciblent la bonne team sans risque de croisement. Reste à faire côté env :
+  - [ ] Vérifier que `RESEND_API_KEY` dans `.env.local` est bien la clé de la team **NexusHub** (pas celle de lleva — celle utilisée par le MCP local `resend-nexushub`)
   - [ ] Mettre `RESEND_FROM_EMAIL=app@brandnewday.agency` dans `.env.local` (racine + `apps/web/.env.local`)
   - [ ] Mettre les mêmes variables sur Vercel (`Production` + `Preview`)
-  - [ ] Redémarrer `pnpm dev`, smoke test : inviter une adresse externe, vérifier `Delivered` dans les logs Resend
+  - [ ] Redémarrer `pnpm dev`, smoke test : inviter une adresse externe, vérifier `Delivered` dans les logs Resend de la team NexusHub
 - [ ] **Frontend domain** : pointer `app.brandnewday.agency` vers Vercel (CNAME OVH → `cname.vercel-dns.com.`) + màj `NEXT_PUBLIC_APP_URL=https://app.brandnewday.agency`. Étapes dans [`docs/runbooks/resend-domain-setup.md`](./docs/runbooks/resend-domain-setup.md) §2 (cas Vercel) — runbook séparé Vercel à écrire si besoin.
 
 ### 9.6 User management — Phase B.1 (scoping foundation) ✅ (2026-05-16)

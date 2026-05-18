@@ -31,7 +31,8 @@
 
 ```
 Name:    brandnewday.agency
-ID:      98abe860-de97-4655-8ea6-fd57768776f4
+ID:      35fa778a-c280-4825-8b5a-ed1eac39cca7
+Team:    NexusHub (isolée de la team lleva)
 Region:  eu-west-1
 TLS:     opportunistic
 Custom Return-Path: send
@@ -43,9 +44,32 @@ SPF TXT: verified
 ```
 
 DNS posés chez OVH le 2026-05-18 (DKIM + return-path MX + return-path
-SPF + DMARC monitoring), vérifiés via `mcp__resend__verify-domain`
-quelques minutes après propagation. Aucun changement sur la SPF
-racine OVH (mail OVH existant intact).
+SPF + DMARC monitoring). Aucun changement sur la SPF racine OVH (mail
+OVH existant intact).
+
+**Note historique** : une première création avait atterri par erreur
+sur la team lleva (l'API key utilisée par le MCP Resend global pointait
+sur ce compte-là). Le domaine y a été supprimé, puis recréé sur la
+team NexusHub via un MCP dédié `resend-nexushub` ajouté en scope local
+au repo (cf. `.claude/settings.local.json`, gitignored). Resend a
+recyclé exactement la même paire DKIM lors de la recréation, donc les
+4 entrées DNS chez OVH n'ont pas eu à être modifiées.
+
+### Comment le MCP scoping est configuré
+
+Le MCP global `resend` (User scope) reste pointé sur la team lleva
+(autre projet). Pour ce repo uniquement, un MCP `resend-nexushub`
+(Local scope) a été ajouté via :
+
+```bash
+claude mcp add -e RESEND_API_KEY=re_xxxxx -t stdio \
+  resend-nexushub -- npx -y resend-mcp
+```
+
+Le `-t stdio` après `-e KEY=val` est important : il interrompt la
+consommation variadic de `-e` (sinon le nom du serveur est avalé
+comme deuxième valeur d'env). Le fichier `.claude/settings.local.json`
+contenant la clé est gitignored.
 
 ---
 
