@@ -24,6 +24,11 @@ out/
 *.p12
 *.cert
 
+# Claude Code per-project settings — contains MCP API keys (Resend, etc.)
+# scoped to this repo. Never commit these.
+.claude/settings.local.json
+.claude/
+
 # Editors / OS
 .vscode/*
 !.vscode/extensions.json
