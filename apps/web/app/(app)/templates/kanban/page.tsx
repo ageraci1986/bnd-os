@@ -9,24 +9,33 @@ export const metadata: Metadata = { title: 'Templates Kanban' };
 export default async function KanbanTemplatesPage() {
   const ctx = await requireUser();
 
-  const rows = await prisma.kanbanTemplate.findMany({
-    where: { workspaceId: ctx.workspaceId },
-    orderBy: [{ isBuiltin: 'desc' }, { name: 'asc' }],
-    select: {
-      id: true,
-      name: true,
-      isBuiltin: true,
-      columns: {
-        orderBy: { position: 'asc' },
-        select: { id: true, name: true, stepChecklist: true },
+  const [rows, cardTemplates] = await Promise.all([
+    prisma.kanbanTemplate.findMany({
+      where: { workspaceId: ctx.workspaceId },
+      orderBy: [{ isBuiltin: 'desc' }, { name: 'asc' }],
+      select: {
+        id: true,
+        name: true,
+        isBuiltin: true,
+        defaultCardTemplateId: true,
+        columns: {
+          orderBy: { position: 'asc' },
+          select: { id: true, name: true, stepChecklist: true },
+        },
       },
-    },
-  });
+    }),
+    prisma.cardTemplate.findMany({
+      where: { workspaceId: ctx.workspaceId, deletedAt: null },
+      orderBy: [{ isDefault: 'desc' }, { name: 'asc' }],
+      select: { id: true, name: true, isDefault: true },
+    }),
+  ]);
 
   const templates: KanbanTemplateDTO[] = rows.map((t) => ({
     id: t.id,
     name: t.name,
     isBuiltin: t.isBuiltin,
+    defaultCardTemplateId: t.defaultCardTemplateId,
     columns: t.columns.map((c) => ({
       id: c.id,
       name: c.name,
@@ -47,7 +56,7 @@ export default async function KanbanTemplatesPage() {
         </p>
       </header>
 
-      <KanbanEditorShell initialTemplates={templates} />
+      <KanbanEditorShell initialTemplates={templates} cardTemplateOptions={cardTemplates} />
     </div>
   );
 }

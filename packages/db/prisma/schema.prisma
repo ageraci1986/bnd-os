@@ -360,6 +360,13 @@ model Project {
   workspaceId     String    @map("workspace_id") @db.Uuid
   clientId        String    @map("client_id") @db.Uuid
   typeId          String?   @map("type_id") @db.Uuid
+  /// Snapshot of the source Kanban template's `defaultCardTemplateId` at
+  /// project-creation time. Editing the source template later does not
+  /// affect this row (templates are frozen — PRD §7.2). Null = fall
+  /// through to the workspace-level `CardTemplate.isDefault` at card
+  /// creation. ON DELETE SET NULL so deleting the card template leaves
+  /// the project intact and falls back to the workspace default.
+  defaultCardTemplateId String? @map("default_card_template_id") @db.Uuid
   name            String
   description     String?
   /// PRD §7 Wizard step 1
@@ -372,18 +379,20 @@ model Project {
   createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  workspace       Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  client          Client            @relation(fields: [clientId], references: [id], onDelete: Restrict)
-  type            ProjectType?      @relation(fields: [typeId], references: [id], onDelete: SetNull)
-  members         ProjectMember[]
-  columns         Column[]
-  cards           Card[]
-  workspaceAccess WorkspaceAccess[]
+  workspace           Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  client              Client            @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  type                ProjectType?      @relation(fields: [typeId], references: [id], onDelete: SetNull)
+  defaultCardTemplate CardTemplate?     @relation("ProjectDefaultCardTemplate", fields: [defaultCardTemplateId], references: [id], onDelete: SetNull)
+  members             ProjectMember[]
+  columns             Column[]
+  cards               Card[]
+  workspaceAccess     WorkspaceAccess[]
 
   @@unique([workspaceId, name])
   @@index([workspaceId])
   @@index([clientId])
   @@index([workspaceId, deletedAt])
+  @@index([defaultCardTemplateId])
   @@map("projects")
 }
 
@@ -563,14 +572,23 @@ model KanbanTemplate {
   workspaceId String   @map("workspace_id") @db.Uuid
   name        String
   isBuiltin   Boolean  @default(false) @map("is_builtin")
+  /// Default card template applied to every card created in a project
+  /// born from this Kanban template. Snapshot semantics — the value is
+  /// copied onto `Project.defaultCardTemplateId` at project-creation
+  /// time, so later edits here do NOT retroactively rewire existing
+  /// projects (PRD §7.2). Null = no override, projects fall through to
+  /// the workspace `CardTemplate.isDefault` at card creation.
+  defaultCardTemplateId String? @map("default_card_template_id") @db.Uuid
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  workspace Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  columns   KanbanTemplateColumn[]
+  workspace           Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  columns             KanbanTemplateColumn[]
+  defaultCardTemplate CardTemplate?          @relation("KanbanTemplateDefaultCardTemplate", fields: [defaultCardTemplateId], references: [id], onDelete: SetNull)
 
   @@unique([workspaceId, name])
   @@index([workspaceId])
+  @@index([defaultCardTemplateId])
   @@map("kanban_templates")
 }
 
@@ -611,8 +629,10 @@ model CardTemplate {
   updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt        DateTime? @map("deleted_at") @db.Timestamptz(6)
 
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  cards     Card[]
+  workspace                Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  cards                    Card[]
+  kanbanTemplatesAsDefault KanbanTemplate[] @relation("KanbanTemplateDefaultCardTemplate")
+  projectsAsDefault        Project[]        @relation("ProjectDefaultCardTemplate")
 
   @@unique([workspaceId, name])
   @@index([workspaceId, deletedAt])

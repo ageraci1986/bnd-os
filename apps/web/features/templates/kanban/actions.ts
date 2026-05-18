@@ -45,10 +45,39 @@ const ColumnsSchema = z
     return validated;
   });
 
-const CreateSchema = z.object({ name: NameSchema, columns: ColumnsSchema });
+// `defaultCardTemplateId` is optional in the *input*: undefined = "don't
+// change", null = "clear", string = "set". We validate ownership server-side
+// after parsing so a malicious client can't point at another workspace's
+// card template.
+const DefaultCardTemplateIdSchema = z.string().uuid().nullable().optional();
+
+const CreateSchema = z.object({
+  name: NameSchema,
+  columns: ColumnsSchema,
+  defaultCardTemplateId: DefaultCardTemplateIdSchema,
+});
 const UpdateSchema = CreateSchema.extend({ id: z.string().uuid() });
 const DeleteSchema = z.object({ id: z.string().uuid() });
 const DuplicateSchema = z.object({ id: z.string().uuid() });
+
+/**
+ * Defence in depth: verify the card template id (when set) belongs to the
+ * caller's workspace and is not soft-deleted. Returns the id when valid,
+ * null when explicitly null, or an error.
+ */
+async function resolveDefaultCardTemplateId(
+  workspaceId: string,
+  raw: string | null | undefined,
+): Promise<{ ok: true; value: string | null | undefined } | { ok: false; message: string }> {
+  if (raw === undefined) return { ok: true, value: undefined };
+  if (raw === null) return { ok: true, value: null };
+  const tpl = await prisma.cardTemplate.findFirst({
+    where: { id: raw, workspaceId, deletedAt: null },
+    select: { id: true },
+  });
+  if (!tpl) return { ok: false, message: 'Template de carte introuvable.' };
+  return { ok: true, value: tpl.id };
+}
 
 export type KanbanTemplateMutationResult =
   | { readonly ok: true; readonly id: string }
@@ -57,6 +86,7 @@ export type KanbanTemplateMutationResult =
 export async function createKanbanTemplate(input: {
   name: string;
   columns: readonly KanbanTemplateColumnDef[];
+  defaultCardTemplateId?: string | null;
 }): Promise<KanbanTemplateMutationResult> {
   const ctx = await requireUser();
   const parsed = CreateSchema.safeParse(input);
@@ -64,11 +94,19 @@ export async function createKanbanTemplate(input: {
     return { ok: false, message: parsed.error.issues[0]?.message ?? 'Données invalides.' };
   }
 
+  const dctRes = await resolveDefaultCardTemplateId(
+    ctx.workspaceId,
+    parsed.data.defaultCardTemplateId,
+  );
+  if (!dctRes.ok) return { ok: false, message: dctRes.message };
+
   try {
     const created = await prisma.kanbanTemplate.create({
       data: {
         workspaceId: ctx.workspaceId,
         name: parsed.data.name,
+        // undefined → omit field (Prisma default: null); null/uuid → write it.
+        ...(dctRes.value !== undefined ? { defaultCardTemplateId: dctRes.value } : {}),
         columns: {
           create: parsed.data.columns.map((c, idx) => ({
             name: c.name,
@@ -93,6 +131,7 @@ export async function updateKanbanTemplate(input: {
   id: string;
   name: string;
   columns: readonly KanbanTemplateColumnDef[];
+  defaultCardTemplateId?: string | null;
 }): Promise<KanbanTemplateMutationResult> {
   const ctx = await requireUser();
   const parsed = UpdateSchema.safeParse(input);
@@ -106,13 +145,22 @@ export async function updateKanbanTemplate(input: {
   });
   if (!tpl) throw new NotFoundError('KanbanTemplate');
 
+  const dctRes = await resolveDefaultCardTemplateId(
+    ctx.workspaceId,
+    parsed.data.defaultCardTemplateId,
+  );
+  if (!dctRes.ok) return { ok: false, message: dctRes.message };
+
   try {
     // Rebuild the columns from scratch in a transaction: simpler than
     // diffing individual rows and the column list is small (≤ 20).
     await prisma.$transaction(async (tx) => {
       await tx.kanbanTemplate.update({
         where: { id: tpl.id },
-        data: { name: parsed.data.name },
+        data: {
+          name: parsed.data.name,
+          ...(dctRes.value !== undefined ? { defaultCardTemplateId: dctRes.value } : {}),
+        },
       });
       await tx.kanbanTemplateColumn.deleteMany({ where: { templateId: tpl.id } });
       if (parsed.data.columns.length > 0) {
@@ -167,6 +215,7 @@ export async function duplicateKanbanTemplate(input: {
     where: { id: parsed.data.id, workspaceId: ctx.workspaceId },
     select: {
       name: true,
+      defaultCardTemplateId: true,
       columns: {
         orderBy: { position: 'asc' },
         select: { name: true, stepChecklist: true },
@@ -196,6 +245,7 @@ export async function duplicateKanbanTemplate(input: {
       data: {
         workspaceId: ctx.workspaceId,
         name: candidate,
+        defaultCardTemplateId: source.defaultCardTemplateId,
         columns: {
           create: source.columns.map((c, idx) => ({
             name: c.name,

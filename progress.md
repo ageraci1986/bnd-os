@@ -391,6 +391,13 @@
 - [s] Colonne Bloqué fixe non éditable → N/A ici : les templates Kanban sont user-facing uniquement, la colonne Bloqué est ajoutée au moment du `createProject` (system column, copy-on-create)
 - [x] **Test critique respecté** : un template est figé au moment de la création du projet (copy-on-create des colonnes vers le projet) — `createProject` accepte UUID (DB template) OU id built-in via `TemplateIdSchema.refine`
 - [x] Step-checklist se propage au projet : `KanbanTemplateColumn.stepChecklist` → `Column.stepChecklist` → semée comme items dans chaque carte de la colonne avec `columnSourceId` (préserve l'état coché si la carte revient via `moveCard` / `skipCardToNextColumn`)
+- [x] **Template Kanban → template carte par défaut** ✅ (2026-05-18)
+  - DB : `kanban_templates.default_card_template_id` + `projects.default_card_template_id` (UUID NULL FK ON DELETE SET NULL, migration `20260518100001_kanban_default_card_template`)
+  - Server : `createKanbanTemplate` / `updateKanbanTemplate` / `duplicateKanbanTemplate` propagent le champ ; ownership validée via `cardTemplate.findFirst({ workspaceId, deletedAt: null })` (defence-in-depth contre un id provenant d'un autre workspace)
+  - Snapshot : `createProject` copie `kanbanTemplate.defaultCardTemplateId` dans `project.defaultCardTemplateId` à la création (cohérent avec le freeze copy-on-create des colonnes — éditer le template Kanban plus tard ne touche pas les projets existants)
+  - Resolution cascade dans `createCard` : `?templateId=` explicite → `project.defaultCardTemplateId` → workspace `CardTemplate.isDefault` → aucun template
+  - UI : sélecteur « Template de carte » dans l'éditeur de template Kanban (sous le champ Nom), `— Défaut du workspace —` quand non défini, hint sur la sémantique snapshot
+  - Tests : 5 sur `createKanbanTemplate/updateKanbanTemplate` (workspace ownership, undefined vs null, propagation au transaction) + 3 sur `createCard` (3 paliers de la cascade)
 
 ---
 

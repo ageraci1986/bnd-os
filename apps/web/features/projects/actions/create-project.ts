@@ -87,12 +87,17 @@ export async function createProject(
     readonly stepChecklist: readonly string[];
   }
   let columnSeeds: readonly ColumnSeed[];
+  // Snapshot of the Kanban template's card-template override at
+  // project-creation time (PRD §7.2: templates are frozen). Built-in
+  // Kanban templates have no override, so this stays null in that path.
+  let defaultCardTemplateIdSnapshot: string | null = null;
 
   if (UUID_RE.test(data.templateId)) {
     const dbTpl = await prisma.kanbanTemplate.findFirst({
       where: { id: data.templateId, workspaceId: ctx.workspaceId },
       select: {
         id: true,
+        defaultCardTemplateId: true,
         columns: {
           orderBy: { position: 'asc' },
           select: { name: true, stepChecklist: true },
@@ -102,6 +107,7 @@ export async function createProject(
     if (!dbTpl) {
       return { status: 'error', message: 'Template Kanban introuvable.' };
     }
+    defaultCardTemplateIdSnapshot = dbTpl.defaultCardTemplateId;
     const userCols: ColumnSeed[] = dbTpl.columns.map((c, idx) => ({
       name: c.name,
       position: (idx + 1) * 1024,
@@ -166,6 +172,9 @@ export async function createProject(
           workspaceId: ctx.workspaceId,
           clientId: data.clientId,
           ...(typeRowId ? { typeId: typeRowId } : {}),
+          ...(defaultCardTemplateIdSnapshot
+            ? { defaultCardTemplateId: defaultCardTemplateIdSnapshot }
+            : {}),
           name: data.name,
           ...(data.description ? { description: data.description } : {}),
           ...(data.startDate ? { startDate: data.startDate } : {}),

@@ -12,8 +12,17 @@ import {
   updateKanbanTemplate,
 } from './actions';
 
+export interface CardTemplateOption {
+  readonly id: string;
+  readonly name: string;
+  readonly isDefault: boolean;
+}
+
 export interface KanbanEditorShellProps {
   readonly initialTemplates: readonly KanbanTemplateDTO[];
+  /** Workspace card templates surfaced in the "card template" picker.
+   *  Empty list = nothing to pick from, the picker is rendered disabled. */
+  readonly cardTemplateOptions: readonly CardTemplateOption[];
 }
 
 /**
@@ -21,7 +30,10 @@ export interface KanbanEditorShellProps {
  * list, the dirty draft, the step-checklist modal state, and routes
  * the server actions through useTransition for spinner ergonomics.
  */
-export function KanbanEditorShell({ initialTemplates }: KanbanEditorShellProps) {
+export function KanbanEditorShell({
+  initialTemplates,
+  cardTemplateOptions,
+}: KanbanEditorShellProps) {
   const router = useRouter();
   const { state, dispatch } = useEditorState(initialTemplates);
   const [pending, startTransition] = useTransition();
@@ -48,6 +60,7 @@ export function KanbanEditorShell({ initialTemplates }: KanbanEditorShellProps) 
       const res = await createKanbanTemplate({
         name: 'Sans titre',
         columns: [{ name: 'À faire', stepChecklist: [] }],
+        defaultCardTemplateId: null,
       });
       if (!res.ok) {
         setError(res.message);
@@ -59,6 +72,7 @@ export function KanbanEditorShell({ initialTemplates }: KanbanEditorShellProps) 
           id: res.id,
           name: 'Sans titre',
           columns: [{ name: 'À faire', stepChecklist: [] }],
+          defaultCardTemplateId: null,
         },
       });
       router.refresh();
@@ -75,6 +89,7 @@ export function KanbanEditorShell({ initialTemplates }: KanbanEditorShellProps) 
         id,
         name: draft.name,
         columns: draft.columns,
+        defaultCardTemplateId: draft.defaultCardTemplateId,
       });
       if (!res.ok) {
         setError(res.message);
@@ -82,7 +97,12 @@ export function KanbanEditorShell({ initialTemplates }: KanbanEditorShellProps) 
       }
       dispatch({
         type: 'saved',
-        template: { id, name: draft.name, columns: draft.columns },
+        template: {
+          id,
+          name: draft.name,
+          columns: draft.columns,
+          defaultCardTemplateId: draft.defaultCardTemplateId,
+        },
       });
       router.refresh();
     });
@@ -160,7 +180,7 @@ export function KanbanEditorShell({ initialTemplates }: KanbanEditorShellProps) 
 
       {state.draft && state.selectedId ? (
         <div key={state.selectedId} className="nx-fade-in">
-          <div className="mb-4 flex items-center gap-3 rounded-2xl border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] px-5 py-3 shadow-[var(--shadow-card)]">
+          <div className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] px-5 py-3 shadow-[var(--shadow-card)]">
             <label
               htmlFor="kanban-template-name"
               className="text-[10px] font-extrabold uppercase tracking-[1px] text-[color:var(--color-text-muted)]"
@@ -181,6 +201,44 @@ export function KanbanEditorShell({ initialTemplates }: KanbanEditorShellProps) 
                 non sauvé
               </span>
             ) : null}
+          </div>
+
+          <div className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] px-5 py-3">
+            <label
+              htmlFor="kanban-template-card-template"
+              className="text-[10px] font-extrabold uppercase tracking-[1px] text-[color:var(--color-text-muted)]"
+            >
+              Template de carte
+            </label>
+            <select
+              id="kanban-template-card-template"
+              value={state.draft.defaultCardTemplateId ?? ''}
+              onChange={(e) =>
+                dispatch({
+                  type: 'setDefaultCardTemplate',
+                  id: e.target.value.length > 0 ? e.target.value : null,
+                })
+              }
+              disabled={cardTemplateOptions.length === 0}
+              className="field-select min-w-[220px] flex-1"
+              aria-describedby="kanban-template-card-template-hint"
+            >
+              <option value="">— Défaut du workspace —</option>
+              {cardTemplateOptions.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                  {c.isDefault ? ' (défaut workspace)' : ''}
+                </option>
+              ))}
+            </select>
+            <p
+              id="kanban-template-card-template-hint"
+              className="basis-full text-[11px] text-[color:var(--color-text-muted)]"
+            >
+              {cardTemplateOptions.length === 0
+                ? "Aucun template de carte dans ce workspace. Crée-en un dans Templates > Cartes pour pouvoir l'associer ici."
+                : 'Choix appliqué aux nouvelles cartes des projets créés à partir de ce template Kanban. Snapshot pris à la création du projet — éditer ce champ plus tard ne touchera pas les projets existants.'}
+            </p>
           </div>
 
           <BoardView

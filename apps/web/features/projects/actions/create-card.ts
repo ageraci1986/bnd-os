@@ -45,7 +45,7 @@ export async function createCard(
 
   const project = await prisma.project.findFirst({
     where: { id: projectId, workspaceId: ctx.workspaceId, deletedAt: null },
-    select: { id: true, clientId: true },
+    select: { id: true, clientId: true, defaultCardTemplateId: true },
   });
   if (!project) return { status: 'error', message: 'Projet introuvable.' };
 
@@ -59,6 +59,16 @@ export async function createCard(
   const templateIdRaw = formData.get('templateId');
   const explicitTemplateId =
     typeof templateIdRaw === 'string' && templateIdRaw.length > 0 ? templateIdRaw : null;
+
+  // Resolution order for the card template applied to the new card:
+  //   1. explicit `?templateId=...` from the caller (UI override)
+  //   2. the project's snapshotted `defaultCardTemplateId` (inherited
+  //      from the Kanban template at project-creation time)
+  //   3. the workspace-level `CardTemplate.isDefault` row
+  //   4. no template at all (the lookup below returns null)
+  // The `isDefault: true` fallback is only used when neither (1) nor (2)
+  // is set — otherwise we'd silently mask the project's own choice.
+  const resolvedTemplateId = explicitTemplateId ?? project.defaultCardTemplateId ?? null;
 
   // Client may provide the desired UUID so it can open the modal
   // optimistically (same id on client + server, no waiting for round-trip).
@@ -79,13 +89,15 @@ export async function createCard(
       },
       select: { id: true, stepChecklist: true },
     }),
-    // Resolve the template to apply: explicit `?templateId=...` wins, otherwise
-    // fall back to the workspace default. Either may be null (no template).
+    // Resolve the template to apply: explicit/project/workspace-default
+    // cascade (see comment above). When neither explicit nor project
+    // override is set, fall back to `CardTemplate.isDefault` at workspace
+    // level. Either branch may return null.
     prisma.cardTemplate.findFirst({
       where: {
         workspaceId: ctx.workspaceId,
         deletedAt: null,
-        ...(explicitTemplateId ? { id: explicitTemplateId } : { isDefault: true }),
+        ...(resolvedTemplateId ? { id: resolvedTemplateId } : { isDefault: true }),
       },
       select: { id: true, body: true, defaultChecklist: true, items: true },
     }),

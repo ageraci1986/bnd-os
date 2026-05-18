@@ -8,11 +8,15 @@ export interface KanbanTemplateDTO {
   readonly columns: readonly KanbanTemplateColumnDef[];
   readonly isBuiltin?: boolean;
   readonly usageCount?: number;
+  /** Default card template applied at project-creation time. Null when the
+   *  template doesn't override the workspace-level CardTemplate.isDefault. */
+  readonly defaultCardTemplateId?: string | null;
 }
 
 export interface EditorDraft {
   readonly name: string;
   readonly columns: readonly KanbanTemplateColumnDef[];
+  readonly defaultCardTemplateId: string | null;
 }
 
 export interface EditorState {
@@ -31,6 +35,7 @@ export type Action =
   | { type: 'renameColumn'; idx: number; name: string }
   | { type: 'reorderColumns'; from: number; to: number }
   | { type: 'setStepChecklist'; idx: number; items: readonly string[] }
+  | { type: 'setDefaultCardTemplate'; id: string | null }
   | { type: 'saved'; template: KanbanTemplateDTO }
   | { type: 'created'; template: KanbanTemplateDTO }
   | { type: 'deleted'; id: string };
@@ -43,7 +48,11 @@ export function makeInitialState(templates: readonly KanbanTemplateDTO[]): Edito
   return {
     templates,
     selectedId: first.id,
-    draft: { name: first.name, columns: first.columns },
+    draft: {
+      name: first.name,
+      columns: first.columns,
+      defaultCardTemplateId: first.defaultCardTemplateId ?? null,
+    },
     isDirty: false,
   };
 }
@@ -56,7 +65,11 @@ export function reduceEditorState(state: EditorState, action: Action): EditorSta
       return {
         ...state,
         selectedId: tpl.id,
-        draft: { name: tpl.name, columns: tpl.columns },
+        draft: {
+          name: tpl.name,
+          columns: tpl.columns,
+          defaultCardTemplateId: tpl.defaultCardTemplateId ?? null,
+        },
         isDirty: false,
       };
     }
@@ -102,6 +115,15 @@ export function reduceEditorState(state: EditorState, action: Action): EditorSta
       );
       return { ...state, draft: { ...state.draft, columns: next }, isDirty: true };
     }
+    case 'setDefaultCardTemplate': {
+      if (!state.draft) return state;
+      if (state.draft.defaultCardTemplateId === action.id) return state;
+      return {
+        ...state,
+        draft: { ...state.draft, defaultCardTemplateId: action.id },
+        isDirty: true,
+      };
+    }
     case 'saved': {
       return {
         ...state,
@@ -114,7 +136,11 @@ export function reduceEditorState(state: EditorState, action: Action): EditorSta
         ...state,
         templates: [...state.templates, action.template],
         selectedId: action.template.id,
-        draft: { name: action.template.name, columns: action.template.columns },
+        draft: {
+          name: action.template.name,
+          columns: action.template.columns,
+          defaultCardTemplateId: action.template.defaultCardTemplateId ?? null,
+        },
         isDirty: false,
       };
     }
