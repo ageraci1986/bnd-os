@@ -456,6 +456,10 @@ model Card {
   dueDate          DateTime? @map("due_date") @db.Timestamptz(6)
   /// Quand la carte est entrée dans la dernière colonne (= candidate archivage)
   movedToLastAt    DateTime? @map("moved_to_last_at") @db.Timestamptz(6)
+  /// Marqueur "todo-list" : quand la carte est dans la dernière colonne,
+  /// le user peut la cocher pour la déclarer terminée — le titre s'affiche
+  /// barré en list view. Indépendant de `archivedAt` (auto-archive 30 j).
+  completedAt      DateTime? @map("completed_at") @db.Timestamptz(6)
   /// Position dans sa colonne (sparse)
   position         Int
   /// Values keyed by template-field id, e.g. `{ "objective": "...", "task-type": "Post" }`.

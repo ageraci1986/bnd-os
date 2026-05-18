@@ -320,6 +320,15 @@
 - [x] Optimistic update via `CARD_ADVANCED_EVENT` (board + liste s'écoutent), `pointerdown` stoppé pour ne pas drag-start
 - [s] Calendrier — skippé : les chips 1-ligne n'ont pas la place
 
+### 5.10 Vue liste — todo-list completion sur dernière colonne ✅ (2026-05-18)
+
+- [x] DB : `Card.completedAt DateTime?` (migration `20260518150001_card_completed_at`, index partiel pour les non-null)
+- [x] Server : `toggleCardCompletion({ cardId, completed })` — refuse Viewer + hors-scope + carte pas dans dernière user-column ; idempotent
+- [x] UI : `CardCompleteCheckbox` (composant client, optimistic via `useOptimistic`) — remplace `CardAdvanceCheckbox` en list view quand carte = dernière colonne
+- [x] UI : titre rendu avec `line-through` + couleur muted quand `completedAt` est posé
+- [x] Scope : list view uniquement (Kanban inchangé pour cette itération)
+- [x] 5 tests dédiés (Viewer refusé, hors dernière colonne refusé, set, clear, idempotent)
+
 ### 5.9 Filtres projet ✅ (2026-05-14)
 
 - [x] Util `card-filter.ts` — parse / serialize URL params, build Prisma `where` (full + filterClauses only pour nested includes)

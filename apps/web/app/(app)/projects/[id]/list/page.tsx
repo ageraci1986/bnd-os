@@ -65,6 +65,7 @@ export default async function ProjectListPage({ params, searchParams }: ProjectL
               categoryTag: true,
               dueDate: true,
               columnId: true,
+              completedAt: true,
               column: { select: { name: true } },
               template: { select: { name: true } },
               assignees: {
@@ -133,6 +134,7 @@ export default async function ProjectListPage({ params, searchParams }: ProjectL
       columnName: c.column.name,
       categoryTag: c.categoryTag,
       dueDate: c.dueDate ? c.dueDate.toISOString() : null,
+      completedAt: c.completedAt ? c.completedAt.toISOString() : null,
       assignees,
       checklistTotal: visibleChecklist.length,
       checklistChecked: checked,

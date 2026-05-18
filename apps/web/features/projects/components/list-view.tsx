@@ -12,6 +12,7 @@ import {
   type OpenCardEventDetail,
 } from './card-modal-controller';
 import { CardAdvanceCheckbox } from './card-advance-checkbox';
+import { CardCompleteCheckbox } from './card-complete-checkbox';
 import { DeleteKanbanCardButton } from './delete-kanban-card-button';
 import { LIST_VIEW_FIELDS, type ListViewFieldId } from './list-view-fields';
 import { useListViewColumns } from './use-list-view-columns';
@@ -30,6 +31,9 @@ export interface ListViewCard {
   readonly columnName: string;
   readonly categoryTag: string | null;
   readonly dueDate: string | null;
+  /** ISO string when the card is checked "done" via the list-view
+   *  todo-list-style checkbox (only available in the last user column). */
+  readonly completedAt: string | null;
   readonly assignees: readonly ListViewAssignee[];
   readonly checklistTotal: number;
   readonly checklistChecked: number;
@@ -179,8 +183,9 @@ export function ListView({
                 </header>
                 <ul className="flex flex-col gap-2">
                   {rows.map((card) => {
-                    const cannotAdvance =
-                      blockedColumnIds.has(card.columnId) || card.columnId === lastUserColumnId;
+                    const isInLastUserColumn = card.columnId === lastUserColumnId;
+                    const isBlocked = blockedColumnIds.has(card.columnId);
+                    const cannotAdvance = isBlocked || isInLastUserColumn;
                     return (
                       <ListRow
                         key={card.id}
@@ -189,6 +194,7 @@ export function ListView({
                         selected={selected}
                         gridTemplate={gridTemplate}
                         cannotAdvance={cannotAdvance}
+                        isInLastUserColumn={isInLastUserColumn}
                         isReadOnly={isReadOnly}
                       />
                     );
@@ -211,6 +217,7 @@ function ListRow({
   selected,
   gridTemplate,
   cannotAdvance,
+  isInLastUserColumn,
   isReadOnly,
 }: {
   card: ListViewCard;
@@ -218,6 +225,10 @@ function ListRow({
   selected: readonly ListViewFieldId[];
   gridTemplate: string;
   cannotAdvance: boolean;
+  /** When true, the row is in the last user column — its checkbox becomes
+   *  a "todo-list" completion toggle (sets `completedAt`) instead of the
+   *  advance shortcut. */
+  isInLastUserColumn: boolean;
   isReadOnly: boolean;
 }) {
   const onClick = () => {
@@ -237,10 +248,24 @@ function ListRow({
       style={{ gridTemplateColumns: gridTemplate }}
     >
       <div onClick={(e) => e.stopPropagation()} className="flex items-center justify-center">
-        <CardAdvanceCheckbox cardId={card.id} disabled={cannotAdvance || isReadOnly} />
+        {isInLastUserColumn ? (
+          <CardCompleteCheckbox
+            cardId={card.id}
+            completedAt={card.completedAt}
+            disabled={isReadOnly}
+          />
+        ) : (
+          <CardAdvanceCheckbox cardId={card.id} disabled={cannotAdvance || isReadOnly} />
+        )}
       </div>
 
-      <div className="min-w-0 truncate text-sm font-bold text-[color:var(--color-text-main)]">
+      <div
+        className={`min-w-0 truncate text-sm font-bold ${
+          card.completedAt
+            ? 'text-[color:var(--color-text-muted)] line-through'
+            : 'text-[color:var(--color-text-main)]'
+        }`}
+      >
         {card.title}
       </div>
 
