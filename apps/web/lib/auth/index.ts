@@ -14,6 +14,7 @@
  *  - We always join via `Membership.workspace_id`; never trust a workspace_id sent by the client.
  */
 import 'server-only';
+import { cache } from 'react';
 import { notFound, redirect } from 'next/navigation';
 import { prisma } from '@nexushub/db';
 import { isRole, Roles, type Role } from '@nexushub/domain';
@@ -30,8 +31,14 @@ export interface AuthContext {
 /**
  * Returns the verified user + workspace membership context, or `null` when
  * the request is unauthenticated.
+ *
+ * Wrapped in React `cache()` so multiple `requireUser()` calls within a
+ * single server render (page + nested server components + helpers) share
+ * one execution. Without this, `getAuthContext` would re-hit Supabase
+ * Auth (network) and re-query Prisma every time, easily adding 100ms+
+ * per duplicate call on auth-gated pages.
  */
-export async function getAuthContext(): Promise<AuthContext | null> {
+export const getAuthContext = cache(async (): Promise<AuthContext | null> => {
   const supabase = await createSupabaseServer();
   const { data, error } = await supabase.auth.getUser();
   if (error || !data.user) return null;
@@ -67,7 +74,7 @@ export async function getAuthContext(): Promise<AuthContext | null> {
     role: membership.role,
     isSuperAdmin: user.isSuperAdmin,
   };
-}
+});
 
 /**
  * Server Action / page guard. Redirects to /login when not authenticated.

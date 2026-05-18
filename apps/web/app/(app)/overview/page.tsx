@@ -22,24 +22,28 @@ export default async function OverviewPage({ searchParams }: OverviewPageProps) 
   const sp = (await searchParams) ?? {};
   const filter = getClientFilterFromSearchParams(sp);
 
-  // Reconcile-on-read (PRD §8.3 + ADR 0001 #2) so the "Cartes bloquées"
-  // counter always reflects the rules at the moment the user looks.
-  await reconcileBeforeRead(ctx.workspaceId);
-
-  const scope = await loadUserScope(ctx);
-  const [profile, activeClient] = await Promise.all([
-    prisma.user.findUniqueOrThrow({
-      where: { id: ctx.userId },
-      select: { firstName: true, email: true },
-    }),
-    resolveActiveClient(filter, ctx.workspaceId, scope),
-  ]);
-
-  const metrics = await getOverviewMetrics({
-    workspaceId: ctx.workspaceId,
-    scope,
-    ...(activeClient ? { clientId: activeClient.id } : {}),
+  // Parallelism strategy: every promise that only depends on `ctx` runs
+  // concurrently from the start. Reconcile-on-read is fire-and-await but
+  // doesn't block the data fetches that follow — those wait on `scope`
+  // (and `scope` only on `ctx`). Cuts a ~4-stage waterfall down to ~3.
+  const reconcilePromise = reconcileBeforeRead(ctx.workspaceId);
+  const profilePromise = prisma.user.findUniqueOrThrow({
+    where: { id: ctx.userId },
+    select: { firstName: true, email: true },
   });
+  const scope = await loadUserScope(ctx);
+
+  const activeClient = await resolveActiveClient(filter, ctx.workspaceId, scope);
+
+  const [, profile, metrics] = await Promise.all([
+    reconcilePromise,
+    profilePromise,
+    getOverviewMetrics({
+      workspaceId: ctx.workspaceId,
+      scope,
+      ...(activeClient ? { clientId: activeClient.id } : {}),
+    }),
+  ]);
 
   const greeting = profile.firstName ?? profile.email.split('@')[0] ?? 'vous';
   const isAdmin = ctx.role === Roles.Admin;
