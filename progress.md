@@ -465,6 +465,18 @@
 - [ ] **Plan B.3 (plus tard)** : commentaires pour Viewer une fois que les Comment server actions existent (dépend de Phase 8)
 - [ ] **Phase C** : console `/super-admin` (CRUD workspaces, liste globale users, promotion super-admin)
 
+### 9.8 User management — Phase B.2 hardening (Viewer read-only enforcement) ✅ (2026-05-18)
+
+Correctifs sortis suite aux tests d'acceptation B.2 :
+
+- [x] **Server** : Viewer refusé sur 11 actions de mutation cartes/projets (move, create, update, delete, advance, skip, due-date, template, assignees ×3, checklist ×3) + `create-project`. Message commun `VIEWER_READ_ONLY_MESSAGE` partagé dans `apps/web/features/projects/lib/scope-error.ts`
+- [x] **UI** : drag-and-drop désactivé, « + Ajouter une carte » caché, modal carte enveloppée dans `<fieldset disabled>` (tous les inputs + boutons figés), `DeleteKanbanCardButton` caché, `DeleteProjectButton` caché, « + Nouveau projet » retiré du topbar et de la liste projets. Vue liste idem
+- [x] **Toaster** : composant `<Toaster />` window-event-driven monté dans le shell `(app)`, fonction `notify({ tone, message })` exportée. Toutes les erreurs/succès `/team` passent par là — fini la bannière inline rouge en pied de row
+- [x] **MemberRow** : sortie du protocole `<form action={...}>` React 19 (race avec `revalidatePath` qui resettait visuellement le `<select>` après chaque OK), passage en `useTransition` + état optimistic + bouton OK désactivé tant que `displayRole === props.role`
+- [x] **Last-Admin** : sniff par message string au lieu d'`instanceof Prisma.PrismaClientKnownRequestError` (PG `RAISE EXCEPTION` remonte en `PrismaClientUnknownRequestError`, et Turbopack double-charge Prisma à la frontière RSC — le check `instanceof` échouait silencieusement, l'erreur était re-thrown jusqu'à l'overlay Next)
+- [x] **Member role select** : option Viewer débloquée dans la dropdown de changement de rôle (`MemberRow`), la guard scope existante côté serveur reste suffisante
+- [x] **5 commits sur main** ; 126 tests web + 154 domain + 54 UI verts
+
 ### 9.2 Paramètres utilisateur
 
 - [ ] Langue FR/EN
