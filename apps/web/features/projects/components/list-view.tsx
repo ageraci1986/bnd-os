@@ -14,6 +14,7 @@ import {
 import { CardAdvanceCheckbox } from './card-advance-checkbox';
 import { CardCompleteCheckbox } from './card-complete-checkbox';
 import { DeleteKanbanCardButton } from './delete-kanban-card-button';
+import { ListAddCardButton } from './list-add-card-button';
 import { LIST_VIEW_FIELDS, type ListViewFieldId } from './list-view-fields';
 import { useListViewColumns } from './use-list-view-columns';
 
@@ -121,7 +122,13 @@ export function ListView({
     list.push(c);
     byColumn.set(c.columnName, list);
   }
-  const orderedColumns = columns.map((c) => c.name).filter((n) => byColumn.has(n));
+  // Always render user-facing columns (even empty) so the "+ Ajouter"
+  // button is reachable per column. System "Bloqué" is only shown when
+  // it actually has cards — no manual add path for it.
+  const orderedColumns = columns.filter((c) => {
+    if (c.isBlockedSystem) return (byColumn.get(c.name) ?? []).length > 0;
+    return true;
+  });
 
   // Cards in the last user column have no destination to skip to. Cards
   // in the system "Bloqué" column shouldn't be advanced via shortcut —
@@ -149,9 +156,9 @@ export function ListView({
         <ColumnPicker selected={selected} onToggle={toggle} onReset={reset} />
       </div>
 
-      {localCards.length === 0 ? (
+      {orderedColumns.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] p-12 text-center text-sm text-[color:var(--color-text-muted)]">
-          Aucune carte dans ce projet.
+          Aucune colonne dans ce projet.
         </div>
       ) : (
         <div className="flex flex-col gap-6">
@@ -169,17 +176,25 @@ export function ListView({
             <span aria-hidden="true" />
           </div>
 
-          {orderedColumns.map((colName) => {
-            const rows = byColumn.get(colName) ?? [];
+          {orderedColumns.map((col) => {
+            const rows = byColumn.get(col.name) ?? [];
             return (
-              <section key={colName} className="flex flex-col gap-2">
+              <section key={col.id} className="flex flex-col gap-2">
                 <header className="flex items-baseline gap-2 px-1">
                   <h2 className="text-[10px] font-extrabold uppercase tracking-[1px] text-[color:var(--color-text-muted)]">
-                    {colName}
+                    {col.name}
                   </h2>
                   <span className="text-[10px] text-[color:var(--color-text-ghost)]">
                     {rows.length}
                   </span>
+                  {!col.isBlockedSystem && !isReadOnly ? (
+                    <ListAddCardButton
+                      projectId={projectId}
+                      columnId={col.id}
+                      columnName={col.name}
+                      csrfToken={csrfToken}
+                    />
+                  ) : null}
                 </header>
                 <ul className="flex flex-col gap-2">
                   {rows.map((card) => {
