@@ -2,10 +2,10 @@
 import 'server-only';
 import { z } from 'zod';
 import { prisma } from '@nexushub/db';
-import { NotFoundError, RACI_VALUES } from '@nexushub/domain';
+import { NotFoundError, RACI_VALUES, Roles } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
 import { loadUserScope } from '@/lib/auth/scope';
-import { SCOPE_ERROR_MESSAGE } from '../lib/scope-error';
+import { SCOPE_ERROR_MESSAGE, VIEWER_READ_ONLY_MESSAGE } from '../lib/scope-error';
 
 /**
  * `instanceof Prisma.PrismaClientKnownRequestError` doesn't reliably hold
@@ -81,6 +81,9 @@ export async function addCardAssignee(input: {
   raci: (typeof RACI_VALUES)[number];
 }): Promise<{ ok: true } | { ok: false; message: string }> {
   const ctx = await requireUser();
+  if (ctx.role === Roles.Viewer) {
+    return { ok: false, message: VIEWER_READ_ONLY_MESSAGE };
+  }
   const parsed = AddSchema.safeParse(input);
   if (!parsed.success) return { ok: false, message: 'Données invalides.' };
 
@@ -124,6 +127,9 @@ export async function updateCardAssigneeRaci(input: {
   raci: (typeof RACI_VALUES)[number];
 }): Promise<{ ok: true } | { ok: false; message: string }> {
   const ctx = await requireUser();
+  if (ctx.role === Roles.Viewer) {
+    return { ok: false, message: VIEWER_READ_ONLY_MESSAGE };
+  }
   const parsed = UpdateSchema.safeParse(input);
   if (!parsed.success) return { ok: false, message: 'Données invalides.' };
 
@@ -156,6 +162,9 @@ export async function removeCardAssignee(input: {
   userId: string;
 }): Promise<{ ok: true } | { ok: false; message: string }> {
   const ctx = await requireUser();
+  if (ctx.role === Roles.Viewer) {
+    return { ok: false, message: VIEWER_READ_ONLY_MESSAGE };
+  }
   const parsed = RemoveSchema.safeParse(input);
   if (!parsed.success) return { ok: false, message: 'Données invalides.' };
 

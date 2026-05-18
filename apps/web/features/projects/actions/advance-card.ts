@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { prisma } from '@nexushub/db';
 import {
   NotFoundError,
+  Roles,
   computeCardPosition,
   evaluateAutoAdvance,
   type Card as DomainCard,
@@ -11,7 +12,7 @@ import {
 } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
 import { loadUserScope } from '@/lib/auth/scope';
-import { SCOPE_ERROR_MESSAGE } from '../lib/scope-error';
+import { SCOPE_ERROR_MESSAGE, VIEWER_READ_ONLY_MESSAGE } from '../lib/scope-error';
 import { AdvanceCardSchema } from '../lib/checklist-schemas';
 
 export type AdvanceCardResult =
@@ -27,6 +28,9 @@ export type AdvanceCardResult =
  */
 export async function advanceCard(input: { cardId: string }): Promise<AdvanceCardResult> {
   const ctx = await requireUser();
+  if (ctx.role === Roles.Viewer) {
+    return { ok: false, message: VIEWER_READ_ONLY_MESSAGE };
+  }
 
   const parsed = AdvanceCardSchema.safeParse(input);
   if (!parsed.success) {

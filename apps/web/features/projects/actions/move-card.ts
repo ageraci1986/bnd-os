@@ -2,10 +2,10 @@
 import 'server-only';
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@nexushub/db';
-import { NotFoundError, computeCardPosition } from '@nexushub/domain';
+import { NotFoundError, Roles, computeCardPosition } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
 import { loadUserScope } from '@/lib/auth/scope';
-import { SCOPE_ERROR_MESSAGE } from '../lib/scope-error';
+import { SCOPE_ERROR_MESSAGE, VIEWER_READ_ONLY_MESSAGE } from '../lib/scope-error';
 import { MoveCardSchema } from '../lib/card-schemas';
 
 /**
@@ -23,6 +23,9 @@ export async function moveCard(input: {
   targetIndex: number;
 }): Promise<{ ok: true; position: number } | { ok: false; message: string }> {
   const ctx = await requireUser();
+  if (ctx.role === Roles.Viewer) {
+    return { ok: false, message: VIEWER_READ_ONLY_MESSAGE };
+  }
 
   const parsed = MoveCardSchema.safeParse(input);
   if (!parsed.success) {

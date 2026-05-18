@@ -2,10 +2,10 @@
 import 'server-only';
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@nexushub/db';
-import { NotFoundError, computeCardPosition } from '@nexushub/domain';
+import { NotFoundError, Roles, computeCardPosition } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
 import { loadUserScope } from '@/lib/auth/scope';
-import { SCOPE_ERROR_MESSAGE } from '../lib/scope-error';
+import { SCOPE_ERROR_MESSAGE, VIEWER_READ_ONLY_MESSAGE } from '../lib/scope-error';
 import { SkipCardSchema } from '../lib/checklist-schemas';
 
 export type SkipCardResult =
@@ -22,6 +22,9 @@ export type SkipCardResult =
  */
 export async function skipCardToNextColumn(input: { cardId: string }): Promise<SkipCardResult> {
   const ctx = await requireUser();
+  if (ctx.role === Roles.Viewer) {
+    return { ok: false, message: VIEWER_READ_ONLY_MESSAGE };
+  }
 
   const parsed = SkipCardSchema.safeParse(input);
   if (!parsed.success) {

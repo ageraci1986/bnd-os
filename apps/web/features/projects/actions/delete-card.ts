@@ -2,10 +2,11 @@
 import 'server-only';
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@nexushub/db';
+import { Roles } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
 import { loadUserScope } from '@/lib/auth/scope';
 import { assertCsrfFromFormData } from '@/lib/csrf';
-import { SCOPE_ERROR_MESSAGE } from '../lib/scope-error';
+import { SCOPE_ERROR_MESSAGE, VIEWER_READ_ONLY_MESSAGE } from '../lib/scope-error';
 import { DeleteCardSchema } from '../lib/card-schemas';
 
 export type DeleteCardState =
@@ -18,6 +19,9 @@ export async function deleteCard(
 ): Promise<DeleteCardState> {
   await assertCsrfFromFormData(formData);
   const ctx = await requireUser();
+  if (ctx.role === Roles.Viewer) {
+    return { status: 'error', message: VIEWER_READ_ONLY_MESSAGE };
+  }
 
   const parsed = DeleteCardSchema.safeParse({ cardId: formData.get('cardId') });
   if (!parsed.success) {

@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { prisma } from '@nexushub/db';
 import {
   NotFoundError,
+  Roles,
   computeCardPosition,
   shouldMoveToBlocked,
   shouldRestoreFromBlocked,
@@ -12,7 +13,7 @@ import {
 } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
 import { loadUserScope } from '@/lib/auth/scope';
-import { SCOPE_ERROR_MESSAGE } from '../lib/scope-error';
+import { SCOPE_ERROR_MESSAGE, VIEWER_READ_ONLY_MESSAGE } from '../lib/scope-error';
 import { UpdateCardDueDateSchema } from '../lib/checklist-schemas';
 
 export type UpdateDueDateResult =
@@ -40,6 +41,9 @@ export async function updateCardDueDate(input: {
   dueDate: string | null;
 }): Promise<UpdateDueDateResult> {
   const ctx = await requireUser();
+  if (ctx.role === Roles.Viewer) {
+    return { ok: false, message: VIEWER_READ_ONLY_MESSAGE };
+  }
 
   const parsed = UpdateCardDueDateSchema.safeParse({
     cardId: input.cardId,

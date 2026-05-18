@@ -5,12 +5,13 @@ import { z } from 'zod';
 import { prisma } from '@nexushub/db';
 import {
   NotFoundError,
+  Roles,
   validateCardTemplateItems,
   pruneFieldValuesByItems,
 } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
 import { loadUserScope } from '@/lib/auth/scope';
-import { SCOPE_ERROR_MESSAGE } from '../lib/scope-error';
+import { SCOPE_ERROR_MESSAGE, VIEWER_READ_ONLY_MESSAGE } from '../lib/scope-error';
 
 const Schema = z.object({
   cardId: z.string().uuid(),
@@ -22,6 +23,9 @@ export async function changeCardTemplate(input: {
   templateId: string;
 }): Promise<{ ok: true } | { ok: false; message: string }> {
   const ctx = await requireUser();
+  if (ctx.role === Roles.Viewer) {
+    return { ok: false, message: VIEWER_READ_ONLY_MESSAGE };
+  }
   const parsed = Schema.safeParse(input);
   if (!parsed.success) return { ok: false, message: 'Données invalides.' };
 

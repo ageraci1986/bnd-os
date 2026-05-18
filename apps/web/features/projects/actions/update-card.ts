@@ -3,10 +3,10 @@ import 'server-only';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { prisma } from '@nexushub/db';
-import { NotFoundError } from '@nexushub/domain';
+import { NotFoundError, Roles } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
 import { loadUserScope } from '@/lib/auth/scope';
-import { SCOPE_ERROR_MESSAGE } from '../lib/scope-error';
+import { SCOPE_ERROR_MESSAGE, VIEWER_READ_ONLY_MESSAGE } from '../lib/scope-error';
 
 // Free-form so users can coin custom workspace-level categories.
 const CategorySchema = z.string().trim().min(1).max(32).nullable();
@@ -43,6 +43,9 @@ export async function updateCard(input: {
   categoryTag?: string | null;
 }): Promise<UpdateCardResult> {
   const ctx = await requireUser();
+  if (ctx.role === Roles.Viewer) {
+    return { ok: false, message: VIEWER_READ_ONLY_MESSAGE };
+  }
   const parsed = UpdateCardSchema.safeParse(input);
   if (!parsed.success) {
     throw new Error(parsed.error.issues[0]?.message ?? 'Données invalides.');

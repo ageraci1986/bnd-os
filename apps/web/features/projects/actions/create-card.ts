@@ -1,11 +1,16 @@
 'use server';
 import 'server-only';
 import { prisma } from '@nexushub/db';
-import { NotFoundError, computeCardPosition, validateCardTemplateItems } from '@nexushub/domain';
+import {
+  NotFoundError,
+  Roles,
+  computeCardPosition,
+  validateCardTemplateItems,
+} from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
 import { loadUserScope } from '@/lib/auth/scope';
 import { assertCsrfFromFormData } from '@/lib/csrf';
-import { SCOPE_ERROR_MESSAGE } from '../lib/scope-error';
+import { SCOPE_ERROR_MESSAGE, VIEWER_READ_ONLY_MESSAGE } from '../lib/scope-error';
 import { CreateCardSchema } from '../lib/card-schemas';
 
 export type CreateCardState =
@@ -24,6 +29,9 @@ export async function createCard(
 ): Promise<CreateCardState> {
   await assertCsrfFromFormData(formData);
   const ctx = await requireUser();
+  if (ctx.role === Roles.Viewer) {
+    return { status: 'error', message: VIEWER_READ_ONLY_MESSAGE };
+  }
 
   const parsed = CreateCardSchema.safeParse({
     projectId: formData.get('projectId'),

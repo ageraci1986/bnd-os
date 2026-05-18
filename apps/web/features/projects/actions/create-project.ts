@@ -7,6 +7,7 @@ import {
   BLOCKED_COLUMN_NAME,
   BLOCKED_COLUMN_POSITION,
   BUILTIN_PROJECT_TYPES,
+  Roles,
   buildProjectColumns,
   findTemplate,
   NotFoundError,
@@ -17,7 +18,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 import { requireUser } from '@/lib/auth';
 import { loadUserScope } from '@/lib/auth/scope';
 import { assertCsrfFromFormData } from '@/lib/csrf';
-import { SCOPE_ERROR_MESSAGE } from '../lib/scope-error';
+import { SCOPE_ERROR_MESSAGE, VIEWER_READ_ONLY_MESSAGE } from '../lib/scope-error';
 import { CreateProjectSchema } from '../lib/schemas';
 
 export type CreateProjectState =
@@ -40,6 +41,9 @@ export async function createProject(
 ): Promise<CreateProjectState> {
   await assertCsrfFromFormData(formData);
   const ctx = await requireUser();
+  if (ctx.role === Roles.Viewer) {
+    return { status: 'error', message: VIEWER_READ_ONLY_MESSAGE };
+  }
 
   const parsed = CreateProjectSchema.safeParse({
     name: formData.get('name'),
