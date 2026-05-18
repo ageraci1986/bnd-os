@@ -441,7 +441,11 @@
 - [x] Smoke vérifié : Admin invite User → User s'inscrit via lien → User accède Overview/Projects/Clients, /team renvoie 403
 - [ ] **Phase C** : console `/super-admin` (CRUD workspaces, liste globale users, promotion super-admin)
 - [ ] **Plan B.2** : Viewer activation (unblock invitation, `/my-projects`, sidebar adaptative, `shareProjectWithViewer` action, Partager modal, comment authorization)
-- [ ] **Infra Resend** : vérifier le domaine `brandnewday.agency` (sender final `app@brandnewday.agency`) pour sortir du mode test. Domaine créé côté Resend le 2026-05-18 via MCP, statut `not_started` en attente des DNS chez OVH. Étapes complètes + records exacts dans [`docs/runbooks/resend-domain-setup.md`](./docs/runbooks/resend-domain-setup.md). Décision : on garde le domaine racine pour pouvoir envoyer FROM `app@brandnewday.agency` (alignement DMARC via DKIM), sans toucher à la SPF OVH existante (Resend publie sa SPF sur le sous-domaine `send.brandnewday.agency`). Action requise utilisateur : (1) poser 3 records DNS chez OVH (DKIM + return-path SPF/MX), (2) `mcp__resend__verify-domain`, (3) màj `RESEND_FROM_EMAIL` sur `.env.local` + Vercel. Domaine d'app (frontend Vercel) prévu sur `app.brandnewday.agency`, séparé.
+- [x] **Infra Resend** ✅ (2026-05-18) — domaine `brandnewday.agency` vérifié (DKIM + SPF MX + SPF TXT tous `verified`, sending `enabled`). DNS posés chez OVH (4 entrées dans la zone DNS, SPF racine OVH **intacte**), vérification déclenchée via MCP. Reste à faire côté env :
+  - [ ] Mettre `RESEND_FROM_EMAIL=app@brandnewday.agency` dans `.env.local` (racine + `apps/web/.env.local`)
+  - [ ] Mettre les mêmes variables sur Vercel (`Production` + `Preview`)
+  - [ ] Redémarrer `pnpm dev`, smoke test : inviter une adresse externe, vérifier `Delivered` dans les logs Resend
+- [ ] **Frontend domain** : pointer `app.brandnewday.agency` vers Vercel (CNAME OVH → `cname.vercel-dns.com.`) + màj `NEXT_PUBLIC_APP_URL=https://app.brandnewday.agency`. Étapes dans [`docs/runbooks/resend-domain-setup.md`](./docs/runbooks/resend-domain-setup.md) §2 (cas Vercel) — runbook séparé Vercel à écrire si besoin.
 
 ### 9.6 User management — Phase B.1 (scoping foundation) ✅ (2026-05-16)
 

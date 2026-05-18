@@ -27,17 +27,25 @@
 
 ---
 
-## 1. Domaine créé côté Resend ✅
-
-Création effectuée via MCP le 2026-05-18 :
+## 1. Domaine créé + vérifié côté Resend ✅ (2026-05-18)
 
 ```
-Name:   brandnewday.agency
-Region: eu-west-1
-TLS:    opportunistic (défaut)
-Custom Return-Path: send (défaut)
-Status: not_started → en attente DNS
+Name:    brandnewday.agency
+ID:      98abe860-de97-4655-8ea6-fd57768776f4
+Region:  eu-west-1
+TLS:     opportunistic
+Custom Return-Path: send
+Status:  verified ✅
+Sending: enabled ✅
+DKIM:    verified
+SPF MX:  verified
+SPF TXT: verified
 ```
+
+DNS posés chez OVH le 2026-05-18 (DKIM + return-path MX + return-path
+SPF + DMARC monitoring), vérifiés via `mcp__resend__verify-domain`
+quelques minutes après propagation. Aucun changement sur la SPF
+racine OVH (mail OVH existant intact).
 
 ---
 
