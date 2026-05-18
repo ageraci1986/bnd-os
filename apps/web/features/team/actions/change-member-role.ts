@@ -3,7 +3,7 @@ import 'server-only';
 import { revalidatePath } from 'next/cache';
 import { headers } from 'next/headers';
 import { z } from 'zod';
-import { Prisma, prisma } from '@nexushub/db';
+import { prisma } from '@nexushub/db';
 import { Roles } from '@nexushub/domain';
 import { requireAdmin } from '@/lib/auth';
 import { assertCsrfFromFormData } from '@/lib/csrf';
@@ -69,10 +69,12 @@ export async function changeMemberRole(
       data: { role },
     });
   } catch (err) {
-    if (
-      err instanceof Prisma.PrismaClientKnownRequestError &&
-      err.message.includes('LAST_ADMIN_PROTECTED')
-    ) {
+    // Detect the `protect_last_admin` trigger error by message string.
+    // Turbopack's RSC module boundary loads Prisma twice, so
+    // `instanceof Prisma.PrismaClientKnownRequestError` is unreliable —
+    // and PG raise-exception errors actually surface as
+    // PrismaClientUnknownRequestError, which would never match anyway.
+    if (err instanceof Error && err.message.includes('LAST_ADMIN_PROTECTED')) {
       return {
         status: 'error',
         message: "Impossible : ce membre est le dernier Admin de l'espace.",

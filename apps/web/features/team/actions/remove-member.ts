@@ -3,7 +3,7 @@ import 'server-only';
 import { revalidatePath } from 'next/cache';
 import { headers } from 'next/headers';
 import { z } from 'zod';
-import { Prisma, prisma } from '@nexushub/db';
+import { prisma } from '@nexushub/db';
 import { requireAdmin } from '@/lib/auth';
 import { assertCsrfFromFormData } from '@/lib/csrf';
 import { recordAudit } from '@/lib/audit';
@@ -53,10 +53,11 @@ export async function removeMember(
   try {
     await prisma.membership.delete({ where: { id: membershipId } });
   } catch (err) {
-    if (
-      err instanceof Prisma.PrismaClientKnownRequestError &&
-      err.message.includes('LAST_ADMIN_PROTECTED')
-    ) {
+    // Detect by message string: Turbopack's RSC module boundary loads
+    // Prisma twice so `instanceof Prisma.PrismaClientKnownRequestError`
+    // is unreliable, and PG raise-exception errors surface as
+    // PrismaClientUnknownRequestError, which would never match anyway.
+    if (err instanceof Error && err.message.includes('LAST_ADMIN_PROTECTED')) {
       return {
         status: 'error',
         message: "Impossible : ce membre est le dernier Admin de l'espace.",
