@@ -142,7 +142,7 @@ export function EditorShell({ initialTemplates }: EditorShellProps) {
       </div>
 
       {state.draft && state.selectedId ? (
-        <div key={state.selectedId} className="nx-fade-in">
+        <div key={`editor-${state.selectedId}`} className="nx-fade-in">
           <TemplateEditor
             name={state.draft.name}
             items={state.draft.items}
@@ -170,7 +170,7 @@ export function EditorShell({ initialTemplates }: EditorShellProps) {
       )}
 
       {state.draft ? (
-        <div key={state.selectedId} className="nx-fade-in">
+        <div key={`preview-${state.selectedId}`} className="nx-fade-in">
           <TemplatePreview templateName={state.draft.name} items={state.draft.items} />
         </div>
       ) : (
