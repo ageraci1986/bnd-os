@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { prisma } from '@nexushub/db';
+import { Roles } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
 import { getClientFilterFromSearchParams, resolveActiveClient } from '@/lib/client-filter/server';
 import { loadUserScope, scopedProjectWhere } from '@/lib/auth/scope';
@@ -19,6 +20,7 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
   const filter = getClientFilterFromSearchParams(sp);
   const scope = await loadUserScope(ctx);
   const activeClient = await resolveActiveClient(filter, ctx.workspaceId, scope);
+  const isViewer = ctx.role === Roles.Viewer;
 
   const projects = await prisma.project.findMany({
     where: {
@@ -65,9 +67,11 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
               <CalendarIcon /> Calendrier
             </Link>
           </div>
-          <Link href="/projects/new" className="btn btn-primary">
-            + Nouveau projet
-          </Link>
+          {!isViewer ? (
+            <Link href="/projects/new" className="btn btn-primary">
+              + Nouveau projet
+            </Link>
+          ) : null}
         </div>
       </header>
 
@@ -77,19 +81,25 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
             {activeClient ? `Aucun projet pour ${activeClient.name}` : 'Aucun projet'}
           </h2>
           <p className="mt-2 text-sm text-[color:var(--color-text-muted)]">
-            Lancez votre premier projet en passant par l’assistant de création.
+            {isViewer
+              ? 'Aucun projet ne vous a été partagé pour le moment.'
+              : 'Lancez votre premier projet en passant par l’assistant de création.'}
           </p>
-          <Link href="/projects/new" className="btn btn-primary mt-4 inline-block">
-            Créer un projet →
-          </Link>
+          {!isViewer ? (
+            <Link href="/projects/new" className="btn btn-primary mt-4 inline-block">
+              Créer un projet →
+            </Link>
+          ) : null}
         </div>
       ) : (
         <ul className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {projects.map((p) => (
             <li key={p.id} className="group relative">
-              <div className="pointer-events-none absolute right-3 top-3 z-10 opacity-0 transition-opacity duration-150 focus-within:pointer-events-auto focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100">
-                <DeleteProjectButton projectId={p.id} projectName={p.name} size="sm" />
-              </div>
+              {!isViewer ? (
+                <div className="pointer-events-none absolute right-3 top-3 z-10 opacity-0 transition-opacity duration-150 focus-within:pointer-events-auto focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100">
+                  <DeleteProjectButton projectId={p.id} projectName={p.name} size="sm" />
+                </div>
+              ) : null}
               <Link
                 href={`/projects/${p.id}`}
                 className="block rounded-2xl border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] p-5 shadow-[var(--shadow-card)] transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-hover)]"

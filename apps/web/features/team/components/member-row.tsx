@@ -1,5 +1,5 @@
 'use client';
-import { useActionState, useState } from 'react';
+import { useActionState, useEffect, useState } from 'react';
 import type { UserScope } from '@nexushub/domain';
 import { CSRF_FIELD_NAME } from '@/lib/csrf/field';
 import { changeMemberRole, type ChangeRoleState } from '../actions/change-member-role';
@@ -34,6 +34,15 @@ export function MemberRow(props: MemberRowProps) {
   const [roleState, roleAction, rolePending] = useActionState(changeMemberRole, idleRole);
   const [removeState, removeAction, removePending] = useActionState(removeMember, idleRemove);
   const [scopeModalOpen, setScopeModalOpen] = useState(false);
+  // Controlled mirror of `props.role`. React 19 form-actions reset
+  // uncontrolled inputs after submit, which would visually snap the
+  // <select> back to its initial `defaultValue` before revalidatePath
+  // pushes the fresh role from the server. Mirroring into state and
+  // re-syncing via useEffect keeps the displayed value coherent.
+  const [selectedRole, setSelectedRole] = useState<MemberRowProps['role']>(props.role);
+  useEffect(() => {
+    setSelectedRole(props.role);
+  }, [props.role]);
   const isSelf = props.userId === props.currentUserId;
 
   const initials =
@@ -87,7 +96,8 @@ export function MemberRow(props: MemberRowProps) {
         <select
           id={`role-${props.membershipId}`}
           name="role"
-          defaultValue={props.role}
+          value={selectedRole}
+          onChange={(e) => setSelectedRole(e.target.value as MemberRowProps['role'])}
           disabled={rolePending}
           className="field-select w-32"
         >

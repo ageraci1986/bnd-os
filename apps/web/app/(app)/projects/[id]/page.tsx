@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { prisma } from '@nexushub/db';
-import { validateCardTemplateItems } from '@nexushub/domain';
+import { Roles, validateCardTemplateItems } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
 import { loadUserScope, scopedProjectWhere } from '@/lib/auth/scope';
 import { getCsrfTokenForForm } from '@/lib/csrf';
@@ -192,6 +192,9 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
 
   const canDelete = canShare;
 
+  // Viewer = strict read-only. Orthogonal to canShare/canDelete (scope-based).
+  const isViewer = ctx.role === Roles.Viewer;
+
   const cardCount = project.cards.length;
 
   const memberOptions = workspaceMembers.map((m) => {
@@ -279,6 +282,7 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
         projectId={project.id}
         columns={project.columns}
         cards={project.cards}
+        isReadOnly={isViewer}
       />
 
       <CardModalController
@@ -288,6 +292,7 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
         customCategories={customCategories}
         availableTemplates={availableTemplates}
         initialIsNew={isNew}
+        isReadOnly={isViewer}
         workspaceMembers={workspaceMembers.map((m) => {
           const name =
             [m.user.firstName, m.user.lastName].filter(Boolean).join(' ').trim() || m.user.email;

@@ -169,13 +169,15 @@ export default async function AppLayout({ children, searchParams }: AppLayoutPro
         <Topbar
           left={<SearchBar disabled />}
           right={
-            <Link
-              href="/projects"
-              className="btn btn-primary btn-sm"
-              aria-label="Créer un nouveau projet"
-            >
-              + Nouveau projet
-            </Link>
+            isViewer ? null : (
+              <Link
+                href="/projects"
+                className="btn btn-primary btn-sm"
+                aria-label="Créer un nouveau projet"
+              >
+                + Nouveau projet
+              </Link>
+            )
           }
         />
 

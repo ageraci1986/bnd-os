@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { prisma } from '@nexushub/db';
+import { Roles } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
 import { loadUserScope } from '@/lib/auth/scope';
 import { getCsrfTokenForForm } from '@/lib/csrf';
@@ -102,6 +103,8 @@ export default async function ProjectListPage({ params, searchParams }: ProjectL
     if (!allowed) notFound();
   }
 
+  const isViewer = ctx.role === Roles.Viewer;
+
   // Map cards to the ListView shape. Counts are filtered the same way
   // the modal does it (other columns' step items are hidden).
   const listCards: ListViewCard[] = project.cards.map((c) => {
@@ -195,7 +198,9 @@ export default async function ProjectListPage({ params, searchParams }: ProjectL
         </div>
         <div className="flex items-center gap-3">
           <ViewToggle projectId={project.id} />
-          <DeleteProjectButton projectId={project.id} projectName={project.name} />
+          {!isViewer ? (
+            <DeleteProjectButton projectId={project.id} projectName={project.name} />
+          ) : null}
         </div>
       </header>
 
@@ -211,6 +216,7 @@ export default async function ProjectListPage({ params, searchParams }: ProjectL
         csrfToken={csrf}
         cards={listCards}
         columns={orderedColumns}
+        isReadOnly={isViewer}
       />
 
       <CardModalController
@@ -221,6 +227,7 @@ export default async function ProjectListPage({ params, searchParams }: ProjectL
         availableTemplates={availableTemplates}
         initialIsNew={false}
         initialCard={null}
+        isReadOnly={isViewer}
         workspaceMembers={workspaceMembers.map((m) => {
           const name =
             [m.user.firstName, m.user.lastName].filter(Boolean).join(' ').trim() || m.user.email;

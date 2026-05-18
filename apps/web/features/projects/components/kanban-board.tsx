@@ -30,6 +30,9 @@ export interface KanbanBoardProps {
   readonly projectId: string;
   readonly columns: readonly KanbanColumnData[];
   readonly cards: readonly KanbanCardData[];
+  /** When true, all mutation affordances (DnD, add, delete, advance)
+   *  are hidden/disabled. Server still rejects them for Viewer. */
+  readonly isReadOnly?: boolean;
 }
 
 /**
@@ -38,7 +41,13 @@ export interface KanbanBoardProps {
  * the card list so the move feels instant even when the round-trip is
  * a few hundred ms.
  */
-export function KanbanBoard({ csrfToken, projectId, columns, cards }: KanbanBoardProps) {
+export function KanbanBoard({
+  csrfToken,
+  projectId,
+  columns,
+  cards,
+  isReadOnly = false,
+}: KanbanBoardProps) {
   const router = useRouter();
   const [localCards, setLocalCards] = useState<readonly KanbanCardData[]>(cards);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -127,11 +136,13 @@ export function KanbanBoard({ csrfToken, projectId, columns, cards }: KanbanBoar
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
   const handleDragStart = (e: DragStartEvent) => {
+    if (isReadOnly) return;
     setActiveId(String(e.active.id));
   };
 
   const handleDragEnd = async (e: DragEndEvent) => {
     setActiveId(null);
+    if (isReadOnly) return;
     const cardId = String(e.active.id);
     const activeCard = localCards.find((c) => c.id === cardId);
     if (!activeCard || !e.over) return;
@@ -213,10 +224,13 @@ export function KanbanBoard({ csrfToken, projectId, columns, cards }: KanbanBoar
             column={col}
             cards={cardsByColumn.get(col.id) ?? []}
             isLastUserColumn={col.id === lastUserColumnId}
+            isReadOnly={isReadOnly}
           />
         ))}
       </div>
-      <DragOverlay>{activeCard ? <KanbanCard card={activeCard} /> : null}</DragOverlay>
+      <DragOverlay>
+        {activeCard ? <KanbanCard card={activeCard} isReadOnly={isReadOnly} /> : null}
+      </DragOverlay>
     </DndContext>
   );
 }

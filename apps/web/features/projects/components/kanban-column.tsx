@@ -31,6 +31,9 @@ export interface KanbanColumnProps {
   /** True for the last user column — the advance shortcut is disabled
    *  on cards living here (no destination to skip to). */
   readonly isLastUserColumn?: boolean;
+  /** When true, hides the "+ Ajouter une carte" button and disables
+   *  card-level mutations. */
+  readonly isReadOnly?: boolean;
 }
 
 export function KanbanColumn({
@@ -39,13 +42,14 @@ export function KanbanColumn({
   column,
   cards,
   isLastUserColumn,
+  isReadOnly = false,
 }: KanbanColumnProps) {
   const [pending, startTransition] = useTransition();
 
   const { setNodeRef, isOver } = useDroppable({
     id: `col:${column.id}`,
     data: { type: 'column', columnId: column.id },
-    disabled: column.isBlockedSystem,
+    disabled: column.isBlockedSystem || isReadOnly,
   });
 
   const colCls = ['column', column.isBlockedSystem && 'blocked'].filter(Boolean).join(' ');
@@ -118,12 +122,13 @@ export function KanbanColumn({
               blocked={column.isBlockedSystem}
               cannotAdvance={column.isBlockedSystem || isLastUserColumn === true}
               csrfToken={csrfToken}
+              isReadOnly={isReadOnly}
             />
           ))}
         </SortableContext>
       </div>
 
-      {!column.isBlockedSystem ? (
+      {!column.isBlockedSystem && !isReadOnly ? (
         <button
           type="button"
           className="add-card-btn"

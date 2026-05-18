@@ -88,6 +88,9 @@ export interface CardModalControllerProps {
   readonly initialCard: CardModalData | null;
   /** When true (URL had ?new=1), the modal autoselects the title. */
   readonly initialIsNew: boolean;
+  /** When true, the rendered modal disables every mutation control
+   *  (Viewer role). The page passes `ctx.role === Roles.Viewer`. */
+  readonly isReadOnly?: boolean;
 }
 
 interface ModalState {
@@ -114,6 +117,7 @@ export function CardModalController({
   availableTemplates,
   initialCard,
   initialIsNew,
+  isReadOnly = false,
 }: CardModalControllerProps) {
   const pathname = usePathname();
   const [state, setState] = useState<ModalState | null>(
@@ -270,6 +274,7 @@ export function CardModalController({
       card={cardForModal}
       onClose={close}
       isLoading={state.data === null}
+      isReadOnly={isReadOnly}
     />
   );
 }

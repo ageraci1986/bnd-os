@@ -47,6 +47,8 @@ export interface ListViewProps {
   readonly csrfToken: string;
   readonly cards: readonly ListViewCard[];
   readonly columns: readonly ListViewColumnMeta[];
+  /** Viewer mode: hide delete + disable advance shortcut. */
+  readonly isReadOnly?: boolean;
 }
 
 /**
@@ -73,7 +75,13 @@ const COLUMN_LABELS: Record<ListViewFieldId, string> = {
   template: 'Template',
 };
 
-export function ListView({ projectId, csrfToken, cards, columns }: ListViewProps) {
+export function ListView({
+  projectId,
+  csrfToken,
+  cards,
+  columns,
+  isReadOnly = false,
+}: ListViewProps) {
   const { selected, toggle, reset } = useListViewColumns(projectId);
   const [localCards, setLocalCards] = useState<readonly ListViewCard[]>(cards);
   useEffect(() => setLocalCards(cards), [cards]);
@@ -181,6 +189,7 @@ export function ListView({ projectId, csrfToken, cards, columns }: ListViewProps
                         selected={selected}
                         gridTemplate={gridTemplate}
                         cannotAdvance={cannotAdvance}
+                        isReadOnly={isReadOnly}
                       />
                     );
                   })}
@@ -202,12 +211,14 @@ function ListRow({
   selected,
   gridTemplate,
   cannotAdvance,
+  isReadOnly,
 }: {
   card: ListViewCard;
   csrfToken: string;
   selected: readonly ListViewFieldId[];
   gridTemplate: string;
   cannotAdvance: boolean;
+  isReadOnly: boolean;
 }) {
   const onClick = () => {
     const detail: OpenCardEventDetail = {
@@ -226,7 +237,7 @@ function ListRow({
       style={{ gridTemplateColumns: gridTemplate }}
     >
       <div onClick={(e) => e.stopPropagation()} className="flex items-center justify-center">
-        <CardAdvanceCheckbox cardId={card.id} disabled={cannotAdvance} />
+        <CardAdvanceCheckbox cardId={card.id} disabled={cannotAdvance || isReadOnly} />
       </div>
 
       <div className="min-w-0 truncate text-sm font-bold text-[color:var(--color-text-main)]">
@@ -237,12 +248,16 @@ function ListRow({
         <FieldCell key={id} field={id} card={card} />
       ))}
 
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="pointer-events-none flex justify-end opacity-0 transition-opacity duration-150 focus-within:pointer-events-auto focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100"
-      >
-        <DeleteKanbanCardButton cardId={card.id} cardTitle={card.title} csrfToken={csrfToken} />
-      </div>
+      {!isReadOnly ? (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="pointer-events-none flex justify-end opacity-0 transition-opacity duration-150 focus-within:pointer-events-auto focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100"
+        >
+          <DeleteKanbanCardButton cardId={card.id} cardTitle={card.title} csrfToken={csrfToken} />
+        </div>
+      ) : (
+        <div aria-hidden="true" />
+      )}
     </li>
   );
 }

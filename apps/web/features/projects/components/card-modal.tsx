@@ -63,6 +63,13 @@ export interface CardModalProps {
    * category) is already meaningful; everything else renders a skeleton.
    */
   readonly isLoading?: boolean;
+  /**
+   * Viewer mode: the modal body is wrapped in <fieldset disabled> so
+   * every interactive control inside is disabled in one shot. The close
+   * button stays interactive (escape hatch). Delete is also explicitly
+   * hidden because focus-managed buttons can sometimes bypass fieldset.
+   */
+  readonly isReadOnly?: boolean;
 }
 
 /**
@@ -81,6 +88,7 @@ export function CardModal({
   card,
   onClose,
   isLoading = false,
+  isReadOnly = false,
 }: CardModalProps) {
   const router = useRouter();
   const [items, setItems] = useState<readonly ChecklistItemDTO[]>(card.checklist);
@@ -145,251 +153,267 @@ export function CardModal({
       <div className="modal-backdrop" onClick={close} />
       <article className="modal" role="dialog" aria-modal="true" aria-labelledby="card-modal-title">
         <header className="modal-head">
-          <div>
-            <div className="modal-breadcrumb">
-              <span>{workspaceName}</span>
-              <span>/</span>
-              <span>{projectName}</span>
-              <span>/</span>
-              <strong>Carte #{String(card.shortRef).padStart(3, '0')}</strong>
+          <fieldset
+            disabled={isReadOnly}
+            className="contents"
+            style={{ border: 0, padding: 0, margin: 0 }}
+          >
+            <div>
+              <div className="modal-breadcrumb">
+                <span>{workspaceName}</span>
+                <span>/</span>
+                <span>{projectName}</span>
+                <span>/</span>
+                <strong>Carte #{String(card.shortRef).padStart(3, '0')}</strong>
+              </div>
+              <CardTitleInput cardId={card.id} initial={card.title} autoSelect={isNew} />
+              {card.columnIsBlocked ? (
+                <BlockedBanner cardId={card.id} dueDate={card.dueDate} />
+              ) : null}
+              {allChecked && !isReadOnly ? (
+                <AutoAdvanceBanner
+                  cardId={card.id}
+                  nextColumnName={card.nextColumnName}
+                  onComplete={close}
+                />
+              ) : null}
             </div>
-            <CardTitleInput cardId={card.id} initial={card.title} autoSelect={isNew} />
-            {card.columnIsBlocked ? (
-              <BlockedBanner cardId={card.id} dueDate={card.dueDate} />
-            ) : null}
-            {allChecked ? (
-              <AutoAdvanceBanner
-                cardId={card.id}
-                nextColumnName={card.nextColumnName}
-                onComplete={close}
-              />
-            ) : null}
-          </div>
+          </fieldset>
           <button type="button" className="modal-close" onClick={close} aria-label="Fermer">
             ✕
           </button>
         </header>
 
-        <div className="modal-body">
-          <div className="modal-main">
-            {isLoading ? (
-              <ModalBodySkeleton />
-            ) : (
-              <TemplateItemsRender
-                cardId={card.id}
-                items={card.templateItems}
-                fieldValues={card.fieldValues}
-                description={card.description ?? ''}
-              />
-            )}
+        <fieldset
+          disabled={isReadOnly}
+          className="contents"
+          style={{ border: 0, padding: 0, margin: 0 }}
+        >
+          <div className="modal-body">
+            <div className="modal-main">
+              {isLoading ? (
+                <ModalBodySkeleton />
+              ) : (
+                <TemplateItemsRender
+                  cardId={card.id}
+                  items={card.templateItems}
+                  fieldValues={card.fieldValues}
+                  description={card.description ?? ''}
+                />
+              )}
 
-            {/* Combined progress bar across step + own items, displayed
+              {/* Combined progress bar across step + own items, displayed
                 once above the two checklist sections. */}
-            {!isLoading && (showStepChecklist || showOwnChecklist) ? (
-              <section className="modal-section">
-                <div className="checklist-meta">
-                  <div className="section-label" style={{ marginBottom: 0 }}>
-                    Progression
+              {!isLoading && (showStepChecklist || showOwnChecklist) ? (
+                <section className="modal-section">
+                  <div className="checklist-meta">
+                    <div className="section-label" style={{ marginBottom: 0 }}>
+                      Progression
+                    </div>
+                    <div className="checklist-count">
+                      {checked} / {visibleItems.length}
+                      {allChecked ? ' ✓' : ''}
+                    </div>
                   </div>
-                  <div className="checklist-count">
-                    {checked} / {visibleItems.length}
-                    {allChecked ? ' ✓' : ''}
-                  </div>
-                </div>
-                {visibleItems.length > 0 ? (
-                  <p className="checklist-hint">
-                    Auto-progression — la carte avance dès que tout est coché (checklist + step).
-                  </p>
-                ) : null}
-                <div
-                  style={{
-                    height: 4,
-                    background: 'var(--color-border-light)',
-                    borderRadius: 9999,
-                    margin: '10px 0 0',
-                  }}
-                >
+                  {visibleItems.length > 0 ? (
+                    <p className="checklist-hint">
+                      Auto-progression — la carte avance dès que tout est coché (checklist + step).
+                    </p>
+                  ) : null}
                   <div
                     style={{
-                      width: `${progress}%`,
-                      height: '100%',
-                      background: allChecked ? 'var(--color-success)' : 'var(--accent-gradient)',
+                      height: 4,
+                      background: 'var(--color-border-light)',
                       borderRadius: 9999,
-                      transition: 'width 0.25s',
+                      margin: '10px 0 0',
                     }}
-                  />
+                  >
+                    <div
+                      style={{
+                        width: `${progress}%`,
+                        height: '100%',
+                        background: allChecked ? 'var(--color-success)' : 'var(--accent-gradient)',
+                        borderRadius: 9999,
+                        transition: 'width 0.25s',
+                      }}
+                    />
+                  </div>
+                </section>
+              ) : null}
+
+              <section className="modal-section" hidden={isLoading || !showStepChecklist}>
+                <div className="checklist-meta">
+                  <div className="section-label" style={{ marginBottom: 0 }}>
+                    Step checklist
+                  </div>
+                  <div className="checklist-count">
+                    {stepItems.filter((i) => i.isChecked).length} / {stepItems.length}
+                  </div>
+                </div>
+                <p className="checklist-hint">
+                  Étapes attendues dans la colonne « {card.columnName} ».
+                </p>
+                <div>
+                  {stepItems.map((item) => (
+                    <CheckRow
+                      key={item.id}
+                      item={item}
+                      onToggle={(isChecked) => {
+                        setItems((prev) =>
+                          prev.map((i) => (i.id === item.id ? { ...i, isChecked } : i)),
+                        );
+                        startTransition(() => {
+                          void toggleChecklistItem({ itemId: item.id, isChecked }).then((res) => {
+                            if (!res.ok) {
+                              window.alert(res.message);
+                              setItems((prev) =>
+                                prev.map((i) =>
+                                  i.id === item.id ? { ...i, isChecked: !isChecked } : i,
+                                ),
+                              );
+                            }
+                          });
+                        });
+                      }}
+                      onDelete={() => {
+                        // Step items are template-driven; user can delete
+                        // them locally on this card if irrelevant.
+                        const snapshot = items;
+                        setItems((prev) => prev.filter((i) => i.id !== item.id));
+                        startTransition(() => {
+                          void deleteChecklistItem({ itemId: item.id }).then((res) => {
+                            if (!res.ok) {
+                              window.alert(res.message);
+                              setItems(snapshot);
+                            }
+                          });
+                        });
+                      }}
+                    />
+                  ))}
                 </div>
               </section>
-            ) : null}
 
-            <section className="modal-section" hidden={isLoading || !showStepChecklist}>
-              <div className="checklist-meta">
-                <div className="section-label" style={{ marginBottom: 0 }}>
-                  Step checklist
+              <section className="modal-section" hidden={isLoading || !showOwnChecklist}>
+                <div className="checklist-meta">
+                  <div className="section-label" style={{ marginBottom: 0 }}>
+                    Checklist
+                  </div>
+                  <div className="checklist-count">
+                    {ownItems.filter((i) => i.isChecked).length} / {ownItems.length}
+                  </div>
                 </div>
-                <div className="checklist-count">
-                  {stepItems.filter((i) => i.isChecked).length} / {stepItems.length}
+                <div>
+                  {ownItems.map((item) => (
+                    <CheckRow
+                      key={item.id}
+                      item={item}
+                      onToggle={(isChecked) => {
+                        setItems((prev) =>
+                          prev.map((i) => (i.id === item.id ? { ...i, isChecked } : i)),
+                        );
+                        startTransition(() => {
+                          void toggleChecklistItem({ itemId: item.id, isChecked }).then((res) => {
+                            if (!res.ok) {
+                              window.alert(res.message);
+                              setItems((prev) =>
+                                prev.map((i) =>
+                                  i.id === item.id ? { ...i, isChecked: !isChecked } : i,
+                                ),
+                              );
+                            }
+                          });
+                        });
+                      }}
+                      onDelete={() => {
+                        const snapshot = items;
+                        setItems((prev) => prev.filter((i) => i.id !== item.id));
+                        startTransition(() => {
+                          void deleteChecklistItem({ itemId: item.id }).then((res) => {
+                            if (!res.ok) {
+                              window.alert(res.message);
+                              setItems(snapshot);
+                            }
+                          });
+                        });
+                      }}
+                    />
+                  ))}
                 </div>
-              </div>
-              <p className="checklist-hint">
-                Étapes attendues dans la colonne « {card.columnName} ».
-              </p>
-              <div>
-                {stepItems.map((item) => (
-                  <CheckRow
-                    key={item.id}
-                    item={item}
-                    onToggle={(isChecked) => {
-                      setItems((prev) =>
-                        prev.map((i) => (i.id === item.id ? { ...i, isChecked } : i)),
-                      );
-                      startTransition(() => {
-                        void toggleChecklistItem({ itemId: item.id, isChecked }).then((res) => {
-                          if (!res.ok) {
-                            window.alert(res.message);
-                            setItems((prev) =>
-                              prev.map((i) =>
-                                i.id === item.id ? { ...i, isChecked: !isChecked } : i,
-                              ),
-                            );
-                          }
-                        });
-                      });
-                    }}
-                    onDelete={() => {
-                      // Step items are template-driven; user can delete
-                      // them locally on this card if irrelevant.
-                      const snapshot = items;
-                      setItems((prev) => prev.filter((i) => i.id !== item.id));
-                      startTransition(() => {
-                        void deleteChecklistItem({ itemId: item.id }).then((res) => {
-                          if (!res.ok) {
-                            window.alert(res.message);
-                            setItems(snapshot);
-                          }
-                        });
-                      });
-                    }}
-                  />
-                ))}
-              </div>
-            </section>
+                <ChecklistAdder
+                  cardId={card.id}
+                  onOptimisticAdd={(temp) => setItems((prev) => [...prev, temp])}
+                  onConfirm={(updated) => setItems(updated)}
+                  onError={(tempId) => setItems((prev) => prev.filter((i) => i.id !== tempId))}
+                />
+              </section>
+            </div>
 
-            <section className="modal-section" hidden={isLoading || !showOwnChecklist}>
-              <div className="checklist-meta">
-                <div className="section-label" style={{ marginBottom: 0 }}>
-                  Checklist
+            <aside className="modal-side">
+              {isLoading ? <ModalSideSkeleton /> : null}
+              <div className="side-row" hidden={isLoading}>
+                <div className="side-label">Colonne actuelle</div>
+                <div className="col-current">
+                  <span className="dot" /> {card.columnName}
                 </div>
-                <div className="checklist-count">
-                  {ownItems.filter((i) => i.isChecked).length} / {ownItems.length}
-                </div>
+                {card.nextColumnName ? (
+                  <div className="next-col">→ {card.nextColumnName} · auto</div>
+                ) : null}
               </div>
-              <div>
-                {ownItems.map((item) => (
-                  <CheckRow
-                    key={item.id}
-                    item={item}
-                    onToggle={(isChecked) => {
-                      setItems((prev) =>
-                        prev.map((i) => (i.id === item.id ? { ...i, isChecked } : i)),
-                      );
-                      startTransition(() => {
-                        void toggleChecklistItem({ itemId: item.id, isChecked }).then((res) => {
-                          if (!res.ok) {
-                            window.alert(res.message);
-                            setItems((prev) =>
-                              prev.map((i) =>
-                                i.id === item.id ? { ...i, isChecked: !isChecked } : i,
-                              ),
-                            );
-                          }
-                        });
-                      });
-                    }}
-                    onDelete={() => {
-                      const snapshot = items;
-                      setItems((prev) => prev.filter((i) => i.id !== item.id));
-                      startTransition(() => {
-                        void deleteChecklistItem({ itemId: item.id }).then((res) => {
-                          if (!res.ok) {
-                            window.alert(res.message);
-                            setItems(snapshot);
-                          }
-                        });
-                      });
-                    }}
-                  />
-                ))}
-              </div>
-              <ChecklistAdder
-                cardId={card.id}
-                onOptimisticAdd={(temp) => setItems((prev) => [...prev, temp])}
-                onConfirm={(updated) => setItems(updated)}
-                onError={(tempId) => setItems((prev) => prev.filter((i) => i.id !== tempId))}
-              />
-            </section>
-          </div>
 
-          <aside className="modal-side">
-            {isLoading ? <ModalSideSkeleton /> : null}
-            <div className="side-row" hidden={isLoading}>
-              <div className="side-label">Colonne actuelle</div>
-              <div className="col-current">
-                <span className="dot" /> {card.columnName}
+              <div className="side-row" hidden={isLoading}>
+                <div className="side-label">Assignés{assignments(card.assignees)}</div>
+                <AssigneesSide
+                  cardId={card.id}
+                  assignments={card.assignees}
+                  members={workspaceMembers}
+                />
               </div>
-              {card.nextColumnName ? (
-                <div className="next-col">→ {card.nextColumnName} · auto</div>
+
+              <div className="side-row" hidden={isLoading}>
+                <div className="side-label">Catégorie</div>
+                <CategorySelector
+                  cardId={card.id}
+                  initial={card.categoryTag}
+                  customCategories={customCategories}
+                />
+              </div>
+
+              <div className="side-row" hidden={isLoading}>
+                <div className="side-label">Échéance</div>
+                <DueDateInput cardId={card.id} initial={card.dueDate} onAfterUpdate={close} />
+              </div>
+
+              <div className="side-row" hidden={isLoading}>
+                <div className="side-label">Template</div>
+                <TemplatePicker
+                  cardId={card.id}
+                  currentTemplateId={card.templateId}
+                  templates={availableTemplates}
+                />
+                <p className="mt-1 text-[10px] text-[color:var(--color-text-muted)]">
+                  Changer le template ré-organise les champs structurés. Les valeurs des champs
+                  conservés sont préservées.
+                </p>
+              </div>
+
+              {!isReadOnly ? (
+                <div className="side-row" hidden={isLoading}>
+                  <div className="side-label">Actions</div>
+                  <div className="side-actions">
+                    <DeleteCardButton cardId={card.id} csrfToken={csrfToken} onDeleted={close} />
+                  </div>
+                </div>
               ) : null}
-            </div>
-
-            <div className="side-row" hidden={isLoading}>
-              <div className="side-label">Assignés{assignments(card.assignees)}</div>
-              <AssigneesSide
-                cardId={card.id}
-                assignments={card.assignees}
-                members={workspaceMembers}
-              />
-            </div>
-
-            <div className="side-row" hidden={isLoading}>
-              <div className="side-label">Catégorie</div>
-              <CategorySelector
-                cardId={card.id}
-                initial={card.categoryTag}
-                customCategories={customCategories}
-              />
-            </div>
-
-            <div className="side-row" hidden={isLoading}>
-              <div className="side-label">Échéance</div>
-              <DueDateInput cardId={card.id} initial={card.dueDate} onAfterUpdate={close} />
-            </div>
-
-            <div className="side-row" hidden={isLoading}>
-              <div className="side-label">Template</div>
-              <TemplatePicker
-                cardId={card.id}
-                currentTemplateId={card.templateId}
-                templates={availableTemplates}
-              />
-              <p className="mt-1 text-[10px] text-[color:var(--color-text-muted)]">
-                Changer le template ré-organise les champs structurés. Les valeurs des champs
-                conservés sont préservées.
-              </p>
-            </div>
-
-            <div className="side-row" hidden={isLoading}>
-              <div className="side-label">Actions</div>
-              <div className="side-actions">
-                <DeleteCardButton cardId={card.id} csrfToken={csrfToken} onDeleted={close} />
-              </div>
-            </div>
-          </aside>
-        </div>
+            </aside>
+          </div>
+        </fieldset>
 
         <footer className="modal-foot">
           <span className="modal-foot-info">
-            ✦ Sauvegarde automatique — vos modifications sont enregistrées au fil de l’eau.
+            {isReadOnly
+              ? '✦ Mode lecture seule — vous ne pouvez pas modifier cette carte.'
+              : '✦ Sauvegarde automatique — vos modifications sont enregistrées au fil de l’eau.'}
           </span>
           <button type="button" className="btn btn-primary btn-sm" onClick={close}>
             Fermer

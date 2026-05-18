@@ -26,16 +26,26 @@ export interface KanbanCardProps {
   /** CSRF token forwarded to inline actions (delete). Omitted when used
    *  inside the dnd-kit <DragOverlay>, which is a transient render. */
   readonly csrfToken?: string;
+  /** When true, drag handle / delete / advance shortcut are hidden or
+   *  disabled (Viewer role). Click-to-open the modal stays enabled. */
+  readonly isReadOnly?: boolean;
 }
 
 /**
  * Sortable card. Wraps the visual `.kcard` block in dnd-kit's useSortable
  * so each card is both a drag handle and a drop target.
  */
-export function KanbanCard({ card, blocked, cannotAdvance, csrfToken }: KanbanCardProps) {
+export function KanbanCard({
+  card,
+  blocked,
+  cannotAdvance,
+  csrfToken,
+  isReadOnly = false,
+}: KanbanCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: card.id,
     data: { type: 'card', columnId: card.columnId },
+    disabled: isReadOnly,
   });
 
   const style: React.CSSProperties = {
@@ -72,26 +82,40 @@ export function KanbanCard({ card, blocked, cannotAdvance, csrfToken }: KanbanCa
   const categoryLabel = builtin?.label ?? card.categoryTag ?? null;
   const customColor = card.categoryTag && !builtin ? customCategoryColor(card.categoryTag) : null;
 
+  // Read-only viewers: skip drag listeners entirely so the card is
+  // click-to-open only (no DnD, no visual handle behaviour). aria-attrs
+  // from dnd-kit are still safe to forward — they describe the disabled
+  // state.
+  const dragProps = isReadOnly ? {} : { ...attributes, ...listeners };
+
   return (
     <article
       ref={setNodeRef}
       style={style}
       className={`${className} group relative`}
       onClick={open}
-      {...attributes}
-      {...listeners}
+      {...dragProps}
     >
       {csrfToken ? (
         <>
           <div style={{ position: 'absolute', top: 10, left: 12, zIndex: 10 }}>
-            <CardAdvanceCheckbox cardId={card.id} disabled={Boolean(blocked || cannotAdvance)} />
+            <CardAdvanceCheckbox
+              cardId={card.id}
+              disabled={Boolean(blocked || cannotAdvance || isReadOnly)}
+            />
           </div>
-          <div
-            style={{ position: 'absolute', top: 8, right: 8, zIndex: 10 }}
-            className="pointer-events-none opacity-0 transition-opacity duration-150 focus-within:pointer-events-auto focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100"
-          >
-            <DeleteKanbanCardButton cardId={card.id} cardTitle={card.title} csrfToken={csrfToken} />
-          </div>
+          {!isReadOnly ? (
+            <div
+              style={{ position: 'absolute', top: 8, right: 8, zIndex: 10 }}
+              className="pointer-events-none opacity-0 transition-opacity duration-150 focus-within:pointer-events-auto focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100"
+            >
+              <DeleteKanbanCardButton
+                cardId={card.id}
+                cardTitle={card.title}
+                csrfToken={csrfToken}
+              />
+            </div>
+          ) : null}
         </>
       ) : null}
       {categoryLabel ? (
