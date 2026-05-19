@@ -10,7 +10,10 @@ const nextConfig: NextConfig = {
   // packages (notably `@prisma/client`) hoisted at the root.
   outputFileTracingRoot: path.join(__dirname, '../..'),
   // Keep Prisma external (it ships precompiled binaries that must not be bundled).
-  serverExternalPackages: ['@prisma/client', '@nexushub/db'],
+  // jsdom + isomorphic-dompurify must stay external too — jsdom reads its
+  // `lib/jsdom/browser/default-stylesheet.css` via dynamic fs at runtime,
+  // and webpack bundling breaks the relative path → ENOENT at build time.
+  serverExternalPackages: ['@prisma/client', '@nexushub/db', 'jsdom', 'isomorphic-dompurify'],
   // Force Vercel's file tracer to include Prisma's generated client +
   // query engine binary (`libquery_engine-rhel-openssl-3.0.x.so.node`)
   // in the deployed Lambda. With pnpm the engine lives under
