@@ -3,6 +3,7 @@ import { useState, useTransition } from 'react';
 import { CSRF_FIELD_NAME } from '@/lib/csrf/field';
 import { inviteAdminToWorkspace } from '../actions/invite-admin-to-workspace';
 import { notify } from '@/features/shell/components/toaster';
+import { DeleteWorkspaceModal } from './delete-workspace-modal';
 
 export interface WorkspaceRowProps {
   readonly csrfToken: string;
@@ -17,6 +18,7 @@ export interface WorkspaceRowProps {
 
 export function WorkspaceRow(props: WorkspaceRowProps) {
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [email, setEmail] = useState('');
 
@@ -71,13 +73,23 @@ export function WorkspaceRow(props: WorkspaceRowProps) {
             </p>
           )}
         </div>
-        <button
-          type="button"
-          className="btn btn-ghost btn-sm"
-          onClick={() => setInviteOpen((v) => !v)}
-        >
-          {inviteOpen ? 'Annuler' : '+ Inviter un Admin'}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            onClick={() => setInviteOpen((v) => !v)}
+          >
+            {inviteOpen ? 'Annuler' : '+ Inviter un Admin'}
+          </button>
+          <button
+            type="button"
+            className="btn btn-danger btn-sm"
+            onClick={() => setDeleteOpen(true)}
+            title="Supprimer définitivement ce workspace et tout son contenu"
+          >
+            Supprimer
+          </button>
+        </div>
       </div>
 
       {inviteOpen ? (
@@ -109,6 +121,17 @@ export function WorkspaceRow(props: WorkspaceRowProps) {
             {pending ? 'Envoi…' : 'Envoyer l’invitation'}
           </button>
         </form>
+      ) : null}
+
+      {deleteOpen ? (
+        <DeleteWorkspaceModal
+          csrfToken={props.csrfToken}
+          workspaceId={props.id}
+          workspaceName={props.name}
+          slug={props.slug}
+          memberCount={props.memberCount}
+          onClose={() => setDeleteOpen(false)}
+        />
       ) : null}
     </li>
   );

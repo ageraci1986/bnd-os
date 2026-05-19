@@ -498,7 +498,15 @@ Console de provisioning des workspaces, accessible uniquement à `User.isSuperAd
 - [x] Sidebar : `NavLink href="/super-admin"` ajouté dans la section Atelier, visible uniquement si `ctx.isSuperAdmin`
 - [x] 7 tests dédiés (4 sur `createWorkspaceWithAdmin` : succès, slug invalide, slug en conflit, email invalide ; 3 sur `inviteAdminToWorkspace` : succès, workspace inconnu, email invalide). Le helper `issueInvitation` est mocké côté tests pour rester orienté action
 - [x] Le super-admin **ne devient pas membre** du workspace qu'il crée — il reste au niveau plateforme. L'admin invité gère ensuite son workspace comme n'importe quel Admin
-- [ ] **Suite Phase C** (mémoire `project_phase_c_followups.md`) : liste globale users cross-workspace, promote/demote `isSuperAdmin`, suppression/archive de workspace, renommage workspace, stats par workspace
+
+### 9.10 User management — Phase C suppression workspace ✅ (2026-05-19)
+
+- [x] DB : nouvel audit kind `workspace_deleted` (migration `20260519110001_audit_workspace_deleted`)
+- [x] Server : `deleteWorkspace({ workspaceId, confirmationName })` — `requireSuperAdmin`, exige la frappe **exacte** du nom du workspace (pas de trim, pas de case-fold). Hard-delete via `prisma.workspace.delete` ; le cascade `onDelete: Cascade` déjà déclaré dans le schema emporte memberships / projects / clients / cards / invitations / intégrations / templates / audit_log / notifications. Audit écrit AVANT le delete pour survivre au cascade
+- [x] UI : nouveau composant `DeleteWorkspaceModal` (Portal, focus auto, escape pour fermer) avec listing explicite de ce qui sera supprimé (members, projets, intégrations, etc.) + champ texte à remplir avec le nom exact + bouton submit désactivé tant que le typed ≠ nom
+- [x] WorkspaceRow : nouveau bouton « Supprimer » (rouge) à côté de « + Inviter un Admin »
+- [x] 5 tests dédiés (succès, mauvaise casse, espaces autour, workspace inconnu, ordre audit→delete vérifié)
+- [ ] **Suite Phase C restante** (mémoire `project_phase_c_followups.md`) : liste globale users cross-workspace, promote/demote `isSuperAdmin`, renommage workspace, stats par workspace
 
 ### 9.8 User management — Phase B.2 hardening (Viewer read-only enforcement) ✅ (2026-05-18)
 

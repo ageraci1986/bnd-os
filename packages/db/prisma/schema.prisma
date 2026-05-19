@@ -127,6 +127,7 @@ enum AuditAction {
   workspace_access_granted
   workspace_access_revoked
   workspace_created
+  workspace_deleted
 }
 
 // =====================================================================
