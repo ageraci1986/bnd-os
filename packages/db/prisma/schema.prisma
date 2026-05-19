@@ -85,6 +85,7 @@ enum NotificationKind {
 enum NotificationChannel {
   push
   slack
+  email
 }
 
 enum ActivityKind {
