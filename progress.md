@@ -320,14 +320,16 @@
 - [x] Optimistic update via `CARD_ADVANCED_EVENT` (board + liste s'écoutent), `pointerdown` stoppé pour ne pas drag-start
 - [s] Calendrier — skippé : les chips 1-ligne n'ont pas la place
 
-### 5.10 Vue liste — todo-list completion sur dernière colonne ✅ (2026-05-18)
+### 5.10 Vue liste — todo-list completion sur dernière colonne ✅ (2026-05-18, raffiné le 2026-05-19)
 
 - [x] DB : `Card.completedAt DateTime?` (migration `20260518150001_card_completed_at`, index partiel pour les non-null)
-- [x] Server : `toggleCardCompletion({ cardId, completed })` — refuse Viewer + hors-scope + carte pas dans dernière user-column ; idempotent
-- [x] UI : `CardCompleteCheckbox` (composant client, optimistic via `useOptimistic`) — remplace `CardAdvanceCheckbox` en list view quand carte = dernière colonne
-- [x] UI : titre rendu avec `line-through` + couleur muted quand `completedAt` est posé
+- [x] **Itération 1 (2026-05-18, déprécié)** : toggle manuel `toggleCardCompletion` + `CardCompleteCheckbox` interactif. Le user pouvait cocher/décocher indépendamment de la position de la carte
+- [x] **Itération 2 (2026-05-19, remplace l'itération 1)** : `completed_at` devient **automatiquement** dérivé de la position de la carte
+  - DB trigger `sync_card_completed_at` (migration `20260519140001_card_completed_at_auto_sync`) : `BEFORE INSERT OR UPDATE OF column_id` sur `cards` ; stamp `NOW()` quand `column_id = last_user_column`, clear `null` sinon. Backfill inclus pour l'existant
+  - Suppression du toggle manuel : action `toggle-card-completion.ts` + tests + composant `CardCompleteCheckbox` retirés du repo
+  - Remplacement par `CardCompletedBadge` (composant pur read-only, juste un SVG check stylé `nx-card-advance[data-state=checked]`) rendu à la place de `CardAdvanceCheckbox` quand `isInLastUserColumn`
+  - Strikethrough du titre piloté désormais par `isInLastUserColumn` (single source of truth = position), pas plus par `card.completedAt` (qui reste cohérent grâce au trigger)
 - [x] Scope : list view uniquement (Kanban inchangé pour cette itération)
-- [x] 5 tests dédiés (Viewer refusé, hors dernière colonne refusé, set, clear, idempotent)
 
 ### 5.9 Filtres projet ✅ (2026-05-14)
 

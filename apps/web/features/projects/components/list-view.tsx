@@ -12,7 +12,7 @@ import {
   type OpenCardEventDetail,
 } from './card-modal-controller';
 import { CardAdvanceCheckbox } from './card-advance-checkbox';
-import { CardCompleteCheckbox } from './card-complete-checkbox';
+import { CardCompletedBadge } from './card-completed-badge';
 import { DeleteKanbanCardButton } from './delete-kanban-card-button';
 import { ListAddCardButton } from './list-add-card-button';
 import { LIST_VIEW_FIELDS, type ListViewFieldId } from './list-view-fields';
@@ -257,9 +257,11 @@ function ListRow({
   selected: readonly ListViewFieldId[];
   gridTemplate: string;
   cannotAdvance: boolean;
-  /** When true, the row is in the last user column — its checkbox becomes
-   *  a "todo-list" completion toggle (sets `completedAt`) instead of the
-   *  advance shortcut. */
+  /** When true, the row is in the last user column — the row renders
+   *  as "done" (checked badge + strikethrough title). The DB trigger
+   *  `sync_card_completed_at` keeps `completedAt` in sync with this
+   *  position, so we render the visual from the column rather than
+   *  the (derived) field. */
   isInLastUserColumn: boolean;
   isReadOnly: boolean;
 }) {
@@ -281,11 +283,7 @@ function ListRow({
     >
       <div onClick={(e) => e.stopPropagation()} className="flex items-center justify-center">
         {isInLastUserColumn ? (
-          <CardCompleteCheckbox
-            cardId={card.id}
-            completedAt={card.completedAt}
-            disabled={isReadOnly}
-          />
+          <CardCompletedBadge />
         ) : (
           <CardAdvanceCheckbox cardId={card.id} disabled={cannotAdvance || isReadOnly} />
         )}
@@ -293,7 +291,7 @@ function ListRow({
 
       <div
         className={`min-w-0 truncate text-sm font-bold ${
-          card.completedAt
+          isInLastUserColumn
             ? 'text-[color:var(--color-text-muted)] line-through'
             : 'text-[color:var(--color-text-main)]'
         }`}
