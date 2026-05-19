@@ -484,7 +484,21 @@
 - [x] Server + UI : `shareProjectWithViewer` action (4 specs) + modal « Partager » sur la page projet (visible Admin + User-in-scope, caché pour Viewer) ; toggle optimiste avec rollback
 - [x] **122 tests web** (+9 nouveaux vs B.1) ; typecheck + lint propres
 - [ ] **Plan B.3 (plus tard)** : commentaires pour Viewer une fois que les Comment server actions existent (dépend de Phase 8)
-- [ ] **Phase C** : console `/super-admin` (CRUD workspaces, liste globale users, promotion super-admin)
+
+### 9.9 User management — Phase C MVP (console super-admin) ✅ (2026-05-19)
+
+Console de provisioning des workspaces, accessible uniquement à `User.isSuperAdmin = true`.
+
+- [x] DB : nouvel audit kind `workspace_created` (migration `20260519100001_audit_workspace_created`)
+- [x] Helper partagé `apps/web/features/invitations/lib/issueInvitation` (mint token + revoke pending + insert row + send Resend email) — utilisable depuis n'importe quelle auth path (Admin in-workspace, super-admin cross-workspace). L'option `anonymousInviter` masque l'identité du super-admin dans le mail (affiché « NexusHub ») puisqu'il n'est pas membre du workspace cible
+- [x] Server : `createWorkspaceWithAdmin({ name, slug, adminEmail })` — `requireSuperAdmin`, crée le row `Workspace` + envoie l'invitation Admin via `issueInvitation`, audit `workspace_created`. Friendly error message sur P2002 (slug déjà pris)
+- [x] Server : `inviteAdminToWorkspace({ workspaceId, email })` — invite un Admin additionnel sur un workspace existant, mêmes garanties que l'action ci-dessus, skip le rate-limit (super-admin = haute confiance)
+- [x] UI : `/super-admin/page.tsx` — liste les workspaces (nom, slug, date création, nb membres, nb invitations en attente, liste Admins) + formulaire « Créer un workspace » + bouton « + Inviter un Admin » inline par workspace (toggle + form)
+- [x] UI : `CreateWorkspaceForm` (auto-slug depuis le nom avec strip de diacritiques via `\p{M}/u`) + `WorkspaceRow` (action inline)
+- [x] Sidebar : `NavLink href="/super-admin"` ajouté dans la section Atelier, visible uniquement si `ctx.isSuperAdmin`
+- [x] 7 tests dédiés (4 sur `createWorkspaceWithAdmin` : succès, slug invalide, slug en conflit, email invalide ; 3 sur `inviteAdminToWorkspace` : succès, workspace inconnu, email invalide). Le helper `issueInvitation` est mocké côté tests pour rester orienté action
+- [x] Le super-admin **ne devient pas membre** du workspace qu'il crée — il reste au niveau plateforme. L'admin invité gère ensuite son workspace comme n'importe quel Admin
+- [ ] **Suite Phase C** (mémoire `project_phase_c_followups.md`) : liste globale users cross-workspace, promote/demote `isSuperAdmin`, suppression/archive de workspace, renommage workspace, stats par workspace
 
 ### 9.8 User management — Phase B.2 hardening (Viewer read-only enforcement) ✅ (2026-05-18)
 

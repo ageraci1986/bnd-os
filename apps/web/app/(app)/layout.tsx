@@ -104,6 +104,7 @@ export default async function AppLayout({ children, searchParams }: AppLayoutPro
 
   const isAdmin = ctx.role === Roles.Admin;
   const isViewer = ctx.role === Roles.Viewer;
+  const isSuperAdmin = ctx.isSuperAdmin;
 
   return (
     <div className="grid min-h-screen grid-cols-[260px_1fr]">
@@ -154,6 +155,7 @@ export default async function AppLayout({ children, searchParams }: AppLayoutPro
             {isAdmin ? <NavLink href="/team" icon="⎔" label="Équipe" /> : null}
             <NavLink href="/integrations" icon="⟷" label="Intégrations" />
             <NavLink href="/settings" icon="⚙" label="Paramètres" />
+            {isSuperAdmin ? <NavLink href="/super-admin" icon="✦" label="Super-admin" /> : null}
           </SidebarSectionCollapsible>
 
           <SidebarFooter>
