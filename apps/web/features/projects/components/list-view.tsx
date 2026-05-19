@@ -192,14 +192,11 @@ export function ListView({
 
     const sameColDown = sameCol && sourceIdxInOwnCol < overIdxInTargetColFull;
     const targetIndex = sameColDown ? overIdxInSiblings + 1 : overIdxInSiblings;
-
-    // No-op if this resolves to the source's current slot.
-    if (sameCol) {
-      const currentIdxAfterRemoval = sourceColCards
-        .filter((c) => c.id !== cardId)
-        .findIndex((c) => c.id === overId);
-      if (currentIdxAfterRemoval === targetIndex) return;
-    }
+    // No same-col no-op early-return here: dropping on any card OTHER
+    // than the source is always a real move (the only "drop on self"
+    // case is handled by the `e.over.id === e.active.id` guard above).
+    // A faulty check on the over card's siblings-index used to match
+    // for every same-col UP drag, killing the persistence.
 
     // Optimistic reorder in the flat array — same algorithm as the
     // Kanban board. Mirror BEFORE/AFTER over depending on direction.
