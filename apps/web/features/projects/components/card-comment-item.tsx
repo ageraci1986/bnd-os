@@ -1,14 +1,13 @@
 'use client';
-import { useActionState, useEffect, useRef, useState } from 'react';
+import { useActionState, useEffect, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { updateComment, type UpdateCommentState } from '../actions/update-comment';
-import { deleteComment, type DeleteCommentState } from '../actions/delete-comment';
+import { deleteComment } from '../actions/delete-comment';
 import { CSRF_FIELD_NAME } from '@/lib/csrf/field';
 import type { CardCommentDTO } from '../lib/comment-dto';
 import { CommentEditor, type CommentEditorHandle } from './comment-editor';
 
 const UPDATE_INITIAL: UpdateCommentState = { status: 'idle' };
-const DELETE_INITIAL: DeleteCommentState = { status: 'idle' };
 
 const dateFmt = new Intl.DateTimeFormat('fr-FR', {
   dateStyle: 'medium',
@@ -24,7 +23,8 @@ export function CardCommentItem({ comment, csrfToken }: CardCommentItemProps) {
   const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
   const [updateState, updateAction, updatePending] = useActionState(updateComment, UPDATE_INITIAL);
-  const [deleteState, deleteAction, deletePending] = useActionState(deleteComment, DELETE_INITIAL);
+  const [deletePending, startDelete] = useTransition();
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const editorRef = useRef<CommentEditorHandle | null>(null);
   const editFormRef = useRef<HTMLFormElement | null>(null);
 
@@ -35,14 +35,24 @@ export function CardCommentItem({ comment, csrfToken }: CardCommentItemProps) {
     }
   }, [updateState, router]);
 
-  useEffect(() => {
-    if (deleteState.status === 'success') {
-      router.refresh();
-    }
-  }, [deleteState, router]);
-
   const canEdit = comment.isMine;
   const canDelete = comment.isMine || comment.canModerate;
+
+  const handleDelete = () => {
+    if (!window.confirm('Supprimer ce commentaire ?')) return;
+    setDeleteError(null);
+    startDelete(async () => {
+      const formData = new FormData();
+      formData.set(CSRF_FIELD_NAME, csrfToken);
+      formData.set('commentId', comment.id);
+      const res = await deleteComment({ status: 'idle' }, formData);
+      if (res.status === 'success') {
+        router.refresh();
+      } else if (res.status === 'error') {
+        setDeleteError(res.message);
+      }
+    });
+  };
 
   return (
     <article className="nx-comment" aria-label={`Commentaire de ${comment.author.displayName}`}>
@@ -109,28 +119,20 @@ export function CardCommentItem({ comment, csrfToken }: CardCommentItemProps) {
               </button>
             ) : null}
             {canDelete ? (
-              <form action={deleteAction} className="nx-comment__delete-form">
-                <input type="hidden" name={CSRF_FIELD_NAME} value={csrfToken} />
-                <input type="hidden" name="commentId" value={comment.id} />
-                <button
-                  type="submit"
-                  disabled={deletePending}
-                  className="nx-btn nx-btn--link nx-btn--danger"
-                  onClick={(e) => {
-                    if (!window.confirm('Supprimer ce commentaire ?')) {
-                      e.preventDefault();
-                    }
-                  }}
-                >
-                  {deletePending ? 'Suppression…' : 'Supprimer'}
-                </button>
-              </form>
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={deletePending}
+                className="nx-btn nx-btn--link nx-btn--danger"
+              >
+                {deletePending ? 'Suppression…' : 'Supprimer'}
+              </button>
             ) : null}
           </div>
         ) : null}
-        {deleteState.status === 'error' ? (
+        {deleteError ? (
           <p role="alert" className="nx-comment__error">
-            {deleteState.message}
+            {deleteError}
           </p>
         ) : null}
       </div>
