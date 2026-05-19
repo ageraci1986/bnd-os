@@ -19,6 +19,7 @@ import {
 } from '@/features/projects/lib/card-filter';
 import { listCustomCategories } from '@/features/projects/lib/categories';
 import { reconcileBeforeRead } from '@/features/projects/lib/reconcile';
+import { loadCardComments } from '@/features/projects/lib/load-card-comments';
 
 export const metadata: Metadata = { title: 'Projet' };
 
@@ -170,6 +171,14 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
       scope.projectIds.includes(project.id) || scope.clientIds.includes(project.client.id);
     if (!allowed) notFound();
   }
+
+  const initialCardComments = openCard
+    ? await loadCardComments({
+        cardId: openCard.id,
+        currentUserId: ctx.userId,
+        currentRole: ctx.role,
+      })
+    : [];
 
   const viewerOptions = viewers.map((v) => {
     const displayName =
@@ -347,6 +356,7 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
                     raci: a.raci,
                   };
                 }),
+                comments: initialCardComments,
               } satisfies CardModalData)
             : null
         }

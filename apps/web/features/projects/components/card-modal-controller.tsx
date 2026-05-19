@@ -260,6 +260,7 @@ export function CardModalController({
       templateId: null,
       templateItems: [],
       fieldValues: {},
+      comments: [],
     } satisfies CardModalData);
 
   return (
