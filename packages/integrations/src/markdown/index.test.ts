@@ -82,9 +82,15 @@ describe('renderMarkdownToSafeHtml', () => {
     expect(out).not.toContain('style=');
   });
 
-  it('escapes lone < and > characters in plain text', () => {
+  it('escapes lone < and > characters inside paragraph text', () => {
     const out = renderMarkdownToSafeHtml('a < b > c');
-    expect(out).not.toMatch(/<[a-z]/i);
+    // The paragraph wrapper is fine; what matters is that the user's
+    // raw `<` and `>` are entity-escaped, not interpreted as a tag.
+    expect(out).toContain('&lt;');
+    expect(out).toContain('&gt;');
+    // No injected element starting with `<b` (the failure mode here is
+    // marked turning `< b >` into a literal <b> tag).
+    expect(out).not.toMatch(/<b[\s>]/i);
   });
 
   it('returns empty string for empty input', () => {

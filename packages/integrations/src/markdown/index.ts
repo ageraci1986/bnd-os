@@ -14,7 +14,19 @@
 import { marked } from 'marked';
 import DOMPurify from 'isomorphic-dompurify';
 
-const ALLOWED_TAGS = ['br', 'strong', 'em', 'code', 'pre', 'blockquote', 'ul', 'ol', 'li', 'a'];
+const ALLOWED_TAGS = [
+  'p',
+  'br',
+  'strong',
+  'em',
+  'code',
+  'pre',
+  'blockquote',
+  'ul',
+  'ol',
+  'li',
+  'a',
+];
 
 const ALLOWED_ATTR = ['href', 'target', 'rel'];
 
