@@ -7,12 +7,18 @@
  *
  * SECURITY:
  *  - Stored body is raw markdown — sanitisation happens at render time
- *    so an updated DOMPurify whitelist applies retroactively to old rows.
+ *    so an updated whitelist applies retroactively to old rows.
  *  - Whitelist is intentionally narrow: no <img>, no <iframe>, no event
  *    handlers, no styles, no data:/javascript: URIs.
+ *
+ * Why sanitize-html (not DOMPurify): we render server-side inside Next 15's
+ * RSC pipeline. DOMPurify needs a DOM (jsdom) which breaks Next's webpack
+ * bundling (jsdom's `lib/jsdom/browser/default-stylesheet.css` is loaded
+ * via dynamic fs and webpack does not copy it). sanitize-html is a pure
+ * Node parser-based sanitiser — no DOM, no fs reads, works in any runtime.
  */
 import { marked } from 'marked';
-import DOMPurify from 'isomorphic-dompurify';
+import sanitizeHtml from 'sanitize-html';
 
 const ALLOWED_TAGS = [
   'p',
@@ -27,8 +33,6 @@ const ALLOWED_TAGS = [
   'li',
   'a',
 ];
-
-const ALLOWED_ATTR = ['href', 'target', 'rel'];
 
 marked.use({
   gfm: true,
@@ -45,28 +49,27 @@ export function renderMarkdownToSafeHtml(raw: string): string {
 
   const dirty = marked.parse(trimmed, { async: false }) as string;
 
-  const clean = DOMPurify.sanitize(dirty, {
-    ALLOWED_TAGS,
-    ALLOWED_ATTR,
-    ALLOWED_URI_REGEXP: /^(?:https:|mailto:)/i,
-    ADD_ATTR: ['target', 'rel'],
-    FORBID_TAGS: ['style', 'script', 'iframe', 'img'],
-    FORBID_ATTR: ['style', 'onerror', 'onclick', 'onload', 'onmouseover'],
-  });
-
-  // Force every anchor to open in a new tab with safe rel — DOMPurify
-  // strips javascript: hrefs but does not add target/rel for us.
-  return clean.replace(
-    /<a\s+([^>]*?)href="([^"]+)"([^>]*)>/gi,
-    (_match, pre: string, href: string, post: string) => {
-      const cleanedPre = pre.replace(/\s(target|rel)="[^"]*"/gi, '');
-      const cleanedPost = post.replace(/\s(target|rel)="[^"]*"/gi, '');
-      return `<a ${cleanedPre.trim()} href="${href}" target="_blank" rel="noopener noreferrer" ${cleanedPost.trim()}>`.replace(
-        /\s+>/,
-        '>',
-      );
+  return sanitizeHtml(dirty, {
+    allowedTags: ALLOWED_TAGS,
+    // `href` lives on `a` only; `target` + `rel` are forced by transformTags.
+    allowedAttributes: {
+      a: ['href', 'target', 'rel'],
     },
-  );
+    allowedSchemes: ['https', 'mailto'],
+    allowedSchemesAppliedToAttributes: ['href'],
+    // Drop content of these tags entirely (not just the tags).
+    disallowedTagsMode: 'discard',
+    transformTags: {
+      a: (_tagName, attribs) => ({
+        tagName: 'a',
+        attribs: {
+          ...attribs,
+          target: '_blank',
+          rel: 'noopener noreferrer',
+        },
+      }),
+    },
+  });
 }
 
 /**
