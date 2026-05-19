@@ -115,19 +115,17 @@ export function ListView({
     };
   }, [columns]);
 
-  // Group cards by Kanban column for visual sections inside the list.
-  const byColumn = new Map<string, ListViewCard[]>();
-  for (const c of localCards) {
-    const list = byColumn.get(c.columnName) ?? [];
-    list.push(c);
-    byColumn.set(c.columnName, list);
-  }
-  // Always render user-facing columns (even empty) so the "+ Ajouter"
-  // button is reachable per column. System "Bloqué" is only shown when
-  // it actually has cards — no manual add path for it.
-  const orderedColumns = columns.filter((c) => {
-    if (c.isBlockedSystem) return (byColumn.get(c.name) ?? []).length > 0;
-    return true;
+  // Flat list, ordered by [Kanban column order, card position within col].
+  // The Kanban-column information stays visible per row via the "Colonne"
+  // field cell — no need to repeat it as a section header.
+  const columnOrder = new Map(columns.map((c, idx) => [c.id, idx]));
+  const orderedCards = [...localCards].sort((a, b) => {
+    const aColPos = columnOrder.get(a.columnId) ?? Number.MAX_SAFE_INTEGER;
+    const bColPos = columnOrder.get(b.columnId) ?? Number.MAX_SAFE_INTEGER;
+    if (aColPos !== bColPos) return aColPos - bColPos;
+    // Within a column, preserve the server-provided order (already by
+    // `position asc`, which is `localCards`'s natural order).
+    return 0;
   });
 
   // Cards in the last user column have no destination to skip to. Cards
@@ -172,13 +170,13 @@ export function ListView({
         </div>
       </div>
 
-      {orderedColumns.length === 0 ? (
+      {orderedCards.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] p-12 text-center text-sm text-[color:var(--color-text-muted)]">
-          Aucune colonne dans ce projet.
+          Aucune carte. Utilise « + Nouvelle carte » pour démarrer.
         </div>
       ) : (
-        <div className="flex flex-col gap-6">
-          {/* Table header row — sticks above the first section. */}
+        <div className="flex flex-col gap-2">
+          {/* Table header row — single row above the flat list. */}
           <div
             className="grid items-center gap-3 px-4 text-[10px] font-extrabold uppercase tracking-[1px] text-[color:var(--color-text-muted)]"
             style={{ gridTemplateColumns: gridTemplate }}
@@ -192,49 +190,25 @@ export function ListView({
             <span aria-hidden="true" />
           </div>
 
-          {orderedColumns.map((col) => {
-            const rows = byColumn.get(col.name) ?? [];
-            return (
-              <section key={col.id} className="flex flex-col gap-2">
-                <header className="flex items-baseline gap-2 px-1">
-                  <h2 className="text-[10px] font-extrabold uppercase tracking-[1px] text-[color:var(--color-text-muted)]">
-                    {col.name}
-                  </h2>
-                  <span className="text-[10px] text-[color:var(--color-text-ghost)]">
-                    {rows.length}
-                  </span>
-                </header>
-                <ul className="flex flex-col gap-2">
-                  {rows.map((card) => {
-                    const isInLastUserColumn = card.columnId === lastUserColumnId;
-                    const isBlocked = blockedColumnIds.has(card.columnId);
-                    const cannotAdvance = isBlocked || isInLastUserColumn;
-                    return (
-                      <ListRow
-                        key={card.id}
-                        card={card}
-                        csrfToken={csrfToken}
-                        selected={selected}
-                        gridTemplate={gridTemplate}
-                        cannotAdvance={cannotAdvance}
-                        isInLastUserColumn={isInLastUserColumn}
-                        isReadOnly={isReadOnly}
-                      />
-                    );
-                  })}
-                </ul>
-                {!col.isBlockedSystem && !isReadOnly ? (
-                  <ListAddCardButton
-                    projectId={projectId}
-                    columnId={col.id}
-                    columnName={col.name}
-                    csrfToken={csrfToken}
-                    variant="dashed"
-                  />
-                ) : null}
-              </section>
-            );
-          })}
+          <ul className="flex flex-col gap-2">
+            {orderedCards.map((card) => {
+              const isInLastUserColumn = card.columnId === lastUserColumnId;
+              const isBlocked = blockedColumnIds.has(card.columnId);
+              const cannotAdvance = isBlocked || isInLastUserColumn;
+              return (
+                <ListRow
+                  key={card.id}
+                  card={card}
+                  csrfToken={csrfToken}
+                  selected={selected}
+                  gridTemplate={gridTemplate}
+                  cannotAdvance={cannotAdvance}
+                  isInLastUserColumn={isInLastUserColumn}
+                  isReadOnly={isReadOnly}
+                />
+              );
+            })}
+          </ul>
         </div>
       )}
     </div>

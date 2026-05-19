@@ -179,10 +179,43 @@ export function KanbanBoard({
       if (currentIndex === targetIndex) return;
     }
 
-    // Optimistic local update
-    setLocalCards((prev) =>
-      prev.map((c) => (c.id === cardId ? { ...c, columnId: targetColumnId } : c)),
-    );
+    // Optimistic local update — we must REORDER the array, not just flip
+    // columnId. dnd-kit's `verticalListSortingStrategy` renders cards in
+    // the order of the SortableContext items prop; without a proper
+    // splice the dropped card snaps back to its pre-drag slot until
+    // `router.refresh()` brings the real new order from the server.
+    // Mirror the server's placement rules:
+    //   • cross-column or same-col UP   → source lands BEFORE the over card
+    //   • same-col DOWN                 → source lands AFTER the over card
+    //   • drop on column (empty area)   → source appended at end of target col
+    setLocalCards((prev) => {
+      const srcIdx = prev.findIndex((c) => c.id === cardId);
+      if (srcIdx < 0) return prev;
+      const sourceCard = prev[srcIdx];
+      if (!sourceCard) return prev;
+
+      const without = prev.filter((c) => c.id !== cardId);
+      const updated = { ...sourceCard, columnId: targetColumnId };
+
+      let insertIdx: number;
+      if (overData.type === 'column') {
+        let lastInTargetIdx = -1;
+        for (let i = 0; i < without.length; i++) {
+          if (without[i]?.columnId === targetColumnId) lastInTargetIdx = i;
+        }
+        insertIdx = lastInTargetIdx + 1;
+      } else {
+        const overId = e.over ? String(e.over.id) : null;
+        if (!overId) return prev;
+        const overIdxAfterRemoval = without.findIndex((c) => c.id === overId);
+        if (overIdxAfterRemoval < 0) return prev;
+        const overIdxOriginal = prev.findIndex((c) => c.id === overId);
+        const sameColDown = sourceCard.columnId === targetColumnId && srcIdx < overIdxOriginal;
+        insertIdx = sameColDown ? overIdxAfterRemoval + 1 : overIdxAfterRemoval;
+      }
+
+      return [...without.slice(0, insertIdx), updated, ...without.slice(insertIdx)];
+    });
 
     const result = await moveCard({
       cardId,
