@@ -19,6 +19,8 @@
   },
   "dependencies": {
     "@nexushub/domain": "workspace:*",
+    "isomorphic-dompurify": "^3.14.0",
+    "marked": "^18.0.4",
     "resend": "^4.0.0",
     "zod": "^3.24.0"
   },
