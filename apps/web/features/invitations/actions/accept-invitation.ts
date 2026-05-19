@@ -106,23 +106,58 @@ export async function acceptInvitation(
     return { status: 'error', message: GENERIC_ERROR };
   }
 
-  // Create the auth.users row via admin API. Email is set as confirmed since
-  // the invitation link itself proved control of the inbox.
-  const admin = createSupabaseAdmin();
-  const created = await admin.auth.admin.createUser({
-    email: consumed.email,
-    password,
-    email_confirm: true,
-    user_metadata: { firstName, lastName },
+  // Two paths depending on whether the invited email already has an
+  // account on the platform:
+  //  1. New user → createUser via admin API, then sign in.
+  //  2. Existing user → reuse the account; verify ownership by signing
+  //     in with the password they typed, then attach a new membership
+  //     to the target workspace. Same email = same identity across
+  //     workspaces (GitHub-style multi-org).
+  // The `public.users` row is synced from `auth.users` by the
+  // `handle_new_auth_user` trigger, so its presence is a reliable
+  // proxy for "Supabase already knows this email".
+  const existing = await prisma.user.findUnique({
+    where: { email: consumed.email },
+    select: { id: true, firstName: true, lastName: true },
   });
 
-  if (created.error || !created.data.user) {
-    return { status: 'error', message: GENERIC_ERROR };
+  let newUserId: string;
+  if (existing) {
+    // Path 2: existing account — verify their CURRENT password via a
+    // sign-in attempt. The cookies set here also serve as the active
+    // session for the redirect to /overview below (no second sign-in
+    // needed). Wrong password → clear UX hint, not the generic error.
+    const supabasePre = await createSupabaseServer();
+    const signedIn = await supabasePre.auth.signInWithPassword({
+      email: consumed.email,
+      password,
+    });
+    if (signedIn.error || !signedIn.data.user) {
+      return {
+        status: 'error',
+        message:
+          'Cet email a déjà un compte NexusHub. Saisissez votre mot de passe existant pour accepter l’invitation.',
+      };
+    }
+    newUserId = existing.id;
+  } else {
+    // Path 1: brand-new account. createUser also triggers the DB sync
+    // that inserts public.users; email_confirm=true because the
+    // invitation link itself proved control of the inbox.
+    const admin = createSupabaseAdmin();
+    const created = await admin.auth.admin.createUser({
+      email: consumed.email,
+      password,
+      email_confirm: true,
+      user_metadata: { firstName, lastName },
+    });
+    if (created.error || !created.data.user) {
+      return { status: 'error', message: GENERIC_ERROR };
+    }
+    newUserId = created.data.user.id;
   }
-  const newUserId = created.data.user.id;
 
   // Mark invitation consumed + create membership + update profile in one tx.
-  // The DB trigger `handle_new_auth_user` already inserted public.users for us.
   await prisma.$transaction(async (tx) => {
     await tx.invitation.update({
       where: { id: consumed.id },
@@ -132,10 +167,14 @@ export async function acceptInvitation(
         consumedByUserId: newUserId,
       },
     });
-    await tx.user.update({
-      where: { id: newUserId },
-      data: { firstName, lastName },
-    });
+    // Only stamp first/last name if the user account had none yet —
+    // existing users keep whatever they already set in another workspace.
+    if (!existing || (!existing.firstName && !existing.lastName)) {
+      await tx.user.update({
+        where: { id: newUserId },
+        data: { firstName, lastName },
+      });
+    }
     const newMembership = await tx.membership.create({
       data: {
         workspaceId: consumed.workspaceId,
