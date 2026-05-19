@@ -10,7 +10,8 @@
     ".": "./src/index.ts",
     "./slack": "./src/slack/index.ts",
     "./graph": "./src/graph/index.ts",
-    "./email": "./src/email/index.ts"
+    "./email": "./src/email/index.ts",
+    "./markdown": "./src/markdown/index.ts"
   },
   "scripts": {
     "lint": "eslint src --max-warnings=0",
