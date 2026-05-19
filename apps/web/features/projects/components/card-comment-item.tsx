@@ -5,6 +5,7 @@ import { updateComment, type UpdateCommentState } from '../actions/update-commen
 import { deleteComment, type DeleteCommentState } from '../actions/delete-comment';
 import { CSRF_FIELD_NAME } from '@/lib/csrf/field';
 import type { CardCommentDTO } from '../lib/comment-dto';
+import { CommentEditor, type CommentEditorHandle } from './comment-editor';
 
 const UPDATE_INITIAL: UpdateCommentState = { status: 'idle' };
 const DELETE_INITIAL: DeleteCommentState = { status: 'idle' };
@@ -24,7 +25,8 @@ export function CardCommentItem({ comment, csrfToken }: CardCommentItemProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [updateState, updateAction, updatePending] = useActionState(updateComment, UPDATE_INITIAL);
   const [deleteState, deleteAction, deletePending] = useActionState(deleteComment, DELETE_INITIAL);
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const editorRef = useRef<CommentEditorHandle | null>(null);
+  const editFormRef = useRef<HTMLFormElement | null>(null);
 
   useEffect(() => {
     if (updateState.status === 'success') {
@@ -57,18 +59,16 @@ export function CardCommentItem({ comment, csrfToken }: CardCommentItemProps) {
         </header>
 
         {isEditing ? (
-          <form action={updateAction} className="nx-comment__edit-form">
+          <form ref={editFormRef} action={updateAction} className="nx-comment__edit-form">
             <input type="hidden" name={CSRF_FIELD_NAME} value={csrfToken} />
             <input type="hidden" name="commentId" value={comment.id} />
-            <textarea
-              ref={textareaRef}
+            <CommentEditor
+              ref={editorRef}
               name="body"
               defaultValue={comment.body}
-              rows={3}
-              maxLength={10_000}
-              aria-label="Modifier le commentaire"
-              className="nx-comment__textarea"
+              ariaLabel="Modifier le commentaire"
               disabled={updatePending}
+              onSubmitShortcut={() => editFormRef.current?.requestSubmit()}
             />
             <div className="nx-comment__edit-actions">
               {updateState.status === 'error' ? (

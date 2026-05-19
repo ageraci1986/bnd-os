@@ -44,6 +44,7 @@ export interface ListViewCard {
   readonly checklistTotal: number;
   readonly checklistChecked: number;
   readonly templateName: string | null;
+  readonly commentCount: number;
 }
 
 export interface ListViewColumnMeta {
@@ -373,7 +374,29 @@ function ListRow({
             : 'text-[color:var(--color-text-main)]'
         }`}
       >
-        {card.title}
+        <span className="truncate align-middle">{card.title}</span>
+        {card.commentCount > 0 ? (
+          <span
+            className="nx-comment-badge"
+            title={`${card.commentCount} commentaire${card.commentCount > 1 ? 's' : ''}`}
+            aria-label={`${card.commentCount} commentaire${card.commentCount > 1 ? 's' : ''}`}
+          >
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 16 16"
+              width="12"
+              height="12"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M2 4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H6.5L4 14.5V12a2 2 0 0 1-2-2V4z" />
+            </svg>
+            <span>{card.commentCount}</span>
+          </span>
+        ) : null}
       </div>
 
       {selected.map((id) => (

@@ -797,6 +797,34 @@
   line-height: 1.4;
   color: var(--text-main);
 }
+.kcard-comments {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.kcard-comments svg {
+  display: block;
+}
+.nx-comment-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(139, 43, 226, 0.08);
+  color: var(--accent-primary, #8b2be2);
+  font-size: 10px;
+  font-weight: 700;
+  vertical-align: middle;
+}
+.nx-comment-badge svg {
+  display: block;
+}
 .kcard-footer {
   display: flex;
   justify-content: space-between;
@@ -2344,12 +2372,14 @@
   margin-top: 6px;
 }
 .nx-comment__textarea,
-.nx-comment-form__textarea {
+.nx-comment-form__textarea,
+.nx-comment-editor__textarea {
   width: 100%;
   min-height: 72px;
   padding: 10px 12px;
   border: 1px solid var(--border-light);
-  border-radius: 8px;
+  border-radius: 0 0 8px 8px;
+  border-top: 0;
   font-family: inherit;
   font-size: 14px;
   resize: vertical;
@@ -2358,10 +2388,58 @@
   box-sizing: border-box;
 }
 .nx-comment__textarea:focus,
-.nx-comment-form__textarea:focus {
+.nx-comment-form__textarea:focus,
+.nx-comment-editor__textarea:focus {
   outline: none;
   border-color: var(--accent-primary);
   box-shadow: 0 0 0 3px rgba(139, 43, 226, 0.18);
+}
+/* Editor + toolbar */
+.nx-comment-editor {
+  display: flex;
+  flex-direction: column;
+}
+.nx-comment-editor__toolbar {
+  display: flex;
+  gap: 2px;
+  padding: 4px 6px;
+  border: 1px solid var(--border-light);
+  border-bottom: 0;
+  border-radius: 8px 8px 0 0;
+  background: #fafbfc;
+}
+.nx-comment-editor__btn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 6px;
+  color: var(--text-main);
+  font-size: 13px;
+  line-height: 1;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
+}
+.nx-comment-editor__btn:hover:not([disabled]) {
+  background: rgba(139, 43, 226, 0.1);
+  color: var(--accent-primary);
+}
+.nx-comment-editor__btn:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 1px;
+}
+.nx-comment-editor__btn[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.nx-comment__content u {
+  text-decoration: underline;
 }
 .nx-comment__edit-form,
 .nx-comment-form {

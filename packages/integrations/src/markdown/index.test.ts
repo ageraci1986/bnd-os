@@ -36,6 +36,11 @@ describe('renderMarkdownToSafeHtml', () => {
     expect(out).toContain('rel="noopener noreferrer"');
   });
 
+  it('preserves <u> tags for underline (toolbar-emitted)', () => {
+    const out = renderMarkdownToSafeHtml('hello <u>underlined</u> world');
+    expect(out).toContain('<u>underlined</u>');
+  });
+
   it('renders mailto: links', () => {
     const out = renderMarkdownToSafeHtml('[mail me](mailto:a@b.c)');
     expect(out).toContain('href="mailto:a@b.c"');

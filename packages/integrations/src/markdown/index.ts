@@ -25,6 +25,7 @@ const ALLOWED_TAGS = [
   'br',
   'strong',
   'em',
+  'u',
   'code',
   'pre',
   'blockquote',

@@ -14,6 +14,7 @@ export interface KanbanCardData {
   readonly title: string;
   readonly columnId: string;
   readonly categoryTag: string | null;
+  readonly commentCount?: number;
 }
 
 export interface KanbanCardProps {
@@ -144,6 +145,28 @@ export function KanbanCard({
         #{String(card.shortRef).padStart(3, '0')}
       </div>
       <div className="kcard-title">{card.title}</div>
+      {card.commentCount && card.commentCount > 0 ? (
+        <div
+          className="kcard-comments"
+          title={`${card.commentCount} commentaire${card.commentCount > 1 ? 's' : ''}`}
+          aria-label={`${card.commentCount} commentaire${card.commentCount > 1 ? 's' : ''}`}
+        >
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 16 16"
+            width="12"
+            height="12"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M2 4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H6.5L4 14.5V12a2 2 0 0 1-2-2V4z" />
+          </svg>
+          <span>{card.commentCount}</span>
+        </div>
+      ) : null}
     </article>
   );
 }

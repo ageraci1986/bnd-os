@@ -91,6 +91,7 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
             shortRef: true,
             title: true,
             categoryTag: true,
+            _count: { select: { comments: { where: { deletedAt: null } } } },
           },
         },
       },
@@ -290,7 +291,14 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
         csrfToken={csrf}
         projectId={project.id}
         columns={project.columns}
-        cards={project.cards}
+        cards={project.cards.map((c) => ({
+          id: c.id,
+          columnId: c.columnId,
+          shortRef: c.shortRef,
+          title: c.title,
+          categoryTag: c.categoryTag,
+          commentCount: c._count.comments,
+        }))}
         isReadOnly={isViewer}
       />
 

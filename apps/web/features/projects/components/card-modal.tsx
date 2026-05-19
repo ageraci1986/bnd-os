@@ -187,13 +187,13 @@ export function CardModal({
           </button>
         </header>
 
-        <fieldset
-          disabled={isReadOnly}
-          className="contents"
-          style={{ border: 0, padding: 0, margin: 0 }}
-        >
-          <div className="modal-body">
-            <div className="modal-main">
+        <div className="modal-body">
+          <div className="modal-main">
+            <fieldset
+              disabled={isReadOnly}
+              className="contents"
+              style={{ border: 0, padding: 0, margin: 0 }}
+            >
               {isLoading ? (
                 <ModalBodySkeleton />
               ) : (
@@ -350,17 +350,29 @@ export function CardModal({
                   onError={(tempId) => setItems((prev) => prev.filter((i) => i.id !== tempId))}
                 />
               </section>
+            </fieldset>
 
-              {!isLoading ? (
-                <CardCommentsThread
-                  cardId={card.id}
-                  csrfToken={csrfToken}
-                  comments={card.comments}
-                  canPost={!isReadOnly}
-                />
-              ) : null}
-            </div>
+            {/* CardCommentsThread sits OUTSIDE the main fieldset so the
+             *  posting form stays interactive for in-scope Viewers (per
+             *  spec: comments are the only mutation Viewers can perform).
+             *  The whole thread is hidden via the read-only flag when the
+             *  modal itself is in a strict read-only mode (super-admin
+             *  inspection of out-of-scope content, etc.). */}
+            {!isLoading ? (
+              <CardCommentsThread
+                cardId={card.id}
+                csrfToken={csrfToken}
+                comments={card.comments}
+                canPost={true}
+              />
+            ) : null}
+          </div>
 
+          <fieldset
+            disabled={isReadOnly}
+            className="contents"
+            style={{ border: 0, padding: 0, margin: 0 }}
+          >
             <aside className="modal-side">
               {isLoading ? <ModalSideSkeleton /> : null}
               <div className="side-row" hidden={isLoading}>
@@ -418,8 +430,8 @@ export function CardModal({
                 </div>
               ) : null}
             </aside>
-          </div>
-        </fieldset>
+          </fieldset>
+        </div>
 
         <footer className="modal-foot">
           <span className="modal-foot-info">
