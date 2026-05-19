@@ -24,6 +24,8 @@ import { updateCard } from '../actions/update-card';
 import { updateCardDueDate } from '../actions/update-card-due-date';
 import { deleteCard } from '../actions/delete-card';
 import { CSRF_FIELD_NAME } from '@/lib/csrf/field';
+import { CardCommentsThread } from './card-comments-thread';
+import type { CardCommentDTO } from '../lib/comment-dto';
 
 export interface CardModalProps {
   readonly csrfToken: string;
@@ -49,6 +51,7 @@ export interface CardModalProps {
     readonly templateId: string | null;
     readonly templateItems: readonly CardTemplateItem[];
     readonly fieldValues: Record<string, string>;
+    readonly comments: readonly CardCommentDTO[];
   };
   readonly availableTemplates: readonly TemplateOption[];
   /**
@@ -347,6 +350,15 @@ export function CardModal({
                   onError={(tempId) => setItems((prev) => prev.filter((i) => i.id !== tempId))}
                 />
               </section>
+
+              {!isLoading ? (
+                <CardCommentsThread
+                  cardId={card.id}
+                  csrfToken={csrfToken}
+                  comments={card.comments}
+                  canPost={!isReadOnly}
+                />
+              ) : null}
             </div>
 
             <aside className="modal-side">
