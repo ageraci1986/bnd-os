@@ -1,8 +1,13 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
+import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { Tag, type TagVariant } from '@nexushub/ui';
 import { BUILTIN_CARD_CATEGORIES } from '@nexushub/domain';
 import { customCategoryColor } from '../lib/custom-category-color';
+import { moveCard } from '../actions/move-card';
 import {
   CARD_ADVANCED_EVENT,
   CARD_REMOVED_EVENT,
@@ -87,9 +92,12 @@ export function ListView({
   columns,
   isReadOnly = false,
 }: ListViewProps) {
+  const router = useRouter();
   const { selected, toggle, reset } = useListViewColumns(projectId);
   const [localCards, setLocalCards] = useState<readonly ListViewCard[]>(cards);
   useEffect(() => setLocalCards(cards), [cards]);
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
   useEffect(() => {
     const onRemoved = (e: Event) => {
       const detail = (e as CustomEvent<CardRemovedEventDetail>).detail;
@@ -149,6 +157,81 @@ export function ListView({
   // the left-most column. The user can drag/skip from there.
   const firstUserColumn = columns.find((c) => !c.isBlockedSystem) ?? null;
 
+  // Drag handler: mirror the Kanban placement logic on the flat list.
+  // The "over" card determines both the target column and the slot.
+  // Same-column drag down → land AFTER over (server places between
+  // over and the next sibling); same-column UP or cross-column → land
+  // BEFORE over. Optimistic reorder of `localCards` keeps the new
+  // position rendered the instant the user releases the pointer.
+  const handleDragEnd = (e: DragEndEvent) => {
+    if (isReadOnly) return;
+    const cardId = String(e.active.id);
+    if (!e.over || e.over.id === e.active.id) return;
+    const overId = String(e.over.id);
+
+    const sourceCard = localCards.find((c) => c.id === cardId);
+    const overCard = localCards.find((c) => c.id === overId);
+    if (!sourceCard || !overCard) return;
+
+    const targetColumnId = overCard.columnId;
+
+    // Compute targetIndex (within target column, EXCLUDING source) —
+    // this is what `moveCard` server action expects.
+    const targetColSiblings = localCards.filter(
+      (c) => c.columnId === targetColumnId && c.id !== cardId,
+    );
+    const overIdxInSiblings = targetColSiblings.findIndex((c) => c.id === overId);
+    if (overIdxInSiblings < 0) return;
+
+    const sameCol = sourceCard.columnId === targetColumnId;
+    const sourceColCards = localCards.filter((c) => c.columnId === sourceCard.columnId);
+    const sourceIdxInOwnCol = sourceColCards.findIndex((c) => c.id === cardId);
+    const overIdxInTargetColFull = localCards
+      .filter((c) => c.columnId === targetColumnId)
+      .findIndex((c) => c.id === overId);
+
+    const sameColDown = sameCol && sourceIdxInOwnCol < overIdxInTargetColFull;
+    const targetIndex = sameColDown ? overIdxInSiblings + 1 : overIdxInSiblings;
+
+    // No-op if this resolves to the source's current slot.
+    if (sameCol) {
+      const currentIdxAfterRemoval = sourceColCards
+        .filter((c) => c.id !== cardId)
+        .findIndex((c) => c.id === overId);
+      if (currentIdxAfterRemoval === targetIndex) return;
+    }
+
+    // Optimistic reorder in the flat array — same algorithm as the
+    // Kanban board. Mirror BEFORE/AFTER over depending on direction.
+    setLocalCards((prev) => {
+      const srcIdx = prev.findIndex((c) => c.id === cardId);
+      if (srcIdx < 0) return prev;
+      const src = prev[srcIdx];
+      if (!src) return prev;
+      const without = prev.filter((c) => c.id !== cardId);
+      const targetCol = columns.find((c) => c.id === targetColumnId);
+      const updated: ListViewCard = {
+        ...src,
+        columnId: targetColumnId,
+        columnName: targetCol?.name ?? src.columnName,
+      };
+      const overIdxAfterRemoval = without.findIndex((c) => c.id === overId);
+      if (overIdxAfterRemoval < 0) return prev;
+      const insertIdx = sameColDown ? overIdxAfterRemoval + 1 : overIdxAfterRemoval;
+      return [...without.slice(0, insertIdx), updated, ...without.slice(insertIdx)];
+    });
+
+    void (async () => {
+      const result = await moveCard({ cardId, targetColumnId, targetIndex });
+      if (!result.ok) {
+        setLocalCards(cards);
+        window.alert(result.message);
+        return;
+      }
+      router.refresh();
+    })();
+  };
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-3">
@@ -190,25 +273,32 @@ export function ListView({
             <span aria-hidden="true" />
           </div>
 
-          <ul className="flex flex-col gap-2">
-            {orderedCards.map((card) => {
-              const isInLastUserColumn = card.columnId === lastUserColumnId;
-              const isBlocked = blockedColumnIds.has(card.columnId);
-              const cannotAdvance = isBlocked || isInLastUserColumn;
-              return (
-                <ListRow
-                  key={card.id}
-                  card={card}
-                  csrfToken={csrfToken}
-                  selected={selected}
-                  gridTemplate={gridTemplate}
-                  cannotAdvance={cannotAdvance}
-                  isInLastUserColumn={isInLastUserColumn}
-                  isReadOnly={isReadOnly}
-                />
-              );
-            })}
-          </ul>
+          <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+            <SortableContext
+              items={orderedCards.map((c) => c.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              <ul className="flex flex-col gap-2">
+                {orderedCards.map((card) => {
+                  const isInLastUserColumn = card.columnId === lastUserColumnId;
+                  const isBlocked = blockedColumnIds.has(card.columnId);
+                  const cannotAdvance = isBlocked || isInLastUserColumn;
+                  return (
+                    <ListRow
+                      key={card.id}
+                      card={card}
+                      csrfToken={csrfToken}
+                      selected={selected}
+                      gridTemplate={gridTemplate}
+                      cannotAdvance={cannotAdvance}
+                      isInLastUserColumn={isInLastUserColumn}
+                      isReadOnly={isReadOnly}
+                    />
+                  );
+                })}
+              </ul>
+            </SortableContext>
+          </DndContext>
         </div>
       )}
     </div>
@@ -239,7 +329,13 @@ function ListRow({
   isInLastUserColumn: boolean;
   isReadOnly: boolean;
 }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: card.id,
+    disabled: isReadOnly,
+  });
+
   const onClick = () => {
+    if (isDragging) return;
     const detail: OpenCardEventDetail = {
       id: card.id,
       title: card.title,
@@ -249,15 +345,25 @@ function ListRow({
     window.dispatchEvent(new CustomEvent(OPEN_CARD_EVENT, { detail }));
   };
 
+  const rowStyle: React.CSSProperties = {
+    gridTemplateColumns: gridTemplate,
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
   return (
     <li
+      ref={setNodeRef}
       onClick={onClick}
       className="group relative grid cursor-pointer items-center gap-3 rounded-2xl border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] px-4 py-3 shadow-[var(--shadow-card)] transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-hover)]"
-      style={{ gridTemplateColumns: gridTemplate }}
+      style={rowStyle}
+      {...attributes}
+      {...listeners}
     >
       <div onClick={(e) => e.stopPropagation()} className="flex items-center justify-center">
         {isInLastUserColumn ? (
-          <CardCompletedBadge />
+          <CardCompletedBadge cardId={card.id} disabled={isReadOnly} />
         ) : (
           <CardAdvanceCheckbox cardId={card.id} disabled={cannotAdvance || isReadOnly} />
         )}
