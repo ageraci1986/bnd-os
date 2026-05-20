@@ -153,7 +153,11 @@ export function KanbanCard({
       >
         #{String(card.shortRef).padStart(3, '0')}
       </div>
-      <div className={`kcard-title${isLastUserColumn ? 'kcard-title--done' : ''}`}>
+      <div
+        className={['kcard-title', isLastUserColumn && 'kcard-title--done']
+          .filter(Boolean)
+          .join(' ')}
+      >
         {card.title}
       </div>
       {card.commentCount && card.commentCount > 0 ? (
