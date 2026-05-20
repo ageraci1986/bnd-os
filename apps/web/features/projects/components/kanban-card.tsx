@@ -5,6 +5,7 @@ import { Tag, type TagVariant } from '@nexushub/ui';
 import { BUILTIN_CARD_CATEGORIES } from '@nexushub/domain';
 import { OPEN_CARD_EVENT, type OpenCardEventDetail } from './card-modal-controller';
 import { CardAdvanceCheckbox } from './card-advance-checkbox';
+import { CardCompletedBadge } from './card-completed-badge';
 import { DeleteKanbanCardButton } from './delete-kanban-card-button';
 import { customCategoryColor } from '../lib/custom-category-color';
 
@@ -30,6 +31,9 @@ export interface KanbanCardProps {
   /** When true, drag handle / delete / advance shortcut are hidden or
    *  disabled (Viewer role). Click-to-open the modal stays enabled. */
   readonly isReadOnly?: boolean;
+  /** When true, the card sits in the last user column → render as "done"
+   *  (filled check + struck title), mirroring the list view. */
+  readonly isLastUserColumn?: boolean;
 }
 
 /**
@@ -42,6 +46,7 @@ export function KanbanCard({
   cannotAdvance,
   csrfToken,
   isReadOnly = false,
+  isLastUserColumn = false,
 }: KanbanCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: card.id,
@@ -100,10 +105,14 @@ export function KanbanCard({
       {csrfToken ? (
         <>
           <div style={{ position: 'absolute', top: 10, left: 12, zIndex: 10 }}>
-            <CardAdvanceCheckbox
-              cardId={card.id}
-              disabled={Boolean(blocked || cannotAdvance || isReadOnly)}
-            />
+            {isLastUserColumn ? (
+              <CardCompletedBadge cardId={card.id} disabled={isReadOnly} />
+            ) : (
+              <CardAdvanceCheckbox
+                cardId={card.id}
+                disabled={Boolean(blocked || cannotAdvance || isReadOnly)}
+              />
+            )}
           </div>
           {!isReadOnly ? (
             <div
@@ -144,7 +153,9 @@ export function KanbanCard({
       >
         #{String(card.shortRef).padStart(3, '0')}
       </div>
-      <div className="kcard-title">{card.title}</div>
+      <div className={`kcard-title${isLastUserColumn ? 'kcard-title--done' : ''}`}>
+        {card.title}
+      </div>
       {card.commentCount && card.commentCount > 0 ? (
         <div
           className="kcard-comments"

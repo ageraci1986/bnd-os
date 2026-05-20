@@ -797,6 +797,10 @@
   line-height: 1.4;
   color: var(--text-main);
 }
+.kcard-title--done {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
 .kcard-comments {
   display: inline-flex;
   align-items: center;

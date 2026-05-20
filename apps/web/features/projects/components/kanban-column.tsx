@@ -123,6 +123,7 @@ export function KanbanColumn({
               cannotAdvance={column.isBlockedSystem || isLastUserColumn === true}
               csrfToken={csrfToken}
               isReadOnly={isReadOnly}
+              isLastUserColumn={isLastUserColumn === true}
             />
           ))}
         </SortableContext>
