@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   requireSuperAdmin: vi.fn(),
+  requireUserVerified: vi.fn(),
   workspaceFindUnique: vi.fn(),
   workspaceDelete: vi.fn(),
   assertCsrf: vi.fn(),
@@ -15,7 +16,10 @@ vi.mock('@nexushub/db', () => ({
     workspace: { findUnique: mocks.workspaceFindUnique, delete: mocks.workspaceDelete },
   },
 }));
-vi.mock('@/lib/auth', () => ({ requireSuperAdmin: mocks.requireSuperAdmin }));
+vi.mock('@/lib/auth', () => ({
+  requireSuperAdmin: mocks.requireSuperAdmin,
+  requireUserVerified: mocks.requireUserVerified,
+}));
 vi.mock('@/lib/csrf', () => ({ assertCsrfFromFormData: mocks.assertCsrf }));
 vi.mock('@/lib/audit', () => ({ recordAudit: mocks.recordAudit }));
 vi.mock('@/lib/rate-limit', () => ({ getClientIp: mocks.getClientIp }));
@@ -35,6 +39,13 @@ function fd(input: Record<string, string>): FormData {
 beforeEach(() => {
   for (const m of Object.values(mocks)) (m as { mockReset?: () => void }).mockReset?.();
   mocks.requireSuperAdmin.mockResolvedValue({
+    userId: 'sa-1',
+    workspaceId: 'ws-anywhere',
+    role: 'admin',
+    isSuperAdmin: true,
+    email: 'sa@platform',
+  });
+  mocks.requireUserVerified.mockResolvedValue({
     userId: 'sa-1',
     workspaceId: 'ws-anywhere',
     role: 'admin',

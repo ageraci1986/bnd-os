@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { headers } from 'next/headers';
 import { z } from 'zod';
 import { prisma } from '@nexushub/db';
-import { requireAdmin } from '@/lib/auth';
+import { requireAdmin, requireUserVerified } from '@/lib/auth';
 import { assertCsrfFromFormData } from '@/lib/csrf';
 import { recordAudit } from '@/lib/audit';
 import { getClientIp } from '@/lib/rate-limit';
@@ -22,6 +22,7 @@ export async function removeMember(
 ): Promise<RemoveMemberState> {
   await assertCsrfFromFormData(formData);
   const ctx = await requireAdmin();
+  await requireUserVerified();
 
   const parsed = Schema.safeParse({ membershipId: formData.get('membershipId') });
   if (!parsed.success) {

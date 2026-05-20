@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { prisma } from '@nexushub/db';
 import { canDeleteClient } from '@nexushub/domain';
-import { requireUser } from '@/lib/auth';
+import { requireUserVerified } from '@/lib/auth';
 import { loadUserScope } from '@/lib/auth/scope';
 import { assertCsrfFromFormData } from '@/lib/csrf';
 import { recordAudit } from '@/lib/audit';
@@ -27,7 +27,7 @@ export async function deleteClient(
   formData: FormData,
 ): Promise<DeleteClientState> {
   await assertCsrfFromFormData(formData);
-  const ctx = await requireUser();
+  const ctx = await requireUserVerified();
 
   const parsed = DeleteClientSchema.safeParse({ clientId: formData.get('clientId') });
   if (!parsed.success) {

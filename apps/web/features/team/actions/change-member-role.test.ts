@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   membershipUpdate: vi.fn(),
   workspaceAccessCount: vi.fn(),
   requireAdmin: vi.fn(),
+  requireUserVerified: vi.fn(),
   assertCsrf: vi.fn(),
   recordAudit: vi.fn(),
   revalidatePath: vi.fn(),
@@ -24,7 +25,10 @@ vi.mock('@nexushub/db', () => ({
   },
   Prisma: { PrismaClientKnownRequestError: mocks.PrismaP0001 },
 }));
-vi.mock('@/lib/auth', () => ({ requireAdmin: mocks.requireAdmin }));
+vi.mock('@/lib/auth', () => ({
+  requireAdmin: mocks.requireAdmin,
+  requireUserVerified: mocks.requireUserVerified,
+}));
 vi.mock('@/lib/csrf', () => ({ assertCsrfFromFormData: mocks.assertCsrf }));
 vi.mock('@/lib/audit', () => ({ recordAudit: mocks.recordAudit }));
 vi.mock('@/lib/rate-limit', () => ({ getClientIp: mocks.getClientIp }));
@@ -43,6 +47,13 @@ function fd(membershipId: string, role: string): FormData {
 beforeEach(() => {
   for (const m of Object.values(mocks)) (m as { mockReset?: () => void }).mockReset?.();
   mocks.requireAdmin.mockResolvedValue({
+    userId: 'admin-user',
+    workspaceId: 'ws-1',
+    role: 'admin',
+    isSuperAdmin: false,
+    email: 'admin@ws-1.test',
+  });
+  mocks.requireUserVerified.mockResolvedValue({
     userId: 'admin-user',
     workspaceId: 'ws-1',
     role: 'admin',

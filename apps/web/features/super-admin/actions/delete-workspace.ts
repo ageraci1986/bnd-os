@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { headers } from 'next/headers';
 import { z } from 'zod';
 import { prisma } from '@nexushub/db';
-import { requireSuperAdmin } from '@/lib/auth';
+import { requireSuperAdmin, requireUserVerified } from '@/lib/auth';
 import { assertCsrfFromFormData } from '@/lib/csrf';
 import { recordAudit } from '@/lib/audit';
 import { getClientIp } from '@/lib/rate-limit';
@@ -44,6 +44,7 @@ export async function deleteWorkspace(
 ): Promise<DeleteWorkspaceState> {
   await assertCsrfFromFormData(formData);
   const ctx = await requireSuperAdmin();
+  await requireUserVerified();
 
   const parsed = Schema.safeParse({
     workspaceId: formData.get('workspaceId'),
