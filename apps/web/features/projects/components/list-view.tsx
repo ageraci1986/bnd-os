@@ -1,6 +1,5 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -93,7 +92,6 @@ export function ListView({
   columns,
   isReadOnly = false,
 }: ListViewProps) {
-  const router = useRouter();
   const { selected, toggle, reset } = useListViewColumns(projectId);
   const [localCards, setLocalCards] = useState<readonly ListViewCard[]>(cards);
   useEffect(() => setLocalCards(cards), [cards]);
@@ -224,9 +222,8 @@ export function ListView({
       if (!result.ok) {
         setLocalCards(cards);
         window.alert(result.message);
-        return;
       }
-      router.refresh();
+      // No router.refresh(): local state is already updated optimistically.
     })();
   };
 

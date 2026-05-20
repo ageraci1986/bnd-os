@@ -1,6 +1,5 @@
 'use client';
 import { useTransition } from 'react';
-import { useRouter } from 'next/navigation';
 import { uncompleteCard } from '../actions/uncomplete-card';
 import { CARD_ADVANCED_EVENT, type CardAdvancedEventDetail } from './card-modal-controller';
 
@@ -19,7 +18,6 @@ export interface CardCompletedBadgeProps {
  * `completed_at` snapshot via the DB trigger.
  */
 export function CardCompletedBadge({ cardId, disabled }: CardCompletedBadgeProps) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
 
   const handleClick = (e: React.MouseEvent) => {
@@ -34,7 +32,6 @@ export function CardCompletedBadge({ cardId, disabled }: CardCompletedBadgeProps
           newColumnId: result.newColumnId,
         };
         window.dispatchEvent(new CustomEvent(CARD_ADVANCED_EVENT, { detail }));
-        router.refresh();
       } else {
         window.alert(result.message);
       }

@@ -171,7 +171,7 @@ export function CardModal({
               </div>
               <CardTitleInput cardId={card.id} initial={card.title} autoSelect={isNew} />
               {card.columnIsBlocked ? (
-                <BlockedBanner cardId={card.id} dueDate={card.dueDate} />
+                <BlockedBanner cardId={card.id} dueDate={card.dueDate} onAfterUpdate={close} />
               ) : null}
               {allChecked && !isReadOnly ? (
                 <AutoAdvanceBanner
@@ -521,7 +521,6 @@ function DueDateInput({
   initial: string | null;
   onAfterUpdate: () => void;
 }) {
-  const router = useRouter();
   const [value, setValue] = useState(initial ? initial.slice(0, 10) : '');
   const [pending, startTransition] = useTransition();
 
@@ -538,9 +537,9 @@ function DueDateInput({
       } else if (res.autoUnblocked) {
         window.alert('La carte est sortie de Bloqué.');
         onAfterUpdate();
-      } else {
-        router.refresh();
       }
+      // No router.refresh(): the date value is already in local state via
+      // setValue. If autoBlocked/autoUnblocked, the modal closes above.
     });
   };
 
@@ -868,8 +867,15 @@ function AutoAdvanceBanner({
 
 // ---------- Blocked banner (PRD §10 #4) -----------------------------------
 
-function BlockedBanner({ cardId, dueDate }: { cardId: string; dueDate: string | null }) {
-  const router = useRouter();
+function BlockedBanner({
+  cardId,
+  dueDate,
+  onAfterUpdate,
+}: {
+  cardId: string;
+  dueDate: string | null;
+  onAfterUpdate: () => void;
+}) {
   const [pending, startTransition] = useTransition();
   return (
     <div className="blocked-banner" role="alert">
@@ -887,7 +893,10 @@ function BlockedBanner({ cardId, dueDate }: { cardId: string; dueDate: string | 
           if (next === null) return;
           startTransition(async () => {
             await updateCardDueDate({ cardId, dueDate: next.trim() || null });
-            router.refresh();
+            // Close the modal so the user sees the updated board state on
+            // reopen. Avoids router.refresh() in favour of the existing close
+            // flow (same as DueDateInput's onAfterUpdate path).
+            onAfterUpdate();
           });
         }}
       >

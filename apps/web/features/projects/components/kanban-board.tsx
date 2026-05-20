@@ -1,6 +1,5 @@
 'use client';
 import { useEffect, useId, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
 // useEffect kept for the incomingKey resync below.
 import {
   DndContext,
@@ -48,7 +47,6 @@ export function KanbanBoard({
   cards,
   isReadOnly = false,
 }: KanbanBoardProps) {
-  const router = useRouter();
   const [localCards, setLocalCards] = useState<readonly KanbanCardData[]>(cards);
   const [activeId, setActiveId] = useState<string | null>(null);
 
@@ -183,7 +181,7 @@ export function KanbanBoard({
     // columnId. dnd-kit's `verticalListSortingStrategy` renders cards in
     // the order of the SortableContext items prop; without a proper
     // splice the dropped card snaps back to its pre-drag slot until
-    // `router.refresh()` brings the real new order from the server.
+    // server data arrives via the incomingKey resync effect.
     // Mirror the server's placement rules:
     //   • cross-column or same-col UP   → source lands BEFORE the over card
     //   • same-col DOWN                 → source lands AFTER the over card
@@ -227,10 +225,10 @@ export function KanbanBoard({
       // Roll back: reset to server-truth and surface the message.
       setLocalCards(cards);
       window.alert(result.message);
-      return;
     }
-
-    router.refresh();
+    // No router.refresh(): the optimistic local state already reflects the
+    // new position. The incomingKey effect will resync if the server later
+    // pushes a fresh ordering (e.g. Realtime or another tab's mutation).
   };
 
   const activeCard = activeId ? (localCards.find((c) => c.id === activeId) ?? null) : null;
