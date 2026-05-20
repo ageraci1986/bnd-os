@@ -112,7 +112,9 @@ export const CommentEditor = forwardRef<CommentEditorHandle, CommentEditorProps>
         <div className="nx-comment-editor__toolbar" role="toolbar" aria-label="Mise en forme">
           <button
             type="button"
-            className={`nx-comment-editor__btn${isActive('bold') ? 'is-active' : ''}`}
+            className={
+              isActive('bold') ? 'nx-comment-editor__btn is-active' : 'nx-comment-editor__btn'
+            }
             onClick={() => editor?.chain().focus().toggleBold().run()}
             disabled={disabled}
             title="Gras (Cmd/Ctrl+B)"
@@ -123,7 +125,9 @@ export const CommentEditor = forwardRef<CommentEditorHandle, CommentEditorProps>
           </button>
           <button
             type="button"
-            className={`nx-comment-editor__btn${isActive('italic') ? 'is-active' : ''}`}
+            className={
+              isActive('italic') ? 'nx-comment-editor__btn is-active' : 'nx-comment-editor__btn'
+            }
             onClick={() => editor?.chain().focus().toggleItalic().run()}
             disabled={disabled}
             title="Italique (Cmd/Ctrl+I)"
@@ -134,7 +138,9 @@ export const CommentEditor = forwardRef<CommentEditorHandle, CommentEditorProps>
           </button>
           <button
             type="button"
-            className={`nx-comment-editor__btn${isActive('underline') ? 'is-active' : ''}`}
+            className={
+              isActive('underline') ? 'nx-comment-editor__btn is-active' : 'nx-comment-editor__btn'
+            }
             onClick={() => editor?.chain().focus().toggleUnderline().run()}
             disabled={disabled}
             title="Souligné (Cmd/Ctrl+U)"
@@ -145,7 +151,9 @@ export const CommentEditor = forwardRef<CommentEditorHandle, CommentEditorProps>
           </button>
           <button
             type="button"
-            className={`nx-comment-editor__btn${isActive('link') ? 'is-active' : ''}`}
+            className={
+              isActive('link') ? 'nx-comment-editor__btn is-active' : 'nx-comment-editor__btn'
+            }
             onClick={setLink}
             disabled={disabled}
             title="Lien"
