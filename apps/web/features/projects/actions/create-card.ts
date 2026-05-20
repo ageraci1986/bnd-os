@@ -122,6 +122,7 @@ export async function createCard(
         workspaceId: ctx.workspaceId,
         projectId,
         columnId,
+        createdById: ctx.userId,
         title,
         position,
         ...(template ? { templateId: template.id } : {}),

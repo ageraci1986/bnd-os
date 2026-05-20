@@ -56,6 +56,8 @@ export async function createComment(
       workspaceId: true,
       shortRef: true,
       title: true,
+      createdById: true,
+      createdBy: { select: { id: true, firstName: true, lastName: true, email: true } },
       project: {
         select: { name: true, clientId: true, client: { select: { name: true } } },
       },
@@ -86,9 +88,25 @@ export async function createComment(
     select: { id: true },
   });
 
-  const recipients = card.assignees
-    .filter((a) => a.userId !== ctx.userId)
-    .map((a) => ({ userId: a.userId, user: a.user }));
+  // Recipients = (assignees ∪ card creator) − comment author, deduped by
+  // userId. The creator is notified even if they're not a RACI assignee
+  // (they have a stake in the card). Cards created before the
+  // `createdById` column exists have a null creator and contribute nobody.
+  const recipientsById = new Map<
+    string,
+    { firstName: string | null; lastName: string | null; email: string }
+  >();
+  for (const a of card.assignees) {
+    if (a.userId !== ctx.userId) recipientsById.set(a.userId, a.user);
+  }
+  if (card.createdBy && card.createdBy.id !== ctx.userId) {
+    recipientsById.set(card.createdBy.id, {
+      firstName: card.createdBy.firstName,
+      lastName: card.createdBy.lastName,
+      email: card.createdBy.email,
+    });
+  }
+  const recipients = [...recipientsById].map(([userId, user]) => ({ userId, user }));
 
   if (recipients.length > 0) {
     const env = getPublicEnv();

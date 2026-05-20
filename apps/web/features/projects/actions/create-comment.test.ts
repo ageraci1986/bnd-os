@@ -60,6 +60,8 @@ beforeEach(() => {
     workspaceId: WS,
     shortRef: 42,
     title: 'Carte de test',
+    createdById: null,
+    createdBy: null,
     project: { name: 'Projet X', clientId: 'client-1', client: { name: 'Acme' } },
     assignees: [
       { userId: ASSIGNEE_A, user: { firstName: 'A', lastName: 'A', email: 'a@test' } },
@@ -167,6 +169,8 @@ describe('createComment', () => {
       workspaceId: WS,
       shortRef: 42,
       title: 'solo',
+      createdById: null,
+      createdBy: null,
       project: { name: 'P', clientId: 'client-1', client: { name: 'C' } },
       assignees: [
         { userId: AUTHOR, user: { firstName: 'A', lastName: 'A', email: 'author@test' } },
@@ -176,6 +180,58 @@ describe('createComment', () => {
     expect(res.status).toBe('success');
     expect(mocks.emailSend).not.toHaveBeenCalled();
     expect(mocks.notificationCreate).not.toHaveBeenCalled();
+  });
+
+  it('notifies the card creator even when they are not an assignee', async () => {
+    const CREATOR = '11111111-1111-1111-1111-111111111111';
+    mocks.cardFindFirst.mockResolvedValueOnce({
+      id: CARD,
+      projectId: PROJECT,
+      workspaceId: WS,
+      shortRef: 42,
+      title: 'created by someone else',
+      createdById: CREATOR,
+      createdBy: { id: CREATOR, firstName: 'Crea', lastName: 'Tor', email: 'creator@test' },
+      project: { name: 'P', clientId: 'client-1', client: { name: 'C' } },
+      assignees: [],
+    });
+    await createComment({ status: 'idle' }, fd('hi'));
+    const recipients = mocks.emailSend.mock.calls.map((c) => (c[0] as { to: string }).to);
+    expect(recipients).toEqual(['creator@test']);
+  });
+
+  it('does not notify the creator when they are the comment author', async () => {
+    mocks.cardFindFirst.mockResolvedValueOnce({
+      id: CARD,
+      projectId: PROJECT,
+      workspaceId: WS,
+      shortRef: 42,
+      title: 'self-created',
+      createdById: AUTHOR,
+      createdBy: { id: AUTHOR, firstName: 'Author', lastName: 'A', email: 'author@test' },
+      project: { name: 'P', clientId: 'client-1', client: { name: 'C' } },
+      assignees: [],
+    });
+    const res = await createComment({ status: 'idle' }, fd('hi'));
+    expect(res.status).toBe('success');
+    expect(mocks.emailSend).not.toHaveBeenCalled();
+  });
+
+  it('deduplicates a creator who is also an assignee (one email)', async () => {
+    mocks.cardFindFirst.mockResolvedValueOnce({
+      id: CARD,
+      projectId: PROJECT,
+      workspaceId: WS,
+      shortRef: 42,
+      title: 'creator is also assignee',
+      createdById: ASSIGNEE_A,
+      createdBy: { id: ASSIGNEE_A, firstName: 'A', lastName: 'A', email: 'a@test' },
+      project: { name: 'P', clientId: 'client-1', client: { name: 'C' } },
+      assignees: [{ userId: ASSIGNEE_A, user: { firstName: 'A', lastName: 'A', email: 'a@test' } }],
+    });
+    await createComment({ status: 'idle' }, fd('hi'));
+    const recipients = mocks.emailSend.mock.calls.map((c) => (c[0] as { to: string }).to);
+    expect(recipients).toEqual(['a@test']);
   });
 
   it('revalidates the project path', async () => {
