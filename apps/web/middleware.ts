@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { verifyAccessToken } from '@/lib/auth/verify-jwt';
 
 /**
  * SECURITY middleware (CLAUDE.md §4.6 + §4.3).
@@ -12,9 +13,10 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr';
  *  3. Auth gating: redirects unauthenticated users away from `(app)` routes
  *     and authenticated users away from `(auth)` routes.
  *
- * Note: do not trust `supabase.auth.getSession()` for authorization decisions
- * inside pages/actions — it only decodes the cookie. Use `getUser()` (which
- * validates the JWT against Supabase) in `lib/auth/index.ts`.
+ * Note: route gating uses a local JWT signature check via `verify-jwt.ts`
+ * (no per-request network validation). The session is still refreshed via
+ * `getSession()` which triggers a network refresh only when the token is
+ * expired. `lib/auth/index.ts` also verifies locally for server-side guards.
  */
 // CSRF cookie config (mirrored in lib/csrf/index.ts)
 const CSRF_COOKIE = 'nh_csrf';
@@ -86,9 +88,16 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
       },
     });
 
-    // IMPORTANT: getUser() (not getSession) — validates JWT against Supabase.
-    const { data } = await supabase.auth.getUser();
-    isAuthenticated = data.user !== null;
+    // getSession() reads the token from cookies and refreshes it only when
+    // expired (network at most ~hourly), persisting the new cookie via the
+    // setAll handler above. We verify the signature locally — no per-request
+    // network validation.
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    isAuthenticated = session?.access_token
+      ? (await verifyAccessToken(session.access_token)) !== null
+      : false;
   }
 
   // ---- Auth gating --------------------------------------------------------------

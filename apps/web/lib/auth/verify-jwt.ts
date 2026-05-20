@@ -1,4 +1,6 @@
-import 'server-only';
+// Note: `server-only` intentionally removed so this module can be imported
+// from Next.js middleware (Edge Runtime). The module contains no secrets and
+// performs only cryptographic verification — it is safe to call from the edge.
 import { jwtVerify, createRemoteJWKSet, decodeProtectedHeader, type JWTPayload } from 'jose';
 import { getPublicEnv, getServerEnv } from '../env';
 
