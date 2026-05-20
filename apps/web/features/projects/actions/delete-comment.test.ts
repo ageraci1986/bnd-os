@@ -5,7 +5,6 @@ const mocks = vi.hoisted(() => ({
   commentFindFirst: vi.fn(),
   commentUpdate: vi.fn(),
   assertCsrf: vi.fn(),
-  revalidatePath: vi.fn(),
 }));
 
 vi.mock('@nexushub/db', () => ({
@@ -15,7 +14,6 @@ vi.mock('@nexushub/db', () => ({
 }));
 vi.mock('@/lib/auth', () => ({ requireUser: mocks.requireUser }));
 vi.mock('@/lib/csrf', () => ({ assertCsrfFromFormData: mocks.assertCsrf }));
-vi.mock('next/cache', () => ({ revalidatePath: mocks.revalidatePath }));
 
 import { deleteComment } from './delete-comment';
 

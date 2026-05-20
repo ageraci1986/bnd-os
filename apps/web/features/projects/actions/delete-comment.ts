@@ -1,6 +1,5 @@
 'use server';
 import 'server-only';
-import { revalidatePath } from 'next/cache';
 import { prisma } from '@nexushub/db';
 import { Roles } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
@@ -62,9 +61,6 @@ export async function deleteComment(
     where: { id: commentId },
     data: { deletedAt: new Date() },
   });
-
-  revalidatePath(`/projects/${comment.card.projectId}`);
-  revalidatePath(`/projects/${comment.card.projectId}/list`);
 
   return { status: 'success', commentId };
 }

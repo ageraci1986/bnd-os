@@ -1,6 +1,5 @@
 'use server';
 import 'server-only';
-import { revalidatePath } from 'next/cache';
 import { prisma, type Prisma } from '@nexushub/db';
 import { NotFoundError } from '@nexushub/domain';
 import { markdown } from '@nexushub/integrations';
@@ -157,9 +156,6 @@ export async function createComment(
       }),
     );
   }
-
-  revalidatePath(`/projects/${card.projectId}`);
-  revalidatePath(`/projects/${card.projectId}/list`);
 
   return { status: 'success', commentId: created.id };
 }
