@@ -1,146 +1,110 @@
 'use client';
-import { forwardRef, useImperativeHandle, useRef } from 'react';
+import { forwardRef, useImperativeHandle, useState } from 'react';
+import { useEditor, EditorContent, type Editor } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import Underline from '@tiptap/extension-underline';
+import Link from '@tiptap/extension-link';
+import Placeholder from '@tiptap/extension-placeholder';
+import { Markdown } from 'tiptap-markdown';
 
 export interface CommentEditorHandle {
-  /** Imperative reset — called by the form after a successful submit. */
   clear: () => void;
-  /** Imperative focus — used when the edit form opens. */
   focus: () => void;
 }
 
 export interface CommentEditorProps {
   readonly name: string;
+  /** Markdown source to prefill (edit mode). */
   readonly defaultValue?: string;
   readonly placeholder?: string;
   readonly disabled?: boolean;
-  readonly rows?: number;
-  readonly maxLength?: number;
   readonly ariaLabel: string;
-  /** Triggered on Cmd/Ctrl+Enter — the parent form submits. */
+  /** Cmd/Ctrl+Enter → parent form submit. */
   readonly onSubmitShortcut?: () => void;
 }
 
-type WrapKind = 'bold' | 'italic' | 'underline' | 'link';
-
-/**
- * Wraps the current selection in the textarea with the requested
- * markdown (or inline HTML for underline) markers. If nothing is
- * selected, a sensible placeholder is inserted and re-selected.
- */
-function applyWrap(textarea: HTMLTextAreaElement, kind: WrapKind): void {
-  const { selectionStart: start, selectionEnd: end, value } = textarea;
-  const selected = value.slice(start, end);
-  let before = '';
-  let after = '';
-  let placeholder = '';
-
-  switch (kind) {
-    case 'bold':
-      before = '**';
-      after = '**';
-      placeholder = 'texte';
-      break;
-    case 'italic':
-      before = '*';
-      after = '*';
-      placeholder = 'texte';
-      break;
-    case 'underline':
-      before = '<u>';
-      after = '</u>';
-      placeholder = 'texte';
-      break;
-    case 'link': {
-       
-      const url = window.prompt('URL du lien (https://…)', 'https://');
-      if (!url || url.trim().length === 0) return;
-      const label = selected.length > 0 ? selected : 'libellé';
-      const next = `${value.slice(0, start)}[${label}](${url.trim()})${value.slice(end)}`;
-      textarea.value = next;
-      // Re-select the label so the user can type to replace it.
-      const newStart = start + 1; // skip the `[`
-      const newEnd = newStart + label.length;
-      textarea.setSelectionRange(newStart, newEnd);
-      textarea.dispatchEvent(new Event('input', { bubbles: true }));
-      textarea.focus();
-      return;
-    }
-  }
-
-  const inner = selected.length > 0 ? selected : placeholder;
-  const next = `${value.slice(0, start)}${before}${inner}${after}${value.slice(end)}`;
-  textarea.value = next;
-  const newStart = start + before.length;
-  const newEnd = newStart + inner.length;
-  textarea.setSelectionRange(newStart, newEnd);
-  textarea.dispatchEvent(new Event('input', { bubbles: true }));
-  textarea.focus();
+/** Read the editor document back as Markdown (tiptap-markdown storage API). */
+function toMarkdown(editor: Editor | null): string {
+  if (!editor) return '';
+  // tiptap-markdown v0.9 exposes storage.markdown.getMarkdown() directly
+  const storage = editor.storage as {
+    markdown?: { getMarkdown?: () => string };
+  };
+  const md = storage.markdown?.getMarkdown?.();
+  return typeof md === 'string' ? md.trim() : '';
 }
 
-/**
- * Reusable comment editor: toolbar + textarea. Wraps current selection
- * with markdown (or `<u>` for underline). Markdown stays the storage
- * format — these buttons are just keystroke shortcuts.
- */
 export const CommentEditor = forwardRef<CommentEditorHandle, CommentEditorProps>(
   function CommentEditor(
-    {
-      name,
-      defaultValue,
-      placeholder,
-      disabled,
-      rows = 3,
-      maxLength = 10_000,
-      ariaLabel,
-      onSubmitShortcut,
-    },
+    { name, defaultValue, placeholder, disabled, ariaLabel, onSubmitShortcut },
     ref,
   ) {
-    const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+    // Keep a React state copy of the Markdown so the hidden input is always
+    // in sync without relying on a single render cycle (avoids one-keystroke lag).
+    const [markdownValue, setMarkdownValue] = useState<string>(defaultValue ?? '');
+
+    const editor = useEditor({
+      immediatelyRender: false,
+      editable: !disabled,
+      extensions: [
+        StarterKit.configure({
+          heading: false,
+          horizontalRule: false,
+        }),
+        Underline,
+        Link.configure({
+          openOnClick: false,
+          autolink: true,
+          protocols: ['https', 'mailto'],
+          HTMLAttributes: { rel: 'noopener noreferrer', target: '_blank' },
+        }),
+        Placeholder.configure({ placeholder: placeholder ?? '' }),
+        Markdown.configure({ html: false, linkify: true }),
+      ],
+      content: defaultValue ?? '',
+      onUpdate: ({ editor: e }) => {
+        setMarkdownValue(toMarkdown(e));
+      },
+      editorProps: {
+        attributes: {
+          'aria-label': ariaLabel,
+          class: 'nx-comment-editor__surface',
+        },
+        handleKeyDown: (_view, event) => {
+          if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+            event.preventDefault();
+            onSubmitShortcut?.();
+            return true;
+          }
+          return false;
+        },
+      },
+    });
 
     useImperativeHandle(
       ref,
       () => ({
         clear: () => {
-          if (textareaRef.current) textareaRef.current.value = '';
+          editor?.commands.clearContent(true);
+          setMarkdownValue('');
         },
-        focus: () => textareaRef.current?.focus(),
+        focus: () => editor?.commands.focus(),
       }),
-      [],
+      [editor],
     );
 
-    const handleKey = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-        e.preventDefault();
-        onSubmitShortcut?.();
+    const isActive = (mark: string) => editor?.isActive(mark) ?? false;
+
+    const setLink = () => {
+      if (!editor) return;
+      const previous = (editor.getAttributes('link')['href'] as string | undefined) ?? 'https://';
+      const url = window.prompt('URL du lien (https://…)', previous);
+      if (url === null) return;
+      if (url.trim().length === 0) {
+        editor.chain().focus().unsetLink().run();
         return;
       }
-      // Optional keyboard shortcuts mirror common editors.
-      if ((e.metaKey || e.ctrlKey) && (e.key === 'b' || e.key === 'B')) {
-        if (textareaRef.current) {
-          e.preventDefault();
-          applyWrap(textareaRef.current, 'bold');
-        }
-      } else if ((e.metaKey || e.ctrlKey) && (e.key === 'i' || e.key === 'I')) {
-        if (textareaRef.current) {
-          e.preventDefault();
-          applyWrap(textareaRef.current, 'italic');
-        }
-      } else if ((e.metaKey || e.ctrlKey) && (e.key === 'u' || e.key === 'U')) {
-        if (textareaRef.current) {
-          e.preventDefault();
-          applyWrap(textareaRef.current, 'underline');
-        }
-      } else if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
-        if (textareaRef.current) {
-          e.preventDefault();
-          applyWrap(textareaRef.current, 'link');
-        }
-      }
-    };
-
-    const wrap = (kind: WrapKind) => {
-      if (textareaRef.current) applyWrap(textareaRef.current, kind);
+      editor.chain().focus().setLink({ href: url.trim() }).run();
     };
 
     return (
@@ -148,41 +112,45 @@ export const CommentEditor = forwardRef<CommentEditorHandle, CommentEditorProps>
         <div className="nx-comment-editor__toolbar" role="toolbar" aria-label="Mise en forme">
           <button
             type="button"
-            className="nx-comment-editor__btn"
-            onClick={() => wrap('bold')}
+            className={`nx-comment-editor__btn${isActive('bold') ? 'is-active' : ''}`}
+            onClick={() => editor?.chain().focus().toggleBold().run()}
             disabled={disabled}
             title="Gras (Cmd/Ctrl+B)"
             aria-label="Gras"
+            aria-pressed={isActive('bold')}
           >
             <strong>B</strong>
           </button>
           <button
             type="button"
-            className="nx-comment-editor__btn"
-            onClick={() => wrap('italic')}
+            className={`nx-comment-editor__btn${isActive('italic') ? 'is-active' : ''}`}
+            onClick={() => editor?.chain().focus().toggleItalic().run()}
             disabled={disabled}
             title="Italique (Cmd/Ctrl+I)"
             aria-label="Italique"
+            aria-pressed={isActive('italic')}
           >
             <em>I</em>
           </button>
           <button
             type="button"
-            className="nx-comment-editor__btn"
-            onClick={() => wrap('underline')}
+            className={`nx-comment-editor__btn${isActive('underline') ? 'is-active' : ''}`}
+            onClick={() => editor?.chain().focus().toggleUnderline().run()}
             disabled={disabled}
             title="Souligné (Cmd/Ctrl+U)"
             aria-label="Souligné"
+            aria-pressed={isActive('underline')}
           >
             <span style={{ textDecoration: 'underline' }}>U</span>
           </button>
           <button
             type="button"
-            className="nx-comment-editor__btn"
-            onClick={() => wrap('link')}
+            className={`nx-comment-editor__btn${isActive('link') ? 'is-active' : ''}`}
+            onClick={setLink}
             disabled={disabled}
-            title="Lien (Cmd/Ctrl+K)"
+            title="Lien"
             aria-label="Lien"
+            aria-pressed={isActive('link')}
           >
             <svg
               aria-hidden="true"
@@ -201,18 +169,8 @@ export const CommentEditor = forwardRef<CommentEditorHandle, CommentEditorProps>
             </svg>
           </button>
         </div>
-        <textarea
-          ref={textareaRef}
-          name={name}
-          defaultValue={defaultValue}
-          placeholder={placeholder}
-          rows={rows}
-          maxLength={maxLength}
-          onKeyDown={handleKey}
-          aria-label={ariaLabel}
-          className="nx-comment-editor__textarea"
-          disabled={disabled}
-        />
+        <EditorContent editor={editor} />
+        <input type="hidden" name={name} value={markdownValue} />
       </div>
     );
   },
