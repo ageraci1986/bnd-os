@@ -10,3 +10,4 @@ export * from './card-templates/index';
 export * from './kanban-templates/index';
 export * from './scope/index';
 export * as crypto from './crypto/index';
+export * from './dates/index';
