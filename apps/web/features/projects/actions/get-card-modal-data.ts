@@ -6,6 +6,8 @@ import { validateCardTemplateItems, type CardTemplateItem, type Raci } from '@ne
 import { requireUser } from '@/lib/auth';
 import { loadUserScope } from '@/lib/auth/scope';
 import { SCOPE_ERROR_MESSAGE } from '../lib/scope-error';
+import type { CardCommentDTO } from '../lib/comment-dto';
+import { loadCardComments } from '../lib/load-card-comments';
 
 const Schema = z.object({ cardId: z.string().uuid() });
 
@@ -38,6 +40,7 @@ export interface CardModalData {
   }[];
   readonly templateId: string | null;
   readonly templateItems: readonly CardTemplateItem[];
+  readonly comments: readonly CardCommentDTO[];
 }
 
 /**
@@ -121,6 +124,12 @@ export async function getCardModalData(input: {
 
   const templateItems = validateCardTemplateItems(card.template?.items ?? []) ?? [];
 
+  const comments = await loadCardComments({
+    cardId: card.id,
+    currentUserId: ctx.userId,
+    currentRole: ctx.role,
+  });
+
   return {
     ok: true,
     data: {
@@ -156,6 +165,7 @@ export async function getCardModalData(input: {
       }),
       templateId: card.templateId,
       templateItems,
+      comments,
     },
   };
 }

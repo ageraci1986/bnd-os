@@ -77,6 +77,7 @@ export default async function ProjectListPage({ params, searchParams }: ProjectL
               checklistItems: {
                 select: { isChecked: true, columnSourceId: true },
               },
+              _count: { select: { comments: { where: { deletedAt: null } } } },
             },
           },
         },
@@ -139,6 +140,7 @@ export default async function ProjectListPage({ params, searchParams }: ProjectL
       checklistTotal: visibleChecklist.length,
       checklistChecked: checked,
       templateName: c.template?.name ?? null,
+      commentCount: c._count.comments,
     } satisfies ListViewCard;
   });
 

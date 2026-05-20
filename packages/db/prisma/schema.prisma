@@ -85,6 +85,7 @@ enum NotificationKind {
 enum NotificationChannel {
   push
   slack
+  email
 }
 
 enum ActivityKind {
@@ -156,6 +157,7 @@ model User {
   activityActor          ActivityEvent[]
   auditEvents            AuditLog[]
   cardAssignments        CardAssignee[]
+  cardsCreated           Card[]            @relation("CardCreatedBy")
   comments               Comment[]
   projectMemberships     ProjectMember[]
   ownedIntegrations      Integration[]            @relation("IntegrationOwner")
@@ -448,6 +450,10 @@ model Card {
   templateId       String?   @map("template_id") @db.Uuid
   /// Mémorise la colonne avant Bloqué pour le retour automatique (PRD §8.3)
   previousColumnId String?   @map("previous_column_id") @db.Uuid
+  /// Auteur de la carte. Nullable car les cartes créées avant l'ajout de
+  /// ce champ n'ont pas l'info. Sert à notifier le créateur des nouveaux
+  /// commentaires (en plus des assignés).
+  createdById      String?   @map("created_by_id") @db.Uuid
   /// Auto-incrémenté par trigger Postgres (#124, #089…). Default 0 lets
   /// Prisma omit it on insert; the trigger replaces it with the real value.
   shortRef         Int       @default(0) @map("short_ref")
@@ -475,6 +481,7 @@ model Card {
   project        Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
   column         Column          @relation(fields: [columnId], references: [id], onDelete: Restrict)
   template       CardTemplate?   @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  createdBy      User?           @relation("CardCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   assignees      CardAssignee[]
   checklistItems ChecklistItem[]
   comments       Comment[]

@@ -797,6 +797,34 @@
   line-height: 1.4;
   color: var(--text-main);
 }
+.kcard-comments {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.kcard-comments svg {
+  display: block;
+}
+.nx-comment-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(139, 43, 226, 0.08);
+  color: var(--accent-primary, #8b2be2);
+  font-size: 10px;
+  font-weight: 700;
+  vertical-align: middle;
+}
+.nx-comment-badge svg {
+  display: block;
+}
 .kcard-footer {
   display: flex;
   justify-content: space-between;
@@ -2178,4 +2206,270 @@
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* ===== nx-btn variants (used by comments + future components) ===== */
+/* Base reset — composable with the modifier classes below. */
+.nx-btn {
+  cursor: pointer;
+  font: inherit;
+  border-radius: 8px;
+  padding: 8px 16px;
+  border: 1px solid transparent;
+  transition:
+    background 120ms ease,
+    opacity 120ms ease,
+    filter 120ms ease;
+  background: transparent;
+  color: inherit;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+}
+.nx-btn[disabled],
+.nx-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+.nx-btn--primary {
+  background: var(--accent-gradient);
+  color: #fff;
+  font-weight: 700;
+  padding: 8px 18px;
+  border: 0;
+  box-shadow: 0 4px 12px rgba(139, 43, 226, 0.25);
+}
+.nx-btn--primary:hover:not([disabled]):not(:disabled) {
+  filter: brightness(1.07);
+}
+.nx-btn--ghost {
+  background: var(--bg-card);
+  color: var(--text-main);
+  border: 1px solid var(--border-light);
+  box-shadow: var(--shadow-card);
+}
+.nx-btn--ghost:hover:not([disabled]):not(:disabled) {
+  background: var(--bg-hover);
+}
+.nx-btn--link {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  color: var(--accent-primary);
+  text-decoration: underline;
+  font-size: 12px;
+  font-weight: 600;
+}
+.nx-btn--link:hover:not([disabled]):not(:disabled) {
+  text-decoration: none;
+}
+.nx-btn--danger {
+  color: var(--danger);
+}
+.nx-btn--link.nx-btn--danger {
+  color: var(--danger);
+}
+
+/* ===== Card comments ===== */
+.nx-comments {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-light);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.nx-comments__title {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 0;
+}
+.nx-comments__empty {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0;
+}
+.nx-comments__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.nx-comment {
+  display: flex;
+  gap: 12px;
+}
+.nx-comment__avatar {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--accent-gradient);
+  color: #fff;
+  font-weight: 700;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.nx-comment__body {
+  flex: 1;
+  min-width: 0;
+}
+.nx-comment__header {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.nx-comment__author {
+  color: var(--text-main);
+  font-weight: 700;
+  font-size: 13px;
+}
+.nx-comment__edited {
+  font-style: italic;
+  font-size: 11px;
+}
+.nx-comment__content {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-main);
+  margin-top: 4px;
+  word-break: break-word;
+}
+.nx-comment__content p {
+  margin: 0 0 6px 0;
+}
+.nx-comment__content code {
+  background: rgba(139, 43, 226, 0.08);
+  padding: 1px 4px;
+  border-radius: 4px;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 13px;
+}
+.nx-comment__content pre {
+  background: #0f172a;
+  color: #e2e8f0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  overflow-x: auto;
+}
+.nx-comment__content a {
+  color: var(--accent-primary);
+  text-decoration: underline;
+}
+.nx-comment__actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 6px;
+}
+.nx-comment__textarea,
+.nx-comment-form__textarea,
+.nx-comment-editor__textarea {
+  width: 100%;
+  min-height: 72px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-light);
+  border-radius: 0 0 8px 8px;
+  border-top: 0;
+  font-family: inherit;
+  font-size: 14px;
+  resize: vertical;
+  background: var(--bg-card);
+  color: var(--text-main);
+  box-sizing: border-box;
+}
+.nx-comment__textarea:focus,
+.nx-comment-form__textarea:focus,
+.nx-comment-editor__textarea:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(139, 43, 226, 0.18);
+}
+/* Editor + toolbar */
+.nx-comment-editor {
+  display: flex;
+  flex-direction: column;
+}
+.nx-comment-editor__toolbar {
+  display: flex;
+  gap: 2px;
+  padding: 4px 6px;
+  border: 1px solid var(--border-light);
+  border-bottom: 0;
+  border-radius: 8px 8px 0 0;
+  background: #fafbfc;
+}
+.nx-comment-editor__btn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 6px;
+  color: var(--text-main);
+  font-size: 13px;
+  line-height: 1;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
+}
+.nx-comment-editor__btn:hover:not([disabled]) {
+  background: rgba(139, 43, 226, 0.1);
+  color: var(--accent-primary);
+}
+.nx-comment-editor__btn:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 1px;
+}
+.nx-comment-editor__btn[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.nx-comment__content u {
+  text-decoration: underline;
+}
+.nx-comment__edit-form,
+.nx-comment-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.nx-comment__edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  align-items: center;
+}
+.nx-comment-form__footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.nx-comment-form__hint {
+  font-size: 11px;
+  color: var(--text-ghost);
+}
+.nx-comment-form__error,
+.nx-comment__error {
+  color: var(--danger);
+  font-size: 12px;
+  margin: 0;
+}
+.nx-comment__delete-form {
+  display: inline;
 }
