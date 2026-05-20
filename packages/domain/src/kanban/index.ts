@@ -3,6 +3,8 @@
  * No dependency on Prisma/Next. Used by both server actions and tests.
  */
 
+import { isDueDateOverdue } from '../dates/index';
+
 export const AUTO_ADVANCE_DELAY_MS = 1800 as const;
 export const ARCHIVE_DONE_AFTER_DAYS = 30 as const;
 
@@ -80,7 +82,7 @@ export function evaluateAutoAdvance(
 export function shouldMoveToBlocked(card: Card, now: Date, columns: readonly Column[]): boolean {
   if (card.archivedAt !== null) return false;
   if (card.dueDate === null) return false;
-  if (card.dueDate.getTime() >= now.getTime()) return false;
+  if (!isDueDateOverdue(card.dueDate, now)) return false;
 
   const current = columns.find((c) => c.id === card.columnId);
   if (!current) return false;
@@ -93,7 +95,7 @@ export function shouldRestoreFromBlocked(card: Card, now: Date, currentColumn: C
   if (!currentColumn.isBlockedSystem) return false;
   if (card.previousColumnId === null) return false;
   if (card.dueDate === null) return true; // due date cleared → unblock
-  return card.dueDate.getTime() >= now.getTime();
+  return !isDueDateOverdue(card.dueDate, now);
 }
 
 /* ---------- Archiving (decision: opt-in per project, ADR 0001) ---------- */

@@ -11,6 +11,7 @@ import {
   type Card,
   type Column,
 } from './index';
+import { isDueDateOverdue } from '../dates/index';
 
 const cols: Column[] = [
   { id: 'todo', name: 'À faire', position: 1, isBlockedSystem: false },
@@ -180,5 +181,58 @@ describe('isArchiveCandidate (ADR 0001 — opt-in 30j)', () => {
     const movedAt = new Date(now.getTime() - 60 * 86400 * 1000);
     const card: Card = { ...baseCard, archivedAt: now };
     expect(isArchiveCandidate(card, now, movedAt, true)).toBe(false);
+  });
+});
+
+describe('shouldMoveToBlocked — end-of-day deadline', () => {
+  const endOfDayCols: Column[] = [
+    { id: 'a', name: 'À faire', position: 1, isBlockedSystem: false },
+    { id: 'b', name: 'En cours', position: 2, isBlockedSystem: false },
+    { id: 'done', name: 'Done', position: 3, isBlockedSystem: false },
+    { id: 'blk', name: 'Bloqué', position: 99, isBlockedSystem: true },
+  ];
+  const baseEndOfDayCard: Card = {
+    id: 'c1',
+    columnId: 'b',
+    previousColumnId: null,
+    dueDate: null,
+    checklistTotal: 0,
+    checklistDone: 0,
+    archivedAt: null,
+  };
+
+  it('does NOT block a card due today (Paris)', () => {
+    const due = new Date('2026-05-20T00:00:00.000Z');
+    const now = new Date('2026-05-20T09:00:00.000Z');
+    expect(shouldMoveToBlocked({ ...baseEndOfDayCard, dueDate: due }, now, endOfDayCols)).toBe(
+      false,
+    );
+  });
+
+  it('blocks a card whose deadline day has passed', () => {
+    const due = new Date('2026-05-19T00:00:00.000Z');
+    const now = new Date('2026-05-20T09:00:00.000Z');
+    expect(shouldMoveToBlocked({ ...baseEndOfDayCard, dueDate: due }, now, endOfDayCols)).toBe(
+      true,
+    );
+  });
+
+  it('still never blocks the last user column', () => {
+    const due = new Date('2026-05-18T00:00:00.000Z');
+    const now = new Date('2026-05-20T09:00:00.000Z');
+    expect(
+      shouldMoveToBlocked(
+        { ...baseEndOfDayCard, columnId: 'done', dueDate: due },
+        now,
+        endOfDayCols,
+      ),
+    ).toBe(false);
+  });
+});
+
+// Verify that isDueDateOverdue is re-exported from the barrel (import smoke-test).
+describe('isDueDateOverdue re-export smoke test', () => {
+  it('is importable from the dates module', () => {
+    expect(typeof isDueDateOverdue).toBe('function');
   });
 });
