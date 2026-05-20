@@ -202,6 +202,7 @@ export function CardModal({
                   items={card.templateItems}
                   fieldValues={card.fieldValues}
                   description={card.description ?? ''}
+                  isReadOnly={isReadOnly}
                 />
               )}
 

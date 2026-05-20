@@ -5,7 +5,7 @@ import { updateComment, type UpdateCommentState } from '../actions/update-commen
 import { deleteComment } from '../actions/delete-comment';
 import { CSRF_FIELD_NAME } from '@/lib/csrf/field';
 import type { CardCommentDTO } from '../lib/comment-dto';
-import { CommentEditor, type CommentEditorHandle } from './comment-editor';
+import { MarkdownEditor, type MarkdownEditorHandle } from './markdown-editor';
 
 const UPDATE_INITIAL: UpdateCommentState = { status: 'idle' };
 
@@ -25,7 +25,7 @@ export function CardCommentItem({ comment, csrfToken }: CardCommentItemProps) {
   const [updateState, updateAction, updatePending] = useActionState(updateComment, UPDATE_INITIAL);
   const [deletePending, startDelete] = useTransition();
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  const editorRef = useRef<CommentEditorHandle | null>(null);
+  const editorRef = useRef<MarkdownEditorHandle | null>(null);
   const editFormRef = useRef<HTMLFormElement | null>(null);
 
   useEffect(() => {
@@ -72,7 +72,7 @@ export function CardCommentItem({ comment, csrfToken }: CardCommentItemProps) {
           <form ref={editFormRef} action={updateAction} className="nx-comment__edit-form">
             <input type="hidden" name={CSRF_FIELD_NAME} value={csrfToken} />
             <input type="hidden" name="commentId" value={comment.id} />
-            <CommentEditor
+            <MarkdownEditor
               ref={editorRef}
               name="body"
               defaultValue={comment.body}

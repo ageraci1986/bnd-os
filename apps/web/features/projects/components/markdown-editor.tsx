@@ -1,5 +1,5 @@
 'use client';
-import { forwardRef, useImperativeHandle, useState } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { useEditor, EditorContent, type Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
@@ -7,13 +7,19 @@ import Link from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
 import { Markdown } from 'tiptap-markdown';
 
-export interface CommentEditorHandle {
+export interface MarkdownEditorHandle {
   clear: () => void;
   focus: () => void;
 }
 
-export interface CommentEditorProps {
-  readonly name: string;
+export interface MarkdownEditorProps {
+  /**
+   * When provided, renders a hidden `<input name={name}>` with the serialised
+   * Markdown value — used by comment forms (form-mode).
+   * When absent, no hidden input is rendered — used by the description
+   * autosave (live-mode via `onChange`).
+   */
+  readonly name?: string;
   /** Markdown source to prefill (edit mode). */
   readonly defaultValue?: string;
   readonly placeholder?: string;
@@ -21,6 +27,12 @@ export interface CommentEditorProps {
   readonly ariaLabel: string;
   /** Cmd/Ctrl+Enter → parent form submit. */
   readonly onSubmitShortcut?: () => void;
+  /**
+   * Called on every document update with the serialised Markdown string.
+   * Used by the description autosave flow (no hidden input needed).
+   * A ref is used internally to avoid stale-closure issues.
+   */
+  readonly onChange?: (markdown: string) => void;
 }
 
 /** Read the editor document back as Markdown (tiptap-markdown storage API). */
@@ -34,14 +46,18 @@ function toMarkdown(editor: Editor | null): string {
   return typeof md === 'string' ? md.trim() : '';
 }
 
-export const CommentEditor = forwardRef<CommentEditorHandle, CommentEditorProps>(
-  function CommentEditor(
-    { name, defaultValue, placeholder, disabled, ariaLabel, onSubmitShortcut },
+export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
+  function MarkdownEditor(
+    { name, defaultValue, placeholder, disabled, ariaLabel, onSubmitShortcut, onChange },
     ref,
   ) {
     // Keep a React state copy of the Markdown so the hidden input is always
     // in sync without relying on a single render cycle (avoids one-keystroke lag).
     const [markdownValue, setMarkdownValue] = useState<string>(defaultValue ?? '');
+
+    // Stable ref for onChange to avoid stale closures inside useEditor's onUpdate.
+    const onChangeRef = useRef(onChange);
+    onChangeRef.current = onChange;
 
     const editor = useEditor({
       immediatelyRender: false,
@@ -63,7 +79,9 @@ export const CommentEditor = forwardRef<CommentEditorHandle, CommentEditorProps>
       ],
       content: defaultValue ?? '',
       onUpdate: ({ editor: e }) => {
-        setMarkdownValue(toMarkdown(e));
+        const md = toMarkdown(e);
+        setMarkdownValue(md);
+        onChangeRef.current?.(md);
       },
       editorProps: {
         attributes: {
@@ -80,6 +98,13 @@ export const CommentEditor = forwardRef<CommentEditorHandle, CommentEditorProps>
         },
       },
     });
+
+    // Keep Tiptap's editable state in sync when `disabled` changes at runtime.
+    // Tiptap's `<fieldset disabled>` does NOT disable a contenteditable, so we
+    // must call setEditable() explicitly (critical for Viewer/read-only mode).
+    useEffect(() => {
+      editor?.setEditable(!disabled);
+    }, [editor, disabled]);
 
     useImperativeHandle(
       ref,
@@ -178,7 +203,7 @@ export const CommentEditor = forwardRef<CommentEditorHandle, CommentEditorProps>
           </button>
         </div>
         <EditorContent editor={editor} />
-        <input type="hidden" name={name} value={markdownValue} />
+        {name !== undefined ? <input type="hidden" name={name} value={markdownValue} /> : null}
       </div>
     );
   },

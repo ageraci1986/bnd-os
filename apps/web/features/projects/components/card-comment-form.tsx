@@ -3,7 +3,7 @@ import { useActionState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createComment, type CreateCommentState } from '../actions/create-comment';
 import { CSRF_FIELD_NAME } from '@/lib/csrf/field';
-import { CommentEditor, type CommentEditorHandle } from './comment-editor';
+import { MarkdownEditor, type MarkdownEditorHandle } from './markdown-editor';
 
 export interface CardCommentFormProps {
   readonly cardId: string;
@@ -19,7 +19,7 @@ const INITIAL: CreateCommentState = { status: 'idle' };
 export function CardCommentForm({ cardId, csrfToken, disabled }: CardCommentFormProps) {
   const router = useRouter();
   const [state, formAction, pending] = useActionState(createComment, INITIAL);
-  const editorRef = useRef<CommentEditorHandle | null>(null);
+  const editorRef = useRef<MarkdownEditorHandle | null>(null);
   const formRef = useRef<HTMLFormElement | null>(null);
 
   useEffect(() => {
@@ -35,7 +35,7 @@ export function CardCommentForm({ cardId, csrfToken, disabled }: CardCommentForm
     <form ref={formRef} action={formAction} className="nx-comment-form">
       <input type="hidden" name={CSRF_FIELD_NAME} value={csrfToken} />
       <input type="hidden" name="cardId" value={cardId} />
-      <CommentEditor
+      <MarkdownEditor
         ref={editorRef}
         name="body"
         placeholder="Écris un commentaire… (Cmd/Ctrl+Enter pour envoyer)"
