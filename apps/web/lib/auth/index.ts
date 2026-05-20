@@ -6,10 +6,16 @@
  * `requireAdmin()` — renders the 404 page if the user is not Admin in the workspace
  *   (super-admin always passes).
  * `requireSuperAdmin()` — renders the 404 page if the user is not a platform super-admin.
+ * `requireUserVerified()` — like `requireUser` but adds a network `getUser()` call to
+ *   reject revoked/banned sessions immediately (used for destructive actions).
  *
  * SECURITY:
- *  - `supabase.auth.getUser()` validates the JWT against Supabase (network call).
- *    Never rely on `getSession()` alone — it only decodes the cookie locally.
+ *  - The JWT signature is now verified locally via `verify-jwt.ts` (no per-request
+ *    network call for the common authenticated case).
+ *  - DB existence is still confirmed via a Prisma `findUnique` call on every request.
+ *  - Revocation latency is bounded by the token lifetime (≤1h, per CLAUDE.md §4.3.1).
+ *  - Destructive actions use `requireUserVerified` which adds a network `getUser()` call
+ *    so a revoked or banned Supabase session is rejected immediately (no ≤1h window).
  *  - All checks happen server-side. Client components must call these via Server Actions.
  *  - We always join via `Membership.workspace_id`; never trust a workspace_id sent by the client.
  */
@@ -19,6 +25,7 @@ import { notFound, redirect } from 'next/navigation';
 import { prisma } from '@nexushub/db';
 import { isRole, Roles, type Role } from '@nexushub/domain';
 import { createSupabaseServer } from '../supabase/server';
+import { verifyAccessToken } from './verify-jwt';
 
 export interface AuthContext {
   readonly userId: string;
@@ -40,13 +47,19 @@ export interface AuthContext {
  */
 export const getAuthContext = cache(async (): Promise<AuthContext | null> => {
   const supabase = await createSupabaseServer();
-  const { data, error } = await supabase.auth.getUser();
-  if (error || !data.user) return null;
+  // getSession() reads the token from cookies locally (and refreshes only
+  // when expired). It does NOT verify the signature — so we verify it
+  // ourselves below. This removes the per-request network getUser() call.
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session?.access_token) return null;
 
-  // Single query joining users + first membership so we get isSuperAdmin
-  // + role in one trip.
+  const verified = await verifyAccessToken(session.access_token);
+  if (!verified) return null;
+
   const user = await prisma.user.findUnique({
-    where: { id: data.user.id },
+    where: { id: verified.sub },
     select: {
       isSuperAdmin: true,
       memberships: {
@@ -60,16 +73,11 @@ export const getAuthContext = cache(async (): Promise<AuthContext | null> => {
   if (!user) return null;
   const membership = user.memberships[0];
   if (!membership) return null;
+  if (!isRole(membership.role)) return null;
 
-  if (!isRole(membership.role)) {
-    // DB has a value we don't recognise (e.g. enum extended without code
-    // update). Treat as not-signed-in so we redirect to /login rather than
-    // hand back an unsafe context.
-    return null;
-  }
   return {
-    userId: data.user.id,
-    email: data.user.email ?? '',
+    userId: verified.sub,
+    email: verified.email ?? '',
     workspaceId: membership.workspaceId,
     role: membership.role,
     isSuperAdmin: user.isSuperAdmin,
@@ -99,6 +107,21 @@ export async function requireSuperAdmin(): Promise<AuthContext> {
   const ctx = await requireUser();
   if (!ctx.isSuperAdmin) {
     notFound();
+  }
+  return ctx;
+}
+
+/**
+ * Stronger guard for DESTRUCTIVE / privilege-changing actions. Adds a
+ * network `getUser()` call on top of the local-verified context so a
+ * revoked/banned Supabase session is rejected immediately (no ≤1h window).
+ */
+export async function requireUserVerified(): Promise<AuthContext> {
+  const ctx = await requireUser();
+  const supabase = await createSupabaseServer();
+  const { data, error } = await supabase.auth.getUser();
+  if (error || !data.user || data.user.id !== ctx.userId) {
+    redirect('/login');
   }
   return ctx;
 }
