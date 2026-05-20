@@ -9,6 +9,7 @@ export interface TemplateItemsRenderProps {
   readonly items: readonly CardTemplateItem[];
   readonly fieldValues: Record<string, string>;
   readonly description: string;
+  readonly isReadOnly?: boolean;
 }
 
 export function TemplateItemsRender({
@@ -16,6 +17,7 @@ export function TemplateItemsRender({
   items,
   fieldValues,
   description,
+  isReadOnly = false,
 }: TemplateItemsRenderProps) {
   if (items.length === 0) return null;
   return (
@@ -32,7 +34,7 @@ export function TemplateItemsRender({
           return (
             <section className="modal-section" key={item.id}>
               <div className="section-label">Description</div>
-              <CardDescriptionInput cardId={cardId} initial={description} />
+              <CardDescriptionInput cardId={cardId} initial={description} disabled={isReadOnly} />
             </section>
           );
         }

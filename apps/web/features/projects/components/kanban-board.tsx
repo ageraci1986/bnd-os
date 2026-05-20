@@ -262,7 +262,13 @@ export function KanbanBoard({
         ))}
       </div>
       <DragOverlay>
-        {activeCard ? <KanbanCard card={activeCard} isReadOnly={isReadOnly} /> : null}
+        {activeCard ? (
+          <KanbanCard
+            card={activeCard}
+            isReadOnly={isReadOnly}
+            isLastUserColumn={activeCard.columnId === lastUserColumnId}
+          />
+        ) : null}
       </DragOverlay>
     </DndContext>
   );

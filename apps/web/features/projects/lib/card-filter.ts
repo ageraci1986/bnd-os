@@ -1,4 +1,5 @@
 import type { Prisma } from '@nexushub/db';
+import { startOfTodayInParis } from '@nexushub/domain';
 
 /**
  * Project-scoped card filter — shared by the three project views
@@ -171,7 +172,7 @@ function buildDueWhere(due: DueFilter): Prisma.CardWhereInput | null {
     return { dueDate: { gte: start, lt: end } };
   }
   if (due.mode === 'overdue') {
-    return { dueDate: { lt: startOfTodayUtc() } };
+    return { dueDate: { lt: startOfTodayInParis() } };
   }
   if (due.mode === 'range') {
     const from = new Date(`${due.from}T00:00:00.000Z`);

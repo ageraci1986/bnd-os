@@ -1,25 +1,29 @@
 'use client';
-import { useRef, useState } from 'react';
+import { useRef } from 'react';
 import { updateCard } from '../actions/update-card';
+import { MarkdownEditor } from './markdown-editor';
 
-export function CardDescriptionInput({ cardId, initial }: { cardId: string; initial: string }) {
-  const [value, setValue] = useState(initial);
+export interface CardDescriptionInputProps {
+  readonly cardId: string;
+  readonly initial: string;
+  readonly disabled?: boolean;
+}
+
+export function CardDescriptionInput({ cardId, initial, disabled }: CardDescriptionInputProps) {
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   return (
-    <textarea
-      rows={4}
-      maxLength={8000}
+    <MarkdownEditor
+      variant="description"
+      defaultValue={initial}
       placeholder="Notes, brief, contraintes…"
-      className="description-input"
-      value={value}
-      onChange={(e) => {
-        const next = e.target.value;
-        setValue(next);
+      ariaLabel="Description de la carte"
+      {...(disabled ? { disabled: true } : {})}
+      onChange={(markdown) => {
         if (timer.current) clearTimeout(timer.current);
         timer.current = setTimeout(() => {
-          void updateCard({ cardId, description: next }).catch(() => {
-            // best-effort; the next save will overwrite
+          void updateCard({ cardId, description: markdown }).catch(() => {
+            // best-effort autosave; the next change overwrites
           });
         }, 600);
       }}
