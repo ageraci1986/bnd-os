@@ -14,6 +14,7 @@
  */
 import 'server-only';
 import { prisma } from '@nexushub/db';
+import { shouldRunReconcile } from './reconcile-throttle';
 import {
   computeCardPosition,
   shouldMoveToBlocked,
@@ -224,6 +225,9 @@ export async function reconcileBeforeRead(
   readonly restored: number;
   readonly archived: number;
 }> {
+  if (!shouldRunReconcile(workspaceId)) {
+    return { blocked: 0, restored: 0, archived: 0 };
+  }
   const [routing, archive] = await Promise.all([
     reconcileOverdueRouting(workspaceId, options),
     applyAutoArchive(workspaceId, options),
