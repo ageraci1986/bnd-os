@@ -33,6 +33,12 @@ export interface MarkdownEditorProps {
    * A ref is used internally to avoid stale-closure issues.
    */
   readonly onChange?: (markdown: string) => void;
+  /**
+   * Visual variant. `comment` (default) is the compact chat-input look;
+   * `description` is a roomier "note/document" surface so the two editors
+   * read as distinct UI even though they share the same engine.
+   */
+  readonly variant?: 'comment' | 'description';
 }
 
 /** Read the editor document back as Markdown (tiptap-markdown storage API). */
@@ -48,7 +54,16 @@ function toMarkdown(editor: Editor | null): string {
 
 export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
   function MarkdownEditor(
-    { name, defaultValue, placeholder, disabled, ariaLabel, onSubmitShortcut, onChange },
+    {
+      name,
+      defaultValue,
+      placeholder,
+      disabled,
+      ariaLabel,
+      onSubmitShortcut,
+      onChange,
+      variant = 'comment',
+    },
     ref,
   ) {
     // Keep a React state copy of the Markdown so the hidden input is always
@@ -133,7 +148,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
     };
 
     return (
-      <div className="nx-comment-editor">
+      <div className={`nx-comment-editor nx-comment-editor--${variant}`}>
         <div className="nx-comment-editor__toolbar" role="toolbar" aria-label="Mise en forme">
           <button
             type="button"

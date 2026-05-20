@@ -14,6 +14,7 @@ export function CardDescriptionInput({ cardId, initial, disabled }: CardDescript
 
   return (
     <MarkdownEditor
+      variant="description"
       defaultValue={initial}
       placeholder="Notes, brief, contraintes…"
       ariaLabel="Description de la carte"

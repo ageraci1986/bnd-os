@@ -2510,6 +2510,40 @@
   background: rgba(139, 43, 226, 0.14);
   color: var(--accent-primary);
 }
+
+/* ---- Description variant -------------------------------------------------
+   Roomier "note / brief" surface, visually distinct from the compact
+   comment chat-input: the wrapper carries the border + a brand left-accent
+   + a faint tint; the toolbar is borderless with just a divider. */
+.nx-comment-editor--description {
+  border: 1px solid var(--border-light);
+  border-left: 3px solid #8b2be2;
+  border-radius: 10px;
+  background: rgba(139, 43, 226, 0.025);
+  overflow: hidden;
+}
+.nx-comment-editor--description .nx-comment-editor__toolbar {
+  border: 0;
+  border-bottom: 1px solid var(--border-light);
+  border-radius: 0;
+  background: transparent;
+}
+.nx-comment-editor--description .nx-comment-editor__surface {
+  min-height: 140px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.nx-comment-editor--description:focus-within {
+  border-color: #8b2be2;
+  box-shadow: 0 0 0 3px rgba(139, 43, 226, 0.12);
+}
+/* The wrapper owns the focus ring for this variant — suppress the surface's. */
+.nx-comment-editor--description:focus-within .nx-comment-editor__surface {
+  border-color: transparent;
+  box-shadow: none;
+}
+
 .nx-comment__content u {
   text-decoration: underline;
 }
