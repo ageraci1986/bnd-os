@@ -47,6 +47,7 @@ export interface CardModalProps {
     readonly description: string | null;
     readonly dueDate: string | null;
     readonly shortRef: number;
+    readonly position: number | null;
     readonly columnId: string;
     readonly columnName: string;
     readonly columnIsBlocked: boolean;
@@ -173,7 +174,7 @@ export function CardModal({
                 <span>/</span>
                 <span>{projectName}</span>
                 <span>/</span>
-                <strong>Carte #{String(card.shortRef).padStart(3, '0')}</strong>
+                <strong>Carte #{card.position ?? '…'}</strong>
               </div>
               <CardTitleInput
                 cardId={card.id}

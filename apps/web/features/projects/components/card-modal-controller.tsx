@@ -18,6 +18,10 @@ export interface OpenCardEventDetail {
   readonly title: string;
   readonly shortRef: number;
   readonly categoryTag: string | null;
+  /** 1-based rank of the card within its column, as displayed on the board/
+   *  list at click time. Lets the modal header show the position instantly,
+   *  before the full detail (which also carries it) has loaded. */
+  readonly position?: number;
   /** When true, the title input autoselects on open (new-card flow). */
   readonly isNew?: boolean;
 }
@@ -285,6 +289,7 @@ export function CardModalController({
       description: null,
       dueDate: null,
       shortRef: state.skeleton?.shortRef ?? 0,
+      position: state.skeleton?.position ?? null,
       columnId: '',
       columnName: '',
       columnIsBlocked: false,

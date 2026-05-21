@@ -220,11 +220,18 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
 
   // Compute the next user column for the auto-advance bandeau message.
   let nextColumnName: string | null = null;
+  let openCardPosition: number | null = null;
   if (openCard) {
     const userCols = project.columns.filter((c) => !c.isBlockedSystem);
     const idx = userCols.findIndex((c) => c.name === openCard.column.name);
     nextColumnName =
       idx >= 0 && idx < userCols.length - 1 ? (userCols[idx + 1]?.name ?? null) : null;
+    // 1-based rank within the column, matching the board badge. `cards` is
+    // already ordered by position; filter to the open card's column.
+    const rankIdx = project.cards
+      .filter((c) => c.columnId === openCard.columnId)
+      .findIndex((c) => c.id === openCard.id);
+    openCardPosition = rankIdx >= 0 ? rankIdx + 1 : null;
   }
 
   return (
@@ -332,6 +339,7 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
                 description: openCard.description,
                 dueDate: openCard.dueDate ? openCard.dueDate.toISOString() : null,
                 shortRef: openCard.shortRef,
+                position: openCardPosition,
                 columnId: openCard.columnId,
                 columnName: openCard.column.name,
                 columnIsBlocked: openCard.column.isBlockedSystem,

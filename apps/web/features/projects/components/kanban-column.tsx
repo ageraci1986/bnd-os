@@ -115,10 +115,11 @@ export function KanbanColumn({
 
       <div ref={setNodeRef} className={cardsCls}>
         <SortableContext items={cards.map((c) => c.id)} strategy={verticalListSortingStrategy}>
-          {cards.map((card) => (
+          {cards.map((card, index) => (
             <KanbanCard
               key={card.id}
               card={card}
+              position={index + 1}
               blocked={column.isBlockedSystem}
               cannotAdvance={column.isBlockedSystem || isLastUserColumn === true}
               csrfToken={csrfToken}

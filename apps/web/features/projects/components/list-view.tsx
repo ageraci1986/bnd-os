@@ -83,7 +83,7 @@ const COLUMN_TRACKS: Record<ListViewFieldId, string> = {
 };
 const COLUMN_LABELS: Record<ListViewFieldId, string> = {
   column: 'Colonne',
-  shortRef: 'Réf.',
+  shortRef: 'Pos.',
   category: 'Catégorie',
   dueDate: 'Échéance',
   assignees: 'Assignés',
@@ -199,6 +199,17 @@ export function ListView({
     // `position asc`, which is `localCards`'s natural order).
     return 0;
   });
+
+  // 1-based rank of each card within its column (the "Pos." badge). Built by
+  // walking the ordered list — recomputed on every reorder, so the number
+  // tracks drag & drop. Mirrors the Kanban board badge.
+  const positionByCard = new Map<string, number>();
+  const perColumnCounter = new Map<string, number>();
+  for (const c of orderedCards) {
+    const next = (perColumnCounter.get(c.columnId) ?? 0) + 1;
+    perColumnCounter.set(c.columnId, next);
+    positionByCard.set(c.id, next);
+  }
 
   // Cards in the last user column have no destination to skip to. Cards
   // in the system "Bloqué" column shouldn't be advanced via shortcut —
@@ -347,6 +358,7 @@ export function ListView({
                     <ListRow
                       key={card.id}
                       card={card}
+                      position={positionByCard.get(card.id) ?? 0}
                       csrfToken={csrfToken}
                       selected={selected}
                       gridTemplate={gridTemplate}
@@ -382,6 +394,7 @@ export function ListView({
 
 function ListRow({
   card,
+  position,
   csrfToken,
   selected,
   gridTemplate,
@@ -390,6 +403,8 @@ function ListRow({
   isReadOnly,
 }: {
   card: ListViewCard;
+  /** 1-based rank within the column (the "Pos." cell). */
+  position: number;
   csrfToken: string;
   selected: readonly ListViewFieldId[];
   gridTemplate: string;
@@ -414,6 +429,7 @@ function ListRow({
       title: card.title,
       shortRef: card.shortRef,
       categoryTag: card.categoryTag,
+      position,
     };
     window.dispatchEvent(new CustomEvent(OPEN_CARD_EVENT, { detail }));
   };
@@ -475,7 +491,7 @@ function ListRow({
       </div>
 
       {selected.map((id) => (
-        <FieldCell key={id} field={id} card={card} />
+        <FieldCell key={id} field={id} card={card} position={position} />
       ))}
 
       {!isReadOnly ? (
@@ -492,7 +508,15 @@ function ListRow({
   );
 }
 
-function FieldCell({ field, card }: { field: ListViewFieldId; card: ListViewCard }) {
+function FieldCell({
+  field,
+  card,
+  position,
+}: {
+  field: ListViewFieldId;
+  card: ListViewCard;
+  position: number;
+}) {
   switch (field) {
     case 'column':
       return (
@@ -509,7 +533,7 @@ function FieldCell({ field, card }: { field: ListViewFieldId; card: ListViewCard
     case 'shortRef':
       return (
         <span className="text-[10px] font-bold uppercase tracking-wider text-[color:var(--color-text-muted)]">
-          #{String(card.shortRef).padStart(3, '0')}
+          #{position}
         </span>
       );
     case 'category':

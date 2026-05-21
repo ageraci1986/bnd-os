@@ -34,6 +34,9 @@ export interface KanbanCardProps {
   /** When true, the card sits in the last user column → render as "done"
    *  (filled check + struck title), mirroring the list view. */
   readonly isLastUserColumn?: boolean;
+  /** 1-based rank of the card within its column (recomputed by the board on
+   *  every reorder). Replaces the immutable shortRef in the card badge. */
+  readonly position?: number;
 }
 
 /**
@@ -47,6 +50,7 @@ export function KanbanCard({
   csrfToken,
   isReadOnly = false,
   isLastUserColumn = false,
+  position,
 }: KanbanCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: card.id,
@@ -75,6 +79,7 @@ export function KanbanCard({
       title: card.title,
       shortRef: card.shortRef,
       categoryTag: card.categoryTag,
+      ...(position !== undefined ? { position } : {}),
     };
     window.dispatchEvent(new CustomEvent(OPEN_CARD_EVENT, { detail }));
   };
@@ -151,7 +156,7 @@ export function KanbanCard({
         className="kcard-ref"
         style={csrfToken && !categoryLabel ? { paddingLeft: 26 } : undefined}
       >
-        #{String(card.shortRef).padStart(3, '0')}
+        #{position ?? '—'}
       </div>
       <div
         className={['kcard-title', isLastUserColumn && 'kcard-title--done']

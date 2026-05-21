@@ -282,6 +282,10 @@ export function KanbanBoard({
         {activeCard ? (
           <KanbanCard
             card={activeCard}
+            position={
+              (cardsByColumn.get(activeCard.columnId)?.findIndex((c) => c.id === activeCard.id) ??
+                -1) + 1
+            }
             isReadOnly={isReadOnly}
             isLastUserColumn={activeCard.columnId === lastUserColumnId}
           />

@@ -17,6 +17,8 @@ export interface CardModalData {
   readonly description: string | null;
   readonly dueDate: string | null;
   readonly shortRef: number;
+  /** 1-based rank of the card within its column (null if unknown). */
+  readonly position: number | null;
   readonly categoryTag: string | null;
   readonly columnName: string;
   readonly columnIsBlocked: boolean;
@@ -107,10 +109,12 @@ export async function getCardModalData(input: {
     if (!allowed) return { ok: false, message: SCOPE_ERROR_MESSAGE };
   }
 
-  // Authorization has passed — fetch the remaining two payloads in
-  // parallel. The columns lookup feeds the auto-advance bandeau hint
-  // (PRD §8.2, system "Bloqué" excluded); comments feed the thread.
-  const [columns, comments] = await Promise.all([
+  // Authorization has passed — fetch the remaining payloads in parallel.
+  // The columns lookup feeds the auto-advance bandeau hint (PRD §8.2, system
+  // "Bloqué" excluded); comments feed the thread; columnCards gives the
+  // card's 1-based rank in its column (the position badge). All three run
+  // together, so this adds no extra round-trip latency.
+  const [columns, comments, columnCards] = await Promise.all([
     prisma.column.findMany({
       where: { projectId: card.projectId },
       orderBy: { position: 'asc' },
@@ -121,11 +125,18 @@ export async function getCardModalData(input: {
       currentUserId: ctx.userId,
       currentRole: ctx.role,
     }),
+    prisma.card.findMany({
+      where: { columnId: card.columnId, deletedAt: null },
+      orderBy: { position: 'asc' },
+      select: { id: true },
+    }),
   ]);
   const userCols = columns.filter((c) => !c.isBlockedSystem);
   const idx = userCols.findIndex((c) => c.name === card.column.name);
   const nextColumnName =
     idx >= 0 && idx < userCols.length - 1 ? (userCols[idx + 1]?.name ?? null) : null;
+  const rankIdx = columnCards.findIndex((c) => c.id === card.id);
+  const position = rankIdx >= 0 ? rankIdx + 1 : null;
 
   const fieldValues =
     card.fieldValues && typeof card.fieldValues === 'object' && !Array.isArray(card.fieldValues)
@@ -146,6 +157,7 @@ export async function getCardModalData(input: {
       description: card.description,
       dueDate: card.dueDate ? card.dueDate.toISOString() : null,
       shortRef: card.shortRef,
+      position,
       categoryTag: card.categoryTag,
       columnId: card.columnId,
       columnName: card.column.name,
