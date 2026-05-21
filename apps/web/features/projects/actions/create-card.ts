@@ -27,8 +27,10 @@ export async function createCard(
   _prev: CreateCardState,
   formData: FormData,
 ): Promise<CreateCardState> {
+  const __ct0 = performance.now(); // TEMP-PERF
   await assertCsrfFromFormData(formData);
   const ctx = await requireUser();
+  const __ctAuth = performance.now(); // TEMP-PERF
   if (ctx.role === Roles.Viewer) {
     return { status: 'error', message: VIEWER_READ_ONLY_MESSAGE };
   }
@@ -175,6 +177,12 @@ export async function createCard(
   // No revalidatePath: the client appends the new card to the board
   // optimistically (nx:card-created event) and opens the modal directly
   // — a full route re-render here would only delay the action response.
+  // TEMP-PERF
+  console.warn(
+    `[perf] createCard auth=${Math.round(__ctAuth - __ct0)} rest=${Math.round(
+      performance.now() - __ctAuth,
+    )} total=${Math.round(performance.now() - __ct0)}ms`,
+  );
   return {
     status: 'success',
     cardId: created.id,

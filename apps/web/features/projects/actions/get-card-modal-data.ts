@@ -53,7 +53,9 @@ export interface CardModalData {
 export async function getCardModalData(input: {
   cardId: string;
 }): Promise<{ ok: true; data: CardModalData } | { ok: false; message: string }> {
+  const __gt0 = performance.now(); // TEMP-PERF
   const ctx = await requireUser();
+  const __gtAuth = performance.now(); // TEMP-PERF
   const parsed = Schema.safeParse(input);
   if (!parsed.success) return { ok: false, message: 'Identifiant carte invalide.' };
 
@@ -129,6 +131,13 @@ export async function getCardModalData(input: {
     currentUserId: ctx.userId,
     currentRole: ctx.role,
   });
+
+  // TEMP-PERF
+  console.warn(
+    `[perf] getCardModalData auth=${Math.round(__gtAuth - __gt0)} queries=${Math.round(
+      performance.now() - __gtAuth,
+    )} total=${Math.round(performance.now() - __gt0)}ms`,
+  );
 
   return {
     ok: true,

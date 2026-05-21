@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { CardModal } from './card-modal';
 import { getCardModalData, type CardModalData } from '../actions/get-card-modal-data';
 import type { WorkspaceMemberOption, CardAssignment } from './assignees-side';
@@ -120,6 +120,7 @@ export function CardModalController({
   isReadOnly = false,
 }: CardModalControllerProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const [state, setState] = useState<ModalState | null>(
     initialCard
       ? { id: initialCard.id, skeleton: null, data: initialCard, isNew: initialIsNew }
@@ -192,7 +193,14 @@ export function CardModalController({
   const close = useCallback(() => {
     setState(null);
     syncUrl(null);
-  }, [syncUrl]);
+    // Modal edits (title, category, due date, assignees, checklist) are
+    // optimistic INSIDE the modal but the board/list rows don't know about
+    // them — the per-mutation revalidate was removed for latency. Refresh
+    // once, on close, to reconcile the board with what was edited. This is
+    // now cheap (local-verify auth, throttled reconcile, parallel queries)
+    // and runs in the background — the modal has already closed.
+    router.refresh();
+  }, [syncUrl, router]);
 
   useEffect(() => {
     const onOpen = (e: Event) => {

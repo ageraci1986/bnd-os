@@ -35,7 +35,9 @@ function readParam(value: string | string[] | undefined): string | null {
 }
 
 export default async function ProjectPage({ params, searchParams }: ProjectPageProps) {
+  const __pt0 = performance.now(); // TEMP-PERF
   const ctx = await requireUser();
+  const __ptAuth = performance.now(); // TEMP-PERF
   const { id } = await params;
   const sp = (await searchParams) ?? {};
   const openCardId = readParam(sp['card']);
@@ -52,6 +54,7 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
   // rendering the board so the user always sees up-to-date state without
   // a background cron.
   await reconcileBeforeRead(ctx.workspaceId, { projectIds: [id] });
+  const __ptReconcile = performance.now(); // TEMP-PERF
 
   // Single Promise.all so the modal data fetch doesn't sequentially block
   // the rest of the page (this used to add a visible delay on open/close).
@@ -165,6 +168,14 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
       },
     }),
   ]);
+  // TEMP-PERF: breakdown of the project page server render.
+  console.warn(
+    `[perf] ProjectPage auth=${Math.round(__ptAuth - __pt0)} scope+reconcile=${Math.round(
+      __ptReconcile - __ptAuth,
+    )} queries=${Math.round(performance.now() - __ptReconcile)} total=${Math.round(
+      performance.now() - __pt0,
+    )}ms openCard=${openCardId ? 'yes' : 'no'}`,
+  );
   if (!project) notFound();
 
   if (scope.kind === 'restricted') {
