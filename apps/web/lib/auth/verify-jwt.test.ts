@@ -1,11 +1,14 @@
 // @vitest-environment node
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { SignJWT } from 'jose';
+import { SignJWT, generateKeyPair, exportJWK } from 'jose';
 
 const TEST_SECRET = 'test-secret-at-least-32-bytes-long-xxxxx';
 
+// Mutable holder so the ES256 test can inject a public JWKS into the mocked env.
+const envHolder = vi.hoisted(() => ({ jwks: undefined as string | undefined }));
+
 vi.mock('../env', () => ({
-  getServerEnv: () => ({ SUPABASE_JWT_SECRET: TEST_SECRET }),
+  getServerEnv: () => ({ SUPABASE_JWT_SECRET: TEST_SECRET, SUPABASE_JWKS: envHolder.jwks }),
   getPublicEnv: () => ({ NEXT_PUBLIC_SUPABASE_URL: 'https://example.supabase.co' }),
 }));
 
@@ -71,5 +74,24 @@ describe('verifyAccessToken', () => {
       .setExpirationTime(now + 3600)
       .sign(key);
     expect(await verifyAccessToken(token)).toEqual({ sub: 'abc', email: null });
+  });
+
+  it('verifies an ES256 token LOCALLY via SUPABASE_JWKS (zero network)', async () => {
+    const { publicKey, privateKey } = await generateKeyPair('ES256', { extractable: true });
+    const pubJwk = await exportJWK(publicKey);
+    pubJwk.kid = 'test-kid';
+    pubJwk.alg = 'ES256';
+    pubJwk.use = 'sig';
+    envHolder.jwks = JSON.stringify({ keys: [pubJwk] });
+
+    const now = Math.floor(Date.now() / 1000);
+    const token = await new SignJWT({ email: 'es@test' })
+      .setProtectedHeader({ alg: 'ES256', kid: 'test-kid' })
+      .setSubject('es-user')
+      .setIssuedAt(now)
+      .setExpirationTime(now + 3600)
+      .sign(privateKey);
+
+    expect(await verifyAccessToken(token)).toEqual({ sub: 'es-user', email: 'es@test' });
   });
 });
