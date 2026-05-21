@@ -1,6 +1,5 @@
 'use client';
 import { useState, useTransition } from 'react';
-import { useRouter } from 'next/navigation';
 import { skipCardToNextColumn } from '../actions/skip-card-to-next-column';
 import { CARD_ADVANCED_EVENT, type CardAdvancedEventDetail } from './card-modal-controller';
 
@@ -18,7 +17,6 @@ export interface CardAdvanceCheckboxProps {
  * board, list view) can move the row optimistically.
  */
 export function CardAdvanceCheckbox({ cardId, disabled }: CardAdvanceCheckboxProps) {
-  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [done, setDone] = useState(false);
 
@@ -36,7 +34,6 @@ export function CardAdvanceCheckbox({ cardId, disabled }: CardAdvanceCheckboxPro
           newColumnId: result.newColumnId,
         };
         window.dispatchEvent(new CustomEvent(CARD_ADVANCED_EVENT, { detail }));
-        router.refresh();
       } else {
         setDone(false);
       }

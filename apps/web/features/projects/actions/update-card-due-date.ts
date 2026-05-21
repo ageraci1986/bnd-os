@@ -1,6 +1,5 @@
 'use server';
 import 'server-only';
-import { revalidatePath } from 'next/cache';
 import { prisma } from '@nexushub/db';
 import {
   NotFoundError,
@@ -92,7 +91,6 @@ export async function updateCardDueDate(input: {
   const blockedColumn = columns.find((c) => c.isBlockedSystem);
   const currentColumn = columns.find((c) => c.id === card.columnId);
   if (!blockedColumn || !currentColumn) {
-    revalidatePath(`/projects/${card.projectId}`);
     return {
       ok: true,
       autoBlocked: false,
@@ -166,7 +164,6 @@ export async function updateCardDueDate(input: {
     autoBlocked = true;
   }
 
-  revalidatePath(`/projects/${card.projectId}`);
   return {
     ok: true,
     autoBlocked,

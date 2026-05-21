@@ -7,7 +7,6 @@ const {
   columnFindMany,
   workspaceAccessFindMany,
   requireUserMock,
-  revalidatePathMock,
 } = vi.hoisted(() => ({
   cardFindFirst: vi.fn(),
   cardUpdate: vi.fn(),
@@ -15,7 +14,6 @@ const {
   columnFindMany: vi.fn(),
   workspaceAccessFindMany: vi.fn(),
   requireUserMock: vi.fn(),
-  revalidatePathMock: vi.fn(),
 }));
 
 vi.mock('@nexushub/db', () => ({
@@ -26,7 +24,6 @@ vi.mock('@nexushub/db', () => ({
   },
 }));
 vi.mock('@/lib/auth', () => ({ requireUser: requireUserMock }));
-vi.mock('next/cache', () => ({ revalidatePath: revalidatePathMock }));
 
 import { updateCardDueDate } from './update-card-due-date';
 
@@ -50,7 +47,6 @@ beforeEach(() => {
   columnFindMany.mockReset();
   workspaceAccessFindMany.mockReset();
   requireUserMock.mockReset();
-  revalidatePathMock.mockReset();
 
   requireUserMock.mockResolvedValue({
     userId: 'u1',

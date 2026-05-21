@@ -31,6 +31,10 @@ const ServerEnvSchema = z.object({
   // Supabase — server-side only
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(20),
   SUPABASE_JWT_SECRET: z.string().min(20),
+  // Public JWKS (verify-only ES256 keys) for zero-network local JWT
+  // verification. NOT a secret — published at <supabase>/auth/v1/.well-known/jwks.json.
+  // Optional: when absent, verification falls back to fetching the JWKS.
+  SUPABASE_JWKS: z.string().optional(),
   DATABASE_URL: z.string().url(),
   DIRECT_URL: z.string().url(),
 

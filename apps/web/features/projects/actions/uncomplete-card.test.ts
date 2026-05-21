@@ -7,7 +7,6 @@ const mocks = vi.hoisted(() => ({
   cardFindMany: vi.fn(),
   columnFindMany: vi.fn(),
   workspaceAccessFindMany: vi.fn(),
-  revalidatePath: vi.fn(),
 }));
 
 vi.mock('@nexushub/db', () => ({
@@ -22,7 +21,6 @@ vi.mock('@nexushub/db', () => ({
   },
 }));
 vi.mock('@/lib/auth', () => ({ requireUser: mocks.requireUser }));
-vi.mock('next/cache', () => ({ revalidatePath: mocks.revalidatePath }));
 
 import { uncompleteCard } from './uncomplete-card';
 

@@ -1,6 +1,5 @@
 'use server';
 import 'server-only';
-import { revalidatePath } from 'next/cache';
 import { prisma } from '@nexushub/db';
 import { requireUser } from '@/lib/auth';
 import { assertCsrfFromFormData } from '@/lib/csrf';
@@ -57,9 +56,6 @@ export async function updateComment(
     where: { id: commentId },
     data: { body },
   });
-
-  revalidatePath(`/projects/${comment.card.projectId}`);
-  revalidatePath(`/projects/${comment.card.projectId}/list`);
 
   return { status: 'success', commentId };
 }

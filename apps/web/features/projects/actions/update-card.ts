@@ -1,6 +1,5 @@
 'use server';
 import 'server-only';
-import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { prisma } from '@nexushub/db';
 import { NotFoundError, Roles } from '@nexushub/domain';
@@ -75,6 +74,5 @@ export async function updateCard(input: {
     await prisma.card.update({ where: { id: card.id }, data });
   }
 
-  revalidatePath(`/projects/${card.projectId}`);
   return { ok: true };
 }

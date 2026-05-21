@@ -25,6 +25,12 @@ import { updateCardDueDate } from '../actions/update-card-due-date';
 import { deleteCard } from '../actions/delete-card';
 import { CSRF_FIELD_NAME } from '@/lib/csrf/field';
 import { CardCommentsThread } from './card-comments-thread';
+import { CARD_UPDATED_EVENT, type CardUpdatedEventDetail } from './card-modal-controller';
+
+/** Patch the board/list row for a card after a board-visible modal edit. */
+function emitCardUpdated(detail: CardUpdatedEventDetail): void {
+  window.dispatchEvent(new CustomEvent(CARD_UPDATED_EVENT, { detail }));
+}
 import type { CardCommentDTO } from '../lib/comment-dto';
 
 export interface CardModalProps {
@@ -171,7 +177,7 @@ export function CardModal({
               </div>
               <CardTitleInput cardId={card.id} initial={card.title} autoSelect={isNew} />
               {card.columnIsBlocked ? (
-                <BlockedBanner cardId={card.id} dueDate={card.dueDate} />
+                <BlockedBanner cardId={card.id} dueDate={card.dueDate} onAfterUpdate={close} />
               ) : null}
               {allChecked && !isReadOnly ? (
                 <AutoAdvanceBanner
@@ -481,6 +487,9 @@ function CardTitleInput({
 
   const flush = useCallback(
     (next: string) => {
+      // Patch the board/list row immediately (optimistic) so the new title
+      // shows without a refetch; the save runs in the background.
+      emitCardUpdated({ id: cardId, title: next });
       void updateCard({ cardId, title: next }).catch(() => {
         // best-effort; the next save will overwrite
       });
@@ -521,7 +530,6 @@ function DueDateInput({
   initial: string | null;
   onAfterUpdate: () => void;
 }) {
-  const router = useRouter();
   const [value, setValue] = useState(initial ? initial.slice(0, 10) : '');
   const [pending, startTransition] = useTransition();
 
@@ -538,9 +546,9 @@ function DueDateInput({
       } else if (res.autoUnblocked) {
         window.alert('La carte est sortie de Bloqué.');
         onAfterUpdate();
-      } else {
-        router.refresh();
       }
+      // No router.refresh(): the date value is already in local state via
+      // setValue. If autoBlocked/autoUnblocked, the modal closes above.
     });
   };
 
@@ -704,6 +712,7 @@ function CategorySelector({
   const pick = (next: string | null) => {
     const previous = active;
     setActive(next);
+    emitCardUpdated({ id: cardId, categoryTag: next });
     void updateCard({ cardId, categoryTag: next }).catch(() => setActive(previous));
   };
 
@@ -718,6 +727,7 @@ function CategorySelector({
     }
     setAdding(false);
     setDraft('');
+    emitCardUpdated({ id: cardId, categoryTag: trimmed });
     void updateCard({ cardId, categoryTag: trimmed }).catch(() => setActive(previous));
   };
 
@@ -868,8 +878,15 @@ function AutoAdvanceBanner({
 
 // ---------- Blocked banner (PRD §10 #4) -----------------------------------
 
-function BlockedBanner({ cardId, dueDate }: { cardId: string; dueDate: string | null }) {
-  const router = useRouter();
+function BlockedBanner({
+  cardId,
+  dueDate,
+  onAfterUpdate,
+}: {
+  cardId: string;
+  dueDate: string | null;
+  onAfterUpdate: () => void;
+}) {
   const [pending, startTransition] = useTransition();
   return (
     <div className="blocked-banner" role="alert">
@@ -887,7 +904,10 @@ function BlockedBanner({ cardId, dueDate }: { cardId: string; dueDate: string | 
           if (next === null) return;
           startTransition(async () => {
             await updateCardDueDate({ cardId, dueDate: next.trim() || null });
-            router.refresh();
+            // Close the modal so the user sees the updated board state on
+            // reopen. Avoids router.refresh() in favour of the existing close
+            // flow (same as DueDateInput's onAfterUpdate path).
+            onAfterUpdate();
           });
         }}
       >

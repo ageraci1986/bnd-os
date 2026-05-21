@@ -1,5 +1,6 @@
 'use server';
 import 'server-only';
+import { revalidatePath } from 'next/cache';
 import { prisma } from '@nexushub/db';
 import {
   NotFoundError,
@@ -172,9 +173,12 @@ export async function createCard(
     return card;
   });
 
-  // No revalidatePath: the client appends the new card to the board
-  // optimistically (nx:card-created event) and opens the modal directly
-  // — a full route re-render here would only delay the action response.
+  // Revalidate so the board reliably shows the new card. Create is a
+  // low-frequency action (not per-keystroke), so a single refetch here is
+  // fine and covers cases the optimistic `nx:card-created` append misses.
+  // The title the user then types is patched live via CARD_UPDATED.
+  revalidatePath(`/projects/${projectId}`);
+  revalidatePath(`/projects/${projectId}/list`);
   return {
     status: 'success',
     cardId: created.id,

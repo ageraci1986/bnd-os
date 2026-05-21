@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   requireUser: vi.fn(),
+  requireUserVerified: vi.fn(),
   projectFindFirst: vi.fn(),
   projectUpdate: vi.fn(),
   workspaceAccessFindMany: vi.fn(),
@@ -17,7 +18,10 @@ vi.mock('@nexushub/db', () => ({
     workspaceAccess: { findMany: mocks.workspaceAccessFindMany },
   },
 }));
-vi.mock('@/lib/auth', () => ({ requireUser: mocks.requireUser }));
+vi.mock('@/lib/auth', () => ({
+  requireUser: mocks.requireUser,
+  requireUserVerified: mocks.requireUserVerified,
+}));
 vi.mock('next/cache', () => ({ revalidatePath: mocks.revalidatePath }));
 vi.mock('next/navigation', () => ({ redirect: mocks.redirect }));
 
@@ -35,7 +39,7 @@ beforeEach(() => {
 
 describe('deleteProject', () => {
   it('refuses when the actor is a Viewer (even with scope access)', async () => {
-    mocks.requireUser.mockResolvedValue({
+    mocks.requireUserVerified.mockResolvedValue({
       userId: 'viewer-1',
       workspaceId: 'ws-1',
       role: 'viewer',
@@ -49,7 +53,7 @@ describe('deleteProject', () => {
   });
 
   it('Admin can soft-delete the project', async () => {
-    mocks.requireUser.mockResolvedValue({
+    mocks.requireUserVerified.mockResolvedValue({
       userId: 'admin-1',
       workspaceId: 'ws-1',
       role: 'admin',

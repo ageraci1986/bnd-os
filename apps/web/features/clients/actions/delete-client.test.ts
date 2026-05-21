@@ -6,6 +6,7 @@ const {
   contactUpdateMany,
   prismaTransaction,
   requireUserMock,
+  requireUserVerifiedMock,
   assertCsrfMock,
   recordAuditMock,
   redirectMock,
@@ -18,6 +19,7 @@ const {
   contactUpdateMany: vi.fn(),
   prismaTransaction: vi.fn(),
   requireUserMock: vi.fn(),
+  requireUserVerifiedMock: vi.fn(),
   assertCsrfMock: vi.fn(),
   recordAuditMock: vi.fn(),
   redirectMock: vi.fn(() => {
@@ -35,7 +37,10 @@ vi.mock('@nexushub/db', () => ({
     $transaction: prismaTransaction,
   },
 }));
-vi.mock('@/lib/auth', () => ({ requireUser: requireUserMock }));
+vi.mock('@/lib/auth', () => ({
+  requireUser: requireUserMock,
+  requireUserVerified: requireUserVerifiedMock,
+}));
 vi.mock('@/lib/csrf', () => ({ assertCsrfFromFormData: assertCsrfMock }));
 vi.mock('@/lib/audit', () => ({ recordAudit: recordAuditMock }));
 vi.mock('@/lib/rate-limit', () => ({ getClientIp: clientIpMock }));
@@ -53,6 +58,7 @@ beforeEach(() => {
   contactUpdateMany.mockReset();
   prismaTransaction.mockReset();
   requireUserMock.mockReset();
+  requireUserVerifiedMock.mockReset();
   assertCsrfMock.mockReset();
   recordAuditMock.mockReset();
   redirectMock.mockClear();
@@ -61,6 +67,12 @@ beforeEach(() => {
   revalidatePathMock.mockReset();
 
   requireUserMock.mockResolvedValue({
+    userId: 'user-1',
+    workspaceId: 'ws-1',
+    role: 'admin',
+    isSuperAdmin: false,
+  });
+  requireUserVerifiedMock.mockResolvedValue({
     userId: 'user-1',
     workspaceId: 'ws-1',
     role: 'admin',

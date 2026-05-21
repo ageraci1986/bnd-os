@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { prisma } from '@nexushub/db';
 import { NotFoundError, Roles } from '@nexushub/domain';
-import { requireUser } from '@/lib/auth';
+import { requireUserVerified } from '@/lib/auth';
 import { loadUserScope } from '@/lib/auth/scope';
 import { SCOPE_ERROR_MESSAGE } from '../lib/scope-error';
 
@@ -22,7 +22,7 @@ const Schema = z.object({
 export async function deleteProject(input: {
   projectId: string;
 }): Promise<{ ok: true } | { ok: false; message: string }> {
-  const ctx = await requireUser();
+  const ctx = await requireUserVerified();
   if (ctx.role === Roles.Viewer) {
     return { ok: false, message: 'Action réservée aux Admins et Users.' };
   }

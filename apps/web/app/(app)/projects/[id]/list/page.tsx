@@ -32,9 +32,13 @@ export default async function ProjectListPage({ params, searchParams }: ProjectL
   const filter = parseProjectCardFilter(sp);
   const filterClauses = buildCardFilterClauses(filter);
 
-  await reconcileBeforeRead(ctx.workspaceId, { projectIds: [id] });
-
-  const scope = await loadUserScope(ctx);
+  // Scope and reconcile are independent — run them together (reconcile is
+  // throttled per-workspace, so it's usually a no-op). Scope is needed by
+  // both listCustomCategories and the post-fetch access check.
+  const [scope] = await Promise.all([
+    loadUserScope(ctx),
+    reconcileBeforeRead(ctx.workspaceId, { projectIds: [id] }),
+  ]);
 
   const [csrf, workspace, project, customCategories, workspaceMembers, availableTemplates] =
     await Promise.all([

@@ -5,7 +5,7 @@ import { headers } from 'next/headers';
 import { z } from 'zod';
 import { prisma } from '@nexushub/db';
 import { Roles } from '@nexushub/domain';
-import { requireAdmin } from '@/lib/auth';
+import { requireAdmin, requireUserVerified } from '@/lib/auth';
 import { assertCsrfFromFormData } from '@/lib/csrf';
 import { recordAudit } from '@/lib/audit';
 import { getClientIp } from '@/lib/rate-limit';
@@ -26,6 +26,7 @@ export async function changeMemberRole(
 ): Promise<ChangeRoleState> {
   await assertCsrfFromFormData(formData);
   const ctx = await requireAdmin();
+  await requireUserVerified();
 
   const parsed = Schema.safeParse({
     membershipId: formData.get('membershipId'),

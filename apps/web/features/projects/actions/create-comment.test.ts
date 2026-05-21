@@ -9,7 +9,6 @@ const mocks = vi.hoisted(() => ({
   userFindUnique: vi.fn(),
   loadUserScope: vi.fn(),
   emailSend: vi.fn(),
-  revalidatePath: vi.fn(),
   assertCsrf: vi.fn(),
 }));
 
@@ -28,8 +27,6 @@ vi.mock('@/lib/email', () => ({ getEmail: () => ({ send: mocks.emailSend }) }));
 vi.mock('@/lib/env', () => ({
   getPublicEnv: () => ({ NEXT_PUBLIC_APP_URL: 'https://nexushub.test' }),
 }));
-vi.mock('next/cache', () => ({ revalidatePath: mocks.revalidatePath }));
-
 import { createComment } from './create-comment';
 
 const CARD = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
@@ -232,11 +229,5 @@ describe('createComment', () => {
     await createComment({ status: 'idle' }, fd('hi'));
     const recipients = mocks.emailSend.mock.calls.map((c) => (c[0] as { to: string }).to);
     expect(recipients).toEqual(['a@test']);
-  });
-
-  it('revalidates the project path', async () => {
-    await createComment({ status: 'idle' }, fd('hi'));
-    expect(mocks.revalidatePath).toHaveBeenCalledWith(`/projects/${PROJECT}`);
-    expect(mocks.revalidatePath).toHaveBeenCalledWith(`/projects/${PROJECT}/list`);
   });
 });

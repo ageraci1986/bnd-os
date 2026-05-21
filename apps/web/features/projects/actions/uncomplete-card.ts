@@ -1,6 +1,5 @@
 'use server';
 import 'server-only';
-import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { prisma } from '@nexushub/db';
 import { NotFoundError, Roles, computeCardPosition } from '@nexushub/domain';
@@ -84,7 +83,5 @@ export async function uncompleteCard(input: { cardId: string }): Promise<Uncompl
     data: { columnId: previousUserCol.id, position },
   });
 
-  revalidatePath(`/projects/${card.projectId}`);
-  revalidatePath(`/projects/${card.projectId}/list`);
   return { ok: true, newColumnId: previousUserCol.id };
 }

@@ -1,6 +1,5 @@
 'use server';
 import 'server-only';
-import { revalidatePath } from 'next/cache';
 import { prisma } from '@nexushub/db';
 import {
   NotFoundError,
@@ -120,7 +119,6 @@ export async function advanceCard(input: { cardId: string }): Promise<AdvanceCar
     },
   });
 
-  revalidatePath(`/projects/${card.projectId}`);
   return { ok: true, moved: true, newColumnId: outcome.nextColumnId };
 }
 
