@@ -25,53 +25,57 @@
 
 Remplace `[TON_MOT_DE_PASSE]` par le mot de passe DB (jamais commité) :
 
-**Session pooler — `5432` (rapide, petite échelle)**
-
-```
-postgresql://postgres.yphedrhofupththvlvoa:[TON_MOT_DE_PASSE]@aws-0-eu-west-1.pooler.supabase.com:5432/postgres?connection_limit=5
-```
-
-**Transaction pooler — `6543` (scalable)**
+**Transaction pooler — `6543` → Vercel / prod / preview (TOUJOURS)**
 
 ```
 postgresql://postgres.yphedrhofupththvlvoa:[TON_MOT_DE_PASSE]@aws-0-eu-west-1.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1
 ```
 
----
+**Session pooler — `5432` → DEV LOCAL UNIQUEMENT (jamais sur Vercel)**
 
-## 2. Quel mode utiliser, et quand basculer
-
-- **Aujourd'hui (≈ 5–20 users, faible concurrence) → `5432`.**
-  Rapide, simple, nombre de connexions négligeable.
-
-- **À grande échelle (dizaines de users concurrents, ~200 inscrits) → `6543`.**
-  Le seul qui tient la charge serverless (Vercel ouvre une connexion par
-  invocation de fonction ; le `5432` épuiserait le plafond Postgres →
-  erreurs « too many connections »).
-
-**Déclencheur concret** : surveiller _Database → Connections_ dans le dashboard
-Supabase. Dès qu'on dépasse ~70–80 % du plafond du plan → basculer sur `6543`.
+```
+postgresql://postgres.yphedrhofupththvlvoa:[TON_MOT_DE_PASSE]@aws-0-eu-west-1.pooler.supabase.com:5432/postgres?connection_limit=5
+```
 
 ---
 
-## 3. Le piège : `6543` est lent SANS co-localisation
+## 2. Quel mode utiliser, et quand
 
-Le surcoût mesuré du transaction pooler (~130 ms/requête) venait surtout de la
-**distance réseau France → eu-west-1** : chaque petit aller-retour interne du
-pooler coûte un RTT. Donc passer en `6543` **sans** réduire le RTT réintroduit
-la lenteur d'origine.
+> 🚨 **Règle d'or : sur Vercel (serverless) → TOUJOURS `6543`, quelle que soit
+> l'échelle.** Le `5432` (session pooler) est réservé au **dev local**.
 
-Pour avoir **vitesse + scalabilité** en `6543`, il faut **co-localiser le
-compute avec la DB** :
+- **Vercel / prod / preview (serverless) → `6543` (+ `pgbouncer=true`).**
+  C'est le seul mode compatible serverless. Le `5432` casse l'app en prod :
+  les fonctions réutilisent les connexions du pooler et Prisma se prend des
+  conflits de prepared statements → erreurs « Invalid prisma invocation »
+  (le `/login` plante et reboucle sur lui-même). Vu en prod le 2026-05-21 en
+  passant à `5432` : login impossible. Retour à `6543` = réparé.
+
+- **Dev local (un seul process long, pas de réutilisation de connexion) →
+  `5432`.** Rapide (pas de désactivation des prepared statements, pas de
+  surcoût `DEALLOCATE`) et sans conflit puisqu'il n'y a qu'une session.
+
+**À grande échelle** : le `6543` tient déjà la charge serverless (connexions
+multiplexées). Surveiller _Database → Connections_ dans Supabase ; si on
+approche du plafond du plan, augmenter le plan Supabase plutôt que changer de
+mode.
+
+---
+
+## 3. Rendre le `6543` rapide : co-localiser compute + DB
+
+Le `6543` est obligatoire sur Vercel (§2), mais il peut être lent. Le surcoût
+mesuré (~130 ms/requête) venait surtout de la **distance réseau
+France → eu-west-1** : chaque petit aller-retour interne du pooler coûte un RTT.
+
+Pour le rendre rapide, **co-localiser le compute avec la DB** :
 
 1. **Vercel Pro** (le plan Hobby ignore la config de région).
 2. Région des fonctions = **eu-west-1** (même région que Supabase).
 
 En co-localisé, le RTT passe de ~40 ms à ~1 ms → le surcoût du pooler devient
-négligeable.
-
-**Donc : ne basculer sur `6543` qu'EN MÊME TEMPS que Vercel Pro + région
-eu-west-1.** Sinon on a la lenteur sans le bénéfice.
+négligeable. **C'est ça le levier de vitesse en prod — pas le passage en
+`5432`** (qui casse le serverless, cf. §2).
 
 ---
 
