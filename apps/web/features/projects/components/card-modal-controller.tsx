@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { CardModal } from './card-modal';
 import { getCardModalData, type CardModalData } from '../actions/get-card-modal-data';
@@ -139,6 +139,11 @@ export function CardModalController({
       ? { id: initialCard.id, skeleton: null, data: initialCard, isNew: initialIsNew }
       : null,
   );
+  // Id of the card the modal currently wants detail for. The detail fetch
+  // (which retries for not-yet-created cards) checks this before each attempt
+  // and bails when superseded — so rapidly creating cards doesn't leave a
+  // pile of overlapping poll loops hammering the server-action queue.
+  const activeCardRef = useRef<string | null>(initialCard ? initialCard.id : null);
 
   // Sync the URL silently — keeps share-links working without triggering RSC.
   const syncUrl = useCallback((cardId: string | null) => {
@@ -159,6 +164,7 @@ export function CardModalController({
 
   const open = useCallback(
     (detail: OpenCardEventDetail) => {
+      activeCardRef.current = detail.id;
       setState({ id: detail.id, skeleton: detail, data: null, isNew: detail.isNew ?? false });
       syncUrl(detail.id);
 
@@ -170,8 +176,12 @@ export function CardModalController({
       const baseDelayMs = detail.isNew ? 150 : 0;
       let attempt = 0;
       const tryFetch = (): void => {
+        // Superseded by a newer open (or a close)? Abandon this loop so we
+        // don't keep firing server actions for a card the user left behind.
+        if (activeCardRef.current !== detail.id) return;
         void getCardModalData({ cardId: detail.id })
           .then((res) => {
+            if (activeCardRef.current !== detail.id) return;
             if (res.ok) {
               setState((prev) =>
                 prev && prev.id === detail.id ? { ...prev, data: res.data } : prev,
@@ -193,8 +203,14 @@ export function CardModalController({
             setTimeout(tryFetch, baseDelayMs * Math.pow(1.5, attempt - 1));
           })
           .catch(() => {
-            setState(null);
-            syncUrl(null);
+            // A transient fetch failure must NOT nuke a new-card modal the
+            // user may already be typing into — the row can still be
+            // materialising (createCard in flight) and a later retry will
+            // load it. Only existing-card opens close on hard failure.
+            if (!detail.isNew) {
+              setState(null);
+              syncUrl(null);
+            }
           });
       };
       if (baseDelayMs === 0) tryFetch();
@@ -204,6 +220,7 @@ export function CardModalController({
   );
 
   const close = useCallback(() => {
+    activeCardRef.current = null;
     setState(null);
     syncUrl(null);
     // No router.refresh() here: it raced with the debounced title save (the

@@ -1,6 +1,5 @@
 'use server';
 import 'server-only';
-import { revalidatePath } from 'next/cache';
 import { prisma } from '@nexushub/db';
 import {
   NotFoundError,
@@ -173,12 +172,14 @@ export async function createCard(
     return card;
   });
 
-  // Revalidate so the board reliably shows the new card. Create is a
-  // low-frequency action (not per-keystroke), so a single refetch here is
-  // fine and covers cases the optimistic `nx:card-created` append misses.
-  // The title the user then types is patched live via CARD_UPDATED.
-  revalidatePath(`/projects/${projectId}`);
-  revalidatePath(`/projects/${projectId}/list`);
+  // Intentionally NO revalidatePath here. The board and list both append
+  // the new row optimistically from the `nx:card-created` event and patch
+  // its shortRef from `nx:card-shortref-resolved`. A server refetch raced
+  // against read-after-write visibility on the pooler: it sometimes
+  // returned a snapshot WITHOUT the just-committed row and clobbered the
+  // optimistic append (card vanished until a manual refresh), and the page
+  // re-render churned the open modal. Optimistic state is the source of
+  // truth until the next natural navigation/refetch.
   return {
     status: 'success',
     cardId: created.id,

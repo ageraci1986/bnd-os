@@ -175,7 +175,12 @@ export function CardModal({
                 <span>/</span>
                 <strong>Carte #{String(card.shortRef).padStart(3, '0')}</strong>
               </div>
-              <CardTitleInput cardId={card.id} initial={card.title} autoSelect={isNew} />
+              <CardTitleInput
+                cardId={card.id}
+                initial={card.title}
+                autoSelect={isNew}
+                canSave={!isNew || !isLoading}
+              />
               {card.columnIsBlocked ? (
                 <BlockedBanner cardId={card.id} dueDate={card.dueDate} onAfterUpdate={close} />
               ) : null}
@@ -465,14 +470,24 @@ function CardTitleInput({
   cardId,
   initial,
   autoSelect,
+  canSave,
 }: {
   cardId: string;
   initial: string;
   autoSelect: boolean;
+  /**
+   * False while a brand-new card is still being created server-side. Typing
+   * is always allowed, but the server save is buffered until the card row
+   * actually exists — otherwise the save races `createCard` (NotFound 500)
+   * and, if we retried, flooded the action queue (cards stuck on "Création…").
+   */
+  canSave: boolean;
 }) {
   const [value, setValue] = useState(initial);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const valueRef = useRef(initial); // latest title the user intends to persist
+  const savedRef = useRef(initial); // last title actually sent to the server
 
   // When the modal opens for a freshly-created card (`?new=1`), focus the
   // title input and select the placeholder text so the user can just type
@@ -485,16 +500,37 @@ function CardTitleInput({
     el.select();
   }, [autoSelect]);
 
-  const flush = useCallback(
+  const save = useCallback(
     (next: string) => {
-      // Patch the board/list row immediately (optimistic) so the new title
-      // shows without a refetch; the save runs in the background.
-      emitCardUpdated({ id: cardId, title: next });
+      if (next === savedRef.current) return;
+      savedRef.current = next;
       void updateCard({ cardId, title: next }).catch(() => {
-        // best-effort; the next save will overwrite
+        // Allow a later edit to retry this value if the call failed.
+        if (savedRef.current === next) savedRef.current = ` ${next}`;
       });
     },
     [cardId],
+  );
+
+  // Once the card becomes saveable (created + loaded), flush the buffered
+  // title exactly once. Single save, no polling — keeps the action queue free
+  // so concurrent createCard calls aren't starved.
+  useEffect(() => {
+    if (canSave && valueRef.current !== savedRef.current) {
+      save(valueRef.current);
+    }
+  }, [canSave, save]);
+
+  const flush = useCallback(
+    (next: string) => {
+      valueRef.current = next;
+      // Patch the board/list row immediately (optimistic) regardless of
+      // whether the server save can run yet.
+      emitCardUpdated({ id: cardId, title: next });
+      if (canSave) save(next);
+      // else: buffered — the canSave effect above flushes it when ready.
+    },
+    [cardId, canSave, save],
   );
 
   return (
@@ -508,12 +544,13 @@ function CardTitleInput({
       onChange={(e) => {
         const next = e.target.value;
         setValue(next);
+        valueRef.current = next;
         if (timer.current) clearTimeout(timer.current);
         timer.current = setTimeout(() => flush(next), 600);
       }}
       onBlur={() => {
         if (timer.current) clearTimeout(timer.current);
-        if (value.trim().length > 0 && value !== initial) flush(value);
+        if (value.trim().length > 0 && value !== savedRef.current) flush(value);
       }}
     />
   );
@@ -713,6 +750,8 @@ function CategorySelector({
     const previous = active;
     setActive(next);
     emitCardUpdated({ id: cardId, categoryTag: next });
+    // The category control is hidden until the card detail has loaded (so the
+    // row already exists server-side) — a single save is enough.
     void updateCard({ cardId, categoryTag: next }).catch(() => setActive(previous));
   };
 

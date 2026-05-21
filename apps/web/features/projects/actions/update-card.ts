@@ -2,7 +2,7 @@
 import 'server-only';
 import { z } from 'zod';
 import { prisma } from '@nexushub/db';
-import { NotFoundError, Roles } from '@nexushub/domain';
+import { Roles } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
 import { loadUserScope } from '@/lib/auth/scope';
 import { SCOPE_ERROR_MESSAGE, VIEWER_READ_ONLY_MESSAGE } from '../lib/scope-error';
@@ -33,7 +33,11 @@ const UpdateCardSchema = z.object({
 
 export type UpdateCardResult =
   | { readonly ok: true }
-  | { readonly ok: false; readonly message: string };
+  // `retriable` marks a transient failure the caller may retry — currently
+  // the new-card window, where a debounced field save can land before
+  // `createCard` has committed the row. The caller backs off and retries
+  // instead of losing the user's edit (and we avoid throwing a 500).
+  | { readonly ok: false; readonly message: string; readonly retriable?: boolean };
 
 export async function updateCard(input: {
   cardId: string;
@@ -47,14 +51,18 @@ export async function updateCard(input: {
   }
   const parsed = UpdateCardSchema.safeParse(input);
   if (!parsed.success) {
-    throw new Error(parsed.error.issues[0]?.message ?? 'Données invalides.');
+    return { ok: false, message: parsed.error.issues[0]?.message ?? 'Données invalides.' };
   }
 
   const card = await prisma.card.findFirst({
     where: { id: parsed.data.cardId, workspaceId: ctx.workspaceId, deletedAt: null },
     select: { id: true, projectId: true, project: { select: { clientId: true } } },
   });
-  if (!card) throw new NotFoundError('Card');
+  // Not throwing here: in the new-card flow a fast-typed title can reach this
+  // action before `createCard` has committed the row. Return a retriable
+  // failure so the client backs off and re-saves once the card exists,
+  // instead of 500-ing and dropping the edit.
+  if (!card) return { ok: false, message: 'Carte introuvable.', retriable: true };
 
   const scope = await loadUserScope(ctx);
   if (scope.kind === 'restricted') {
