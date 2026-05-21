@@ -25,6 +25,12 @@ import { updateCardDueDate } from '../actions/update-card-due-date';
 import { deleteCard } from '../actions/delete-card';
 import { CSRF_FIELD_NAME } from '@/lib/csrf/field';
 import { CardCommentsThread } from './card-comments-thread';
+import { CARD_UPDATED_EVENT, type CardUpdatedEventDetail } from './card-modal-controller';
+
+/** Patch the board/list row for a card after a board-visible modal edit. */
+function emitCardUpdated(detail: CardUpdatedEventDetail): void {
+  window.dispatchEvent(new CustomEvent(CARD_UPDATED_EVENT, { detail }));
+}
 import type { CardCommentDTO } from '../lib/comment-dto';
 
 export interface CardModalProps {
@@ -481,6 +487,9 @@ function CardTitleInput({
 
   const flush = useCallback(
     (next: string) => {
+      // Patch the board/list row immediately (optimistic) so the new title
+      // shows without a refetch; the save runs in the background.
+      emitCardUpdated({ id: cardId, title: next });
       void updateCard({ cardId, title: next }).catch(() => {
         // best-effort; the next save will overwrite
       });
@@ -703,6 +712,7 @@ function CategorySelector({
   const pick = (next: string | null) => {
     const previous = active;
     setActive(next);
+    emitCardUpdated({ id: cardId, categoryTag: next });
     void updateCard({ cardId, categoryTag: next }).catch(() => setActive(previous));
   };
 
@@ -717,6 +727,7 @@ function CategorySelector({
     }
     setAdding(false);
     setDraft('');
+    emitCardUpdated({ id: cardId, categoryTag: trimmed });
     void updateCard({ cardId, categoryTag: trimmed }).catch(() => setActive(previous));
   };
 

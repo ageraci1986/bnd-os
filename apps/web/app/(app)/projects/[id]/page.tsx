@@ -35,9 +35,7 @@ function readParam(value: string | string[] | undefined): string | null {
 }
 
 export default async function ProjectPage({ params, searchParams }: ProjectPageProps) {
-  const __pt0 = performance.now(); // TEMP-PERF
   const ctx = await requireUser();
-  const __ptAuth = performance.now(); // TEMP-PERF
   const { id } = await params;
   const sp = (await searchParams) ?? {};
   const openCardId = readParam(sp['card']);
@@ -45,16 +43,16 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
   const filter = parseProjectCardFilter(sp);
   const filterClauses = buildCardFilterClauses(filter);
 
-  // Load scope eagerly so the parallel openCard fetch can scope-gate its
-  // own query (?card=<id> must not leak data from an out-of-scope card
-  // even if it happens to live in this same workspace).
-  const scope = await loadUserScope(ctx);
-
-  // Reconcile-on-read: align overdue / restored / archived cards before
-  // rendering the board so the user always sees up-to-date state without
-  // a background cron.
-  await reconcileBeforeRead(ctx.workspaceId, { projectIds: [id] });
-  const __ptReconcile = performance.now(); // TEMP-PERF
+  // Scope and reconcile are independent — run them together. Scope gates
+  // the parallel openCard fetch (?card=<id> must not leak data from an
+  // out-of-scope card even if it lives in this same workspace). Reconcile
+  // aligns overdue / restored / archived cards before rendering the board
+  // so the user always sees up-to-date state without a background cron
+  // (throttled per-workspace, so it's usually a no-op).
+  const [scope] = await Promise.all([
+    loadUserScope(ctx),
+    reconcileBeforeRead(ctx.workspaceId, { projectIds: [id] }),
+  ]);
 
   // Single Promise.all so the modal data fetch doesn't sequentially block
   // the rest of the page (this used to add a visible delay on open/close).
@@ -168,14 +166,6 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
       },
     }),
   ]);
-  // TEMP-PERF: breakdown of the project page server render.
-  console.warn(
-    `[perf] ProjectPage auth=${Math.round(__ptAuth - __pt0)} scope+reconcile=${Math.round(
-      __ptReconcile - __ptAuth,
-    )} queries=${Math.round(performance.now() - __ptReconcile)} total=${Math.round(
-      performance.now() - __pt0,
-    )}ms openCard=${openCardId ? 'yes' : 'no'}`,
-  );
   if (!project) notFound();
 
   if (scope.kind === 'restricted') {

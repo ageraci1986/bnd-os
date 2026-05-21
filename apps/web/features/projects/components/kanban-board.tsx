@@ -18,10 +18,12 @@ import {
   CARD_CREATED_EVENT,
   CARD_REMOVED_EVENT,
   CARD_SHORTREF_RESOLVED_EVENT,
+  CARD_UPDATED_EVENT,
   type CardAdvancedEventDetail,
   type CardCreatedEventDetail,
   type CardRemovedEventDetail,
   type CardShortRefResolvedEventDetail,
+  type CardUpdatedEventDetail,
 } from './card-modal-controller';
 
 export interface KanbanBoardProps {
@@ -101,15 +103,32 @@ export function KanbanBoard({
         prev.map((c) => (c.id === detail.id ? { ...c, columnId: detail.newColumnId } : c)),
       );
     };
+    const onUpdated = (e: Event) => {
+      const detail = (e as CustomEvent<CardUpdatedEventDetail>).detail;
+      if (!detail || typeof detail.id !== 'string') return;
+      setLocalCards((prev) =>
+        prev.map((c) =>
+          c.id === detail.id
+            ? {
+                ...c,
+                ...(detail.title !== undefined ? { title: detail.title } : {}),
+                ...(detail.categoryTag !== undefined ? { categoryTag: detail.categoryTag } : {}),
+              }
+            : c,
+        ),
+      );
+    };
     window.addEventListener(CARD_CREATED_EVENT, onCreated);
     window.addEventListener(CARD_REMOVED_EVENT, onRemoved);
     window.addEventListener(CARD_SHORTREF_RESOLVED_EVENT, onShortRef);
     window.addEventListener(CARD_ADVANCED_EVENT, onAdvanced);
+    window.addEventListener(CARD_UPDATED_EVENT, onUpdated);
     return () => {
       window.removeEventListener(CARD_CREATED_EVENT, onCreated);
       window.removeEventListener(CARD_REMOVED_EVENT, onRemoved);
       window.removeEventListener(CARD_SHORTREF_RESOLVED_EVENT, onShortRef);
       window.removeEventListener(CARD_ADVANCED_EVENT, onAdvanced);
+      window.removeEventListener(CARD_UPDATED_EVENT, onUpdated);
     };
   }, []);
 

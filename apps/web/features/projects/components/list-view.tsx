@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -9,10 +9,16 @@ import { customCategoryColor } from '../lib/custom-category-color';
 import { moveCard } from '../actions/move-card';
 import {
   CARD_ADVANCED_EVENT,
+  CARD_CREATED_EVENT,
   CARD_REMOVED_EVENT,
+  CARD_SHORTREF_RESOLVED_EVENT,
+  CARD_UPDATED_EVENT,
   OPEN_CARD_EVENT,
   type CardAdvancedEventDetail,
+  type CardCreatedEventDetail,
   type CardRemovedEventDetail,
+  type CardShortRefResolvedEventDetail,
+  type CardUpdatedEventDetail,
   type OpenCardEventDetail,
 } from './card-modal-controller';
 import { CardAdvanceCheckbox } from './card-advance-checkbox';
@@ -97,11 +103,49 @@ export function ListView({
   useEffect(() => setLocalCards(cards), [cards]);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
+  // Pin the DndContext to a React-stable id so dnd-kit's auto-generated
+  // `DndDescribedBy-N` aria-describedby matches between SSR and CSR (its
+  // default uses a module-level counter that diverges → hydration error).
+  const dndId = useId();
   useEffect(() => {
+    const onCreated = (e: Event) => {
+      const detail = (e as CustomEvent<CardCreatedEventDetail>).detail;
+      if (!detail || typeof detail.id !== 'string') return;
+      const col = columns.find((c) => c.id === detail.columnId);
+      setLocalCards((prev) =>
+        prev.some((c) => c.id === detail.id)
+          ? prev
+          : [
+              ...prev,
+              {
+                id: detail.id,
+                shortRef: detail.shortRef,
+                title: detail.title,
+                columnId: detail.columnId,
+                columnName: col?.name ?? '',
+                categoryTag: detail.categoryTag,
+                dueDate: null,
+                completedAt: null,
+                assignees: [],
+                checklistTotal: 0,
+                checklistChecked: 0,
+                templateName: null,
+                commentCount: 0,
+              },
+            ],
+      );
+    };
     const onRemoved = (e: Event) => {
       const detail = (e as CustomEvent<CardRemovedEventDetail>).detail;
       if (!detail || typeof detail.id !== 'string') return;
       setLocalCards((prev) => prev.filter((c) => c.id !== detail.id));
+    };
+    const onShortRef = (e: Event) => {
+      const detail = (e as CustomEvent<CardShortRefResolvedEventDetail>).detail;
+      if (!detail || typeof detail.id !== 'string') return;
+      setLocalCards((prev) =>
+        prev.map((c) => (c.id === detail.id ? { ...c, shortRef: detail.shortRef } : c)),
+      );
     };
     const onAdvanced = (e: Event) => {
       const detail = (e as CustomEvent<CardAdvancedEventDetail>).detail;
@@ -114,11 +158,32 @@ export function ListView({
         ),
       );
     };
+    const onUpdated = (e: Event) => {
+      const detail = (e as CustomEvent<CardUpdatedEventDetail>).detail;
+      if (!detail || typeof detail.id !== 'string') return;
+      setLocalCards((prev) =>
+        prev.map((c) =>
+          c.id === detail.id
+            ? {
+                ...c,
+                ...(detail.title !== undefined ? { title: detail.title } : {}),
+                ...(detail.categoryTag !== undefined ? { categoryTag: detail.categoryTag } : {}),
+              }
+            : c,
+        ),
+      );
+    };
+    window.addEventListener(CARD_CREATED_EVENT, onCreated);
     window.addEventListener(CARD_REMOVED_EVENT, onRemoved);
+    window.addEventListener(CARD_SHORTREF_RESOLVED_EVENT, onShortRef);
     window.addEventListener(CARD_ADVANCED_EVENT, onAdvanced);
+    window.addEventListener(CARD_UPDATED_EVENT, onUpdated);
     return () => {
+      window.removeEventListener(CARD_CREATED_EVENT, onCreated);
       window.removeEventListener(CARD_REMOVED_EVENT, onRemoved);
+      window.removeEventListener(CARD_SHORTREF_RESOLVED_EVENT, onShortRef);
       window.removeEventListener(CARD_ADVANCED_EVENT, onAdvanced);
+      window.removeEventListener(CARD_UPDATED_EVENT, onUpdated);
     };
   }, [columns]);
 
@@ -268,7 +333,7 @@ export function ListView({
             <span aria-hidden="true" />
           </div>
 
-          <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+          <DndContext id={dndId} sensors={sensors} onDragEnd={handleDragEnd}>
             <SortableContext
               items={orderedCards.map((c) => c.id)}
               strategy={verticalListSortingStrategy}
@@ -294,6 +359,19 @@ export function ListView({
               </ul>
             </SortableContext>
           </DndContext>
+
+          {/* Convenience "add" affordance at the bottom of the list so the
+              user doesn't have to scroll back to the top CTA. Drops into the
+              first user column, same target as the primary button. */}
+          {firstUserColumn && !isReadOnly ? (
+            <ListAddCardButton
+              projectId={projectId}
+              columnId={firstUserColumn.id}
+              columnName={firstUserColumn.name}
+              csrfToken={csrfToken}
+              variant="dashed"
+            />
+          ) : null}
         </div>
       )}
     </div>

@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { CardModal } from './card-modal';
 import { getCardModalData, type CardModalData } from '../actions/get-card-modal-data';
 import type { WorkspaceMemberOption, CardAssignment } from './assignees-side';
@@ -76,6 +76,20 @@ export interface CardAdvancedEventDetail {
   readonly newColumnId: string;
 }
 
+/**
+ * Dispatched when a board-visible card field is edited in the modal (title,
+ * category). The board + list view patch their local row instantly — no
+ * full-page refetch, and no race with the debounced save (the event fires
+ * only once the save has actually landed).
+ */
+export const CARD_UPDATED_EVENT = 'nx:card-updated' as const;
+
+export interface CardUpdatedEventDetail {
+  readonly id: string;
+  readonly title?: string;
+  readonly categoryTag?: string | null;
+}
+
 export interface CardModalControllerProps {
   readonly csrfToken: string;
   readonly workspaceName: string;
@@ -120,7 +134,6 @@ export function CardModalController({
   isReadOnly = false,
 }: CardModalControllerProps) {
   const pathname = usePathname();
-  const router = useRouter();
   const [state, setState] = useState<ModalState | null>(
     initialCard
       ? { id: initialCard.id, skeleton: null, data: initialCard, isNew: initialIsNew }
@@ -193,14 +206,11 @@ export function CardModalController({
   const close = useCallback(() => {
     setState(null);
     syncUrl(null);
-    // Modal edits (title, category, due date, assignees, checklist) are
-    // optimistic INSIDE the modal but the board/list rows don't know about
-    // them — the per-mutation revalidate was removed for latency. Refresh
-    // once, on close, to reconcile the board with what was edited. This is
-    // now cheap (local-verify auth, throttled reconcile, parallel queries)
-    // and runs in the background — the modal has already closed.
-    router.refresh();
-  }, [syncUrl, router]);
+    // No router.refresh() here: it raced with the debounced title save (the
+    // refetch could read the old title) and reloaded the whole page. Instead,
+    // board-visible edits dispatch CARD_UPDATED on save (see CardModal), which
+    // the board/list patch instantly.
+  }, [syncUrl]);
 
   useEffect(() => {
     const onOpen = (e: Event) => {

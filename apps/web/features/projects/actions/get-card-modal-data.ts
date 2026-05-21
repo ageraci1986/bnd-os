@@ -53,63 +53,75 @@ export interface CardModalData {
 export async function getCardModalData(input: {
   cardId: string;
 }): Promise<{ ok: true; data: CardModalData } | { ok: false; message: string }> {
-  const __gt0 = performance.now(); // TEMP-PERF
   const ctx = await requireUser();
-  const __gtAuth = performance.now(); // TEMP-PERF
   const parsed = Schema.safeParse(input);
   if (!parsed.success) return { ok: false, message: 'Identifiant carte invalide.' };
 
-  const card = await prisma.card.findFirst({
-    where: { id: parsed.data.cardId, workspaceId: ctx.workspaceId, deletedAt: null },
-    select: {
-      id: true,
-      projectId: true,
-      columnId: true,
-      title: true,
-      description: true,
-      dueDate: true,
-      shortRef: true,
-      categoryTag: true,
-      fieldValues: true,
-      column: { select: { name: true, isBlockedSystem: true } },
-      checklistItems: {
-        orderBy: { position: 'asc' },
-        select: {
-          id: true,
-          title: true,
-          isChecked: true,
-          position: true,
-          columnSourceId: true,
+  // The card lookup and the user's scope are independent — fetch in
+  // parallel. Scope is memoised per-request and free for admins, so this
+  // only adds a real round-trip for restricted users (and even then it
+  // overlaps the card fetch instead of serialising after it).
+  const [card, scope] = await Promise.all([
+    prisma.card.findFirst({
+      where: { id: parsed.data.cardId, workspaceId: ctx.workspaceId, deletedAt: null },
+      select: {
+        id: true,
+        projectId: true,
+        columnId: true,
+        title: true,
+        description: true,
+        dueDate: true,
+        shortRef: true,
+        categoryTag: true,
+        fieldValues: true,
+        column: { select: { name: true, isBlockedSystem: true } },
+        checklistItems: {
+          orderBy: { position: 'asc' },
+          select: {
+            id: true,
+            title: true,
+            isChecked: true,
+            position: true,
+            columnSourceId: true,
+          },
         },
-      },
-      assignees: {
-        select: {
-          userId: true,
-          raci: true,
-          user: { select: { firstName: true, lastName: true, email: true } },
+        assignees: {
+          select: {
+            userId: true,
+            raci: true,
+            user: { select: { firstName: true, lastName: true, email: true } },
+          },
         },
+        templateId: true,
+        template: { select: { items: true } },
+        project: { select: { clientId: true } },
       },
-      templateId: true,
-      template: { select: { items: true } },
-      project: { select: { clientId: true } },
-    },
-  });
+    }),
+    loadUserScope(ctx),
+  ]);
   if (!card) return { ok: false, message: 'Carte introuvable.' };
 
-  const scope = await loadUserScope(ctx);
   if (scope.kind === 'restricted') {
     const allowed =
       scope.projectIds.includes(card.projectId) || scope.clientIds.includes(card.project.clientId);
     if (!allowed) return { ok: false, message: SCOPE_ERROR_MESSAGE };
   }
 
-  // Lookup the project's user-columns to compute the next-column hint
-  // shown by the auto-advance bandeau (PRD §8.2). System "Bloqué" excluded.
-  const columns = await prisma.column.findMany({
-    where: { projectId: card.projectId },
-    orderBy: { position: 'asc' },
-    select: { name: true, isBlockedSystem: true },
-  });
+  // Authorization has passed — fetch the remaining two payloads in
+  // parallel. The columns lookup feeds the auto-advance bandeau hint
+  // (PRD §8.2, system "Bloqué" excluded); comments feed the thread.
+  const [columns, comments] = await Promise.all([
+    prisma.column.findMany({
+      where: { projectId: card.projectId },
+      orderBy: { position: 'asc' },
+      select: { name: true, isBlockedSystem: true },
+    }),
+    loadCardComments({
+      cardId: card.id,
+      currentUserId: ctx.userId,
+      currentRole: ctx.role,
+    }),
+  ]);
   const userCols = columns.filter((c) => !c.isBlockedSystem);
   const idx = userCols.findIndex((c) => c.name === card.column.name);
   const nextColumnName =
@@ -125,19 +137,6 @@ export async function getCardModalData(input: {
       : {};
 
   const templateItems = validateCardTemplateItems(card.template?.items ?? []) ?? [];
-
-  const comments = await loadCardComments({
-    cardId: card.id,
-    currentUserId: ctx.userId,
-    currentRole: ctx.role,
-  });
-
-  // TEMP-PERF
-  console.warn(
-    `[perf] getCardModalData auth=${Math.round(__gtAuth - __gt0)} queries=${Math.round(
-      performance.now() - __gtAuth,
-    )} total=${Math.round(performance.now() - __gt0)}ms`,
-  );
 
   return {
     ok: true,

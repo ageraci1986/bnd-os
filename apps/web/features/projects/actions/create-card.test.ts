@@ -23,6 +23,7 @@ vi.mock('@nexushub/db', () => ({
 }));
 vi.mock('@/lib/auth', () => ({ requireUser: mocks.requireUser }));
 vi.mock('@/lib/csrf', () => ({ assertCsrfFromFormData: mocks.assertCsrf }));
+vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 
 import { createCard } from './create-card';
 
