@@ -119,12 +119,16 @@ export function StepChecklistModal({
           </button>
         </div>
 
-        <footer className="mt-6 flex justify-end gap-2">
+        <p className="mt-5 rounded-md bg-[color:var(--color-bg-muted)] px-3 py-2 text-[11px] text-[color:var(--color-text-muted)]">
+          ⚠ « Appliquer » met à jour le brouillon. Pour conserver durablement, cliquez ensuite sur{' '}
+          <strong>Enregistrer</strong> dans la barre du template.
+        </p>
+        <footer className="mt-3 flex justify-end gap-2">
           <button type="button" onClick={onClose} className="btn btn-ghost btn-sm">
             Annuler
           </button>
           <button type="button" onClick={save} className="btn btn-primary btn-sm">
-            Enregistrer
+            Appliquer
           </button>
         </footer>
       </div>
