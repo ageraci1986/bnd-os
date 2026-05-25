@@ -25,7 +25,12 @@ import { updateCardDueDate } from '../actions/update-card-due-date';
 import { deleteCard } from '../actions/delete-card';
 import { CSRF_FIELD_NAME } from '@/lib/csrf/field';
 import { CardCommentsThread } from './card-comments-thread';
-import { CARD_UPDATED_EVENT, type CardUpdatedEventDetail } from './card-modal-controller';
+import {
+  CARD_REMOVED_EVENT,
+  CARD_UPDATED_EVENT,
+  type CardRemovedEventDetail,
+  type CardUpdatedEventDetail,
+} from './card-modal-controller';
 
 /** Patch the board/list row for a card after a board-visible modal edit. */
 function emitCardUpdated(detail: CardUpdatedEventDetail): void {
@@ -975,7 +980,18 @@ function DeleteCardButton({
       action={async (fd) => {
         if (!window.confirm('Supprimer définitivement cette carte ?')) return;
         startTransition(async () => {
-          await deleteCard({ status: 'idle' }, fd);
+          const res = await deleteCard({ status: 'idle' }, fd);
+          if (res.status === 'error') {
+            window.alert(res.message);
+            return;
+          }
+          // Optimistic board/list removal — no server revalidate (it raced
+          // read-after-write and could resurrect the row).
+          window.dispatchEvent(
+            new CustomEvent(CARD_REMOVED_EVENT, {
+              detail: { id: cardId } satisfies CardRemovedEventDetail,
+            }),
+          );
           onDeleted();
         });
       }}

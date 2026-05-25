@@ -1,6 +1,5 @@
 'use server';
 import 'server-only';
-import { revalidatePath } from 'next/cache';
 import { prisma } from '@nexushub/db';
 import { Roles } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
@@ -50,6 +49,11 @@ export async function deleteCard(
     data: { deletedAt: new Date() },
   });
 
-  revalidatePath(`/projects/${card.projectId}`);
+  // Intentionally NO revalidatePath: the board and list remove the row
+  // optimistically via the `nx:card-removed` event. A server refetch raced
+  // read-after-write on the pooler and sometimes returned a snapshot where
+  // the soft-deleted row was still present, re-adding it to the board (the
+  // user had to delete several times). Optimistic removal is authoritative
+  // until the next natural navigation/refetch.
   return { status: 'idle' };
 }
