@@ -55,19 +55,32 @@ export async function syncGraphInbox(): Promise<SyncResult> {
   let removed: readonly string[] = [];
   let deltaLink: string | null;
 
-  if (integration.deltaToken) {
-    const res = await listInboxDelta({ token, deltaUrl: integration.deltaToken });
-    fetched = res.messages;
-    removed = res.removedIds;
-    deltaLink = res.deltaLink;
-  } else {
-    const res = await listInboxInitial({
-      token,
-      sinceDays: INITIAL_DAYS,
-      maxMessages: INITIAL_MAX,
+  // Bump `lastSyncedAt` on *both* success and failure paths. The
+  // /communications page re-triggers a sync whenever `lastSyncedAt < now-30s`,
+  // so a broken sync would loop on every render if we only updated on success.
+  // The 30s throttle is the only guard against retry storms.
+  try {
+    if (integration.deltaToken) {
+      const res = await listInboxDelta({ token, deltaUrl: integration.deltaToken });
+      fetched = res.messages;
+      removed = res.removedIds;
+      deltaLink = res.deltaLink;
+    } else {
+      const res = await listInboxInitial({
+        token,
+        sinceDays: INITIAL_DAYS,
+        maxMessages: INITIAL_MAX,
+      });
+      fetched = res.messages;
+      deltaLink = res.deltaLink;
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Graph fetch failed';
+    await prisma.integration.update({
+      where: { id: integration.id },
+      data: { lastSyncedAt: new Date(), lastError: message },
     });
-    fetched = res.messages;
-    deltaLink = res.deltaLink;
+    return { ok: false, message };
   }
 
   for (const m of fetched) {
