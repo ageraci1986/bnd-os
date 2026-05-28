@@ -70,6 +70,10 @@ const ServerEnvSchema = z.object({
 
   // Sentry
   SENTRY_DSN: optionalUrl(),
+
+  // Public base URL of the app — used server-side to build OAuth callback URIs.
+  // Falls back to NEXT_PUBLIC_APP_URL resolution at the callsite when absent.
+  APP_URL: optionalUrl(),
 });
 
 export type ServerEnv = z.infer<typeof ServerEnvSchema>;
