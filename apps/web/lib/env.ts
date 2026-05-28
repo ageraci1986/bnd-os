@@ -43,6 +43,9 @@ const ServerEnvSchema = z.object({
     .string()
     .min(44, 'ENCRYPTION_KEY must be a base64-encoded 32-byte key (44 chars)'),
   ENCRYPTION_KEY_VERSION: z.coerce.number().int().min(1).default(1),
+  OAUTH_STATE_SECRET: z
+    .string()
+    .min(44, 'OAUTH_STATE_SECRET must be a base64-encoded 32-byte secret (44 chars)'),
   INVITATION_SECRET: z.string().min(32),
 
   // Integrations
