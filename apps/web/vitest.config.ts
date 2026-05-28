@@ -23,14 +23,38 @@ export default defineConfig({
     },
   },
   resolve: {
-    alias: {
-      '@': path.resolve(__dirname),
-      '@nexushub/db': path.resolve(__dirname, '../../packages/db/src/index.ts'),
-      '@nexushub/domain': path.resolve(__dirname, '../../packages/domain/src/index.ts'),
-      '@nexushub/integrations': path.resolve(__dirname, '../../packages/integrations/src/index.ts'),
-      '@nexushub/ui': path.resolve(__dirname, '../../packages/ui/src/index.ts'),
+    alias: [
+      {
+        find: '@nexushub/integrations/graph',
+        replacement: path.resolve(__dirname, '../../packages/integrations/src/graph/index.ts'),
+      },
+      {
+        find: '@nexushub/integrations/slack',
+        replacement: path.resolve(__dirname, '../../packages/integrations/src/slack/index.ts'),
+      },
+      {
+        find: '@nexushub/integrations/email',
+        replacement: path.resolve(__dirname, '../../packages/integrations/src/email/index.ts'),
+      },
+      {
+        find: '@nexushub/integrations',
+        replacement: path.resolve(__dirname, '../../packages/integrations/src/index.ts'),
+      },
+      {
+        find: '@nexushub/db',
+        replacement: path.resolve(__dirname, '../../packages/db/src/index.ts'),
+      },
+      {
+        find: '@nexushub/domain',
+        replacement: path.resolve(__dirname, '../../packages/domain/src/index.ts'),
+      },
+      {
+        find: '@nexushub/ui',
+        replacement: path.resolve(__dirname, '../../packages/ui/src/index.ts'),
+      },
+      { find: '@', replacement: path.resolve(__dirname) },
       // Stub Next's `server-only` marker in tests (it throws at import in non-RSC contexts).
-      'server-only': path.resolve(__dirname, 'test/stubs/server-only.ts'),
-    },
+      { find: 'server-only', replacement: path.resolve(__dirname, 'test/stubs/server-only.ts') },
+    ],
   },
 });

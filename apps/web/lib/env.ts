@@ -43,6 +43,9 @@ const ServerEnvSchema = z.object({
     .string()
     .min(44, 'ENCRYPTION_KEY must be a base64-encoded 32-byte key (44 chars)'),
   ENCRYPTION_KEY_VERSION: z.coerce.number().int().min(1).default(1),
+  OAUTH_STATE_SECRET: z
+    .string()
+    .min(44, 'OAUTH_STATE_SECRET must be a base64-encoded 32-byte secret (44 chars)'),
   INVITATION_SECRET: z.string().min(32),
 
   // Integrations
@@ -67,6 +70,10 @@ const ServerEnvSchema = z.object({
 
   // Sentry
   SENTRY_DSN: optionalUrl(),
+
+  // Public base URL of the app — used server-side to build OAuth callback URIs.
+  // Falls back to NEXT_PUBLIC_APP_URL resolution at the callsite when absent.
+  APP_URL: optionalUrl(),
 });
 
 export type ServerEnv = z.infer<typeof ServerEnvSchema>;

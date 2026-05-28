@@ -677,6 +677,9 @@ model Integration {
   expiresAt            DateTime?         @map("expires_at") @db.Timestamptz(6)
   lastSyncedAt         DateTime?         @map("last_synced_at") @db.Timestamptz(6)
   lastError            String?           @map("last_error")
+  /// Opaque Microsoft Graph delta link for incremental sync (non-secret).
+  /// Null until first sync completes. Reset on 410 Gone (token expired).
+  deltaToken           String?           @map("delta_token")
   createdAt            DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt            DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -694,7 +697,7 @@ model Integration {
 /// Stored OAuth state (workspace-scoped). Single-use, TTL via expiresAt.
 /// Production may store this in Redis instead — schema kept for fallback / audit.
 model OAuthState {
-  state       String          @id @db.VarChar(128)
+  state       String          @id
   workspaceId String          @map("workspace_id") @db.Uuid
   userId      String          @map("user_id") @db.Uuid
   kind        IntegrationKind
@@ -733,6 +736,9 @@ model EmailMessage {
   receivedAt        DateTime @map("received_at") @db.Timestamptz(6)
   isRead            Boolean  @default(false) @map("is_read")
   conversationId    String?  @map("conversation_id")
+  /// Soft-delete: set when Graph reports the message removed (delta @removed).
+  /// Filter out in queries via `where: { deletedAt: null }`.
+  deletedAt         DateTime? @map("deleted_at") @db.Timestamptz(6)
   createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -743,6 +749,7 @@ model EmailMessage {
   @@index([workspaceId, isRead])
   @@index([clientId, receivedAt])
   @@index([conversationId])
+  @@index([workspaceId, deletedAt])
   @@map("email_messages")
 }
 
