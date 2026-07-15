@@ -1,5 +1,5 @@
 -- AlterEnum
-ALTER TYPE "IntegrationKind" ADD VALUE 'imap';
+ALTER TYPE "IntegrationKind" ADD VALUE IF NOT EXISTS 'imap';
 
 -- AlterTable Integration: additive nullable columns (safe on live DB)
 ALTER TABLE "integrations"
