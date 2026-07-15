@@ -12,15 +12,37 @@ interface PageProps {
 
 export default async function IntegrationsPage({ searchParams }: PageProps) {
   const ctx = await requireUser();
-  const integration = await prisma.integration.findFirst({
-    where: { workspaceId: ctx.workspaceId, kind: 'graph', ownerUserId: ctx.userId },
-    select: {
-      status: true,
-      externalAccountLabel: true,
-      lastSyncedAt: true,
-      lastError: true,
-    },
-  });
+  // Prefer an active/error row over a revoked one — connecting a different
+  // mailbox after a disconnect leaves the old row in `revoked` state and
+  // creates a new one, so the arbitrary findFirst could show the wrong card.
+  // We also fall back to the most-recently-touched row when only revoked
+  // rows exist (so the "Précédemment connecté" state stays honest).
+  const integration =
+    (await prisma.integration.findFirst({
+      where: {
+        workspaceId: ctx.workspaceId,
+        kind: 'graph',
+        ownerUserId: ctx.userId,
+        status: { in: ['active', 'error'] },
+      },
+      select: {
+        status: true,
+        externalAccountLabel: true,
+        lastSyncedAt: true,
+        lastError: true,
+      },
+      orderBy: { updatedAt: 'desc' },
+    })) ??
+    (await prisma.integration.findFirst({
+      where: { workspaceId: ctx.workspaceId, kind: 'graph', ownerUserId: ctx.userId },
+      select: {
+        status: true,
+        externalAccountLabel: true,
+        lastSyncedAt: true,
+        lastError: true,
+      },
+      orderBy: { updatedAt: 'desc' },
+    }));
   const outlook: OutlookCardData = integration
     ? {
         status: integration.status as OutlookCardData['status'],
