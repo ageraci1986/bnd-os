@@ -10,7 +10,23 @@
         "NEXT_PUBLIC_SUPABASE_URL",
         "NEXT_PUBLIC_SUPABASE_ANON_KEY",
         "DATABASE_URL",
-        "DIRECT_URL"
+        "DIRECT_URL",
+        "SUPABASE_SERVICE_ROLE_KEY",
+        "SUPABASE_JWT_SECRET",
+        "SUPABASE_JWKS",
+        "ENCRYPTION_KEY",
+        "ENCRYPTION_KEY_VERSION",
+        "INVITATION_SECRET",
+        "OAUTH_STATE_SECRET",
+        "GRAPH_CLIENT_ID",
+        "GRAPH_CLIENT_SECRET",
+        "APP_URL",
+        "RESEND_API_KEY",
+        "RESEND_FROM_EMAIL",
+        "RESEND_FROM_NAME",
+        "REDIS_URL",
+        "UPSTASH_REDIS_REST_URL",
+        "UPSTASH_REDIS_REST_TOKEN"
       ]
     },
     "dev": {
