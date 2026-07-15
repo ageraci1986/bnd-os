@@ -20,14 +20,30 @@ export default async function CommunicationsPage({ searchParams }: PageProps) {
   const ctx = await requireUser();
   const sp = (await searchParams) ?? {};
 
-  const integration = await prisma.integration.findFirst({
-    where: {
-      workspaceId: ctx.workspaceId,
-      kind: 'graph',
-      ownerUserId: ctx.userId,
-    },
-    select: { status: true, lastSyncedAt: true },
-  });
+  // Prefer an active/error row over a revoked one — connecting a different
+  // mailbox after a disconnect leaves the old row in `revoked` state and
+  // creates a new one, so an unordered findFirst could pick the stale row
+  // and wrongly render the "no integration" empty state.
+  const integration =
+    (await prisma.integration.findFirst({
+      where: {
+        workspaceId: ctx.workspaceId,
+        kind: 'graph',
+        ownerUserId: ctx.userId,
+        status: { in: ['active', 'error'] },
+      },
+      select: { status: true, lastSyncedAt: true },
+      orderBy: { updatedAt: 'desc' },
+    })) ??
+    (await prisma.integration.findFirst({
+      where: {
+        workspaceId: ctx.workspaceId,
+        kind: 'graph',
+        ownerUserId: ctx.userId,
+      },
+      select: { status: true, lastSyncedAt: true },
+      orderBy: { updatedAt: 'desc' },
+    }));
 
   if (!integration || (integration.status !== 'active' && integration.status !== 'error')) {
     return (
@@ -78,8 +94,14 @@ export default async function CommunicationsPage({ searchParams }: PageProps) {
   const mails = rows.map(toMailDTO);
   const unreadCount = rows.filter((r) => !r.isRead).length;
   const refreshedIntegration = await prisma.integration.findFirst({
-    where: { workspaceId: ctx.workspaceId, kind: 'graph', ownerUserId: ctx.userId },
+    where: {
+      workspaceId: ctx.workspaceId,
+      kind: 'graph',
+      ownerUserId: ctx.userId,
+      status: { in: ['active', 'error'] },
+    },
     select: { lastSyncedAt: true },
+    orderBy: { updatedAt: 'desc' },
   });
 
   return (
