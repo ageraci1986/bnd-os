@@ -1,0 +1,10 @@
+export { openImapSession, ImapConnectionError } from './client';
+export type { ImapCredentials } from './client';
+export { autodiscoverImap } from './autodiscover';
+export type { AutodiscoverResult } from './autodiscover';
+export { parseImapMessage } from './parse';
+export type { RawImapMessage, ImapAddress, ImapEnvelope } from './parse';
+export { listInboxInitial, listInboxIncremental, UidValidityChangedError } from './messages';
+export type { InboxFetchResult } from './messages';
+export { testImapConnection } from './connection-test';
+export type { ConnectionTestResult } from './connection-test';
