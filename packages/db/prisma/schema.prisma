@@ -760,6 +760,7 @@ model EmailMessage {
   @@index([conversationId])
   @@index([workspaceId, deletedAt])
   @@index([workspaceId, integrationId, receivedAt(sort: Desc)])
+  @@index([integrationId])
   @@map("email_messages")
 }
 
