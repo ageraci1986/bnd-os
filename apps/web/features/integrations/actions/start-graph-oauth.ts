@@ -45,5 +45,10 @@ export async function startGraphOAuth(): Promise<never> {
   url.searchParams.set('scope', SCOPES);
   url.searchParams.set('state', state);
   url.searchParams.set('response_mode', 'query');
+  // Force the account picker even when the browser has an active MS session:
+  // without this Microsoft silently reuses the last logged-in account, so a
+  // user who already connected one mailbox can't choose a different one from
+  // the same browser without going to logout.live.com first.
+  url.searchParams.set('prompt', 'select_account');
   redirect(url.toString());
 }
