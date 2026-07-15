@@ -1,7 +1,10 @@
-// Microsoft Graph adapter skeleton — implemented in Phase 6.2.
-// Responsibilities:
-// - OAuth délégué (per-user mailbox connection)
-// - Subscriptions notifications (validationToken + clientState)
-// - Mail read / sendMail wrappers
-// - Auto-association email → client by domain rules
+export { graphFetch, GraphError } from './client';
+export type { GraphFetchOptions } from './client';
+export { exchangeCodeForTokens, refreshTokens, GraphAuthError } from './auth';
+export type { GraphTokens } from './auth';
+export { listInboxInitial, listInboxDelta } from './messages';
+export type { InitialSyncResult, DeltaSyncResult } from './messages';
+export { parseGraphMessage } from './parse';
+export type { ParsedGraphMessage } from './parse';
+
 export const GRAPH_INTEGRATION_KEY = 'graph' as const;

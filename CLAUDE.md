@@ -368,6 +368,22 @@ Validées par Angelo L. le 2026-04-27. Décisions formalisées dans [`docs/adr/0
 
 ## 10. Procédure pour Claude (et tout assistant IA)
 
+### Lancer une nouvelle feature (ou sous-feature significative)
+
+> 🚨 **OBLIGATOIRE — AVANT TOUTE LIGNE DE CODE.** Dès qu'une nouvelle feature
+> (ou sous-feature non triviale) est lancée, **invoquer la skill
+> `superpowers:brainstorming`**. Pas de raccourci : même pour ce qui paraît
+> simple, le brainstorm fait émerger le scope, les hypothèses cachées, les
+> alternatives, et produit un spec validé dans `docs/superpowers/specs/`.
+>
+> Le flow est : `superpowers:brainstorming` → spec validé par l'utilisateur →
+> `superpowers:writing-plans` → plan d'implémentation → worktree isolé →
+> exécution (subagent-driven-development ou inline).
+>
+> Quand l'utilisateur dit « créons une nouvelle branche pour X » ou
+> « j'aimerais intégrer Y », invoquer le brainstorming est la première
+> action — pas créer la branche tout de suite.
+
 Avant chaque action :
 
 1. **Lire ce fichier** + les sections pertinentes du PRD + l'état dans `progress.md`.
@@ -394,5 +410,6 @@ Avant chaque action :
 | ---------- | ------------------------------------------------------------------------------------------------------ | ------------------ |
 | 2026-04-27 | Création initiale (analyse PRD + mockups)                                                              | Claude (Opus 4.7)  |
 | 2026-04-27 | Décisions actées : Supabase (DB + Auth + Realtime + Storage), pnpm + turbo, 15 hypothèses PRD validées | Angelo L. + Claude |
+| 2026-05-28 | §10 — règle obligatoire : invoquer `superpowers:brainstorming` avant toute nouvelle feature            | Angelo L. + Claude |
 
 > **Règle :** chaque modification de ce fichier ajoute une ligne ici.

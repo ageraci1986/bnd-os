@@ -115,7 +115,11 @@ export function getRateLimiter(key: RateLimitKey): Limiter {
     return limiter;
   }
 
-  if (process.env['NODE_ENV'] === 'production') {
+  // Only *real* production (VERCEL_ENV=production) requires Upstash.
+  // Preview and Development deployments — where NODE_ENV is also 'production'
+  // in Next.js builds — fall back to the in-memory limiter so the whole app
+  // doesn't crash when previewing on a Vercel branch that lacks the secrets.
+  if (process.env['VERCEL_ENV'] === 'production') {
     throw new Error(
       'Rate limiter: Upstash credentials missing in production. ' +
         'Set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN.',
