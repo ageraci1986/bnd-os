@@ -20,6 +20,8 @@
   },
   "dependencies": {
     "@nexushub/domain": "workspace:*",
+    "fast-xml-parser": "^5.10.0",
+    "imapflow": "^1.4.7",
     "marked": "^18.0.4",
     "resend": "^4.0.0",
     "sanitize-html": "^2.17.4",
