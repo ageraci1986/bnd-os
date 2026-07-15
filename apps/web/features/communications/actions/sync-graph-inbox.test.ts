@@ -122,7 +122,12 @@ describe('syncGraphInbox', () => {
     const res = await syncGraphInbox();
     expect(res).toEqual({ ok: true, fetched: 0, removed: 1 });
     expect(mocks.emailUpdateMany).toHaveBeenCalledWith({
-      where: { workspaceId: 'W1', externalId: { in: ['MX'] }, deletedAt: null },
+      where: {
+        workspaceId: 'W1',
+        integrationId: 'I1',
+        externalId: { in: ['MX'] },
+        deletedAt: null,
+      },
       data: { deletedAt: expect.any(Date) },
     });
   });

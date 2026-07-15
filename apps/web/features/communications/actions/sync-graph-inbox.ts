@@ -87,13 +87,15 @@ export async function syncGraphInbox(): Promise<SyncResult> {
     const clientId = matchClientByDomain(m.fromEmail, domainIndex);
     await prisma.emailMessage.upsert({
       where: {
-        workspaceId_externalId: {
+        workspaceId_integrationId_externalId: {
           workspaceId: ctx.workspaceId,
+          integrationId: integration.id,
           externalId: m.externalId,
         },
       },
       create: {
         workspaceId: ctx.workspaceId,
+        integrationId: integration.id,
         externalId: m.externalId,
         folder: 'inbox',
         subject: m.subject,
@@ -122,6 +124,7 @@ export async function syncGraphInbox(): Promise<SyncResult> {
     await prisma.emailMessage.updateMany({
       where: {
         workspaceId: ctx.workspaceId,
+        integrationId: integration.id,
         externalId: { in: [...removed] },
         deletedAt: null,
       },
