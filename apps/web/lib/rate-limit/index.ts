@@ -12,7 +12,7 @@ import 'server-only';
 import { Ratelimit } from '@upstash/ratelimit';
 import { Redis } from '@upstash/redis';
 
-export type RateLimitKey = 'login' | 'password_reset' | 'invitation' | 'signup_token';
+export type RateLimitKey = 'login' | 'password_reset' | 'invitation' | 'signup_token' | 'imap_test';
 
 export interface RateLimitResult {
   readonly success: boolean;
@@ -33,6 +33,7 @@ const WINDOWS: Record<
   password_reset: { limit: 3, window: '1 h' },
   invitation: { limit: 20, window: '24 h' },
   signup_token: { limit: 5, window: '1 h' },
+  imap_test: { limit: 5, window: '5 m' },
 };
 
 /* ---------- Upstash backend ---------------------------------------------- */
