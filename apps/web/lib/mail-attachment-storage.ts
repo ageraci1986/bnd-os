@@ -47,3 +47,21 @@ export async function deleteMailAttachment(storagePath: string): Promise<void> {
     /* swallow */
   }
 }
+
+export type DownloadResult =
+  | { readonly ok: true; readonly binary: Buffer }
+  | { readonly ok: false; readonly message: string };
+
+/**
+ * Download an attachment binary from Storage — used by the send-mail
+ * orchestrator (Task 16) to resolve `composeAttachments` storagePaths into
+ * in-memory buffers right before dispatching to the Graph / SMTP adapters.
+ * Caller MUST NOT bubble `message` to the client verbatim (CLAUDE.md §4.7) —
+ * it can contain infra/bucket internals.
+ */
+export async function downloadMailAttachment(storagePath: string): Promise<DownloadResult> {
+  const { data, error } = await createSupabaseAdmin().storage.from(BUCKET).download(storagePath);
+  if (error || !data) return { ok: false, message: error?.message ?? 'Download failed' };
+  const binary = Buffer.from(await data.arrayBuffer());
+  return { ok: true, binary };
+}

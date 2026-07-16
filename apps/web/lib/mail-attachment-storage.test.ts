@@ -3,10 +3,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const upload = vi.hoisted(() => vi.fn());
 const createSignedUrl = vi.hoisted(() => vi.fn());
 const remove = vi.hoisted(() => vi.fn());
+const download = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/supabase/server', () => ({
   createSupabaseAdmin: () => ({
     storage: {
-      from: () => ({ upload, createSignedUrl, remove }),
+      from: () => ({ upload, createSignedUrl, remove, download }),
     },
   }),
 }));
@@ -15,6 +16,7 @@ import {
   uploadMailAttachment,
   getMailAttachmentSignedUrl,
   deleteMailAttachment,
+  downloadMailAttachment,
 } from './mail-attachment-storage';
 
 beforeEach(() => vi.clearAllMocks());
@@ -64,5 +66,25 @@ describe('deleteMailAttachment', () => {
     remove.mockRejectedValueOnce(new Error('network down'));
     await expect(deleteMailAttachment('w1/att-uuid')).resolves.toBeUndefined();
     expect(remove).toHaveBeenCalledWith(['w1/att-uuid']);
+  });
+});
+
+describe('downloadMailAttachment', () => {
+  it('downloads and returns the binary as a Buffer', async () => {
+    // NOTE: Buffer.from(str).buffer is unsafe here — Node pools small
+    // allocations, so `.buffer` can include bytes beyond the string's own
+    // content. TextEncoder produces an unpooled, exactly-sized buffer.
+    const blob = { arrayBuffer: async () => new TextEncoder().encode('hello').buffer };
+    download.mockResolvedValueOnce({ data: blob, error: null });
+    const r = await downloadMailAttachment('w1/att-uuid');
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.binary.toString()).toBe('hello');
+    expect(download).toHaveBeenCalledWith('w1/att-uuid');
+  });
+
+  it('returns error on Storage failure', async () => {
+    download.mockResolvedValueOnce({ data: null, error: { message: 'not found' } });
+    const r = await downloadMailAttachment('w1/att-uuid');
+    expect(r).toEqual({ ok: false, message: expect.any(String) });
   });
 });
