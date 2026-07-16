@@ -4,8 +4,7 @@ import { z } from 'zod';
 import { prisma } from '@nexushub/db';
 import { requireUser } from '@/lib/auth';
 import { getValidImapCredentials } from '@/features/integrations/lib/get-valid-imap-credentials';
-import { openImapSession } from '@nexushub/integrations/imap';
-import { sanitizeMailHtml, stripMailHtmlToText } from '@nexushub/integrations/mail';
+import { openImapSession, fetchImapMessageBody } from '@nexushub/integrations/imap';
 
 const inputSchema = z.object({ emailId: z.string().uuid() });
 
@@ -92,33 +91,14 @@ export async function fetchMailBody(
   const uid = Number(mail.externalId);
   if (!Number.isFinite(uid)) return { ok: false, message: 'UID invalide.' };
 
-  let raw_body: { text: string | null; html: string | null } = { text: null, html: null };
+  // Delegate full MIME parsing + sanitize to the adapter — see
+  // `packages/integrations/src/imap/body.ts` for the pipeline.
+  let body: { bodyText: string; bodyHtmlSanitized: string | null } | null = null;
   try {
     const session = await openImapSession(creds);
     try {
       await session.mailboxOpen('INBOX');
-      // `{ uid: true }` interprets the range in UID space (matching what we
-      // stored during sync), not IMAP sequence-number space.
-      const dl = await session.download(uid, 'TEXT', { uid: true });
-      if (dl?.content) {
-        const chunks: Buffer[] = [];
-        const content = dl.content as unknown;
-        if (Buffer.isBuffer(content)) {
-          chunks.push(content);
-        } else if (
-          content &&
-          typeof (content as AsyncIterable<unknown>)[Symbol.asyncIterator] === 'function'
-        ) {
-          for await (const chunk of content as AsyncIterable<Buffer | string>) {
-            chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-          }
-        }
-        const text = Buffer.concat(chunks).toString('utf8');
-        if (text) {
-          const looksHtml = text.trimStart().startsWith('<');
-          raw_body = looksHtml ? { text: null, html: text } : { text, html: null };
-        }
-      }
+      body = await fetchImapMessageBody(session, uid);
     } finally {
       try {
         await session.logout();
@@ -130,8 +110,9 @@ export async function fetchMailBody(
     return { ok: false, message: err instanceof Error ? err.message : 'IMAP body fetch failed' };
   }
 
-  const bodyHtmlSanitized = raw_body.html ? sanitizeMailHtml(raw_body.html) : null;
-  const bodyText = raw_body.html ? stripMailHtmlToText(raw_body.html) : (raw_body.text ?? '');
+  if (!body) return { ok: false, message: 'Message source indisponible côté serveur IMAP.' };
+
+  const { bodyText, bodyHtmlSanitized } = body;
 
   await prisma.emailMessage.update({
     where: { id: mail.id },

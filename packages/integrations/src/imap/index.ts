@@ -8,3 +8,5 @@ export { listInboxInitial, listInboxIncremental, UidValidityChangedError } from 
 export type { InboxFetchResult } from './messages';
 export { testImapConnection } from './connection-test';
 export type { ConnectionTestResult } from './connection-test';
+export { fetchImapMessageBody } from './body';
+export type { ImapMessageBody } from './body';
