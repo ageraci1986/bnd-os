@@ -74,7 +74,18 @@ export function MailList({
                     })}
                   </span>
                 </div>
-                <div className="mt-1 truncate text-xs">{m.subject || '(sans sujet)'}</div>
+                <div className="mt-1 truncate text-xs">
+                  {m.subject || '(sans sujet)'}
+                  {m.sendStatus === 'sent' ? (
+                    <span className="ml-1 text-xs text-[color:var(--color-success)]">✓ Envoyé</span>
+                  ) : m.sendStatus === 'queued' || m.sendStatus === 'sending' ? (
+                    <span className="ml-1 text-xs text-[color:var(--color-text-muted)]">
+                      Envoi…
+                    </span>
+                  ) : m.sendStatus === 'failed' ? (
+                    <span className="ml-1 text-xs text-[color:var(--color-danger)]">⚠ Échec</span>
+                  ) : null}
+                </div>
                 <div className="truncate text-[11px] text-[color:var(--color-text-muted)]">
                   {m.preview}
                 </div>

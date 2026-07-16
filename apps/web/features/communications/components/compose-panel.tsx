@@ -7,6 +7,7 @@ import { computePrefill, type ComposePrefill } from '../lib/compose-prefill';
 import { saveDraft, loadDraft, deleteDraft } from '../actions/mail-drafts';
 import { sendMail } from '../actions/send-mail';
 import { AddMailboxModal } from '@/features/integrations/components/add-mailbox-modal';
+import { notify } from '@/features/shell/components/toaster';
 
 export interface MailboxOption {
   readonly integrationId: string;
@@ -132,11 +133,16 @@ export function ComposePanel({ mailboxes }: { readonly mailboxes: readonly Mailb
       });
       if (r.ok) {
         close();
-        // Toast + navigation handled in Task 22.
+        notify({ tone: 'success', message: 'Mail envoyé ✓' });
       } else if (r.code === 'SMTP_NOT_CONFIGURED') {
         setSmtpConfigRequired(true);
       } else {
         setSendError(`${r.code}${r.message ? `: ${r.message}` : ''}`);
+        notify({
+          tone: 'error',
+          message: `Échec de l'envoi${r.message ? ` : ${r.message}` : ''}`,
+          action: { label: 'Réessayer', onClick: () => void onSend() },
+        });
       }
     });
   }

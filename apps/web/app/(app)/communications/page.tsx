@@ -132,6 +132,8 @@ export default async function CommunicationsPage({ searchParams }: PageProps) {
         integration: { select: { externalAccountLabel: true } },
         externalId: true,
         integrationId: true,
+        sendStatus: true,
+        sendError: true,
       },
       orderBy: { receivedAt: 'desc' },
       take: PAGE_SIZE,
