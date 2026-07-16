@@ -2,7 +2,8 @@ import type { Metadata } from 'next';
 import { prisma } from '@nexushub/db';
 import { requireUser } from '@/lib/auth';
 import { IntegrationsGrid } from '@/features/integrations/components/integrations-grid';
-import type { OutlookCardData } from '@/features/integrations/components/outlook-card';
+import { MailboxList } from '@/features/integrations/components/mailbox-list';
+import type { MailboxCardData } from '@/features/integrations/components/mailbox-card';
 
 export const metadata: Metadata = { title: 'Intégrations' };
 
@@ -12,53 +13,47 @@ interface PageProps {
 
 export default async function IntegrationsPage({ searchParams }: PageProps) {
   const ctx = await requireUser();
-  // Prefer an active/error row over a revoked one — connecting a different
-  // mailbox after a disconnect leaves the old row in `revoked` state and
-  // creates a new one, so the arbitrary findFirst could show the wrong card.
-  // We also fall back to the most-recently-touched row when only revoked
-  // rows exist (so the "Précédemment connecté" state stays honest).
-  const integration =
-    (await prisma.integration.findFirst({
-      where: {
-        workspaceId: ctx.workspaceId,
-        kind: 'graph',
-        ownerUserId: ctx.userId,
-        status: { in: ['active', 'error'] },
-      },
-      select: {
-        status: true,
-        externalAccountLabel: true,
-        lastSyncedAt: true,
-        lastError: true,
-      },
-      orderBy: { updatedAt: 'desc' },
-    })) ??
-    (await prisma.integration.findFirst({
-      where: { workspaceId: ctx.workspaceId, kind: 'graph', ownerUserId: ctx.userId },
-      select: {
-        status: true,
-        externalAccountLabel: true,
-        lastSyncedAt: true,
-        lastError: true,
-      },
-      orderBy: { updatedAt: 'desc' },
-    }));
-  const outlook: OutlookCardData = integration
-    ? {
-        status: integration.status as OutlookCardData['status'],
-        externalAccountLabel: integration.externalAccountLabel,
-        lastSyncedAt: integration.lastSyncedAt ? integration.lastSyncedAt.toISOString() : null,
-        lastError: integration.lastError,
-      }
-    : { status: 'inactive', externalAccountLabel: null, lastSyncedAt: null, lastError: null };
+  // `revoked` rows are intentionally excluded — once a mailbox is
+  // disconnected, its row disappears from the list so re-connecting starts
+  // fresh instead of resurrecting stale state.
+  const integrations = await prisma.integration.findMany({
+    where: {
+      workspaceId: ctx.workspaceId,
+      ownerUserId: ctx.userId,
+      kind: { in: ['graph', 'imap'] },
+      status: { in: ['active', 'error'] },
+    },
+    select: {
+      id: true,
+      kind: true,
+      status: true,
+      externalAccountLabel: true,
+      lastSyncedAt: true,
+      lastError: true,
+    },
+    orderBy: { createdAt: 'asc' },
+  });
+
+  const mailboxes: MailboxCardData[] = integrations.map((integration) => ({
+    integrationId: integration.id,
+    kind: integration.kind as MailboxCardData['kind'],
+    label:
+      integration.externalAccountLabel ??
+      (integration.kind === 'graph' ? 'Microsoft Outlook' : 'IMAP'),
+    status: integration.status as MailboxCardData['status'],
+    lastSyncedAt: integration.lastSyncedAt ? integration.lastSyncedAt.toISOString() : null,
+    lastError: integration.lastError,
+  }));
 
   const sp = (await searchParams) ?? {};
   const flash =
     sp['connected'] === 'graph'
       ? { kind: 'ok' as const, msg: 'Boîte Outlook connectée.' }
-      : typeof sp['error'] === 'string'
-        ? { kind: 'err' as const, msg: `Erreur OAuth: ${sp['error']}` }
-        : null;
+      : sp['connected'] === 'imap'
+        ? { kind: 'ok' as const, msg: 'Boîte IMAP connectée.' }
+        : typeof sp['error'] === 'string'
+          ? { kind: 'err' as const, msg: `Erreur OAuth: ${sp['error']}` }
+          : null;
 
   return (
     <div className="mx-auto max-w-[900px]">
@@ -79,7 +74,8 @@ export default async function IntegrationsPage({ searchParams }: PageProps) {
           {flash.msg}
         </div>
       ) : null}
-      <IntegrationsGrid outlook={outlook} />
+      <MailboxList mailboxes={mailboxes} />
+      <IntegrationsGrid />
     </div>
   );
 }
