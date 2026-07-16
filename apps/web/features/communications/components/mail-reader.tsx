@@ -16,10 +16,6 @@ interface BodyState {
   readonly error: string | null;
 }
 
-function isEmptyBody(mail: MailDTO): boolean {
-  return (!mail.bodyText || mail.bodyText.length === 0) && mail.bodyHtmlSanitized === null;
-}
-
 export function MailReader({ mail }: { readonly mail: MailDTO | null }) {
   const [body, setBody] = useState<BodyState>(() => ({
     bodyText: mail?.bodyText ?? '',
@@ -30,20 +26,19 @@ export function MailReader({ mail }: { readonly mail: MailDTO | null }) {
 
   useEffect(() => {
     if (!mail) return;
-    // Reset body state when the selected mail changes. If the DTO already
-    // carries a body (Graph mails, or IMAP mails we've fetched before during
-    // this session), no network call is needed.
-    if (!isEmptyBody(mail)) {
-      setBody({
-        bodyText: mail.bodyText,
-        bodyHtmlSanitized: mail.bodyHtmlSanitized,
-        loading: false,
-        error: null,
-      });
-      return;
-    }
+    // Always ask the server — it's the single source of truth for whether
+    // the cached body is good, needs a MIME re-parse, or is truly empty.
+    // The DB round-trip is cheap; only actually broken bodies trigger an
+    // IMAP session. Falling back to `!mail.bodyHtmlSanitized && !mail.bodyText`
+    // client-side missed raw-MIME bodies stored by an older code path
+    // (non-empty but unusable).
     let cancelled = false;
-    setBody({ bodyText: '', bodyHtmlSanitized: null, loading: true, error: null });
+    setBody({
+      bodyText: mail.bodyText ?? '',
+      bodyHtmlSanitized: mail.bodyHtmlSanitized,
+      loading: true,
+      error: null,
+    });
     void fetchMailBody({ emailId: mail.id }).then((r) => {
       if (cancelled) return;
       if (r.ok) {
@@ -54,7 +49,9 @@ export function MailReader({ mail }: { readonly mail: MailDTO | null }) {
           error: null,
         });
       } else {
-        setBody({ bodyText: '', bodyHtmlSanitized: null, loading: false, error: r.message });
+        // Server refused — keep whatever we already had (may still be raw
+        // MIME, but at least the user sees SOMETHING and the error).
+        setBody((prev) => ({ ...prev, loading: false, error: r.message }));
       }
     });
     return () => {
