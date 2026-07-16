@@ -74,6 +74,141 @@ describe('sendViaSmtp', () => {
     expect(captured['references']).toEqual(['<original@ex.com>']);
   });
 
+  it('passes a single attachment through to nodemailer', async () => {
+    let captured: Record<string, unknown> = {};
+    const t = {
+      async sendMail(mail: Record<string, unknown>) {
+        captured = mail;
+        return { messageId: '<id>', accepted: [], rejected: [], response: '250' };
+      },
+      async close() {
+        /* noop */
+      },
+    };
+    await sendViaSmtp(t as never, {
+      from: 'me@ex.com',
+      to: ['you@ex.com'],
+      cc: [],
+      bcc: [],
+      subject: 'Hi',
+      html: '<p>x</p>',
+      text: 'x',
+      attachments: [
+        { filename: 'a.pdf', contentType: 'application/pdf', content: Buffer.from('data') },
+      ],
+    });
+    expect(captured['attachments']).toHaveLength(1);
+    expect((captured['attachments'] as unknown[])[0]).toMatchObject({
+      filename: 'a.pdf',
+      contentType: 'application/pdf',
+    });
+  });
+
+  it('passes multiple attachments through to nodemailer', async () => {
+    let captured: Record<string, unknown> = {};
+    const t = {
+      async sendMail(mail: Record<string, unknown>) {
+        captured = mail;
+        return { messageId: '<id>', accepted: [], rejected: [], response: '250' };
+      },
+      async close() {
+        /* noop */
+      },
+    };
+    await sendViaSmtp(t as never, {
+      from: 'me@ex.com',
+      to: ['you@ex.com'],
+      cc: [],
+      bcc: [],
+      subject: 'Hi',
+      html: '<p>x</p>',
+      text: 'x',
+      attachments: [
+        { filename: 'a.pdf', contentType: 'application/pdf', content: Buffer.from('one') },
+        { filename: 'b.png', contentType: 'image/png', content: Buffer.from('two') },
+      ],
+    });
+    expect(captured['attachments']).toHaveLength(2);
+  });
+
+  it('sends reply with attachment without restriction', async () => {
+    let captured: Record<string, unknown> = {};
+    const t = {
+      async sendMail(mail: Record<string, unknown>) {
+        captured = mail;
+        return { messageId: '<id>', accepted: [], rejected: [], response: '250' };
+      },
+      async close() {
+        /* noop */
+      },
+    };
+    await sendViaSmtp(t as never, {
+      from: 'me@ex.com',
+      to: ['you@ex.com'],
+      cc: [],
+      bcc: [],
+      subject: 'Re: Hi',
+      html: '<blockquote>quoted</blockquote>',
+      text: 'quoted',
+      inReplyTo: '<original@ex.com>',
+      references: ['<original@ex.com>'],
+      attachments: [
+        { filename: 'a.pdf', contentType: 'application/pdf', content: Buffer.from('data') },
+      ],
+    });
+    expect(captured['inReplyTo']).toBe('<original@ex.com>');
+    expect(captured['attachments']).toHaveLength(1);
+  });
+
+  it('sends forward with attachment without restriction', async () => {
+    let captured: Record<string, unknown> = {};
+    const t = {
+      async sendMail(mail: Record<string, unknown>) {
+        captured = mail;
+        return { messageId: '<id>', accepted: [], rejected: [], response: '250' };
+      },
+      async close() {
+        /* noop */
+      },
+    };
+    await sendViaSmtp(t as never, {
+      from: 'me@ex.com',
+      to: ['you@ex.com'],
+      cc: [],
+      bcc: [],
+      subject: 'Fwd: Hi',
+      html: '<p>forwarded</p>',
+      text: 'forwarded',
+      attachments: [
+        { filename: 'a.pdf', contentType: 'application/pdf', content: Buffer.from('data') },
+      ],
+    });
+    expect(captured['attachments']).toHaveLength(1);
+  });
+
+  it('omits the attachments key when none are provided', async () => {
+    let captured: Record<string, unknown> = {};
+    const t = {
+      async sendMail(mail: Record<string, unknown>) {
+        captured = mail;
+        return { messageId: '<id>', accepted: [], rejected: [], response: '250' };
+      },
+      async close() {
+        /* noop */
+      },
+    };
+    await sendViaSmtp(t as never, {
+      from: 'me@ex.com',
+      to: ['you@ex.com'],
+      cc: [],
+      bcc: [],
+      subject: 'Hi',
+      html: '<p>x</p>',
+      text: 'x',
+    });
+    expect(captured['attachments']).toBeUndefined();
+  });
+
   it('wraps sendMail errors in SmtpSendError', async () => {
     const t = makeFakeTransport({ throws: new Error('550 5.7.1 relay denied') });
     await expect(
