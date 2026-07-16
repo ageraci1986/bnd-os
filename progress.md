@@ -350,6 +350,10 @@
 
 - [x] IMAP mailbox integration — read-only V1, multi-mailbox per user, autodiscover, unified UI, filter dropdown. Migration `20260715142026_imap_integration_foundations` applied to shared Supabase on 2026-07-15.
 
+### 6.0b Mail send (Communications iter 3)
+
+- [x] Mail send — V1 outbound (Reply / Reply-All / Forward / Nouveau) via Graph sendMail + IMAP SMTP. Drafts DB, signatures per mailbox, outbox pattern (queued → sending → sent | failed), rate limit dual window (50/h + 300/day). Migrations `20260716134517_mail_send_foundations` + `20260716140000_audit_mail_sent` appliquées à la Supabase partagée le 2026-07-16.
+
 ### 6.1 Intégration Slack
 
 - [ ] Setup app Slack (manifest, scopes mini : `channels:read`, `chat:write`, `users:read`)

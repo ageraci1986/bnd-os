@@ -1,6 +1,8 @@
 # Runbook — Intégration Microsoft Graph (Outlook)
 
 > **See also:** [`imap-integration.md`](./imap-integration.md) for the generic IMAP flow. Both adapters share the sanitize allowlist at `packages/integrations/src/mail/sanitize.ts` — any change there affects both mail sources.
+>
+> **See also:** [`mail-send.md`](./mail-send.md) for outbound mail (Reply / Reply-All / Forward / Nouveau) across both mailbox kinds.
 
 > **But** : connecter une boîte Outlook à NexusHub pour lire les mails dans `/communications`.
 >
@@ -111,7 +113,7 @@ Ajoute (additif, sans casse) :
 
 Documenté pour éviter le scope creep en revue :
 
-- ❌ Envoi de réponses (`Mail.Send`) → itération 2
+- ✅ Envoi de réponses (`Mail.Send`) → livré en itération 3, voir [`mail-send.md`](./mail-send.md)
 - ❌ Templates email CRUD → itération 2
 - ❌ Webhooks Graph (subscriptions, validationToken) → itération 3
 - ❌ `isRead` writeback vers Outlook (V1 = lecture locale seulement)

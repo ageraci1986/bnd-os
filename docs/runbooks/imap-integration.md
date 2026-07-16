@@ -1,5 +1,7 @@
 # Runbook — Intégration IMAP générique
 
+> **See also:** [`mail-send.md`](./mail-send.md) for outbound mail (Reply / Reply-All / Forward / Nouveau) across both mailbox kinds.
+
 > **But** : connecter une boîte mail IMAP quelconque (OVH, Fastmail, iCloud,
 > self-hosted…) à NexusHub pour lire les mails dans `/communications`, en
 > complément de Microsoft Graph.
