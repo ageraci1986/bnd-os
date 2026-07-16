@@ -170,7 +170,7 @@ export default async function CommunicationsPage({ searchParams }: PageProps) {
             Aucun mail à afficher pour l&apos;instant.
           </div>
         ) : (
-          <MailList mails={mails} showMailboxBadge={!mailboxFilter} />
+          <MailList key={page} mails={mails} showMailboxBadge={!mailboxFilter} />
         )}
         {totalCount > PAGE_SIZE ? (
           <MailPagination page={page} totalPages={totalPages} totalCount={totalCount} />

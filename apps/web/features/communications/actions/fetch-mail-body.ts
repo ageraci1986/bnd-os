@@ -55,11 +55,28 @@ export async function fetchMailBody(
 
   if (!mail) return { ok: false, message: 'Email introuvable.' };
 
-  // Body already cached — return as-is (covers Graph, and IMAP mails whose
-  // body was fetched by a previous call).
-  const alreadyLoaded =
-    (mail.bodyText && mail.bodyText.length > 0) || mail.bodyHtmlSanitized !== null;
-  if (alreadyLoaded) {
+  // Detect cached bodies that were stored by an earlier version of this action
+  // (before we swapped in mailparser). Those bodies contain raw MIME headers /
+  // boundary markers / quoted-printable escapes — heuristics: a leading
+  // `------=_Part`, a `Content-Type:` line at the start, or the tell-tale
+  // `Content-Transfer-Encoding` header. When we see one, we throw away the
+  // cached body and refetch through the mailparser pipeline. Self-heals on
+  // the next open; no DB migration needed.
+  function looksLikeUnparsedMime(text: string | null): boolean {
+    if (!text || text.length === 0) return false;
+    const head = text.slice(0, 200);
+    return (
+      head.includes('------=_Part') ||
+      /^Content-Type:\s/im.test(head) ||
+      /^Content-Transfer-Encoding:\s/im.test(head)
+    );
+  }
+
+  const cachedIsUsable =
+    ((mail.bodyText && mail.bodyText.length > 0) || mail.bodyHtmlSanitized !== null) &&
+    !looksLikeUnparsedMime(mail.bodyText);
+
+  if (cachedIsUsable) {
     return {
       ok: true,
       bodyText: mail.bodyText ?? '',
