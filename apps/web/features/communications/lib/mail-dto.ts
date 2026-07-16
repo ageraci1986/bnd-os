@@ -15,6 +15,8 @@ export type EmailMessageListRow = Prisma.EmailMessageGetPayload<{
     toRecipients: true;
     ccRecipients: true;
     integration: { select: { externalAccountLabel: true } };
+    externalId: true;
+    integrationId: true;
   };
 }>;
 
@@ -36,6 +38,8 @@ export interface MailDTO {
   readonly bodyHtmlSanitized: string | null;
   readonly bodyText: string;
   readonly mailboxLabel: string | null;
+  readonly externalId: string;
+  readonly integrationId: string;
 }
 
 const PREVIEW_LEN = 140;
@@ -58,5 +62,7 @@ export function toMailDTO(row: EmailMessageListRow): MailDTO {
     bodyHtmlSanitized: row.bodyHtmlSanitized,
     bodyText,
     mailboxLabel: row.integration?.externalAccountLabel ?? null,
+    externalId: row.externalId,
+    integrationId: row.integrationId,
   };
 }

@@ -14,6 +14,8 @@ import { MailTabs } from '@/features/communications/components/mail-tabs';
 import { MailList } from '@/features/communications/components/mail-list';
 import { MailboxFilter } from '@/features/communications/components/mailbox-filter';
 import { MailPagination } from '@/features/communications/components/mail-pagination';
+import { ComposePanel } from '@/features/communications/components/compose-panel';
+import { NewMailButton } from '@/features/communications/components/new-mail-button';
 
 export const metadata: Metadata = { title: 'Communications' };
 
@@ -85,12 +87,17 @@ export default async function CommunicationsPage({ searchParams }: PageProps) {
       kind: { in: ['graph', 'imap'] },
       status: { in: ['active', 'error'] },
     },
-    select: { id: true, externalAccountLabel: true },
+    select: { id: true, externalAccountLabel: true, signatureHtml: true },
     orderBy: { createdAt: 'asc' },
   });
   const mailboxOptions = mailboxOptionRows.map((m) => ({
     id: m.id,
     label: m.externalAccountLabel ?? m.id,
+  }));
+  const composeMailboxes = mailboxOptionRows.map((m) => ({
+    integrationId: m.id,
+    externalAccountId: m.externalAccountLabel ?? '',
+    signatureHtml: m.signatureHtml,
   }));
   const mailboxFilter = mailboxOptions.some((o) => o.id === mailboxParam) ? mailboxParam : null;
 
@@ -123,6 +130,8 @@ export default async function CommunicationsPage({ searchParams }: PageProps) {
         toRecipients: true,
         ccRecipients: true,
         integration: { select: { externalAccountLabel: true } },
+        externalId: true,
+        integrationId: true,
       },
       orderBy: { receivedAt: 'desc' },
       take: PAGE_SIZE,
@@ -161,6 +170,7 @@ export default async function CommunicationsPage({ searchParams }: PageProps) {
           }
           totalCount={mails.length}
           unreadCount={unreadCount}
+          composeCta={<NewMailButton />}
           mailboxFilter={
             <MailboxFilter options={mailboxOptions} initialMailboxId={mailboxFilter} />
           }
@@ -176,6 +186,7 @@ export default async function CommunicationsPage({ searchParams }: PageProps) {
           <MailPagination page={page} totalPages={totalPages} totalCount={totalCount} />
         ) : null}
       </div>
+      <ComposePanel mailboxes={composeMailboxes} />
     </div>
   );
 }
