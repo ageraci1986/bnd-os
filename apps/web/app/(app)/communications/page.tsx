@@ -13,6 +13,7 @@ import { EmptyNoIntegration } from '@/features/communications/components/empty-n
 import { MailTabs } from '@/features/communications/components/mail-tabs';
 import { MailList } from '@/features/communications/components/mail-list';
 import { MailboxFilter } from '@/features/communications/components/mailbox-filter';
+import { MailPagination } from '@/features/communications/components/mail-pagination';
 
 export const metadata: Metadata = { title: 'Communications' };
 
@@ -21,6 +22,7 @@ interface PageProps {
 }
 
 const SYNC_FRESHNESS_MS = 30_000;
+const PAGE_SIZE = 50;
 
 export default async function CommunicationsPage({ searchParams }: PageProps) {
   const ctx = await requireUser();
@@ -92,33 +94,45 @@ export default async function CommunicationsPage({ searchParams }: PageProps) {
   }));
   const mailboxFilter = mailboxOptions.some((o) => o.id === mailboxParam) ? mailboxParam : null;
 
-  const rows = await prisma.emailMessage.findMany({
-    where: {
-      workspaceId: ctx.workspaceId,
-      deletedAt: null,
-      ...(clientFilter ? { clientId: clientFilter } : {}),
-      ...(mailboxFilter ? { integrationId: mailboxFilter } : {}),
-    },
-    select: {
-      id: true,
-      subject: true,
-      fromEmail: true,
-      fromName: true,
-      bodyText: true,
-      bodyHtmlSanitized: true,
-      receivedAt: true,
-      isRead: true,
-      clientId: true,
-      client: { select: { id: true, name: true, colorToken: true } },
-      toRecipients: true,
-      ccRecipients: true,
-      integration: { select: { externalAccountLabel: true } },
-    },
-    orderBy: { receivedAt: 'desc' },
-    take: 200,
-  });
+  // URL-driven pagination: ?page=N (1-based). Composes with client + mailbox
+  // filters — MailPagination preserves the other query params on nav.
+  const pageParam = Number(readSearchParamString(sp['page']) ?? '1');
+  const page = Number.isFinite(pageParam) && pageParam > 0 ? Math.max(1, Math.floor(pageParam)) : 1;
+
+  const emailWhere = {
+    workspaceId: ctx.workspaceId,
+    deletedAt: null,
+    ...(clientFilter ? { clientId: clientFilter } : {}),
+    ...(mailboxFilter ? { integrationId: mailboxFilter } : {}),
+  };
+
+  const [rows, totalCount] = await Promise.all([
+    prisma.emailMessage.findMany({
+      where: emailWhere,
+      select: {
+        id: true,
+        subject: true,
+        fromEmail: true,
+        fromName: true,
+        bodyText: true,
+        bodyHtmlSanitized: true,
+        receivedAt: true,
+        isRead: true,
+        clientId: true,
+        client: { select: { id: true, name: true, colorToken: true } },
+        toRecipients: true,
+        ccRecipients: true,
+        integration: { select: { externalAccountLabel: true } },
+      },
+      orderBy: { receivedAt: 'desc' },
+      take: PAGE_SIZE,
+      skip: (page - 1) * PAGE_SIZE,
+    }),
+    prisma.emailMessage.count({ where: emailWhere }),
+  ]);
   const mails = rows.map(toMailDTO);
   const unreadCount = rows.filter((r) => !r.isRead).length;
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
   // Most recently synced mailbox across Graph + IMAP drives the "last synced"
   // label — nulls last so a mailbox that hasn't synced yet doesn't hide a
   // fresher sibling's timestamp.
@@ -158,6 +172,9 @@ export default async function CommunicationsPage({ searchParams }: PageProps) {
         ) : (
           <MailList mails={mails} showMailboxBadge={!mailboxFilter} />
         )}
+        {totalCount > PAGE_SIZE ? (
+          <MailPagination page={page} totalPages={totalPages} totalCount={totalCount} />
+        ) : null}
       </div>
     </div>
   );
