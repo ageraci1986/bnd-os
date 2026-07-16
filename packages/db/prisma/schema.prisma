@@ -137,6 +137,8 @@ enum AuditAction {
   workspace_access_revoked
   workspace_created
   workspace_deleted
+  mail_sent
+  mail_send_failed
 }
 
 // =====================================================================
