@@ -61,6 +61,11 @@ export function MailList({
                     )}
                   >
                     {m.fromName ?? m.fromEmail}
+                    {m.hasAttachments ? (
+                      <span aria-label="Pièce jointe" className="ml-1">
+                        📎
+                      </span>
+                    ) : null}
                     {showMailboxBadge && m.mailboxLabel ? (
                       <span className="ml-2 text-xs font-normal text-[color:var(--color-text-muted)]">
                         · {m.mailboxLabel}
