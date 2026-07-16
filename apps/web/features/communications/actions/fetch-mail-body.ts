@@ -100,11 +100,11 @@ export async function fetchMailBody(
 
   let creds;
   try {
-    creds = await getValidImapCredentials({
+    ({ imap: creds } = await getValidImapCredentials({
       workspaceId: ctx.workspaceId,
       userId: ctx.userId,
       integrationId: mail.integration.id,
-    });
+    }));
   } catch (err) {
     return { ok: false, message: err instanceof Error ? err.message : 'creds error' };
   }

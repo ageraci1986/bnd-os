@@ -19,11 +19,14 @@ vi.mock('@nexushub/db', () => ({
 
 vi.mock('@/features/integrations/lib/get-valid-imap-credentials', () => ({
   getValidImapCredentials: vi.fn(async () => ({
-    host: 'h',
-    port: 993,
-    secure: true,
-    username: 'u@ex',
-    password: 'p',
+    imap: {
+      host: 'h',
+      port: 993,
+      secure: true,
+      username: 'u@ex',
+      password: 'p',
+    },
+    smtp: null,
   })),
 }));
 

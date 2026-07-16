@@ -1,7 +1,10 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import { fetchMailBody } from '../actions/fetch-mail-body';
+import { retrySendMail } from '../actions/retry-send-mail';
 import type { MailDTO } from '../lib/mail-dto';
+import { useComposePanelStore } from '@/stores/compose-panel-store';
+import { notify } from '@/features/shell/components/toaster';
 
 function initials(name: string | null, email: string): string {
   const src = name ?? email;
@@ -17,6 +20,7 @@ interface BodyState {
 }
 
 export function MailReader({ mail }: { readonly mail: MailDTO | null }) {
+  const [retryPending, startRetry] = useTransition();
   const [body, setBody] = useState<BodyState>(() => ({
     bodyText: mail?.bodyText ?? '',
     bodyHtmlSanitized: mail?.bodyHtmlSanitized ?? null,
@@ -128,8 +132,98 @@ export function MailReader({ mail }: { readonly mail: MailDTO | null }) {
           (Aucun contenu)
         </div>
       )}
-      <div className="mt-6 rounded-lg border border-dashed border-[color:var(--color-border-light)] bg-[color:var(--color-bg-muted)] px-4 py-3 text-center text-xs text-[color:var(--color-text-muted)]">
-        ↩ Répondre — bientôt (itération 2)
+      <div className="mt-6 flex items-center gap-2">
+        {mail.sendStatus === 'failed' ? (
+          <button
+            type="button"
+            disabled={retryPending}
+            onClick={() =>
+              startRetry(async () => {
+                const r = await retrySendMail({ emailMessageId: mail.id });
+                if (r.ok) {
+                  notify({ tone: 'success', message: 'Mail envoyé ✓' });
+                } else {
+                  notify({
+                    tone: 'error',
+                    message: `Échec de l'envoi${r.message ? ` : ${r.message}` : ''}`,
+                  });
+                }
+              })
+            }
+            className="btn btn-primary btn-sm"
+          >
+            {retryPending ? 'Envoi…' : 'Réessayer'}
+          </button>
+        ) : null}
+        <button
+          type="button"
+          onClick={() =>
+            useComposePanelStore.getState().open({
+              mode: 'reply',
+              replyTo: {
+                id: mail.id,
+                externalId: mail.externalId,
+                subject: mail.subject,
+                fromEmail: mail.fromEmail,
+                toRecipients: mail.toRecipients,
+                ccRecipients: mail.ccRecipients,
+                bodyText: mail.bodyText,
+                bodyHtmlSanitized: mail.bodyHtmlSanitized,
+                receivedAt: mail.receivedAt,
+                integrationId: mail.integrationId,
+              },
+            })
+          }
+          className="btn btn-primary btn-sm"
+        >
+          ↩ Répondre
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            useComposePanelStore.getState().open({
+              mode: 'reply_all',
+              replyTo: {
+                id: mail.id,
+                externalId: mail.externalId,
+                subject: mail.subject,
+                fromEmail: mail.fromEmail,
+                toRecipients: mail.toRecipients,
+                ccRecipients: mail.ccRecipients,
+                bodyText: mail.bodyText,
+                bodyHtmlSanitized: mail.bodyHtmlSanitized,
+                receivedAt: mail.receivedAt,
+                integrationId: mail.integrationId,
+              },
+            })
+          }
+          className="btn btn-ghost btn-sm"
+        >
+          ↩↩ Répondre à tous
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            useComposePanelStore.getState().open({
+              mode: 'forward',
+              replyTo: {
+                id: mail.id,
+                externalId: mail.externalId,
+                subject: mail.subject,
+                fromEmail: mail.fromEmail,
+                toRecipients: mail.toRecipients,
+                ccRecipients: mail.ccRecipients,
+                bodyText: mail.bodyText,
+                bodyHtmlSanitized: mail.bodyHtmlSanitized,
+                receivedAt: mail.receivedAt,
+                integrationId: mail.integrationId,
+              },
+            })
+          }
+          className="btn btn-ghost btn-sm"
+        >
+          ➡ Transférer
+        </button>
       </div>
     </div>
   );

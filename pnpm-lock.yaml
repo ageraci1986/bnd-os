@@ -236,6 +236,9 @@ importers:
       marked:
         specifier: ^18.0.4
         version: 18.0.4
+      nodemailer:
+        specifier: ^9.0.3
+        version: 9.0.3
       resend:
         specifier: ^4.0.0
         version: 4.8.0(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
@@ -249,6 +252,9 @@ importers:
       '@types/mailparser':
         specifier: ^3.4.6
         version: 3.4.6
+      '@types/nodemailer':
+        specifier: ^8.0.1
+        version: 8.0.1
       '@types/sanitize-html':
         specifier: ^2.16.1
         version: 2.16.1
@@ -2198,6 +2204,9 @@ packages:
 
   '@types/node@22.19.17':
     resolution: {integrity: sha512-wGdMcf+vPYM6jikpS/qhg6WiqSV/OhG+jeeHT/KlVqxYfD40iYJf9/AE1uQxVWFvU7MipKRkRv8NSHiCGgPr8Q==}
+
+  '@types/nodemailer@8.0.1':
+    resolution: {integrity: sha512-PxpaInm8V1JQDd4j0ds5HfvWQk8JupS1C0Picb96QJsrrRDjBH+DlK7L4ZdNSqNULhiZRQHc40nLVShaGxXAMw==}
 
   '@types/react-dom@19.2.3':
     resolution: {integrity: sha512-jp2L/eY6fn+KgVVQAOqYItbF0VY/YApe5Mz2F0aykSO8gx31bYCZyvSeYxCHKvzHG5eZjc+zyaS5BrBWya2+kQ==}
@@ -6977,6 +6986,10 @@ snapshots:
   '@types/node@22.19.17':
     dependencies:
       undici-types: 6.21.0
+
+  '@types/nodemailer@8.0.1':
+    dependencies:
+      '@types/node': 22.19.17
 
   '@types/react-dom@19.2.3(@types/react@19.2.14)':
     dependencies:

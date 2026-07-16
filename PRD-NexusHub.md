@@ -436,7 +436,7 @@ Tous les écrans principaux sont construits sur le même cadre : **sidebar perma
   - **Notes IA (Fireflies / Otter)** — V1.5, affiché en V1 mais désactivé ou absent
 - Statut affiché par intégration : "Actif" / "Non connecté" + bouton "Connecter" ou "Gérer"
 - **Actions disponibles** : connecter, déconnecter, gérer les canaux Slack associés.
-- **Mail V1** : lecture (INBOX) via Microsoft Graph (Outlook/M365) OU IMAP générique (OVH, Fastmail, iCloud, self-hosted…). **Mail V1.5** : envoi + pièces jointes.
+- **Mail V1** : lecture (INBOX) + envoi (Reply / Reply-All / Forward / Nouveau) via Microsoft Graph (Outlook/M365) OU IMAP+SMTP générique (OVH, Fastmail, iCloud, self-hosted…). **Mail V1.5** : pièces jointes + multi-compose + auto-retry.
 
 ## 8. Fonctionnalités transverses détaillées
 

@@ -3,11 +3,18 @@ import { useEffect, useState, useCallback } from 'react';
 
 export type ToastTone = 'success' | 'error' | 'info';
 
+export interface ToastAction {
+  readonly label: string;
+  readonly onClick: () => void;
+}
+
 export interface ToastEventDetail {
   readonly tone: ToastTone;
   readonly message: string;
   /** Override the default auto-dismiss delay (ms). */
   readonly durationMs?: number;
+  /** Optional CTA rendered next to the message, e.g. "Réessayer". */
+  readonly action?: ToastAction;
 }
 
 export const TOAST_EVENT = 'nx:toast';
@@ -52,6 +59,7 @@ export function Toaster() {
         tone: detail.tone,
         message: detail.message,
         ...(detail.durationMs !== undefined ? { durationMs: detail.durationMs } : {}),
+        ...(detail.action !== undefined ? { action: detail.action } : {}),
       };
       setToasts((prev) => [...prev, entry]);
       const delay = entry.durationMs ?? DEFAULT_DURATION_MS;
@@ -82,6 +90,18 @@ export function Toaster() {
             }}
           >
             <p className="flex-1 text-sm font-medium leading-snug">{t.message}</p>
+            {t.action ? (
+              <button
+                type="button"
+                onClick={() => {
+                  t.action?.onClick();
+                  dismiss(t.id);
+                }}
+                className="shrink-0 whitespace-nowrap text-xs font-bold text-[color:var(--color-accent-primary)] hover:underline"
+              >
+                {t.action.label}
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={() => dismiss(t.id)}

@@ -10,6 +10,8 @@ export interface MailTabsProps {
   readonly unreadCount: number;
   /** Toolbar slot rendered before the sync label — the mailbox filter. */
   readonly mailboxFilter?: ReactNode;
+  /** Toolbar slot rendered before the mailbox filter — the "+ Nouveau mail" CTA. */
+  readonly composeCta?: ReactNode;
 }
 
 function relativeTime(iso: string): string {
@@ -22,7 +24,13 @@ function relativeTime(iso: string): string {
   return `il y a ${Math.floor(h / 24)} j`;
 }
 
-export function MailTabs({ lastSyncedAt, totalCount, unreadCount, mailboxFilter }: MailTabsProps) {
+export function MailTabs({
+  lastSyncedAt,
+  totalCount,
+  unreadCount,
+  mailboxFilter,
+  composeCta,
+}: MailTabsProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const refresh = (): void => {
@@ -56,6 +64,7 @@ export function MailTabs({ lastSyncedAt, totalCount, unreadCount, mailboxFilter 
         </span>
       </nav>
       <div className="flex items-center gap-3">
+        {composeCta}
         {mailboxFilter}
         <span className="text-[11px] text-[color:var(--color-text-muted)]">
           {lastSyncedAt

@@ -41,6 +41,14 @@ export default defineConfig({
         replacement: path.resolve(__dirname, '../../packages/integrations/src/imap/index.ts'),
       },
       {
+        find: '@nexushub/integrations/smtp',
+        replacement: path.resolve(__dirname, '../../packages/integrations/src/smtp/index.ts'),
+      },
+      {
+        find: '@nexushub/integrations/mail',
+        replacement: path.resolve(__dirname, '../../packages/integrations/src/mail/index.ts'),
+      },
+      {
         find: '@nexushub/integrations',
         replacement: path.resolve(__dirname, '../../packages/integrations/src/index.ts'),
       },

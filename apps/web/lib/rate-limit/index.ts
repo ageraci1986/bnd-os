@@ -12,7 +12,14 @@ import 'server-only';
 import { Ratelimit } from '@upstash/ratelimit';
 import { Redis } from '@upstash/redis';
 
-export type RateLimitKey = 'login' | 'password_reset' | 'invitation' | 'signup_token' | 'imap_test';
+export type RateLimitKey =
+  | 'login'
+  | 'password_reset'
+  | 'invitation'
+  | 'signup_token'
+  | 'imap_test'
+  | 'mail_send_hour'
+  | 'mail_send_day';
 
 export interface RateLimitResult {
   readonly success: boolean;
@@ -34,6 +41,8 @@ const WINDOWS: Record<
   invitation: { limit: 20, window: '24 h' },
   signup_token: { limit: 5, window: '1 h' },
   imap_test: { limit: 5, window: '5 m' },
+  mail_send_hour: { limit: 50, window: '1 h' },
+  mail_send_day: { limit: 300, window: '24 h' },
 };
 
 /* ---------- Upstash backend ---------------------------------------------- */
@@ -130,6 +139,27 @@ export function getRateLimiter(key: RateLimitKey): Limiter {
   const limiter = makeMemoryLimiter(key);
   _limiters.set(key, limiter);
   return limiter;
+}
+
+/* ---------- Mail send (dual window) --------------------------------------- */
+
+export interface MailSendRateResult {
+  readonly success: boolean;
+  readonly window: 'hour' | 'day' | null;
+  readonly reset: number;
+}
+
+/**
+ * Checks the mail_send rate limit for a user across two windows: 50/hour
+ * and 300/day. Hour is checked first — if it fails, `window` is 'hour' and
+ * the day window is left untouched (no double-consumption on failure).
+ */
+export async function checkMailSendRate(userId: string): Promise<MailSendRateResult> {
+  const hour = await getRateLimiter('mail_send_hour').check(userId);
+  if (!hour.success) return { success: false, window: 'hour', reset: hour.reset };
+  const day = await getRateLimiter('mail_send_day').check(userId);
+  if (!day.success) return { success: false, window: 'day', reset: day.reset };
+  return { success: true, window: null, reset: day.reset };
 }
 
 /** Extract the client IP from common Vercel/Edge headers. */
