@@ -63,6 +63,13 @@ enum IntegrationKind {
   imap
 }
 
+enum EmailSendStatus {
+  queued
+  sending
+  sent
+  failed
+}
+
 enum IntegrationScope {
   workspace
   user
@@ -163,6 +170,7 @@ model User {
   projectMemberships     ProjectMember[]
   ownedIntegrations      Integration[]            @relation("IntegrationOwner")
   workspaceAccessCreated WorkspaceAccess[]        @relation("WorkspaceAccessCreatedBy")
+  emailsSent             EmailMessage[]  @relation("EmailMessageSentByUser")
 
   @@index([email])
   @@map("users")
@@ -192,6 +200,7 @@ model Workspace {
   emailMessages    EmailMessage[]
   slackMessages    SlackMessage[]
   workspaceAccess  WorkspaceAccess[]
+  mailDrafts           MailDraft[]
 
   @@map("workspaces")
 }
@@ -693,6 +702,11 @@ model Integration {
   owner           User?                  @relation("IntegrationOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
   channelMappings ClientChannelMapping[]
   emailMessages   EmailMessage[]
+  /// Per-mailbox signature (HTML). Sanitized via sanitizeMailHtml on save.
+  /// Auto-appended to the body when the user opens the compose panel with
+  /// this mailbox as the From. Null = no signature configured.
+  signatureHtml        String?           @map("signature_html") @db.Text
+  mailDrafts      MailDraft[]
 
   @@unique([workspaceId, kind, ownerUserId, externalAccountId])
   @@index([workspaceId])
@@ -747,12 +761,22 @@ model EmailMessage {
   /// Soft-delete: set when Graph reports the message removed (delta @removed).
   /// Filter out in queries via `where: { deletedAt: null }`.
   deletedAt         DateTime? @map("deleted_at") @db.Timestamptz(6)
+  /// Send status. NULL on inbound mails. Set only on outbound (folder='sent').
+  /// Transitions: queued → sending → sent | failed.
+  sendStatus       EmailSendStatus?  @map("send_status")
+  /// Error string for failed sends. Never contains password / body / PII.
+  sendError        String?           @map("send_error")
+  /// User who invoked the send. NULL on inbound mails. Future-proofs shared
+  /// mailbox attribution (V1 is per-user, column stays cheap).
+  sentByUserId     String?           @map("sent_by_user_id") @db.Uuid
   createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   workspace   Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   client      Client?     @relation(fields: [clientId], references: [id], onDelete: SetNull)
   integration Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  sentByUser       User?             @relation("EmailMessageSentByUser", fields: [sentByUserId], references: [id], onDelete: SetNull)
+  mailDrafts  MailDraft[]
 
   @@unique([workspaceId, integrationId, externalId])
   @@index([workspaceId, isRead])
@@ -886,4 +910,37 @@ model AuditLog {
   @@index([actorId, createdAt])
   @@index([action, createdAt])
   @@map("audit_log")
+}
+
+model MailDraft {
+  id                String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId       String        @map("workspace_id") @db.Uuid
+  userId            String        @map("user_id") @db.Uuid
+  fromIntegrationId String        @map("from_integration_id") @db.Uuid
+  /// Discriminates the auto-quote / pre-fill behavior at compose time.
+  kind              MailDraftKind
+  /// Original mail id when kind IN (reply, reply_all, forward). Null for new.
+  replyToId         String?       @map("reply_to_id") @db.Uuid
+  toRecipients      String[]      @default([]) @map("to_recipients")
+  ccRecipients      String[]      @default([]) @map("cc_recipients")
+  bccRecipients     String[]      @default([]) @map("bcc_recipients")
+  subject           String        @default("")
+  bodyHtml          String        @default("") @map("body_html") @db.Text
+  createdAt         DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  workspace       Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  fromIntegration Integration   @relation(fields: [fromIntegrationId], references: [id], onDelete: Cascade)
+  replyTo         EmailMessage? @relation(fields: [replyToId], references: [id], onDelete: SetNull)
+
+  @@unique([workspaceId, userId])
+  @@index([workspaceId, userId])
+  @@map("mail_drafts")
+}
+
+enum MailDraftKind {
+  reply
+  reply_all
+  forward
+  new_mail
 }
