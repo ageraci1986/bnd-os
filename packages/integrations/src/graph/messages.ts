@@ -14,6 +14,7 @@ const SELECT_FIELDS = [
   'conversationId',
   'bodyPreview',
   'body',
+  'hasAttachments',
 ].join(',');
 
 interface GraphListResponse {

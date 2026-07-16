@@ -60,4 +60,20 @@ describe('parseGraphMessage', () => {
     const m = parseGraphMessage(baseGraph);
     expect(m.fromEmail).toBe('marie@acme.com');
   });
+
+  it('omits hasAttachments when the source field is absent', () => {
+    const m = parseGraphMessage(baseGraph);
+    expect(m.hasAttachments).toBeUndefined();
+    expect('hasAttachments' in m).toBe(false);
+  });
+
+  it('passes through hasAttachments: true', () => {
+    const m = parseGraphMessage({ ...baseGraph, hasAttachments: true });
+    expect(m.hasAttachments).toBe(true);
+  });
+
+  it('passes through hasAttachments: false', () => {
+    const m = parseGraphMessage({ ...baseGraph, hasAttachments: false });
+    expect(m.hasAttachments).toBe(false);
+  });
 });

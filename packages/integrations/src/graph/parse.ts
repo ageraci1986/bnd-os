@@ -17,6 +17,7 @@ interface GraphMessage {
   conversationId?: string;
   bodyPreview?: string;
   body?: { contentType: string; content: string };
+  hasAttachments?: boolean;
 }
 
 function extractRecipients(arr: GraphAddress[] | undefined): string[] {
@@ -52,5 +53,6 @@ export function parseGraphMessage(raw: GraphMessage): ParsedGraphMessage {
     conversationId: raw.conversationId ?? null,
     bodyText,
     bodyHtmlSanitized,
+    ...(raw.hasAttachments !== undefined ? { hasAttachments: raw.hasAttachments } : {}),
   };
 }

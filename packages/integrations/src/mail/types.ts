@@ -31,4 +31,10 @@ export interface ParsedMailMessage {
   readonly bodyHtmlSanitized: string | null;
   /** Undefined = adapter didn't populate attachments for this fetch. */
   readonly attachments?: readonly ParsedMailAttachmentMeta[];
+  /**
+   * Native "has attachments" flag exposed by some sources (Graph) without a
+   * follow-up call. Undefined = adapter doesn't expose the flag (e.g. IMAP,
+   * which instead populates `attachments` directly from bodyStructure).
+   */
+  readonly hasAttachments?: boolean;
 }

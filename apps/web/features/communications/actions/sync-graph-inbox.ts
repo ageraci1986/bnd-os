@@ -6,6 +6,7 @@ import { getValidAccessToken } from '@/features/integrations/lib/get-valid-acces
 import {
   listInboxInitial,
   listInboxDelta,
+  listGraphAttachments,
   type ParsedGraphMessage,
 } from '@nexushub/integrations/graph';
 import { buildDomainIndex, matchClientByDomain } from '../lib/auto-associate';
@@ -85,7 +86,7 @@ export async function syncGraphInbox(): Promise<SyncResult> {
 
   for (const m of fetched) {
     const clientId = matchClientByDomain(m.fromEmail, domainIndex);
-    await prisma.emailMessage.upsert({
+    const emailMessageRow = await prisma.emailMessage.upsert({
       where: {
         workspaceId_integrationId_externalId: {
           workspaceId: ctx.workspaceId,
@@ -118,6 +119,50 @@ export async function syncGraphInbox(): Promise<SyncResult> {
         deletedAt: null,
       },
     });
+
+    // Graph exposes `hasAttachments` natively on the message list response,
+    // but never the attachment bytes/metadata themselves — a follow-up call
+    // is always required. Attachment binaries are never fetched during sync
+    // (would blow the serverless timeout) — only metadata persisted here.
+    // The binary is lazy-fetched from source on first user download demand.
+    if (m.hasAttachments) {
+      const attachments = await listGraphAttachments(token, m.externalId);
+      if (attachments.length > 0) {
+        await prisma.emailMessage.update({
+          where: { id: emailMessageRow.id },
+          data: { hasAttachments: true },
+        });
+        for (const att of attachments) {
+          await prisma.emailAttachment.upsert({
+            where: {
+              emailMessageId_sourceExternalId: {
+                emailMessageId: emailMessageRow.id,
+                sourceExternalId: att.id,
+              },
+            },
+            create: {
+              workspaceId: ctx.workspaceId,
+              emailMessageId: emailMessageRow.id,
+              filename: att.filename,
+              contentType: att.contentType,
+              sizeBytes: att.sizeBytes,
+              sourceExternalId: att.id,
+              ...(att.contentId ? { contentId: att.contentId } : {}),
+              isInline: att.isInline,
+              storagePath: null,
+              scanStatus: null,
+            },
+            update: {
+              filename: att.filename,
+              contentType: att.contentType,
+              sizeBytes: att.sizeBytes,
+              ...(att.contentId ? { contentId: att.contentId } : { contentId: null }),
+              isInline: att.isInline,
+            },
+          });
+        }
+      }
+    }
   }
 
   if (removed.length > 0) {
