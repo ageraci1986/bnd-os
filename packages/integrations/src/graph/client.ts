@@ -40,7 +40,13 @@ export async function graphFetch<T>(url: string, opts: GraphFetchOptions): Promi
       ...(opts.body ? { body: opts.body } : {}),
     });
     if (res.ok) {
-      return (await res.json()) as T;
+      try {
+        return (await res.json()) as T;
+      } catch {
+        // Some endpoints (e.g. /sendMail, /reply, /forward) return 202 Accepted
+        // with an empty body — res.json() throws on that; treat as no payload.
+        return undefined as T;
+      }
     }
     if (RETRYABLE.has(res.status) && attempt < maxRetries) {
       const backoff = 1000 * Math.pow(2, attempt);
