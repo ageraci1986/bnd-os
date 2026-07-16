@@ -1,6 +1,7 @@
 import type { ImapFlow, FetchMessageObject } from 'imapflow';
 import { parseImapMessage, type RawImapMessage } from './parse';
-import type { ParsedMailMessage } from '../mail';
+import { parseImapAttachments } from './attachments';
+import type { ParsedMailMessage, ParsedMailAttachmentMeta } from '../mail';
 
 export class UidValidityChangedError extends Error {
   readonly serverUidValidity: bigint;
@@ -45,14 +46,30 @@ function envelopeOf(m: FetchMessageObject): RawImapMessage['envelope'] {
   };
 }
 
+function attachmentsOf(m: FetchMessageObject): readonly ParsedMailAttachmentMeta[] {
+  const bodyStructure = (m as { bodyStructure?: unknown }).bodyStructure;
+  if (!bodyStructure) return [];
+  return parseImapAttachments(bodyStructure).map((a) => ({
+    sourceExternalId: a.partNumber,
+    filename: a.filename,
+    contentType: a.contentType,
+    sizeBytes: a.sizeBytes,
+    contentId: a.contentId,
+    isInline: a.isInline,
+  }));
+}
+
 function toParsedMessage(m: FetchMessageObject): ParsedMailMessage {
-  // V1: envelope-only. Downloading each message body via `session.download`
-  // is a separate IMAP round-trip per UID — 200 sequential downloads blow
-  // past Vercel's serverless timeout on the initial sync. Bodies will be
-  // lazy-fetched on demand when the user opens a mail (V1.5 task).
+  // V1: envelope-only body. Downloading each message body via
+  // `session.download` is a separate IMAP round-trip per UID — 200
+  // sequential downloads blow past Vercel's serverless timeout on the
+  // initial sync. Bodies will be lazy-fetched on demand when the user opens
+  // a mail (V1.5 task). BODYSTRUCTURE, in contrast, comes back as part of
+  // the same FETCH response as the envelope — no extra round-trip — so
+  // attachment *metadata* (not binaries) is safe to collect eagerly here.
   const uid = Number((m as { uid: number }).uid);
   const internalDate = (m as { internalDate?: Date }).internalDate;
-  return parseImapMessage({
+  const parsed = parseImapMessage({
     uid,
     envelope: envelopeOf(m),
     flags: new Set((m as { flags?: Set<string> }).flags ?? []),
@@ -60,6 +77,8 @@ function toParsedMessage(m: FetchMessageObject): ParsedMailMessage {
     bodyHtml: null,
     ...(internalDate !== undefined ? { internalDate } : {}),
   });
+  const attachments = attachmentsOf(m);
+  return attachments.length > 0 ? { ...parsed, attachments } : parsed;
 }
 
 export async function listInboxInitial(args: InitialArgs): Promise<InboxFetchResult> {
@@ -69,7 +88,7 @@ export async function listInboxInitial(args: InitialArgs): Promise<InboxFetchRes
   let maxUid = 0n;
   for await (const m of args.session.fetch(
     { since },
-    { envelope: true, flags: true, internalDate: true },
+    { envelope: true, flags: true, internalDate: true, bodyStructure: true },
     { uid: true },
   )) {
     if (messages.length >= args.maxMessages) break;
@@ -92,7 +111,7 @@ export async function listInboxIncremental(args: IncrementalArgs): Promise<Inbox
   let count = 0;
   for await (const m of args.session.fetch(
     range,
-    { envelope: true, flags: true, internalDate: true },
+    { envelope: true, flags: true, internalDate: true, bodyStructure: true },
     { uid: true },
   )) {
     if (count >= INCREMENTAL_CAP) break;
