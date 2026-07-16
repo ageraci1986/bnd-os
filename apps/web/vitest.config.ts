@@ -25,6 +25,10 @@ export default defineConfig({
   resolve: {
     alias: [
       {
+        find: '@nexushub/integrations/antivirus',
+        replacement: path.resolve(__dirname, '../../packages/integrations/src/antivirus/index.ts'),
+      },
+      {
         find: '@nexushub/integrations/graph',
         replacement: path.resolve(__dirname, '../../packages/integrations/src/graph/index.ts'),
       },
