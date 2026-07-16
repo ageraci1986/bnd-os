@@ -56,20 +56,24 @@ export async function fetchMailBody(
   if (!mail) return { ok: false, message: 'Email introuvable.' };
 
   // Detect cached bodies that were stored by an earlier version of this action
-  // (before we swapped in mailparser). Those bodies contain raw MIME headers /
-  // boundary markers / quoted-printable escapes — heuristics: a leading
-  // `------=_Part`, a `Content-Type:` line at the start, or the tell-tale
-  // `Content-Transfer-Encoding` header. When we see one, we throw away the
-  // cached body and refetch through the mailparser pipeline. Self-heals on
-  // the next open; no DB migration needed.
+  // (before we swapped in mailparser). Signature of a raw multipart body:
+  // starts with a `--<boundary>` line AND has a `Content-Type` / `Content-
+  // Transfer-Encoding` header within the first ~500 chars. Covers Java-style
+  // (`------=_Part_...`), Exchange-style (`--_006_GVXPR08...`), Java-mailer
+  // style (`--350561275-...`), and any other RFC 2046 boundary the sender
+  // decided to use. When matched, we throw away the cached body and refetch
+  // through the mailparser pipeline — self-heals on the next open, no DB
+  // migration needed.
   function looksLikeUnparsedMime(text: string | null): boolean {
     if (!text || text.length === 0) return false;
-    const head = text.slice(0, 200);
-    return (
-      head.includes('------=_Part') ||
-      /^Content-Type:\s/im.test(head) ||
-      /^Content-Transfer-Encoding:\s/im.test(head)
-    );
+    const head = text.replace(/^\s+/, '').slice(0, 500);
+    const firstLine = head.split(/\r?\n/, 1)[0] ?? '';
+    const startsWithBoundary = /^--[A-Za-z0-9=_.:+/-]{4,}$/.test(firstLine);
+    const hasMimeHeader =
+      /^Content-Type:\s/im.test(head) || /^Content-Transfer-Encoding:\s/im.test(head);
+    // Both signals together: a legit plain-text body could mention
+    // "Content-Type:" but wouldn't also start with a boundary line.
+    return startsWithBoundary && hasMimeHeader;
   }
 
   const cachedIsUsable =
