@@ -1,13 +1,18 @@
 import type { Metadata } from 'next';
 import { prisma } from '@nexushub/db';
 import { requireUser } from '@/lib/auth';
-import { getClientFilterFromSearchParams, resolveActiveClient } from '@/lib/client-filter/server';
+import {
+  getClientFilterFromSearchParams,
+  readSearchParamString,
+  resolveActiveClient,
+} from '@/lib/client-filter/server';
 import { syncGraphInbox } from '@/features/communications/actions/sync-graph-inbox';
 import { syncImapInbox } from '@/features/communications/actions/sync-imap-inbox';
 import { toMailDTO } from '@/features/communications/lib/mail-dto';
 import { EmptyNoIntegration } from '@/features/communications/components/empty-no-integration';
 import { MailTabs } from '@/features/communications/components/mail-tabs';
 import { MailList } from '@/features/communications/components/mail-list';
+import { MailboxFilter } from '@/features/communications/components/mailbox-filter';
 
 export const metadata: Metadata = { title: 'Communications' };
 
@@ -66,11 +71,33 @@ export default async function CommunicationsPage({ searchParams }: PageProps) {
   const activeClient = await resolveActiveClient(filter, ctx.workspaceId);
   const clientFilter = activeClient?.id ?? null;
 
+  // `?mailbox=<integrationId>` narrows the list to a single connected
+  // mailbox. Options are scoped to the user's own mailboxes (Graph/IMAP are
+  // both delegated per-user, PRD §9 hypothesis 8), same scoping as the
+  // sync queries above, ordered by connection date for a stable dropdown.
+  const mailboxParam = readSearchParamString(sp['mailbox']);
+  const mailboxOptionRows = await prisma.integration.findMany({
+    where: {
+      workspaceId: ctx.workspaceId,
+      ownerUserId: ctx.userId,
+      kind: { in: ['graph', 'imap'] },
+      status: { in: ['active', 'error'] },
+    },
+    select: { id: true, externalAccountLabel: true },
+    orderBy: { createdAt: 'asc' },
+  });
+  const mailboxOptions = mailboxOptionRows.map((m) => ({
+    id: m.id,
+    label: m.externalAccountLabel ?? m.id,
+  }));
+  const mailboxFilter = mailboxOptions.some((o) => o.id === mailboxParam) ? mailboxParam : null;
+
   const rows = await prisma.emailMessage.findMany({
     where: {
       workspaceId: ctx.workspaceId,
       deletedAt: null,
       ...(clientFilter ? { clientId: clientFilter } : {}),
+      ...(mailboxFilter ? { integrationId: mailboxFilter } : {}),
     },
     select: {
       id: true,
@@ -119,6 +146,9 @@ export default async function CommunicationsPage({ searchParams }: PageProps) {
           }
           totalCount={mails.length}
           unreadCount={unreadCount}
+          mailboxFilter={
+            <MailboxFilter options={mailboxOptions} initialMailboxId={mailboxFilter} />
+          }
         />
         {mails.length === 0 ? (
           <div className="p-10 text-center text-sm text-[color:var(--color-text-muted)]">

@@ -1,4 +1,5 @@
 'use client';
+import type { ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTransition } from 'react';
 import { syncGraphInbox } from '../actions/sync-graph-inbox';
@@ -7,6 +8,8 @@ export interface MailTabsProps {
   readonly lastSyncedAt: string | null;
   readonly totalCount: number;
   readonly unreadCount: number;
+  /** Toolbar slot rendered before the sync label — the mailbox filter. */
+  readonly mailboxFilter?: ReactNode;
 }
 
 function relativeTime(iso: string): string {
@@ -19,7 +22,7 @@ function relativeTime(iso: string): string {
   return `il y a ${Math.floor(h / 24)} j`;
 }
 
-export function MailTabs({ lastSyncedAt, totalCount, unreadCount }: MailTabsProps) {
+export function MailTabs({ lastSyncedAt, totalCount, unreadCount, mailboxFilter }: MailTabsProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const refresh = (): void => {
@@ -53,6 +56,7 @@ export function MailTabs({ lastSyncedAt, totalCount, unreadCount }: MailTabsProp
         </span>
       </nav>
       <div className="flex items-center gap-3">
+        {mailboxFilter}
         <span className="text-[11px] text-[color:var(--color-text-muted)]">
           {lastSyncedAt
             ? `Sync ${relativeTime(lastSyncedAt)} · ${totalCount} mails`
