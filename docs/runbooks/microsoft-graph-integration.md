@@ -3,6 +3,8 @@
 > **See also:** [`imap-integration.md`](./imap-integration.md) for the generic IMAP flow. Both adapters share the sanitize allowlist at `packages/integrations/src/mail/sanitize.ts` — any change there affects both mail sources.
 >
 > **See also:** [`mail-send.md`](./mail-send.md) for outbound mail (Reply / Reply-All / Forward / Nouveau) across both mailbox kinds.
+>
+> **See also:** [`mail-attachments.md`](./mail-attachments.md) for file attachments (V1.5).
 
 > **But** : connecter une boîte Outlook à NexusHub pour lire les mails dans `/communications`.
 >

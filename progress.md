@@ -354,6 +354,13 @@
 
 - [x] Mail send — V1 outbound (Reply / Reply-All / Forward / Nouveau) via Graph sendMail + IMAP SMTP. Drafts DB, signatures per mailbox, outbox pattern (queued → sending → sent | failed), rate limit dual window (50/h + 300/day). Migrations `20260716134517_mail_send_foundations` + `20260716140000_audit_mail_sent` appliquées à la Supabase partagée le 2026-07-16.
 
+### 6.0c Mail attachments V1.5 (Communications iter 4, 2026-07-15 → 2026-07-17)
+
+- [x] Pièces jointes — réception (lazy-fetch au download depuis IMAP/Graph) + envoi (drag & drop multi-fichiers dans le `ComposePanel`) + Forward reprise automatique. Table `email_attachments` (`AttachmentScanStatus` : pending/clean/dirty/scan_failed) + `email_messages.has_attachments` (denorm, badge 📎 `MailList`) + `mail_drafts.compose_attachments`. Bucket Supabase Storage privé `mail-attachments` (RLS scopée workspace_id) créé le 2026-07-16 (Task 3), migration `20260716201000_mail_attachments` appliquée à la Supabase partagée le 2026-07-16. Caps 25 MB/fichier + 25 MB/mail + 20 fichiers, cap Graph 3 MB/pièce jointe à l'envoi. Rate limits `mail_attachment_upload` 30/h + `mail_attachment_download` 100/h. Dédup SHA-256 par workspace.
+  - **Note** : pivot **VirusTotal → ClamAV self-hosted** en cours d'itération — le tier gratuit VirusTotal interdit l'usage en produit commercial (clause CGU). Scan synchrone bloquant via daemon ClamAV (TCP INSTREAM, `clamscan`/`clamdscan`, `localFallback: false`), déployé sur Fly.io. Voir [`docs/runbooks/mail-attachments.md`](./docs/runbooks/mail-attachments.md).
+  - **Post-merge, avant test utilisateur** : déployer le daemon ClamAV sur Fly.io (`fly volumes create` + `fly deploy`, voir runbook §2.1) et renseigner `CLAMAV_HOST`/`CLAMAV_PORT` sur Vercel (Preview + Production) — non fait automatiquement par ce merge.
+- [ ] V2 next : `Workspace.storageQuotaBytes` + enforcement à l'upload (trigger : plus gros workspace > 1 GB — voir runbook §8 monitoring SQL). Demandé explicitement par l'utilisateur, à ne pas oublier.
+
 ### 6.1 Intégration Slack
 
 - [ ] Setup app Slack (manifest, scopes mini : `channels:read`, `chat:write`, `users:read`)
