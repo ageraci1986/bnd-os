@@ -13,6 +13,7 @@
     "./email": "./src/email/index.ts",
     "./markdown": "./src/markdown/index.ts",
     "./imap": "./src/imap/index.ts",
+    "./smtp": "./src/smtp/index.ts",
     "./mail": "./src/mail/index.ts"
   },
   "scripts": {
