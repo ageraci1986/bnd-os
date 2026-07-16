@@ -224,6 +224,9 @@ importers:
       '@nexushub/domain':
         specifier: workspace:*
         version: link:../domain
+      clamscan:
+        specifier: ^2.4.0
+        version: 2.4.0
       fast-xml-parser:
         specifier: ^5.10.0
         version: 5.10.0
@@ -252,6 +255,9 @@ importers:
         specifier: ^3.24.0
         version: 3.25.76
     devDependencies:
+      '@types/clamscan':
+        specifier: ^2.4.1
+        version: 2.4.1
       '@types/mailparser':
         specifier: ^3.4.6
         version: 3.4.6
@@ -2179,6 +2185,9 @@ packages:
   '@types/babel__traverse@7.28.0':
     resolution: {integrity: sha512-8PvcXf70gTDZBgt9ptxJ8elBeBjcLOAcOtoO/mPJjtji1+CdGbHgm77om1GrsPxsiE+uXIpNSK64UYaIwQXd4Q==}
 
+  '@types/clamscan@2.4.1':
+    resolution: {integrity: sha512-KhBHhXsMGDoEkk87VRtHtDsjoqXD3epu+a09c1sjW7xqpvoihScxhZNdNIPegVCLDvPOp4khiIpy02XabseztQ==}
+
   '@types/conventional-commits-parser@5.0.2':
     resolution: {integrity: sha512-BgT2szDXnVypgpNxOK8aL5SGjUdaQbC++WZNjF1Qge3Og2+zhHj+RWhmehLhYyvQwqAmvezruVfOf8+3m74W+g==}
 
@@ -2677,6 +2686,10 @@ packages:
 
   citty@0.2.2:
     resolution: {integrity: sha512-+6vJA3L98yv+IdfKGZHBNiGW5KHn22e/JwID0Strsz8h4S/csAu/OuICwxrg44k5MRiZHWIo8XXuJgQTriRP4w==}
+
+  clamscan@2.4.0:
+    resolution: {integrity: sha512-XBOxUiGOcQGuKmCn5qaM5rIK153fGCwsvJMbjVtcnNJ+j/YHrSj2gKNjyP65yr/E8JsKTTDtKYFG++p7Lzigyw==}
+    engines: {node: '>=16.0.0'}
 
   cli-cursor@5.0.0:
     resolution: {integrity: sha512-aCj4O5wKyszjMmDT4tZj93kxyydN/K5zPWSCe6/0AV/AA1pqe5ZBIw0a2ZfPQV7lL5/yb5HsUreJ6UFAF1tEQw==}
@@ -6991,6 +7004,10 @@ snapshots:
     dependencies:
       '@babel/types': 7.29.0
 
+  '@types/clamscan@2.4.1':
+    dependencies:
+      '@types/node': 22.19.17
+
   '@types/conventional-commits-parser@5.0.2':
     dependencies:
       '@types/node': 22.19.17
@@ -7544,6 +7561,8 @@ snapshots:
       consola: 3.4.2
 
   citty@0.2.2: {}
+
+  clamscan@2.4.0: {}
 
   cli-cursor@5.0.0:
     dependencies:
