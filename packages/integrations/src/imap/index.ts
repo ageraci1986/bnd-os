@@ -10,3 +10,5 @@ export { testImapConnection } from './connection-test';
 export type { ConnectionTestResult } from './connection-test';
 export { fetchImapMessageBody } from './body';
 export type { ImapMessageBody } from './body';
+export { parseImapAttachments, fetchImapAttachmentBinary } from './attachments';
+export type { ParsedImapAttachment } from './attachments';
