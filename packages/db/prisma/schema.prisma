@@ -171,6 +171,7 @@ model User {
   ownedIntegrations      Integration[]            @relation("IntegrationOwner")
   workspaceAccessCreated WorkspaceAccess[]        @relation("WorkspaceAccessCreatedBy")
   emailsSent             EmailMessage[]  @relation("EmailMessageSentByUser")
+  mailDrafts             MailDraft[]
 
   @@index([email])
   @@map("users")
@@ -931,6 +932,7 @@ model MailDraft {
 
   workspace       Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   fromIntegration Integration   @relation(fields: [fromIntegrationId], references: [id], onDelete: Cascade)
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   replyTo         EmailMessage? @relation(fields: [replyToId], references: [id], onDelete: SetNull)
 
   @@unique([workspaceId, userId])
