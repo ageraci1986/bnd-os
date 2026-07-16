@@ -32,44 +32,6 @@ interface IncrementalArgs {
 
 const INCREMENTAL_CAP = 200;
 
-/**
- * ImapFlow's `download()` resolves with `{ content: Readable }` against a
- * real server. Tests exercise this module against a fake session that
- * returns a plain Buffer instead of a stream, so this helper accepts both
- * shapes rather than assuming one.
- */
-async function readAllContent(content: unknown): Promise<Buffer> {
-  if (Buffer.isBuffer(content)) return content;
-  if (content && typeof (content as AsyncIterable<unknown>)[Symbol.asyncIterator] === 'function') {
-    const chunks: Buffer[] = [];
-    for await (const chunk of content as AsyncIterable<Buffer | string>) {
-      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-    }
-    return Buffer.concat(chunks);
-  }
-  return Buffer.alloc(0);
-}
-
-async function bodyOf(
-  session: ImapFlow,
-  uid: number,
-): Promise<{ text: string | null; html: string | null }> {
-  try {
-    // { uid: true } is required so the download range is interpreted in UID
-    // space (matching the UIDs we track), not IMAP sequence-number space.
-    const dl = await session.download(uid, 'TEXT', { uid: true });
-    if (!dl?.content) return { text: null, html: null };
-    const raw = (await readAllContent(dl.content)).toString('utf8');
-    if (!raw) return { text: null, html: null };
-    // Heuristic: if it looks like HTML, treat as HTML; else text.
-    const trimmed = raw.trimStart();
-    if (trimmed.startsWith('<')) return { text: null, html: raw };
-    return { text: raw, html: null };
-  } catch {
-    return { text: null, html: null };
-  }
-}
-
 function envelopeOf(m: FetchMessageObject): RawImapMessage['envelope'] {
   const env = (m as unknown as { envelope: RawImapMessage['envelope'] }).envelope;
   return {
@@ -83,19 +45,19 @@ function envelopeOf(m: FetchMessageObject): RawImapMessage['envelope'] {
   };
 }
 
-async function toParsedMessage(
-  session: ImapFlow,
-  m: FetchMessageObject,
-): Promise<ParsedMailMessage> {
+function toParsedMessage(m: FetchMessageObject): ParsedMailMessage {
+  // V1: envelope-only. Downloading each message body via `session.download`
+  // is a separate IMAP round-trip per UID — 200 sequential downloads blow
+  // past Vercel's serverless timeout on the initial sync. Bodies will be
+  // lazy-fetched on demand when the user opens a mail (V1.5 task).
   const uid = Number((m as { uid: number }).uid);
-  const body = await bodyOf(session, uid);
   const internalDate = (m as { internalDate?: Date }).internalDate;
   return parseImapMessage({
     uid,
     envelope: envelopeOf(m),
     flags: new Set((m as { flags?: Set<string> }).flags ?? []),
-    bodyText: body.text,
-    bodyHtml: body.html,
+    bodyText: null,
+    bodyHtml: null,
     ...(internalDate !== undefined ? { internalDate } : {}),
   });
 }
@@ -111,7 +73,7 @@ export async function listInboxInitial(args: InitialArgs): Promise<InboxFetchRes
     { uid: true },
   )) {
     if (messages.length >= args.maxMessages) break;
-    messages.push(await toParsedMessage(args.session, m));
+    messages.push(toParsedMessage(m));
     const uid = BigInt(Number((m as { uid: number }).uid));
     if (uid > maxUid) maxUid = uid;
   }
@@ -136,7 +98,7 @@ export async function listInboxIncremental(args: IncrementalArgs): Promise<Inbox
     if (count >= INCREMENTAL_CAP) break;
     const uid = BigInt(Number((m as { uid: number }).uid));
     if (uid <= args.lastSeenUid) continue;
-    messages.push(await toParsedMessage(args.session, m));
+    messages.push(toParsedMessage(m));
     if (uid > maxUid) maxUid = uid;
     count++;
   }
