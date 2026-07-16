@@ -411,5 +411,6 @@ Avant chaque action :
 | 2026-04-27 | Création initiale (analyse PRD + mockups)                                                              | Claude (Opus 4.7)  |
 | 2026-04-27 | Décisions actées : Supabase (DB + Auth + Realtime + Storage), pnpm + turbo, 15 hypothèses PRD validées | Angelo L. + Claude |
 | 2026-05-28 | §10 — règle obligatoire : invoquer `superpowers:brainstorming` avant toute nouvelle feature            | Angelo L. + Claude |
+| 2026-07-15 | Adapter IMAP générique (Communications iter 2) + sanitize partagé + tokens design system respectés     | Angelo L. + Claude |
 
 > **Règle :** chaque modification de ce fichier ajoute une ligne ici.

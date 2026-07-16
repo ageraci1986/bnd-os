@@ -1,18 +1,6 @@
-import sanitizeHtml from 'sanitize-html';
+import { sanitizeMailHtml, stripMailHtmlToText, type ParsedMailMessage } from '../mail';
 
-export interface ParsedGraphMessage {
-  readonly externalId: string;
-  readonly subject: string;
-  readonly fromEmail: string;
-  readonly fromName: string | null;
-  readonly toRecipients: readonly string[];
-  readonly ccRecipients: readonly string[];
-  readonly receivedAt: Date;
-  readonly isRead: boolean;
-  readonly conversationId: string | null;
-  readonly bodyText: string;
-  readonly bodyHtmlSanitized: string | null;
-}
+export type ParsedGraphMessage = ParsedMailMessage;
 
 interface GraphAddress {
   emailAddress?: { name?: string; address?: string };
@@ -31,46 +19,6 @@ interface GraphMessage {
   body?: { contentType: string; content: string };
 }
 
-const SANITIZE_OPTS: sanitizeHtml.IOptions = {
-  allowedTags: [
-    'p',
-    'br',
-    'strong',
-    'em',
-    'u',
-    'a',
-    'ul',
-    'ol',
-    'li',
-    'blockquote',
-    'h1',
-    'h2',
-    'h3',
-    'h4',
-    'h5',
-    'h6',
-    'code',
-    'pre',
-    'span',
-    'div',
-    'img',
-  ],
-  allowedAttributes: {
-    a: ['href', 'title', 'target', 'rel'],
-    img: ['src', 'alt', 'title', 'width', 'height'],
-    span: ['style'],
-    div: ['style'],
-  },
-  allowedSchemes: ['http', 'https', 'mailto', 'cid'],
-  transformTags: {
-    a: sanitizeHtml.simpleTransform('a', { rel: 'noopener noreferrer', target: '_blank' }),
-  },
-};
-
-function stripToText(html: string): string {
-  return sanitizeHtml(html, { allowedTags: [], allowedAttributes: {} }).replace(/\s+/g, ' ').trim();
-}
-
 function extractRecipients(arr: GraphAddress[] | undefined): string[] {
   if (!arr) return [];
   return arr
@@ -86,8 +34,8 @@ export function parseGraphMessage(raw: GraphMessage): ParsedGraphMessage {
   let bodyHtmlSanitized: string | null = null;
   if (body && typeof body.content === 'string') {
     if (body.contentType === 'html') {
-      bodyHtmlSanitized = sanitizeHtml(body.content, SANITIZE_OPTS);
-      bodyText = stripToText(body.content);
+      bodyHtmlSanitized = sanitizeMailHtml(body.content);
+      bodyText = stripMailHtmlToText(body.content);
     } else {
       bodyText = body.content;
     }

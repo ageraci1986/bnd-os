@@ -1,3 +1,6 @@
+'use client';
+import { useEffect, useState } from 'react';
+import { fetchMailBody } from '../actions/fetch-mail-body';
 import type { MailDTO } from '../lib/mail-dto';
 
 function initials(name: string | null, email: string): string {
@@ -6,7 +9,56 @@ function initials(name: string | null, email: string): string {
   return (parts[0]?.[0] ?? '?').toUpperCase() + (parts[1]?.[0]?.toUpperCase() ?? '');
 }
 
+interface BodyState {
+  readonly bodyText: string;
+  readonly bodyHtmlSanitized: string | null;
+  readonly loading: boolean;
+  readonly error: string | null;
+}
+
 export function MailReader({ mail }: { readonly mail: MailDTO | null }) {
+  const [body, setBody] = useState<BodyState>(() => ({
+    bodyText: mail?.bodyText ?? '',
+    bodyHtmlSanitized: mail?.bodyHtmlSanitized ?? null,
+    loading: false,
+    error: null,
+  }));
+
+  useEffect(() => {
+    if (!mail) return;
+    // Always ask the server — it's the single source of truth for whether
+    // the cached body is good, needs a MIME re-parse, or is truly empty.
+    // The DB round-trip is cheap; only actually broken bodies trigger an
+    // IMAP session. Falling back to `!mail.bodyHtmlSanitized && !mail.bodyText`
+    // client-side missed raw-MIME bodies stored by an older code path
+    // (non-empty but unusable).
+    let cancelled = false;
+    setBody({
+      bodyText: mail.bodyText ?? '',
+      bodyHtmlSanitized: mail.bodyHtmlSanitized,
+      loading: true,
+      error: null,
+    });
+    void fetchMailBody({ emailId: mail.id }).then((r) => {
+      if (cancelled) return;
+      if (r.ok) {
+        setBody({
+          bodyText: r.bodyText,
+          bodyHtmlSanitized: r.bodyHtmlSanitized,
+          loading: false,
+          error: null,
+        });
+      } else {
+        // Server refused — keep whatever we already had (may still be raw
+        // MIME, but at least the user sees SOMETHING and the error).
+        setBody((prev) => ({ ...prev, loading: false, error: r.message }));
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [mail]);
+
   if (!mail) {
     return (
       <div className="flex items-center justify-center p-10 text-sm text-[color:var(--color-text-muted)]">
@@ -14,6 +66,7 @@ export function MailReader({ mail }: { readonly mail: MailDTO | null }) {
       </div>
     );
   }
+
   return (
     <div className="overflow-y-auto bg-[color:var(--color-bg-card)] p-7">
       <h2 className="mb-3 text-lg font-extrabold text-[color:var(--color-text-main)]">
@@ -53,15 +106,27 @@ export function MailReader({ mail }: { readonly mail: MailDTO | null }) {
           </div>
         </div>
       </div>
-      {mail.bodyHtmlSanitized ? (
+      {body.loading ? (
+        <div className="py-8 text-center text-sm text-[color:var(--color-text-muted)]">
+          Chargement du contenu…
+        </div>
+      ) : body.error ? (
+        <div className="rounded-lg border border-[color:var(--color-danger)] bg-[color:var(--color-bg-muted)] px-4 py-3 text-sm text-[color:var(--color-danger)]">
+          Impossible de charger le contenu : {body.error}
+        </div>
+      ) : body.bodyHtmlSanitized ? (
         <div
           className="text-sm leading-relaxed text-[color:var(--color-text-soft)]"
-          dangerouslySetInnerHTML={{ __html: mail.bodyHtmlSanitized }}
+          dangerouslySetInnerHTML={{ __html: body.bodyHtmlSanitized }}
         />
-      ) : (
+      ) : body.bodyText ? (
         <pre className="whitespace-pre-wrap font-sans text-sm text-[color:var(--color-text-soft)]">
-          {mail.bodyText}
+          {body.bodyText}
         </pre>
+      ) : (
+        <div className="py-8 text-center text-sm text-[color:var(--color-text-muted)]">
+          (Aucun contenu)
+        </div>
       )}
       <div className="mt-6 rounded-lg border border-dashed border-[color:var(--color-border-light)] bg-[color:var(--color-bg-muted)] px-4 py-3 text-center text-xs text-[color:var(--color-text-muted)]">
         ↩ Répondre — bientôt (itération 2)

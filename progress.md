@@ -346,6 +346,10 @@
 
 ## Phase 6 — Module Communications (Slack + Exchange)
 
+### 6.0 Intégration IMAP générique (Communications iter 2)
+
+- [x] IMAP mailbox integration — read-only V1, multi-mailbox per user, autodiscover, unified UI, filter dropdown. Migration `20260715142026_imap_integration_foundations` applied to shared Supabase on 2026-07-15.
+
 ### 6.1 Intégration Slack
 
 - [ ] Setup app Slack (manifest, scopes mini : `channels:read`, `chat:write`, `users:read`)
