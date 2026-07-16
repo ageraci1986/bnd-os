@@ -112,6 +112,7 @@ export default async function CommunicationsPage({ searchParams }: PageProps) {
       client: { select: { id: true, name: true, colorToken: true } },
       toRecipients: true,
       ccRecipients: true,
+      integration: { select: { externalAccountLabel: true } },
     },
     orderBy: { receivedAt: 'desc' },
     take: 200,
@@ -155,7 +156,7 @@ export default async function CommunicationsPage({ searchParams }: PageProps) {
             Aucun mail à afficher pour l&apos;instant.
           </div>
         ) : (
-          <MailList mails={mails} />
+          <MailList mails={mails} showMailboxBadge={!mailboxFilter} />
         )}
       </div>
     </div>

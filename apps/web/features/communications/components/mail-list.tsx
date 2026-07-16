@@ -4,7 +4,13 @@ import { markEmailRead } from '../actions/mark-email-read';
 import type { MailDTO } from '../lib/mail-dto';
 import { MailReader } from './mail-reader';
 
-export function MailList({ mails }: { readonly mails: readonly MailDTO[] }) {
+export function MailList({
+  mails,
+  showMailboxBadge = false,
+}: {
+  readonly mails: readonly MailDTO[];
+  readonly showMailboxBadge?: boolean;
+}) {
   const [items, setItems] = useState<readonly MailDTO[]>(mails);
   const [selectedId, setSelectedId] = useState<string | null>(mails[0]?.id ?? null);
   const [, startTransition] = useTransition();
@@ -55,6 +61,11 @@ export function MailList({ mails }: { readonly mails: readonly MailDTO[] }) {
                     )}
                   >
                     {m.fromName ?? m.fromEmail}
+                    {showMailboxBadge && m.mailboxLabel ? (
+                      <span className="ml-2 text-xs font-normal text-[color:var(--color-text-muted)]">
+                        · {m.mailboxLabel}
+                      </span>
+                    ) : null}
                   </span>
                   <span className="shrink-0 text-[11px] text-[color:var(--color-text-muted)]">
                     {new Date(m.receivedAt).toLocaleTimeString('fr-FR', {
