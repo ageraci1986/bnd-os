@@ -1,10 +1,12 @@
 'use client';
 import { useEffect, useState, useTransition, useRef } from 'react';
 import { useComposePanelStore } from '@/stores/compose-panel-store';
+import { useSmtpConfigStore } from '@/stores/smtp-config-store';
 import { RichTextEditor } from './rich-text-editor';
 import { computePrefill, type ComposePrefill } from '../lib/compose-prefill';
 import { saveDraft, loadDraft, deleteDraft } from '../actions/mail-drafts';
 import { sendMail } from '../actions/send-mail';
+import { AddMailboxModal } from '@/features/integrations/components/add-mailbox-modal';
 
 export interface MailboxOption {
   readonly integrationId: string;
@@ -29,9 +31,21 @@ export function ComposePanel({ mailboxes }: { readonly mailboxes: readonly Mailb
   const [bodyHtml, setBodyHtml] = useState('');
   const [pending, start] = useTransition();
   const [sendError, setSendError] = useState<string | null>(null);
+  const [smtpConfigRequired, setSmtpConfigRequired] = useState(false);
+  const [showConfigModal, setShowConfigModal] = useState(false);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const currentMailbox = mailboxes.find((m) => m.integrationId === fromId) ?? mailboxes[0];
+
+  // The AddMailboxModal (updateSmtpFor mode) emits on the shared store once
+  // it has successfully saved+tested SMTP creds for this mailbox — clear
+  // the banner without a full mailboxes re-fetch.
+  const lastConfigured = useSmtpConfigStore((s) => s.lastConfigured);
+  useEffect(() => {
+    if (lastConfigured && lastConfigured === fromId) {
+      setSmtpConfigRequired(false);
+    }
+  }, [lastConfigured, fromId]);
 
   // On open: load draft or compute prefill from mode + replyTo + signature
   useEffect(() => {
@@ -97,6 +111,7 @@ export function ComposePanel({ mailboxes }: { readonly mailboxes: readonly Mailb
 
   async function onSend() {
     setSendError(null);
+    setSmtpConfigRequired(false);
     start(async () => {
       const r = await sendMail({
         fromIntegrationId: fromId,
@@ -118,6 +133,8 @@ export function ComposePanel({ mailboxes }: { readonly mailboxes: readonly Mailb
       if (r.ok) {
         close();
         // Toast + navigation handled in Task 22.
+      } else if (r.code === 'SMTP_NOT_CONFIGURED') {
+        setSmtpConfigRequired(true);
       } else {
         setSendError(`${r.code}${r.message ? `: ${r.message}` : ''}`);
       }
@@ -227,6 +244,18 @@ export function ComposePanel({ mailboxes }: { readonly mailboxes: readonly Mailb
         <RichTextEditor value={bodyHtml} onChange={setBodyHtml} minHeight={200} />
       </div>
       <div className="border-t border-[color:var(--color-border-light)] px-3 py-2">
+        {smtpConfigRequired ? (
+          <div className="mb-2 rounded border border-[color:var(--color-warning)] bg-[color:var(--color-bg-muted)] px-3 py-2 text-sm">
+            ⚠ Configuration SMTP requise pour <strong>{currentMailbox?.externalAccountId}</strong>.
+            <button
+              type="button"
+              onClick={() => setShowConfigModal(true)}
+              className="ml-2 underline"
+            >
+              Configurer maintenant
+            </button>
+          </div>
+        ) : null}
         {sendError ? (
           <div className="mb-2 rounded bg-[color:var(--color-bg-muted)] px-2 py-1 text-xs text-[color:var(--color-danger)]">
             {sendError}
@@ -255,6 +284,16 @@ export function ComposePanel({ mailboxes }: { readonly mailboxes: readonly Mailb
           </div>
         </div>
       </div>
+      {showConfigModal && currentMailbox ? (
+        <AddMailboxModal
+          onClose={() => setShowConfigModal(false)}
+          reconnectFor={null}
+          updateSmtpFor={{
+            integrationId: currentMailbox.integrationId,
+            email: currentMailbox.externalAccountId,
+          }}
+        />
+      ) : null}
     </div>
   );
 }
