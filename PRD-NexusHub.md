@@ -37,7 +37,7 @@
 - Templates Kanban (éditeur de colonnes)
 - Gestion des membres de l'équipe (Admin / Membre)
 - Paramètres généraux utilisateur
-- Intégrations Slack et Microsoft Exchange
+- Intégrations Slack, Microsoft Exchange (Graph) et IMAP générique
 - Interface bilingue **FR / EN**
 - Support **desktop uniquement**
 - Notifications Slack bidirectionnelles + push desktop
@@ -431,10 +431,12 @@ Tous les écrans principaux sont construits sur le même cadre : **sidebar perma
 - **Accès depuis** — Menu utilisateur › Intégrations.
 - **Contenu affiché** — Liste des intégrations disponibles :
   - **Slack** — connecter les canaux à associer aux clients (synchronisation bidirectionnelle des messages)
-  - **Microsoft Exchange** — synchroniser la boîte mail, association automatique des e-mails au client correspondant
+  - **Microsoft Exchange** — synchroniser la boîte mail via Microsoft Graph (Outlook/M365), association automatique des e-mails au client correspondant
+  - **IMAP générique** — connecter n'importe quelle boîte mail via IMAP (OVH, Fastmail, iCloud, self-hosted…), même flux d'association automatique par domaine que Microsoft Exchange
   - **Notes IA (Fireflies / Otter)** — V1.5, affiché en V1 mais désactivé ou absent
 - Statut affiché par intégration : "Actif" / "Non connecté" + bouton "Connecter" ou "Gérer"
 - **Actions disponibles** : connecter, déconnecter, gérer les canaux Slack associés.
+- **Mail V1** : lecture (INBOX) via Microsoft Graph (Outlook/M365) OU IMAP générique (OVH, Fastmail, iCloud, self-hosted…). **Mail V1.5** : envoi + pièces jointes.
 
 ## 8. Fonctionnalités transverses détaillées
 

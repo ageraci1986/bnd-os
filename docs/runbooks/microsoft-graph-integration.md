@@ -1,5 +1,7 @@
 # Runbook — Intégration Microsoft Graph (Outlook)
 
+> **See also:** [`imap-integration.md`](./imap-integration.md) for the generic IMAP flow. Both adapters share the sanitize allowlist at `packages/integrations/src/mail/sanitize.ts` — any change there affects both mail sources.
+
 > **But** : connecter une boîte Outlook à NexusHub pour lire les mails dans `/communications`.
 >
 > **Quand l'utiliser** : avant le premier déploiement de la feature, ou pour
