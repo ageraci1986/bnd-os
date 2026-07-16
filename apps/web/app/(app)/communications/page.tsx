@@ -3,6 +3,7 @@ import { prisma } from '@nexushub/db';
 import { requireUser } from '@/lib/auth';
 import { getClientFilterFromSearchParams, resolveActiveClient } from '@/lib/client-filter/server';
 import { syncGraphInbox } from '@/features/communications/actions/sync-graph-inbox';
+import { syncImapInbox } from '@/features/communications/actions/sync-imap-inbox';
 import { toMailDTO } from '@/features/communications/lib/mail-dto';
 import { EmptyNoIntegration } from '@/features/communications/components/empty-no-integration';
 import { MailTabs } from '@/features/communications/components/mail-tabs';
@@ -20,32 +21,19 @@ export default async function CommunicationsPage({ searchParams }: PageProps) {
   const ctx = await requireUser();
   const sp = (await searchParams) ?? {};
 
-  // Prefer an active/error row over a revoked one — connecting a different
-  // mailbox after a disconnect leaves the old row in `revoked` state and
-  // creates a new one, so an unordered findFirst could pick the stale row
-  // and wrongly render the "no integration" empty state.
-  const integration =
-    (await prisma.integration.findFirst({
-      where: {
-        workspaceId: ctx.workspaceId,
-        kind: 'graph',
-        ownerUserId: ctx.userId,
-        status: { in: ['active', 'error'] },
-      },
-      select: { status: true, lastSyncedAt: true },
-      orderBy: { updatedAt: 'desc' },
-    })) ??
-    (await prisma.integration.findFirst({
-      where: {
-        workspaceId: ctx.workspaceId,
-        kind: 'graph',
-        ownerUserId: ctx.userId,
-      },
-      select: { status: true, lastSyncedAt: true },
-      orderBy: { updatedAt: 'desc' },
-    }));
+  // Any active/error mailbox (Graph or IMAP) is enough to leave the empty
+  // state — a mailbox that failed its last sync still has messages worth
+  // showing, so `error` counts alongside `active`.
+  const mailboxCount = await prisma.integration.count({
+    where: {
+      workspaceId: ctx.workspaceId,
+      kind: { in: ['graph', 'imap'] },
+      ownerUserId: ctx.userId,
+      status: { in: ['active', 'error'] },
+    },
+  });
 
-  if (!integration || (integration.status !== 'active' && integration.status !== 'error')) {
+  if (mailboxCount === 0) {
     return (
       <div className="mx-auto max-w-[1100px]">
         <header className="mb-6">
@@ -56,13 +44,23 @@ export default async function CommunicationsPage({ searchParams }: PageProps) {
     );
   }
 
-  if (
-    integration.status === 'active' &&
-    (!integration.lastSyncedAt ||
-      Date.now() - integration.lastSyncedAt.getTime() > SYNC_FRESHNESS_MS)
-  ) {
-    await syncGraphInbox();
-  }
+  // Sync every active mailbox in parallel. `allSettled` (not `all`) ensures a
+  // broken IMAP connection never stalls a working Graph sync, or vice versa —
+  // each sync action already records its own failure on the integration row.
+  const activeMailboxes = await prisma.integration.findMany({
+    where: {
+      workspaceId: ctx.workspaceId,
+      ownerUserId: ctx.userId,
+      kind: { in: ['graph', 'imap'] },
+      status: 'active',
+    },
+    select: { id: true, kind: true, lastSyncedAt: true },
+  });
+  await Promise.allSettled(
+    activeMailboxes
+      .filter((m) => !m.lastSyncedAt || Date.now() - m.lastSyncedAt.getTime() > SYNC_FRESHNESS_MS)
+      .map((m) => (m.kind === 'graph' ? syncGraphInbox() : syncImapInbox(m.id))),
+  );
 
   const filter = getClientFilterFromSearchParams(sp);
   const activeClient = await resolveActiveClient(filter, ctx.workspaceId);
@@ -93,15 +91,18 @@ export default async function CommunicationsPage({ searchParams }: PageProps) {
   });
   const mails = rows.map(toMailDTO);
   const unreadCount = rows.filter((r) => !r.isRead).length;
+  // Most recently synced mailbox across Graph + IMAP drives the "last synced"
+  // label — nulls last so a mailbox that hasn't synced yet doesn't hide a
+  // fresher sibling's timestamp.
   const refreshedIntegration = await prisma.integration.findFirst({
     where: {
       workspaceId: ctx.workspaceId,
-      kind: 'graph',
+      kind: { in: ['graph', 'imap'] },
       ownerUserId: ctx.userId,
       status: { in: ['active', 'error'] },
     },
     select: { lastSyncedAt: true },
-    orderBy: { updatedAt: 'desc' },
+    orderBy: { lastSyncedAt: { sort: 'desc', nulls: 'last' } },
   });
 
   return (
