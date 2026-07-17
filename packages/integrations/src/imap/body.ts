@@ -1,5 +1,6 @@
 import type { ImapFlow } from 'imapflow';
 import { simpleParser } from 'mailparser';
+import iconv from 'iconv-lite';
 import { sanitizeMailHtml, stripMailHtmlToText } from '../mail';
 
 export interface ImapMessageBody {
@@ -36,13 +37,14 @@ function countReplacementChars(s: string | null | undefined): number {
 function rewriteCharset(source: Buffer, override: string): Buffer {
   // Cheap-and-safe implementation: convert to latin1 string (round-trip safe
   // since latin1 is 1:1 with bytes 0-255), regex-replace charset= in header-
-  // like lines, convert back to Buffer via latin1. This preserves all raw
-  // body bytes exactly since they never match Content-Type header patterns.
+  // like lines, convert back to Buffer via latin1. Body bytes are preserved
+  // exactly since only Content-Type header patterns are targeted.
+  //
+  // Regex allows RFC 5322 line-folded headers (CRLF followed by whitespace).
   const raw = source.toString('latin1');
-  // Match `Content-Type: ...; charset=<value>` including optional quotes and
-  // whitespace. Group 1 = the Content-Type prefix up to charset=, group 2 =
-  // opening quote (or empty), group 3 = the charset value.
-  const re = /(Content-Type\s*:[^\r\n]*?charset\s*=\s*)(["']?)([A-Za-z0-9._+:-]+)\2/gi;
+  const re =
+    // eslint-disable-next-line security/detect-unsafe-regex -- bounded pattern; source is our own IMAP fetch, not attacker-controlled
+    /(Content-Type\s*:(?:[^\r\n]|\r?\n[ \t])*?charset\s*=\s*)(["']?)([A-Za-z0-9._+:-]+)\2/gi;
   const rewritten = raw.replace(
     re,
     (_m, prefix: string, quote: string) => `${prefix}${quote}${override}${quote}`,
@@ -50,30 +52,72 @@ function rewriteCharset(source: Buffer, override: string): Buffer {
   return Buffer.from(rewritten, 'latin1');
 }
 
+/**
+ * Convert the entire source Buffer from windows-1252 to UTF-8. Non-ASCII
+ * bytes get transcoded; ASCII bytes (all of the MIME structure — boundaries,
+ * headers, base64 payloads) round-trip unchanged. Then rewrite every
+ * Content-Type charset= header to `utf-8` so mailparser's iconv-lite step
+ * doesn't try to re-decode already-clean UTF-8 as windows-1252 again.
+ *
+ * This is the strongest fallback: it works even when the sender's headers
+ * are inconsistent (Content-Type says utf-8 but bytes are 1252) or when
+ * charset=utf-8 is declared on parts whose bodies are actually windows-1252
+ * base64-encoded (mailparser decodes base64 → 1252 bytes → applies utf-8
+ * → mojibake; whereas after this transform, the base64 body itself decodes
+ * to UTF-8 bytes matching the (also-rewritten) utf-8 declaration).
+ */
+function coerceToUtf8(source: Buffer): Buffer {
+  const asString = iconv.decode(source, 'windows-1252');
+  const asUtf8 = Buffer.from(asString, 'utf-8');
+  return rewriteCharset(asUtf8, 'utf-8');
+}
+
 async function parseWithFallback(source: Buffer): Promise<{
   html: string | null;
   text: string;
 }> {
-  // First pass: honor whatever the sender declared.
-  const first = await simpleParser(source);
-  const firstHtml = typeof first.html === 'string' && first.html.length > 0 ? first.html : null;
-  const firstText = first.text ?? '';
-  const firstBad = countReplacementChars(firstHtml) + countReplacementChars(firstText);
-  if (firstBad === 0) return { html: firstHtml, text: firstText };
+  const attempts: { html: string | null; text: string; bad: number; label: string }[] = [];
 
-  // Fallback pass: many legacy senders (French/European corporate mail from
-  // Java/Exchange stacks) declare `charset=utf-8` in the Content-Type header
-  // but emit windows-1252 bytes. When mailparser produces U+FFFD chars, retry
-  // with the source's charset header overridden to windows-1252 and pick
-  // whichever pass produced fewer replacement chars.
+  async function run(input: Buffer, label: string) {
+    const p = await simpleParser(input);
+    const html = typeof p.html === 'string' && p.html.length > 0 ? p.html : null;
+    const text = p.text ?? '';
+    const bad = countReplacementChars(html) + countReplacementChars(text);
+    attempts.push({ html, text, bad, label });
+    return bad;
+  }
+
+  // Pass 1 — honor the sender's declaration verbatim. Common happy path.
+  const bad1 = await run(source, 'utf8-declared');
+  if (bad1 === 0)
+    return {
+      html: (attempts[0] as { html: string | null; text: string }).html,
+      text: (attempts[0] as { html: string | null; text: string }).text,
+    };
+
+  // Pass 2 — rewrite every Content-Type charset= to windows-1252. Works when
+  // the mail body parts are 8bit or quoted-printable — mailparser then hands
+  // the raw bytes to iconv-lite as windows-1252, which is what the bytes
+  // actually are.
   const rewritten = rewriteCharset(source, 'windows-1252');
-  const second = await simpleParser(rewritten);
-  const secondHtml = typeof second.html === 'string' && second.html.length > 0 ? second.html : null;
-  const secondText = second.text ?? '';
-  const secondBad = countReplacementChars(secondHtml) + countReplacementChars(secondText);
+  const bad2 = await run(rewritten, 'windows-1252-header');
+  if (bad2 === 0)
+    return {
+      html: (attempts[1] as { html: string | null; text: string }).html,
+      text: (attempts[1] as { html: string | null; text: string }).text,
+    };
 
-  if (secondBad < firstBad) return { html: secondHtml, text: secondText };
-  return { html: firstHtml, text: firstText };
+  // Pass 3 — brute force: transcode the whole source Buffer from
+  // windows-1252 to UTF-8 (identity for ASCII, correct for 0x80-0xFF), and
+  // rewrite the headers to say utf-8 to match. Fixes cases pass 2 can't:
+  // parts that are base64-encoded with windows-1252 payloads that mailparser
+  // would otherwise re-decode as windows-1252-of-windows-1252 (garbled).
+  const coerced = coerceToUtf8(source);
+  await run(coerced, 'windows-1252-transcoded');
+
+  attempts.sort((a, b) => a.bad - b.bad);
+  const best = attempts[0] as { html: string | null; text: string };
+  return { html: best.html, text: best.text };
 }
 
 /**
