@@ -55,15 +55,21 @@ export async function fetchMailBody(
 
   if (!mail) return { ok: false, message: 'Email introuvable.' };
 
-  // Detect cached bodies that were stored by an earlier version of this action
-  // (before we swapped in mailparser). Signature of a raw multipart body:
-  // starts with a `--<boundary>` line AND has a `Content-Type` / `Content-
-  // Transfer-Encoding` header within the first ~500 chars. Covers Java-style
-  // (`------=_Part_...`), Exchange-style (`--_006_GVXPR08...`), Java-mailer
-  // style (`--350561275-...`), and any other RFC 2046 boundary the sender
-  // decided to use. When matched, we throw away the cached body and refetch
-  // through the mailparser pipeline — self-heals on the next open, no DB
-  // migration needed.
+  // Detect cached bodies stored by an earlier version of this action (before
+  // we swapped in mailparser). Two failure modes both self-heal by refetching
+  // through the current mailparser pipeline — no DB migration needed:
+  //
+  // 1. Raw multipart still-encoded body: starts with a `--<boundary>` line
+  //    AND has a `Content-Type` / `Content-Transfer-Encoding` header within
+  //    the first ~500 chars (Java-mailer, Exchange, etc.).
+  //
+  // 2. Mojibake — the old code did `Buffer.toString('utf8')` on raw MIME
+  //    bytes without honoring the message's declared charset, so any
+  //    windows-1252 / iso-8859-1 byte outside ASCII got replaced by U+FFFD
+  //    ('�', the "�" Unicode replacement char). Since the replacement is
+  //    lossy (original byte gone), the cached body can't be salvaged in place
+  //    — but a fresh IMAP fetch through mailparser reads the raw bytes again
+  //    and decodes them with iconv-lite according to the Content-Type header.
   function looksLikeUnparsedMime(text: string | null): boolean {
     if (!text || text.length === 0) return false;
     const head = text.replace(/^\s+/, '').slice(0, 500);
@@ -71,14 +77,18 @@ export async function fetchMailBody(
     const startsWithBoundary = /^--[A-Za-z0-9=_.:+/-]{4,}$/.test(firstLine);
     const hasMimeHeader =
       /^Content-Type:\s/im.test(head) || /^Content-Transfer-Encoding:\s/im.test(head);
-    // Both signals together: a legit plain-text body could mention
-    // "Content-Type:" but wouldn't also start with a boundary line.
     return startsWithBoundary && hasMimeHeader;
+  }
+
+  function containsMojibake(text: string | null): boolean {
+    return text != null && text.includes('�');
   }
 
   const cachedIsUsable =
     ((mail.bodyText && mail.bodyText.length > 0) || mail.bodyHtmlSanitized !== null) &&
-    !looksLikeUnparsedMime(mail.bodyText);
+    !looksLikeUnparsedMime(mail.bodyText) &&
+    !containsMojibake(mail.bodyText) &&
+    !containsMojibake(mail.bodyHtmlSanitized);
 
   if (cachedIsUsable) {
     return {

@@ -61,8 +61,24 @@ function makeUpstashLimiter(redis: Redis, key: RateLimitKey): Limiter {
   });
   return {
     async check(identifier) {
-      const r = await rl.limit(identifier);
-      return { success: r.success, remaining: r.remaining, reset: r.reset };
+      // Rate limits are anti-abuse, not availability gates. When the Upstash
+      // backend is unreachable (DNS outage, network hiccup, quota expired,
+      // instance paused), failing CLOSED would take the whole feature down
+      // just because Redis is flaky. Industry-standard behavior: fail OPEN
+      // with an error log so ops can notice. A single-request bypass has
+      // negligible abuse impact — the per-user, per-window caps are still
+      // enforced whenever the backend recovers.
+      try {
+        const r = await rl.limit(identifier);
+        return { success: r.success, remaining: r.remaining, reset: r.reset };
+      } catch (err) {
+        console.error(
+          `[rate-limit] Upstash backend unavailable for key=${key} — failing open. Cause:`,
+          err instanceof Error ? err.message : String(err),
+        );
+        const { limit, window } = WINDOWS[key];
+        return { success: true, remaining: limit, reset: Date.now() + windowToMs(window) };
+      }
     },
   };
 }
