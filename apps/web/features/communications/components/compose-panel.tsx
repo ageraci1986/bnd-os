@@ -3,9 +3,13 @@ import { useEffect, useState, useTransition, useRef } from 'react';
 import { useComposePanelStore } from '@/stores/compose-panel-store';
 import { useSmtpConfigStore } from '@/stores/smtp-config-store';
 import { RichTextEditor } from './rich-text-editor';
+import { AttachmentDrop } from './attachment-drop';
+import { useAttachmentUploader, type UploadedAttachment } from '../hooks/use-attachment-uploader';
 import { computePrefill, type ComposePrefill } from '../lib/compose-prefill';
 import { saveDraft, loadDraft, deleteDraft } from '../actions/mail-drafts';
 import { sendMail } from '../actions/send-mail';
+import { loadForwardAttachments } from '../actions/load-forward-attachments';
+import { removeAttachmentFromDraft } from '../actions/remove-attachment-from-draft';
 import { AddMailboxModal } from '@/features/integrations/components/add-mailbox-modal';
 import { notify } from '@/features/shell/components/toaster';
 
@@ -13,6 +17,58 @@ export interface MailboxOption {
   readonly integrationId: string;
   readonly externalAccountId: string;
   readonly signatureHtml: string | null;
+}
+
+/** Shared shape between DraftDto.composeAttachments entries and
+ * loadForwardAttachments' `added` entries — both carry the fields the
+ * uploader needs, always in a terminal ('clean') state since only clean
+ * entries are ever persisted (see mail-drafts.ts / load-forward-attachments.ts). */
+function toUploadedAttachment(a: {
+  readonly id: string;
+  readonly filename: string;
+  readonly contentType: string;
+  readonly sizeBytes: number;
+  readonly storagePath: string;
+  readonly sha256: string;
+}): UploadedAttachment {
+  return {
+    id: a.id,
+    filename: a.filename,
+    contentType: a.contentType,
+    sizeBytes: a.sizeBytes,
+    storagePath: a.storagePath,
+    sha256: a.sha256,
+    state: 'clean',
+  };
+}
+
+/** `saveDraft`/`sendMail` only ever want the attachments that finished
+ * uploading cleanly — 'uploading' placeholders and 'dirty'/'error' rows are
+ * local-only UI state, never sent to the server. */
+function toAttachmentDraftPayload(items: readonly UploadedAttachment[]) {
+  return items
+    .filter((x) => x.state === 'clean')
+    .map((x) => ({
+      id: x.id,
+      filename: x.filename,
+      contentType: x.contentType,
+      sizeBytes: x.sizeBytes,
+      storagePath: x.storagePath,
+      sha256: x.sha256,
+    }));
+}
+
+/**
+ * Spec §11 (Communications iter V1.5, mail attachments) prescribes exact
+ * French copy for the Graph 3 MB attachments cap. Every other new send
+ * failure code's server-provided `message` (see send-mail.ts) is already
+ * the right actionable French text, so this only overrides the one case.
+ */
+function attachmentFailureCopy(code: string): string | null {
+  if (code === 'SEND_FAILED_TOO_LARGE') {
+    return 'Ce mail dépasse la limite Microsoft Graph (3 MB de pièces jointes). Réduis la taille ou utilise une boîte IMAP.';
+  }
+  return null;
 }
 
 export function ComposePanel({ mailboxes }: { readonly mailboxes: readonly MailboxOption[] }) {
@@ -34,7 +90,9 @@ export function ComposePanel({ mailboxes }: { readonly mailboxes: readonly Mailb
   const [sendError, setSendError] = useState<string | null>(null);
   const [smtpConfigRequired, setSmtpConfigRequired] = useState(false);
   const [showConfigModal, setShowConfigModal] = useState(false);
+  const [forwardLoading, setForwardLoading] = useState(false);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const uploader = useAttachmentUploader();
 
   const currentMailbox = mailboxes.find((m) => m.integrationId === fromId) ?? mailboxes[0];
 
@@ -51,7 +109,7 @@ export function ComposePanel({ mailboxes }: { readonly mailboxes: readonly Mailb
   // On open: load draft or compute prefill from mode + replyTo + signature
   useEffect(() => {
     if (!isOpen) return;
-    void loadDraft().then((r) => {
+    void loadDraft().then(async (r) => {
       if (r.ok && r.draft) {
         setFromId(r.draft.fromIntegrationId);
         setTo(r.draft.toRecipients.join(', '));
@@ -64,18 +122,59 @@ export function ComposePanel({ mailboxes }: { readonly mailboxes: readonly Mailb
           subject: r.draft.subject,
           bodyHtml: r.draft.bodyHtml,
         });
-      } else {
-        const p = computePrefill({
-          mode,
-          replyTo,
-          myEmail: currentMailbox?.externalAccountId ?? '',
-          signatureHtml: currentMailbox?.signatureHtml ?? null,
-        });
-        setTo(p.toRecipients.join(', '));
-        setCc(p.ccRecipients.join(', '));
-        setSubject(p.subject);
-        setBodyHtml(p.bodyHtml);
-        setPrefill(p);
+        uploader.setInitial(r.draft.composeAttachments.map(toUploadedAttachment));
+        return;
+      }
+
+      const p = computePrefill({
+        mode,
+        replyTo,
+        myEmail: currentMailbox?.externalAccountId ?? '',
+        signatureHtml: currentMailbox?.signatureHtml ?? null,
+      });
+      setTo(p.toRecipients.join(', '));
+      setCc(p.ccRecipients.join(', '));
+      setSubject(p.subject);
+      setBodyHtml(p.bodyHtml);
+      setPrefill(p);
+
+      // Forward reprise (Task 17): only for a brand-new draft — an existing
+      // draft (handled in the `if` branch above) already persisted its
+      // reprised attachments the first time this ran, so re-triggering here
+      // would double-add them (loadForwardAttachments has no dedupe against
+      // already-reprised source ids). A draft row must exist before we can
+      // target it, so we create one via saveDraft first.
+      if (mode === 'forward' && replyTo?.id) {
+        setForwardLoading(true);
+        try {
+          const saved = await saveDraft({
+            fromIntegrationId: fromId,
+            kind: mode,
+            replyToId: replyTo.id,
+            toRecipients: [...p.toRecipients],
+            ccRecipients: [...p.ccRecipients],
+            bccRecipients: [],
+            subject: p.subject,
+            bodyHtml: p.bodyHtml,
+          });
+          if (saved.ok) {
+            const fr = await loadForwardAttachments({
+              emailMessageId: replyTo.id,
+              draftId: saved.id,
+            });
+            if (fr.ok) {
+              uploader.setInitial(fr.added.map(toUploadedAttachment));
+              if (fr.skipped.length > 0) {
+                notify({
+                  tone: 'info',
+                  message: `${fr.skipped.length} pièce(s) jointe(s) d'origine non reprise(s).`,
+                });
+              }
+            }
+          }
+        } finally {
+          setForwardLoading(false);
+        }
       }
     });
     // Intentionally scoped to `isOpen` only: mode/replyTo/currentMailbox are
@@ -103,12 +202,13 @@ export function ComposePanel({ mailboxes }: { readonly mailboxes: readonly Mailb
         bccRecipients: [],
         subject,
         bodyHtml,
+        composeAttachments: toAttachmentDraftPayload(uploader.items),
       });
     }, 2_000);
     return () => {
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
     };
-  }, [isOpen, fromId, mode, replyTo, to, cc, subject, bodyHtml]);
+  }, [isOpen, fromId, mode, replyTo, to, cc, subject, bodyHtml, uploader.items]);
 
   async function onSend() {
     setSendError(null);
@@ -130,6 +230,7 @@ export function ComposePanel({ mailboxes }: { readonly mailboxes: readonly Mailb
         bccRecipients: [],
         subject,
         bodyHtml,
+        composeAttachments: toAttachmentDraftPayload(uploader.items),
       });
       if (r.ok) {
         close();
@@ -137,10 +238,11 @@ export function ComposePanel({ mailboxes }: { readonly mailboxes: readonly Mailb
       } else if (r.code === 'SMTP_NOT_CONFIGURED') {
         setSmtpConfigRequired(true);
       } else {
-        setSendError(`${r.code}${r.message ? `: ${r.message}` : ''}`);
+        const message = attachmentFailureCopy(r.code) ?? r.message;
+        setSendError(`${r.code}${message ? `: ${message}` : ''}`);
         notify({
           tone: 'error',
-          message: `Échec de l'envoi${r.message ? ` : ${r.message}` : ''}`,
+          message: `Échec de l'envoi${message ? ` : ${message}` : ''}`,
           action: { label: 'Réessayer', onClick: () => void onSend() },
         });
       }
@@ -163,6 +265,7 @@ export function ComposePanel({ mailboxes }: { readonly mailboxes: readonly Mailb
       bccRecipients: [],
       subject,
       bodyHtml,
+      composeAttachments: toAttachmentDraftPayload(uploader.items),
     });
     close();
   }
@@ -248,6 +351,33 @@ export function ComposePanel({ mailboxes }: { readonly mailboxes: readonly Mailb
           className="mb-2 w-full rounded border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] px-2 py-1 text-sm font-medium"
         />
         <RichTextEditor value={bodyHtml} onChange={setBodyHtml} minHeight={200} />
+        {forwardLoading ? (
+          <p
+            className="mt-2 text-xs text-[color:var(--color-text-muted)]"
+            role="status"
+            aria-live="polite"
+          >
+            Chargement des pièces jointes originales…
+          </p>
+        ) : null}
+        <AttachmentDrop
+          items={uploader.items}
+          totalBytes={uploader.totalBytes}
+          disabled={pending}
+          onDrop={async (files) => {
+            const res = await uploader.addFiles(files);
+            if (res.capRejected > 0) {
+              notify({
+                tone: 'error',
+                message: 'Vous avez atteint la limite de 20 pièces jointes.',
+              });
+            }
+          }}
+          onRemove={(id) => {
+            uploader.removeItem(id);
+            void removeAttachmentFromDraft({ attachmentDraftId: id });
+          }}
+        />
       </div>
       <div className="border-t border-[color:var(--color-border-light)] px-3 py-2">
         {smtpConfigRequired ? (
@@ -282,7 +412,9 @@ export function ComposePanel({ mailboxes }: { readonly mailboxes: readonly Mailb
             <button
               type="button"
               onClick={onSend}
-              disabled={pending || !to || !subject}
+              disabled={
+                pending || !to || !subject || uploader.items.some((x) => x.state === 'uploading')
+              }
               className="btn btn-primary btn-sm"
             >
               {pending ? 'Envoi…' : 'Envoyer ↩'}

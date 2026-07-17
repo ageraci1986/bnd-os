@@ -2,9 +2,32 @@
 import 'server-only';
 import { z } from 'zod';
 import { requireUser } from '@/lib/auth';
-import { prisma } from '@nexushub/db';
+import { prisma, type Prisma } from '@nexushub/db';
+import { deleteMailAttachment } from '@/lib/mail-attachment-storage';
 
 const kindSchema = z.enum(['reply', 'reply_all', 'forward', 'new_mail']);
+
+// Mirrors the AttachmentDraft shape persisted in MailDraft.composeAttachments
+// (JSONB array — see packages/db/prisma/schema.prisma MailDraft doc comment).
+// `reprisedFromAttachmentId` marks entries carried over from a Forward (an
+// existing EmailAttachment id) rather than a fresh compose-time upload — used
+// downstream to skip a Storage delete on removal (see
+// remove-attachment-from-draft.ts).
+export const attachmentDraftSchema = z.object({
+  id: z.string().uuid(),
+  filename: z.string().min(1).max(255),
+  contentType: z.string().min(1).max(255),
+  sizeBytes: z
+    .number()
+    .int()
+    .nonnegative()
+    .max(25 * 1024 * 1024),
+  storagePath: z.string().min(1),
+  sha256: z.string().length(64),
+  reprisedFromAttachmentId: z.string().uuid().optional(),
+});
+
+export type AttachmentDraft = z.infer<typeof attachmentDraftSchema>;
 
 const saveSchema = z.object({
   fromIntegrationId: z.string().uuid(),
@@ -15,9 +38,15 @@ const saveSchema = z.object({
   bccRecipients: z.array(z.string().email()).default([]),
   subject: z.string().default(''),
   bodyHtml: z.string().max(500_000).default(''),
+  composeAttachments: z.array(attachmentDraftSchema).max(20).default([]),
 });
 
-export type SaveDraftInput = z.infer<typeof saveSchema>;
+// z.input (not z.infer) so fields carrying `.default()` — including the new
+// `composeAttachments` — stay optional for callers, matching runtime
+// behavior (saveSchema.parse fills them in). Using the output type here
+// would force every existing call site (e.g. compose-panel.tsx) to pass
+// `composeAttachments: []` explicitly for no behavioral gain.
+export type SaveDraftInput = z.input<typeof saveSchema>;
 
 export async function saveDraft(
   raw: SaveDraftInput,
@@ -38,6 +67,7 @@ export async function saveDraft(
         bccRecipients: [...parsed.bccRecipients],
         subject: parsed.subject,
         bodyHtml: parsed.bodyHtml,
+        composeAttachments: parsed.composeAttachments as unknown as Prisma.InputJsonValue,
       },
       update: {
         fromIntegrationId: parsed.fromIntegrationId,
@@ -48,6 +78,7 @@ export async function saveDraft(
         bccRecipients: [...parsed.bccRecipients],
         subject: parsed.subject,
         bodyHtml: parsed.bodyHtml,
+        composeAttachments: parsed.composeAttachments as unknown as Prisma.InputJsonValue,
       },
       select: { id: true },
     });
@@ -67,6 +98,7 @@ export interface DraftDto {
   readonly bccRecipients: readonly string[];
   readonly subject: string;
   readonly bodyHtml: string;
+  readonly composeAttachments: readonly AttachmentDraft[];
   readonly updatedAt: string;
 }
 
@@ -84,10 +116,15 @@ export async function loadDraft(): Promise<{ ok: true; draft: DraftDto | null }>
       bccRecipients: true,
       subject: true,
       bodyHtml: true,
+      composeAttachments: true,
       updatedAt: true,
     },
   });
   if (!row) return { ok: true, draft: null };
+  // Defensive re-validation of the persisted JSONB — it was Zod-validated on
+  // write, but re-parsing on read guards against stale rows written before
+  // this field existed (defaults to `[]`, which is valid) or manual DB edits.
+  const attachmentsParsed = z.array(attachmentDraftSchema).safeParse(row.composeAttachments);
   return {
     ok: true,
     draft: {
@@ -100,6 +137,7 @@ export async function loadDraft(): Promise<{ ok: true; draft: DraftDto | null }>
       bccRecipients: row.bccRecipients,
       subject: row.subject,
       bodyHtml: row.bodyHtml,
+      composeAttachments: attachmentsParsed.success ? attachmentsParsed.data : [],
       updatedAt: row.updatedAt.toISOString(),
     },
   };
@@ -107,6 +145,23 @@ export async function loadDraft(): Promise<{ ok: true; draft: DraftDto | null }>
 
 export async function deleteDraft(): Promise<{ ok: true }> {
   const ctx = await requireUser();
+  // Best-effort Storage cleanup for fresh compose-time uploads before the row
+  // goes away — reprised (Forward) entries are skipped since the source
+  // EmailAttachment row still references that Storage object (mirrors
+  // remove-attachment-from-draft.ts).
+  const draft = await prisma.mailDraft.findFirst({
+    where: { workspaceId: ctx.workspaceId, userId: ctx.userId },
+    select: { composeAttachments: true },
+  });
+  if (draft) {
+    const listParsed = z.array(attachmentDraftSchema).safeParse(draft.composeAttachments);
+    const list = listParsed.success ? listParsed.data : [];
+    await Promise.all(
+      list
+        .filter((a) => !a.reprisedFromAttachmentId)
+        .map((a) => deleteMailAttachment(a.storagePath)),
+    );
+  }
   await prisma.mailDraft.deleteMany({
     where: { workspaceId: ctx.workspaceId, userId: ctx.userId },
   });

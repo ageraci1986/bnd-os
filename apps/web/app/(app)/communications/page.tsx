@@ -134,6 +134,18 @@ export default async function CommunicationsPage({ searchParams }: PageProps) {
         integrationId: true,
         sendStatus: true,
         sendError: true,
+        hasAttachments: true,
+        emailAttachments: {
+          where: { isInline: false },
+          select: {
+            id: true,
+            filename: true,
+            contentType: true,
+            sizeBytes: true,
+            scanStatus: true,
+          },
+          orderBy: { createdAt: 'asc' },
+        },
       },
       orderBy: { receivedAt: 'desc' },
       take: PAGE_SIZE,

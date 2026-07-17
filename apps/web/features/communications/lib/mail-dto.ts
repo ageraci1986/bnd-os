@@ -19,8 +19,35 @@ export type EmailMessageListRow = Prisma.EmailMessageGetPayload<{
     integrationId: true;
     sendStatus: true;
     sendError: true;
+    hasAttachments: true;
+    emailAttachments: {
+      where: { isInline: false };
+      select: {
+        id: true;
+        filename: true;
+        contentType: true;
+        sizeBytes: true;
+        scanStatus: true;
+      };
+      orderBy: { createdAt: 'asc' };
+    };
   };
 }>;
+
+/**
+ * Client-facing shape of a persisted attachment (Task 20, Communications
+ * iter V1.5). Deliberately narrower than the Prisma row — `sha256`,
+ * `storagePath` and `scanReport` are server-only (dedup key, Storage
+ * internals, antivirus engine details) and must never reach the browser
+ * (CLAUDE.md §4.7 — no infra/PII leakage in client payloads).
+ */
+export interface MailAttachmentDto {
+  readonly id: string;
+  readonly filename: string;
+  readonly contentType: string;
+  readonly sizeBytes: number;
+  readonly scanStatus: 'pending' | 'clean' | 'dirty' | 'scan_failed' | null;
+}
 
 export interface MailDTO {
   readonly id: string;
@@ -44,6 +71,8 @@ export interface MailDTO {
   readonly integrationId: string;
   readonly sendStatus: 'queued' | 'sending' | 'sent' | 'failed' | null;
   readonly sendError: string | null;
+  readonly hasAttachments: boolean;
+  readonly attachments: readonly MailAttachmentDto[];
 }
 
 const PREVIEW_LEN = 140;
@@ -70,5 +99,13 @@ export function toMailDTO(row: EmailMessageListRow): MailDTO {
     integrationId: row.integrationId,
     sendStatus: row.sendStatus,
     sendError: row.sendError,
+    hasAttachments: row.hasAttachments,
+    attachments: row.emailAttachments.map((a) => ({
+      id: a.id,
+      filename: a.filename,
+      contentType: a.contentType,
+      sizeBytes: a.sizeBytes,
+      scanStatus: a.scanStatus,
+    })),
   };
 }

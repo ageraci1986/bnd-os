@@ -113,7 +113,8 @@ export async function syncImapInbox(integrationId: string): Promise<SyncImapResu
 
   for (const m of fetched) {
     const clientId = matchClientByDomain(m.fromEmail, domainIndex);
-    await prisma.emailMessage.upsert({
+    const hasAttachments = Boolean(m.attachments && m.attachments.length > 0);
+    const emailMessageRow = await prisma.emailMessage.upsert({
       where: {
         workspaceId_integrationId_externalId: {
           workspaceId: ctx.workspaceId,
@@ -136,6 +137,7 @@ export async function syncImapInbox(integrationId: string): Promise<SyncImapResu
         receivedAt: m.receivedAt,
         isRead: m.isRead,
         conversationId: m.conversationId,
+        hasAttachments,
         ...(clientId ? { clientId } : {}),
       },
       update: {
@@ -144,8 +146,44 @@ export async function syncImapInbox(integrationId: string): Promise<SyncImapResu
         bodyHtmlSanitized: m.bodyHtmlSanitized,
         isRead: m.isRead,
         deletedAt: null,
+        ...(hasAttachments ? { hasAttachments: true } : {}),
       },
     });
+
+    // Attachment binaries are never fetched during sync (would blow the
+    // serverless timeout) — only metadata persisted here. The binary is
+    // lazy-fetched from source on first user download demand.
+    if (m.attachments) {
+      for (const att of m.attachments) {
+        await prisma.emailAttachment.upsert({
+          where: {
+            emailMessageId_sourceExternalId: {
+              emailMessageId: emailMessageRow.id,
+              sourceExternalId: att.sourceExternalId,
+            },
+          },
+          create: {
+            workspaceId: ctx.workspaceId,
+            emailMessageId: emailMessageRow.id,
+            filename: att.filename,
+            contentType: att.contentType,
+            sizeBytes: att.sizeBytes,
+            sourceExternalId: att.sourceExternalId,
+            ...(att.contentId ? { contentId: att.contentId } : {}),
+            isInline: att.isInline,
+            storagePath: null,
+            scanStatus: null,
+          },
+          update: {
+            filename: att.filename,
+            contentType: att.contentType,
+            sizeBytes: att.sizeBytes,
+            ...(att.contentId ? { contentId: att.contentId } : { contentId: null }),
+            isInline: att.isInline,
+          },
+        });
+      }
+    }
   }
 
   await prisma.integration.update({

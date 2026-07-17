@@ -136,4 +136,43 @@ describe('sendViaImapSmtp', () => {
     expect(sendArgs.inReplyTo).toBe('<original@ex.com>');
     expect(sendArgs.references).toEqual(['<original@ex.com>']);
   });
+
+  it('threads resolved attachment binaries through to sendViaSmtp', async () => {
+    getCreds.mockResolvedValueOnce({
+      imap: { host: 'i.h', port: 993, secure: true, username: 'u', password: 'p' },
+      smtp: {
+        host: 's.h',
+        port: 587,
+        secure: false,
+        requireTls: true,
+        username: 'u',
+        password: 'p',
+      },
+    });
+    openSmtp.mockResolvedValueOnce({ close: vi.fn() });
+    send.mockResolvedValueOnce({ messageId: '<new@ex.com>', accepted: [], rejected: [] });
+    openImap.mockResolvedValueOnce({ logout: vi.fn().mockResolvedValue(undefined) });
+    append.mockResolvedValueOnce(undefined);
+
+    const attachments = [
+      { filename: 'doc.pdf', contentType: 'application/pdf', content: Buffer.from('x') },
+    ];
+    await sendViaImapSmtp({
+      integrationId: 'i1',
+      workspaceId: 'w',
+      userId: 'u',
+      fromEmail: 'me@ex.com',
+      payload: {
+        subject: 'Hi',
+        to: ['you@ex.com'],
+        cc: [],
+        bcc: [],
+        bodyHtml: '<p>Body</p>',
+        bodyText: 'Body',
+        attachments,
+      },
+    });
+    const sendArgs = send.mock.calls[0]?.[1] as { attachments?: unknown[] };
+    expect(sendArgs.attachments).toEqual(attachments);
+  });
 });

@@ -4,6 +4,8 @@
 > [`imap-integration.md`](./imap-integration.md) pour la lecture/connexion des boîtes.
 > Ce runbook couvre uniquement l'**envoi** (outbound), qui réutilise ces deux adapters.
 >
+> **See also:** [`mail-attachments.md`](./mail-attachments.md) pour les pièces jointes (V1.5).
+>
 > **But** : envoyer un mail (Reply / Reply-All / Forward / Nouveau mail) depuis
 > `/communications`, via Microsoft Graph **ou** IMAP/SMTP.
 >

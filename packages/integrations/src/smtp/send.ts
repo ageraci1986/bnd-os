@@ -1,5 +1,11 @@
 import type { Transporter } from 'nodemailer';
 
+export interface SmtpAttachment {
+  readonly filename: string;
+  readonly contentType: string;
+  readonly content: Buffer;
+}
+
 export interface SmtpSendPayload {
   readonly from: string;
   readonly to: readonly string[];
@@ -12,6 +18,8 @@ export interface SmtpSendPayload {
   readonly inReplyTo?: string;
   /** Threading chain — usually `[inReplyTo]` for a first reply, longer for deeper. */
   readonly references?: readonly string[];
+  /** Binaries already resolved in memory — SMTP has no server-side size cap we enforce here. */
+  readonly attachments?: readonly SmtpAttachment[];
 }
 
 export interface SmtpSendResult {
@@ -46,6 +54,9 @@ export async function sendViaSmtp(
       ...(payload.inReplyTo ? { inReplyTo: payload.inReplyTo } : {}),
       ...(payload.references && payload.references.length > 0
         ? { references: [...payload.references] }
+        : {}),
+      ...(payload.attachments && payload.attachments.length > 0
+        ? { attachments: [...payload.attachments] }
         : {}),
     });
     // `Transporter<T = SentMessageInfo>` in @types/nodemailer@8 resolves the

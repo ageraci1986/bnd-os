@@ -406,12 +406,13 @@ Avant chaque action :
 
 ## 11. Journal des évolutions de ce document
 
-| Date       | Modification                                                                                           | Auteur             |
-| ---------- | ------------------------------------------------------------------------------------------------------ | ------------------ |
-| 2026-04-27 | Création initiale (analyse PRD + mockups)                                                              | Claude (Opus 4.7)  |
-| 2026-04-27 | Décisions actées : Supabase (DB + Auth + Realtime + Storage), pnpm + turbo, 15 hypothèses PRD validées | Angelo L. + Claude |
-| 2026-05-28 | §10 — règle obligatoire : invoquer `superpowers:brainstorming` avant toute nouvelle feature            | Angelo L. + Claude |
-| 2026-07-15 | Adapter IMAP générique (Communications iter 2) + sanitize partagé + tokens design system respectés     | Angelo L. + Claude |
-| 2026-07-16 | Mail send V1 (Communications iter 3) — Graph + IMAP SMTP + drafts + signatures + outbox pattern        | Angelo L. + Claude |
+| Date       | Modification                                                                                                           | Auteur             |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------ |
+| 2026-04-27 | Création initiale (analyse PRD + mockups)                                                                              | Claude (Opus 4.7)  |
+| 2026-04-27 | Décisions actées : Supabase (DB + Auth + Realtime + Storage), pnpm + turbo, 15 hypothèses PRD validées                 | Angelo L. + Claude |
+| 2026-05-28 | §10 — règle obligatoire : invoquer `superpowers:brainstorming` avant toute nouvelle feature                            | Angelo L. + Claude |
+| 2026-07-15 | Adapter IMAP générique (Communications iter 2) + sanitize partagé + tokens design system respectés                     | Angelo L. + Claude |
+| 2026-07-16 | Mail send V1 (Communications iter 3) — Graph + IMAP SMTP + drafts + signatures + outbox pattern                        | Angelo L. + Claude |
+| 2026-07-17 | Mail attachments V1.5 (Communications iter 4) — Storage + ClamAV self-hosted + Forward reprise + hasAttachments denorm | Angelo L. + Claude |
 
 > **Règle :** chaque modification de ce fichier ajoute une ligne ici.

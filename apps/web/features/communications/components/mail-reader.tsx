@@ -2,6 +2,7 @@
 import { useEffect, useState, useTransition } from 'react';
 import { fetchMailBody } from '../actions/fetch-mail-body';
 import { retrySendMail } from '../actions/retry-send-mail';
+import { MailAttachmentRow } from './mail-attachment-row';
 import type { MailDTO } from '../lib/mail-dto';
 import { useComposePanelStore } from '@/stores/compose-panel-store';
 import { notify } from '@/features/shell/components/toaster';
@@ -132,6 +133,18 @@ export function MailReader({ mail }: { readonly mail: MailDTO | null }) {
           (Aucun contenu)
         </div>
       )}
+      {mail.attachments.length > 0 ? (
+        <div className="mt-4 rounded border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-muted)] p-3">
+          <div className="mb-2 text-xs font-bold text-[color:var(--color-text-muted)]">
+            📎 Pièces jointes ({mail.attachments.length})
+          </div>
+          <ul className="flex flex-col gap-1">
+            {mail.attachments.map((a) => (
+              <MailAttachmentRow key={a.id} attachment={a} />
+            ))}
+          </ul>
+        </div>
+      ) : null}
       <div className="mt-6 flex items-center gap-2">
         {mail.sendStatus === 'failed' ? (
           <button

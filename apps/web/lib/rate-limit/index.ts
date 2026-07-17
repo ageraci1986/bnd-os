@@ -19,7 +19,9 @@ export type RateLimitKey =
   | 'signup_token'
   | 'imap_test'
   | 'mail_send_hour'
-  | 'mail_send_day';
+  | 'mail_send_day'
+  | 'mail_attachment_upload'
+  | 'mail_attachment_download';
 
 export interface RateLimitResult {
   readonly success: boolean;
@@ -43,6 +45,8 @@ const WINDOWS: Record<
   imap_test: { limit: 5, window: '5 m' },
   mail_send_hour: { limit: 50, window: '1 h' },
   mail_send_day: { limit: 300, window: '24 h' },
+  mail_attachment_upload: { limit: 30, window: '1 h' },
+  mail_attachment_download: { limit: 100, window: '1 h' },
 };
 
 /* ---------- Upstash backend ---------------------------------------------- */

@@ -14,6 +14,8 @@ export interface SendImapPayload {
   readonly bodyText: string;
   /** Local EmailMessage id — used to resolve the RFC 5322 In-Reply-To header. */
   readonly replyToLocalId?: string;
+  /** Binaries already resolved in memory (Task 16 — mail attachments). */
+  readonly attachments?: readonly { filename: string; contentType: string; content: Buffer }[];
 }
 
 interface Args {
@@ -62,6 +64,9 @@ export async function sendViaImapSmtp(args: Args): Promise<void> {
       html: args.payload.bodyHtml,
       text: args.payload.bodyText,
       ...(inReplyTo ? { inReplyTo, references: [inReplyTo] } : {}),
+      ...(args.payload.attachments && args.payload.attachments.length > 0
+        ? { attachments: args.payload.attachments }
+        : {}),
     });
     rawMessageIdForAppend = r.messageId ?? null;
   } finally {

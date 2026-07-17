@@ -436,7 +436,23 @@ Tous les écrans principaux sont construits sur le même cadre : **sidebar perma
   - **Notes IA (Fireflies / Otter)** — V1.5, affiché en V1 mais désactivé ou absent
 - Statut affiché par intégration : "Actif" / "Non connecté" + bouton "Connecter" ou "Gérer"
 - **Actions disponibles** : connecter, déconnecter, gérer les canaux Slack associés.
-- **Mail V1** : lecture (INBOX) + envoi (Reply / Reply-All / Forward / Nouveau) via Microsoft Graph (Outlook/M365) OU IMAP+SMTP générique (OVH, Fastmail, iCloud, self-hosted…). **Mail V1.5** : pièces jointes + multi-compose + auto-retry.
+- **Mail V1** : lecture (INBOX) + envoi (Reply / Reply-All / Forward / Nouveau) via Microsoft Graph (Outlook/M365) OU IMAP+SMTP générique (OVH, Fastmail, iCloud, self-hosted…). **Mail V1.5** : pièces jointes ✅ (livré 2026-07-17) + multi-compose + auto-retry (restants).
+
+#### Mail V1.5 — Pièces jointes (Communications iter 4, livré 2026-07-17)
+
+Réception (parse `BODYSTRUCTURE` IMAP / `/attachments` Graph au sync, binaire
+lazy-fetché au premier téléchargement), envoi (drag & drop multi-fichiers
+dans le `ComposePanel`, upload immédiat), et reprise automatique des pièces
+jointes du mail d'origine sur un Forward. Scan antivirus **synchrone et
+bloquant** via un daemon **ClamAV self-hosted** (pivot depuis VirusTotal, dont
+le tier gratuit interdit l'usage en produit commercial) avant tout stockage.
+Binaires cachés dans un bucket Supabase Storage privé
+(`mail-attachments`), scopé par workspace via RLS. Caps : 25 MB/fichier,
+25 MB/mail, 20 fichiers, 3 MB/pièce jointe côté Graph `sendMail`. Dédup
+SHA-256 par workspace pour éviter les re-scans inutiles.
+
+Détails opérationnels complets (déploiement ClamAV, rate limits, monitoring
+Storage, réponse à incident) : [`docs/runbooks/mail-attachments.md`](./docs/runbooks/mail-attachments.md).
 
 ## 8. Fonctionnalités transverses détaillées
 
@@ -558,7 +574,7 @@ Ces points ont été ajoutés par défaut ou restent ambigus. Ils nécessitent u
 
 ## 11. Questions ouvertes
 
-- **Gestion des pièces jointes dans les mails** — envoi/réception dans le hub Communications ?
+- ~~**Gestion des pièces jointes dans les mails**~~ — **RÉSOLU** : envoi/réception livrés en Mail V1.5 (2026-07-17), voir §7 Écran Intégrations et [`docs/runbooks/mail-attachments.md`](./docs/runbooks/mail-attachments.md).
 - **Historique d'un contact** — l'ouverture d'un contact dans la fiche client donne-t-elle accès à l'historique des échanges avec lui ?
 - **Recherche globale** — y a-t-il une barre de recherche pour retrouver une carte, un mail, un contact ?
 - **Gestion des archives** — où retrouve-t-on les projets archivés / terminés ?

@@ -20,6 +20,8 @@ export interface GraphFetchOptions {
   readonly contentType?: string;
   readonly sleep?: (ms: number) => Promise<void>;
   readonly maxRetries?: number;
+  /** When true, returns the raw response body as a Buffer instead of parsing JSON (e.g. attachment `$value` downloads). */
+  readonly raw?: boolean;
 }
 
 const DEFAULT_SLEEP = (ms: number): Promise<void> => new Promise<void>((r) => setTimeout(r, ms));
@@ -40,6 +42,9 @@ export async function graphFetch<T>(url: string, opts: GraphFetchOptions): Promi
       ...(opts.body ? { body: opts.body } : {}),
     });
     if (res.ok) {
+      if (opts.raw) {
+        return Buffer.from(await res.arrayBuffer()) as unknown as T;
+      }
       try {
         return (await res.json()) as T;
       } catch {

@@ -33,3 +33,26 @@ describe('checkMailSendRate', () => {
     expect(r).toEqual({ success: true, window: null, reset: expect.any(Number) });
   });
 });
+
+describe('mail attachment rate limits', () => {
+  it('mail_attachment_upload allows 30 hits then blocks', async () => {
+    // Unique identifier — see interference note above.
+    const userId = 'u-attachment-upload';
+    for (let i = 0; i < 30; i++) {
+      const r = await getRateLimiter('mail_attachment_upload').check(userId);
+      expect(r.success).toBe(true);
+    }
+    const blocked = await getRateLimiter('mail_attachment_upload').check(userId);
+    expect(blocked.success).toBe(false);
+  });
+
+  it('mail_attachment_download allows 100 hits then blocks', async () => {
+    const userId = 'u-attachment-download';
+    for (let i = 0; i < 100; i++) {
+      const r = await getRateLimiter('mail_attachment_download').check(userId);
+      expect(r.success).toBe(true);
+    }
+    const blocked = await getRateLimiter('mail_attachment_download').check(userId);
+    expect(blocked.success).toBe(false);
+  });
+});

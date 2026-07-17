@@ -6,7 +6,13 @@ export { listInboxInitial, listInboxDelta } from './messages';
 export type { InitialSyncResult, DeltaSyncResult } from './messages';
 export { parseGraphMessage } from './parse';
 export type { ParsedGraphMessage } from './parse';
-export { sendViaGraph } from './send';
-export type { GraphSendPayload, GraphSendResult } from './send';
+export {
+  sendViaGraph,
+  GraphPayloadTooLargeError,
+  GraphReplyAttachmentsUnsupportedError,
+} from './send';
+export type { GraphSendPayload, GraphSendResult, GraphAttachment } from './send';
+export { listGraphAttachments, fetchGraphAttachmentBinary } from './attachments';
+export type { ParsedGraphAttachment } from './attachments';
 
 export const GRAPH_INTEGRATION_KEY = 'graph' as const;

@@ -71,6 +71,16 @@ const ServerEnvSchema = z.object({
   // Sentry
   SENTRY_DSN: optionalUrl(),
 
+  // ClamAV (mail attachment antivirus scan, V1.5) — remote clamd daemon TCP
+  // host/port for INSTREAM scanning (packages/integrations/src/antivirus/clamav.ts).
+  // Optional: when CLAMAV_HOST is absent, uploadAttachment fails closed
+  // (SCAN_FAILED) rather than skipping the scan.
+  CLAMAV_HOST: optionalString(1),
+  CLAMAV_PORT: z.preprocess(
+    (v) => (typeof v === 'string' && v.trim().length === 0 ? undefined : v),
+    z.coerce.number().int().min(1).max(65535).default(3310),
+  ),
+
   // Public base URL of the app — used server-side to build OAuth callback URIs.
   // Falls back to NEXT_PUBLIC_APP_URL resolution at the callsite when absent.
   APP_URL: optionalUrl(),

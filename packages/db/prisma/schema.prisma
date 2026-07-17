@@ -70,6 +70,13 @@ enum EmailSendStatus {
   failed
 }
 
+enum AttachmentScanStatus {
+  pending
+  clean
+  dirty
+  scan_failed
+}
+
 enum IntegrationScope {
   workspace
   user
@@ -139,6 +146,10 @@ enum AuditAction {
   workspace_deleted
   mail_sent
   mail_send_failed
+  attachment_uploaded
+  attachment_scanned_dirty
+  attachment_downloaded
+  attachment_rejected_upload
 }
 
 // =====================================================================
@@ -204,6 +215,7 @@ model Workspace {
   slackMessages    SlackMessage[]
   workspaceAccess  WorkspaceAccess[]
   mailDrafts           MailDraft[]
+  emailAttachments     EmailAttachment[]
 
   @@map("workspaces")
 }
@@ -767,6 +779,9 @@ model EmailMessage {
   /// Send status. NULL on inbound mails. Set only on outbound (folder='sent').
   /// Transitions: queued → sending → sent | failed.
   sendStatus       EmailSendStatus?  @map("send_status")
+  /// Denormalized flag set at parse-time from BODYSTRUCTURE / Graph metadata.
+  /// Lets MailList show 📎 without joining EmailAttachment.
+  hasAttachments   Boolean           @default(false) @map("has_attachments")
   /// Error string for failed sends. Never contains password / body / PII.
   sendError        String?           @map("send_error")
   /// User who invoked the send. NULL on inbound mails. Future-proofs shared
@@ -780,6 +795,7 @@ model EmailMessage {
   integration Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
   sentByUser       User?             @relation("EmailMessageSentByUser", fields: [sentByUserId], references: [id], onDelete: SetNull)
   mailDrafts  MailDraft[]
+  emailAttachments EmailAttachment[]
 
   @@unique([workspaceId, integrationId, externalId])
   @@index([workspaceId, isRead])
@@ -929,6 +945,11 @@ model MailDraft {
   bccRecipients     String[]      @default([]) @map("bcc_recipients")
   subject           String        @default("")
   bodyHtml          String        @default("") @map("body_html") @db.Text
+  /// Uploaded attachments (Storage-persisted + scanned clean) that will
+  /// become EmailAttachment rows on send. JSONB array of AttachmentDraft
+  /// records: { id, filename, contentType, sizeBytes, storagePath, sha256,
+  /// reprisedFromAttachmentId? }.
+  composeAttachments Json          @default("[]") @map("compose_attachments")
   createdAt         DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt         DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -940,6 +961,48 @@ model MailDraft {
   @@unique([workspaceId, userId])
   @@index([workspaceId, userId])
   @@map("mail_drafts")
+}
+
+model EmailAttachment {
+  id               String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId      String                @map("workspace_id") @db.Uuid
+  emailMessageId   String                @map("email_message_id") @db.Uuid
+  /// Filename from the sender / user upload. Sanitized (no path traversal,
+  /// no null bytes, unicode-safe, capped 255) before persist.
+  filename         String                @db.Text
+  /// MIME content-type as declared. Verified against magic bytes after fetch.
+  contentType      String                @map("content_type")
+  /// Size in bytes as reported by source. Verified against actual size after fetch.
+  sizeBytes        Int                   @map("size_bytes")
+  /// Source-specific reference used to re-fetch: IMAP part number (e.g. "2.1")
+  /// or Graph attachment id.
+  sourceExternalId String                @map("source_external_id") @db.Text
+  /// Content-Id header for inline images (cid: scheme in HTML body). Null for
+  /// regular attachments.
+  contentId        String?               @map("content_id")
+  /// True = inline (referenced by cid: in body HTML). Not re-attachable as a
+  /// file on Forward — stays in the quoted HTML.
+  isInline         Boolean               @default(false) @map("is_inline")
+  /// Supabase Storage object key `<workspaceId>/<attachment uuid>`. Null
+  /// until the binary is fetched.
+  storagePath      String?               @map("storage_path")
+  /// pending → clean | dirty | scan_failed. Null = not scanned yet (lazy state).
+  scanStatus       AttachmentScanStatus? @map("scan_status")
+  /// VirusTotal analysis summary (engine detections, verdict, analysis id).
+  scanReport       Json?                 @map("scan_report")
+  /// SHA-256 hex of the binary. Set on first fetch. Enables workspace-scoped dedup.
+  sha256           String?               @db.Char(64)
+  createdAt        DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  workspace    Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  emailMessage EmailMessage @relation(fields: [emailMessageId], references: [id], onDelete: Cascade)
+
+  @@unique([emailMessageId, sourceExternalId])
+  @@index([workspaceId, emailMessageId])
+  @@index([workspaceId, scanStatus])
+  @@index([workspaceId, sha256])
+  @@map("email_attachments")
 }
 
 enum MailDraftKind {
