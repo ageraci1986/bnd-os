@@ -6,7 +6,7 @@ import { requireUser } from '@/lib/auth';
 import { getRateLimiter } from '@/lib/rate-limit';
 import { prisma, type Prisma } from '@nexushub/db';
 import { fetchAttachmentBinary, type FetchAttachmentResult } from './fetch-attachment';
-import { attachmentDraftSchema, type AttachmentDraft } from './mail-drafts';
+import { attachmentDraftSchema, type AttachmentDraft } from '../lib/attachment-draft-schema';
 
 /**
  * loadForwardAttachments — Communications iter V1.5 (mail attachments),

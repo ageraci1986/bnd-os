@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { requireUser } from '@/lib/auth';
 import { prisma, type Prisma } from '@nexushub/db';
 import { deleteMailAttachment } from '@/lib/mail-attachment-storage';
-import { attachmentDraftSchema } from './mail-drafts';
+import { attachmentDraftSchema } from '../lib/attachment-draft-schema';
 
 /**
  * removeAttachmentFromDraft — Communications iter V1.5 (mail attachments),

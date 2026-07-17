@@ -14,7 +14,7 @@ import {
 import { getValidAccessToken } from '@/features/integrations/lib/get-valid-access-token';
 import { downloadMailAttachment } from '@/lib/mail-attachment-storage';
 import { sendViaImapSmtp } from './send-mail-imap';
-import { attachmentDraftSchema, type AttachmentDraft } from './mail-drafts';
+import { attachmentDraftSchema, type AttachmentDraft } from '../lib/attachment-draft-schema';
 
 const inputSchema = z
   .object({

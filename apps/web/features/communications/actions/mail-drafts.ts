@@ -4,30 +4,9 @@ import { z } from 'zod';
 import { requireUser } from '@/lib/auth';
 import { prisma, type Prisma } from '@nexushub/db';
 import { deleteMailAttachment } from '@/lib/mail-attachment-storage';
+import { attachmentDraftSchema, type AttachmentDraft } from '../lib/attachment-draft-schema';
 
 const kindSchema = z.enum(['reply', 'reply_all', 'forward', 'new_mail']);
-
-// Mirrors the AttachmentDraft shape persisted in MailDraft.composeAttachments
-// (JSONB array — see packages/db/prisma/schema.prisma MailDraft doc comment).
-// `reprisedFromAttachmentId` marks entries carried over from a Forward (an
-// existing EmailAttachment id) rather than a fresh compose-time upload — used
-// downstream to skip a Storage delete on removal (see
-// remove-attachment-from-draft.ts).
-export const attachmentDraftSchema = z.object({
-  id: z.string().uuid(),
-  filename: z.string().min(1).max(255),
-  contentType: z.string().min(1).max(255),
-  sizeBytes: z
-    .number()
-    .int()
-    .nonnegative()
-    .max(25 * 1024 * 1024),
-  storagePath: z.string().min(1),
-  sha256: z.string().length(64),
-  reprisedFromAttachmentId: z.string().uuid().optional(),
-});
-
-export type AttachmentDraft = z.infer<typeof attachmentDraftSchema>;
 
 const saveSchema = z.object({
   fromIntegrationId: z.string().uuid(),
