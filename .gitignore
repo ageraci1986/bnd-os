@@ -80,3 +80,4 @@ NOTES.local.md
 *.generated.tsx
 .superpowers/
 .worktrees/
+.vercel
