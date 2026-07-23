@@ -146,5 +146,41 @@ export async function fetchImapMessageBody(
   const { html: rawHtml, text: rawText } = await parseWithFallback(msg.source);
   const bodyHtmlSanitized = rawHtml ? sanitizeMailHtml(rawHtml) : null;
   const bodyText = rawHtml ? stripMailHtmlToText(rawHtml) : rawText;
+
+  // TEMP DEBUG (2026-07-23) — remove once mojibake root-cause is identified.
+  // Logs a compact fingerprint when the final output still contains U+FFFD so
+  // we can see the ACTUAL raw source bytes + which pass "won" + a sample of
+  // the first non-ASCII byte context. Never logs full body, no PII beyond
+  // what's inherently in a byte fingerprint.
+  const finalBad = countReplacementChars(bodyText) + countReplacementChars(bodyHtmlSanitized);
+  if (finalBad > 0) {
+    const src = msg.source;
+    // Locate first non-ASCII byte (>0x7F) and its context
+    let firstNonAsciiIdx = -1;
+    for (let i = 0; i < Math.min(src.length, 200_000); i++) {
+      const b = src[i];
+      if (b !== undefined && b > 0x7f) {
+        firstNonAsciiIdx = i;
+        break;
+      }
+    }
+    const contextHex =
+      firstNonAsciiIdx >= 0
+        ? src.subarray(Math.max(0, firstNonAsciiIdx - 8), firstNonAsciiIdx + 24).toString('hex')
+        : '(no non-ascii bytes)';
+    const headers1KB = src.subarray(0, 1024).toString('utf-8');
+    console.warn(
+      '[imap-body debug]',
+      JSON.stringify({
+        uid,
+        srcLen: src.length,
+        finalBad,
+        firstNonAsciiIdx,
+        firstNonAsciiHexCtx: contextHex,
+        headers1KB: headers1KB.slice(0, 1024),
+      }),
+    );
+  }
+
   return { bodyText, bodyHtmlSanitized };
 }
