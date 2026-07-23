@@ -56,3 +56,14 @@ describe('mail attachment rate limits', () => {
     expect(blocked.success).toBe(false);
   });
 });
+
+describe('recipient search rate limit', () => {
+  it('recipient_search allows 300 hits then blocks', async () => {
+    const rl = getRateLimiter('recipient_search');
+    const id = 'u-recipient-search';
+    for (let i = 0; i < 300; i++) {
+      expect((await rl.check(id)).success).toBe(true);
+    }
+    expect((await rl.check(id)).success).toBe(false);
+  });
+});

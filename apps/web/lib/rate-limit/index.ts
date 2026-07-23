@@ -21,7 +21,8 @@ export type RateLimitKey =
   | 'mail_send_hour'
   | 'mail_send_day'
   | 'mail_attachment_upload'
-  | 'mail_attachment_download';
+  | 'mail_attachment_download'
+  | 'recipient_search';
 
 export interface RateLimitResult {
   readonly success: boolean;
@@ -47,6 +48,7 @@ const WINDOWS: Record<
   mail_send_day: { limit: 300, window: '24 h' },
   mail_attachment_upload: { limit: 30, window: '1 h' },
   mail_attachment_download: { limit: 100, window: '1 h' },
+  recipient_search: { limit: 300, window: '1 m' },
 };
 
 /* ---------- Upstash backend ---------------------------------------------- */
