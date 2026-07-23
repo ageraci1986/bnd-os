@@ -176,8 +176,19 @@ describe('<ComposePanel /> — attachments wiring (Task 19)', () => {
     useComposePanelStore.setState({
       isOpen: true,
       minimized: false,
-      mode: 'new_mail',
-      replyTo: null,
+      mode: 'reply',
+      replyTo: {
+        id: 'msg-1',
+        externalId: 'ext-1',
+        subject: 'Original',
+        fromEmail: 'them@example.com',
+        toRecipients: ['me@example.com'],
+        ccRecipients: [],
+        bodyText: 'body',
+        bodyHtmlSanitized: '<p>body</p>',
+        receivedAt: new Date().toISOString(),
+        integrationId: 'int-1',
+      },
     });
 
     render(<ComposePanel mailboxes={mailboxes} />);
@@ -275,8 +286,19 @@ describe('<ComposePanel /> — attachments wiring (Task 19)', () => {
     useComposePanelStore.setState({
       isOpen: true,
       minimized: false,
-      mode: 'new_mail',
-      replyTo: null,
+      mode: 'reply',
+      replyTo: {
+        id: 'msg-1',
+        externalId: 'ext-1',
+        subject: 'Original',
+        fromEmail: 'them@example.com',
+        toRecipients: ['me@example.com'],
+        ccRecipients: [],
+        bodyText: 'body',
+        bodyHtmlSanitized: '<p>body</p>',
+        receivedAt: new Date().toISOString(),
+        integrationId: 'int-1',
+      },
     });
     render(<ComposePanel mailboxes={mailboxes} />);
 
@@ -302,7 +324,11 @@ describe('<ComposePanel /> — send failure codes (Task 19 §8)', () => {
       replyTo: null,
     });
     render(<ComposePanel mailboxes={mailboxes} />);
-    await waitFor(() => expect(loadDraftSpy).toHaveBeenCalled());
+    // Gate on a real render marker rather than loadDraft — in new_mail mode
+    // the panel skips the draft load entirely and starts empty.
+    await waitFor(() =>
+      expect(screen.getByPlaceholderText('À (séparés par des virgules)')).toBeInTheDocument(),
+    );
     const to = screen.getByPlaceholderText('À (séparés par des virgules)');
     const subject = screen.getByPlaceholderText('Objet');
     await act(async () => {
