@@ -64,7 +64,16 @@ export async function scanFileWithClamAV(
       return { clean: true, verdict: 'clean', stats: EMPTY_STATS, analysisId };
     }
 
+    // Defensive: the `clamscan` npm library returns `{isInfected:true,
+    // viruses:[]}` when the daemon is unreachable (e.g. TCP connection
+    // refused, wrong bind address) — presenting an infra failure as a
+    // detection. Treat "infected without any signature name" as an unknown
+    // state and fail closed as `scan_failed` so the audit log stays honest.
     const viruses = result.viruses ?? [];
+    if (viruses.length === 0) {
+      return { clean: false, verdict: 'scan_failed', stats: EMPTY_STATS, analysisId };
+    }
+
     return {
       clean: false,
       verdict: 'dirty',
