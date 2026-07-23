@@ -94,10 +94,7 @@ function coerceToUtf8(source: Buffer): Buffer {
   return rewriteCharset(asUtf8, 'utf-8');
 }
 
-async function parseWithFallback(
-  source: Buffer,
-  debug?: { uid: number },
-): Promise<{
+async function parseWithFallback(source: Buffer): Promise<{
   html: string | null;
   text: string;
 }> {
@@ -111,8 +108,6 @@ async function parseWithFallback(
     attempts.push({ html, text, bad, label });
     return bad;
   }
-
-  void debug;
 
   // Pass 1 — honor the sender's declaration verbatim. Common happy path.
   const bad1 = await run(source, 'utf8-declared');
@@ -144,29 +139,6 @@ async function parseWithFallback(
 
   attempts.sort((a, b) => a.bad - b.bad);
   const best = attempts[0] as { html: string | null; text: string };
-
-  // TEMP DEBUG — log each pass score + Content-Type headers of the source.
-  if (debug) {
-    const raw = source.toString('latin1');
-    const ctMatches: string[] = [];
-    const ctRe = /Content-Type\s*:[^\r\n]{0,200}/gi;
-    let m;
-    while ((m = ctRe.exec(raw)) !== null) ctMatches.push(m[0].replace(/\s+/g, ' ').slice(0, 200));
-    const cteMatches: string[] = [];
-    const cteRe = /Content-Transfer-Encoding\s*:[^\r\n]{0,60}/gi;
-    while ((m = cteRe.exec(raw)) !== null) cteMatches.push(m[0].replace(/\s+/g, ' '));
-    console.warn(
-      '[imap-body pass-scores]',
-      JSON.stringify({
-        uid: debug.uid,
-        passes: attempts.map((a) => ({ label: a.label, bad: a.bad })),
-        winner: (attempts[0] as { label: string }).label,
-        contentTypes: ctMatches.slice(0, 10),
-        contentTransferEncodings: cteMatches.slice(0, 10),
-      }),
-    );
-  }
-
   return { html: best.html, text: best.text };
 }
 
@@ -193,44 +165,8 @@ export async function fetchImapMessageBody(
 ): Promise<ImapMessageBody | null> {
   const msg = await session.fetchOne(String(uid), { source: true }, { uid: true });
   if (!msg || !Buffer.isBuffer(msg.source)) return null;
-  const { html: rawHtml, text: rawText } = await parseWithFallback(msg.source, { uid });
+  const { html: rawHtml, text: rawText } = await parseWithFallback(msg.source);
   const bodyHtmlSanitized = rawHtml ? sanitizeMailHtml(rawHtml) : null;
   const bodyText = rawHtml ? stripMailHtmlToText(rawHtml) : rawText;
-
-  // TEMP DEBUG (2026-07-23) — remove once mojibake root-cause is identified.
-  // Logs a compact fingerprint when the final output still contains U+FFFD so
-  // we can see the ACTUAL raw source bytes + which pass "won" + a sample of
-  // the first non-ASCII byte context. Never logs full body, no PII beyond
-  // what's inherently in a byte fingerprint.
-  const finalBad = countReplacementChars(bodyText) + countReplacementChars(bodyHtmlSanitized);
-  if (finalBad > 0) {
-    const src = msg.source;
-    // Locate first non-ASCII byte (>0x7F) and its context
-    let firstNonAsciiIdx = -1;
-    for (let i = 0; i < Math.min(src.length, 200_000); i++) {
-      const b = src[i];
-      if (b !== undefined && b > 0x7f) {
-        firstNonAsciiIdx = i;
-        break;
-      }
-    }
-    const contextHex =
-      firstNonAsciiIdx >= 0
-        ? src.subarray(Math.max(0, firstNonAsciiIdx - 8), firstNonAsciiIdx + 24).toString('hex')
-        : '(no non-ascii bytes)';
-    const headers1KB = src.subarray(0, 1024).toString('utf-8');
-    console.warn(
-      '[imap-body debug]',
-      JSON.stringify({
-        uid,
-        srcLen: src.length,
-        finalBad,
-        firstNonAsciiIdx,
-        firstNonAsciiHexCtx: contextHex,
-        headers1KB: headers1KB.slice(0, 1024),
-      }),
-    );
-  }
-
   return { bodyText, bodyHtmlSanitized };
 }
