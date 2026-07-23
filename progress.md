@@ -361,6 +361,14 @@
   - **Post-merge, avant test utilisateur** : déployer le daemon ClamAV sur Fly.io (`fly volumes create` + `fly deploy`, voir runbook §2.1) et renseigner `CLAMAV_HOST`/`CLAMAV_PORT` sur Vercel (Preview + Production) — non fait automatiquement par ce merge.
 - [ ] V2 next : `Workspace.storageQuotaBytes` + enforcement à l'upload (trigger : plus gros workspace > 1 GB — voir runbook §8 monitoring SQL). Demandé explicitement par l'utilisateur, à ne pas oublier.
 
+### 6.0d Recipient autocomplete V1.6 — DONE (2026-07-24)
+
+- Server action `searchRecipients` + Zod input + rate limit `recipient_search` 300/min
+- Pure matcher/ranking lib (unit tested)
+- `RecipientField` chips-dropdown component
+- ComposePanel migration `string` → `string[]` state, Cci field visible
+- No DB migration, no new dep
+
 ### 6.1 Intégration Slack
 
 - [ ] Setup app Slack (manifest, scopes mini : `channels:read`, `chat:write`, `users:read`)
