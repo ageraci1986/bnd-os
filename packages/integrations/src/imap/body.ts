@@ -35,21 +35,43 @@ function countReplacementChars(s: string | null | undefined): number {
  * preserved.
  */
 function rewriteCharset(source: Buffer, override: string): Buffer {
-  // Cheap-and-safe implementation: convert to latin1 string (round-trip safe
-  // since latin1 is 1:1 with bytes 0-255), regex-replace charset= in header-
-  // like lines, convert back to Buffer via latin1. Body bytes are preserved
-  // exactly since only Content-Type header patterns are targeted.
+  // Round-trip through latin1 (1:1 with bytes 0-255) so body bytes are
+  // preserved exactly. Two rewrites, applied in order:
+  //
+  //   1. REPLACE — every Content-Type: header that already declares a charset
+  //      gets its charset value replaced with `override`.
+  //
+  //   2. APPEND — every Content-Type: text/* header that has NO charset param
+  //      gets `; charset=<override>` appended. This is critical for legacy
+  //      Exchange forwards: they often emit `Content-Type: text/html` (no
+  //      charset) with a raw 8bit body in iso-8859-1 / windows-1252, and
+  //      mailparser defaults absent charsets to us-ascii — every non-ASCII
+  //      byte becomes U+FFFD.
   //
   // Regex allows RFC 5322 line-folded headers (CRLF followed by whitespace).
   const raw = source.toString('latin1');
-  const re =
-    // eslint-disable-next-line security/detect-unsafe-regex -- bounded pattern; source is our own IMAP fetch, not attacker-controlled
+
+  const replaceRe =
+    // eslint-disable-next-line security/detect-unsafe-regex -- bounded pattern; source is our own IMAP fetch
     /(Content-Type\s*:(?:[^\r\n]|\r?\n[ \t])*?charset\s*=\s*)(["']?)([A-Za-z0-9._+:-]+)\2/gi;
-  const rewritten = raw.replace(
-    re,
+  const step1 = raw.replace(
+    replaceRe,
     (_m, prefix: string, quote: string) => `${prefix}${quote}${override}${quote}`,
   );
-  return Buffer.from(rewritten, 'latin1');
+
+  // Match `Content-Type: text/<subtype>` up to end-of-header (including
+  // folded continuations). Skip if `charset=` appears anywhere in the header
+  // (already handled by step 1). Append `; charset=<override>` at the end
+  // of the header value.
+  const appendRe =
+    // eslint-disable-next-line security/detect-unsafe-regex -- bounded pattern; source is our own IMAP fetch
+    /(Content-Type\s*:\s*text\/[A-Za-z0-9._+-]+(?:(?:[^\r\n]|\r?\n[ \t])*?)?)(?=\r?\n(?![ \t]))/gi;
+  const step2 = step1.replace(appendRe, (m: string) => {
+    if (/charset\s*=/i.test(m)) return m;
+    return `${m}; charset=${override}`;
+  });
+
+  return Buffer.from(step2, 'latin1');
 }
 
 /**
