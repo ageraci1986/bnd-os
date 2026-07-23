@@ -72,7 +72,10 @@ function coerceToUtf8(source: Buffer): Buffer {
   return rewriteCharset(asUtf8, 'utf-8');
 }
 
-async function parseWithFallback(source: Buffer): Promise<{
+async function parseWithFallback(
+  source: Buffer,
+  debug?: { uid: number },
+): Promise<{
   html: string | null;
   text: string;
 }> {
@@ -86,6 +89,8 @@ async function parseWithFallback(source: Buffer): Promise<{
     attempts.push({ html, text, bad, label });
     return bad;
   }
+
+  void debug;
 
   // Pass 1 — honor the sender's declaration verbatim. Common happy path.
   const bad1 = await run(source, 'utf8-declared');
@@ -117,6 +122,29 @@ async function parseWithFallback(source: Buffer): Promise<{
 
   attempts.sort((a, b) => a.bad - b.bad);
   const best = attempts[0] as { html: string | null; text: string };
+
+  // TEMP DEBUG — log each pass score + Content-Type headers of the source.
+  if (debug) {
+    const raw = source.toString('latin1');
+    const ctMatches: string[] = [];
+    const ctRe = /Content-Type\s*:[^\r\n]{0,200}/gi;
+    let m;
+    while ((m = ctRe.exec(raw)) !== null) ctMatches.push(m[0].replace(/\s+/g, ' ').slice(0, 200));
+    const cteMatches: string[] = [];
+    const cteRe = /Content-Transfer-Encoding\s*:[^\r\n]{0,60}/gi;
+    while ((m = cteRe.exec(raw)) !== null) cteMatches.push(m[0].replace(/\s+/g, ' '));
+    console.warn(
+      '[imap-body pass-scores]',
+      JSON.stringify({
+        uid: debug.uid,
+        passes: attempts.map((a) => ({ label: a.label, bad: a.bad })),
+        winner: (attempts[0] as { label: string }).label,
+        contentTypes: ctMatches.slice(0, 10),
+        contentTransferEncodings: cteMatches.slice(0, 10),
+      }),
+    );
+  }
+
   return { html: best.html, text: best.text };
 }
 
@@ -143,7 +171,7 @@ export async function fetchImapMessageBody(
 ): Promise<ImapMessageBody | null> {
   const msg = await session.fetchOne(String(uid), { source: true }, { uid: true });
   if (!msg || !Buffer.isBuffer(msg.source)) return null;
-  const { html: rawHtml, text: rawText } = await parseWithFallback(msg.source);
+  const { html: rawHtml, text: rawText } = await parseWithFallback(msg.source, { uid });
   const bodyHtmlSanitized = rawHtml ? sanitizeMailHtml(rawHtml) : null;
   const bodyText = rawHtml ? stripMailHtmlToText(rawHtml) : rawText;
 
