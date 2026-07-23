@@ -106,10 +106,16 @@ export function ComposePanel({ mailboxes }: { readonly mailboxes: readonly Mailb
     }
   }, [lastConfigured, fromId]);
 
-  // On open: load draft or compute prefill from mode + replyTo + signature
+  // On open: load draft or compute prefill from mode + replyTo + signature.
+  // Skip the draft load when the user clicked "Nouveau mail" — resuming a
+  // half-finished reply/forward there would be confusing (they explicitly
+  // asked for a fresh compose). Autosave will overwrite the persisted draft
+  // as soon as the user types anything.
   useEffect(() => {
     if (!isOpen) return;
-    void loadDraft().then(async (r) => {
+    const load =
+      mode === 'new_mail' ? Promise.resolve({ ok: true as const, draft: null }) : loadDraft();
+    void load.then(async (r) => {
       if (r.ok && r.draft) {
         setFromId(r.draft.fromIntegrationId);
         setTo(r.draft.toRecipients.join(', '));
