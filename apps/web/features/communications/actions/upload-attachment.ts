@@ -35,6 +35,38 @@ import { fileTypeFromBuffer } from 'file-type';
 
 const MAX_SIZE_BYTES = 25 * 1024 * 1024;
 
+/**
+ * IANA-registered dual-registration MIME aliases. When the browser declares
+ * one form and `file-type` sniffs the other, the guard treats them as
+ * equivalent instead of rejecting the upload as a spoof. Each set groups
+ * MIMEs that describe the same wire format.
+ *
+ * RTF is the trigger case: browsers (Chromium, WebKit) send `text/rtf` on
+ * some paths while `file-type` returns `application/rtf` from the magic
+ * bytes (`{\rtf`). Both are officially registered; refusing either is a
+ * false positive that broke real user uploads.
+ */
+const MIME_ALIASES: readonly ReadonlySet<string>[] = [
+  new Set(['application/rtf', 'text/rtf']),
+  new Set(['application/xml', 'text/xml']),
+  new Set(['application/javascript', 'text/javascript', 'application/x-javascript']),
+  new Set(['application/yaml', 'text/yaml', 'application/x-yaml']),
+  new Set(['image/vnd.microsoft.icon', 'image/x-icon']),
+  new Set(['application/x-tar', 'application/tar']),
+  new Set(['audio/mpeg', 'audio/mp3']),
+];
+
+function isMimeCompatible(a: string, b: string): boolean {
+  if (a === b) return true;
+  const na = a.toLowerCase();
+  const nb = b.toLowerCase();
+  if (na === nb) return true;
+  for (const group of MIME_ALIASES) {
+    if (group.has(na) && group.has(nb)) return true;
+  }
+  return false;
+}
+
 // Extension blacklist — cheap defense evaluated before any scan is spent.
 // Base list from the design spec §9; `sh` and `dll` added per the ClamAV
 // pivot's security requirements (shell scripts and Windows DLLs are common
@@ -207,9 +239,12 @@ export async function uploadAttachment(formData: FormData): Promise<UploadAttach
 
   // 6. Magic-byte content-type sniff — reject on active mismatch. Some
   // formats have no reliable magic bytes (plain text); only reject when the
-  // sniffer confidently disagrees with the declared type.
+  // sniffer confidently disagrees with the declared type. Known IANA-registered
+  // aliases (RTF, XML, JS, YAML, ICO...) are treated as compatible — rejecting
+  // them would block legitimate uploads whose browser-declared MIME just
+  // happens to be the sibling registration.
   const sniffed = await fileTypeFromBuffer(binary);
-  if (sniffed && sniffed.mime !== declaredType) {
+  if (sniffed && !isMimeCompatible(sniffed.mime, declaredType)) {
     await prisma.auditLog.create({
       data: {
         workspaceId: ctx.workspaceId,
