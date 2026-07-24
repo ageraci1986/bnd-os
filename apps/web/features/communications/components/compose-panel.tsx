@@ -4,8 +4,10 @@ import { useComposePanelStore } from '@/stores/compose-panel-store';
 import { useSmtpConfigStore } from '@/stores/smtp-config-store';
 import { RichTextEditor } from './rich-text-editor';
 import { AttachmentDrop } from './attachment-drop';
+import { RecipientField } from './recipient-field';
 import { useAttachmentUploader, type UploadedAttachment } from '../hooks/use-attachment-uploader';
 import { computePrefill, type ComposePrefill } from '../lib/compose-prefill';
+import { isValidEmail } from '../lib/recipient-match';
 import { saveDraft, loadDraft, deleteDraft } from '../actions/mail-drafts';
 import { sendMail } from '../actions/send-mail';
 import { loadForwardAttachments } from '../actions/load-forward-attachments';
@@ -82,8 +84,9 @@ export function ComposePanel({ mailboxes }: { readonly mailboxes: readonly Mailb
     subject: '',
     bodyHtml: '',
   });
-  const [to, setTo] = useState<string>('');
-  const [cc, setCc] = useState<string>('');
+  const [toList, setToList] = useState<readonly string[]>([]);
+  const [ccList, setCcList] = useState<readonly string[]>([]);
+  const [bccList, setBccList] = useState<readonly string[]>([]);
   const [subject, setSubject] = useState('');
   const [bodyHtml, setBodyHtml] = useState('');
   const [pending, start] = useTransition();
@@ -118,8 +121,9 @@ export function ComposePanel({ mailboxes }: { readonly mailboxes: readonly Mailb
     void load.then(async (r) => {
       if (r.ok && r.draft) {
         setFromId(r.draft.fromIntegrationId);
-        setTo(r.draft.toRecipients.join(', '));
-        setCc(r.draft.ccRecipients.join(', '));
+        setToList(r.draft.toRecipients);
+        setCcList(r.draft.ccRecipients);
+        setBccList(r.draft.bccRecipients);
         setSubject(r.draft.subject);
         setBodyHtml(r.draft.bodyHtml);
         setPrefill({
@@ -138,8 +142,9 @@ export function ComposePanel({ mailboxes }: { readonly mailboxes: readonly Mailb
         myEmail: currentMailbox?.externalAccountId ?? '',
         signatureHtml: currentMailbox?.signatureHtml ?? null,
       });
-      setTo(p.toRecipients.join(', '));
-      setCc(p.ccRecipients.join(', '));
+      setToList(p.toRecipients);
+      setCcList(p.ccRecipients);
+      setBccList([]);
       setSubject(p.subject);
       setBodyHtml(p.bodyHtml);
       setPrefill(p);
@@ -197,15 +202,9 @@ export function ComposePanel({ mailboxes }: { readonly mailboxes: readonly Mailb
         fromIntegrationId: fromId,
         kind: mode,
         ...(replyTo?.id ? { replyToId: replyTo.id } : {}),
-        toRecipients: to
-          .split(',')
-          .map((s) => s.trim())
-          .filter(Boolean),
-        ccRecipients: cc
-          .split(',')
-          .map((s) => s.trim())
-          .filter(Boolean),
-        bccRecipients: [],
+        toRecipients: [...toList],
+        ccRecipients: [...ccList],
+        bccRecipients: [...bccList],
         subject,
         bodyHtml,
         composeAttachments: toAttachmentDraftPayload(uploader.items),
@@ -214,7 +213,7 @@ export function ComposePanel({ mailboxes }: { readonly mailboxes: readonly Mailb
     return () => {
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
     };
-  }, [isOpen, fromId, mode, replyTo, to, cc, subject, bodyHtml, uploader.items]);
+  }, [isOpen, fromId, mode, replyTo, toList, ccList, bccList, subject, bodyHtml, uploader.items]);
 
   async function onSend() {
     setSendError(null);
@@ -225,15 +224,9 @@ export function ComposePanel({ mailboxes }: { readonly mailboxes: readonly Mailb
         mode,
         ...(replyTo?.id ? { replyToId: replyTo.id } : {}),
         ...(replyTo?.externalId ? { replyToExternalId: replyTo.externalId } : {}),
-        toRecipients: to
-          .split(',')
-          .map((s) => s.trim())
-          .filter(Boolean),
-        ccRecipients: cc
-          .split(',')
-          .map((s) => s.trim())
-          .filter(Boolean),
-        bccRecipients: [],
+        toRecipients: [...toList].filter(isValidEmail),
+        ccRecipients: [...ccList].filter(isValidEmail),
+        bccRecipients: [...bccList].filter(isValidEmail),
         subject,
         bodyHtml,
         composeAttachments: toAttachmentDraftPayload(uploader.items),
@@ -260,15 +253,9 @@ export function ComposePanel({ mailboxes }: { readonly mailboxes: readonly Mailb
       fromIntegrationId: fromId,
       kind: mode,
       ...(replyTo?.id ? { replyToId: replyTo.id } : {}),
-      toRecipients: to
-        .split(',')
-        .map((s) => s.trim())
-        .filter(Boolean),
-      ccRecipients: cc
-        .split(',')
-        .map((s) => s.trim())
-        .filter(Boolean),
-      bccRecipients: [],
+      toRecipients: [...toList],
+      ccRecipients: [...ccList],
+      bccRecipients: [...bccList],
       subject,
       bodyHtml,
       composeAttachments: toAttachmentDraftPayload(uploader.items),
@@ -338,18 +325,9 @@ export function ComposePanel({ mailboxes }: { readonly mailboxes: readonly Mailb
             ))}
           </select>
         </div>
-        <input
-          value={to}
-          onChange={(e) => setTo(e.target.value)}
-          placeholder="À (séparés par des virgules)"
-          className="mb-2 w-full rounded border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] px-2 py-1 text-sm"
-        />
-        <input
-          value={cc}
-          onChange={(e) => setCc(e.target.value)}
-          placeholder="Cc (optionnel)"
-          className="mb-2 w-full rounded border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] px-2 py-1 text-sm"
-        />
+        <RecipientField label="À" value={toList} onChange={setToList} placeholder="Destinataires" />
+        <RecipientField label="Cc" value={ccList} onChange={setCcList} placeholder="Cc" />
+        <RecipientField label="Cci" value={bccList} onChange={setBccList} placeholder="Cci" />
         <input
           value={subject}
           onChange={(e) => setSubject(e.target.value)}
@@ -419,7 +397,10 @@ export function ComposePanel({ mailboxes }: { readonly mailboxes: readonly Mailb
               type="button"
               onClick={onSend}
               disabled={
-                pending || !to || !subject || uploader.items.some((x) => x.state === 'uploading')
+                pending ||
+                toList.length === 0 ||
+                !subject ||
+                uploader.items.some((x) => x.state === 'uploading')
               }
               className="btn btn-primary btn-sm"
             >

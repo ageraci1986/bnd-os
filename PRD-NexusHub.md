@@ -454,6 +454,20 @@ SHA-256 par workspace pour éviter les re-scans inutiles.
 Détails opérationnels complets (déploiement ClamAV, rate limits, monitoring
 Storage, réponse à incident) : [`docs/runbooks/mail-attachments.md`](./docs/runbooks/mail-attachments.md).
 
+### V1.6 — Recipient autocomplete (2026-07-24)
+
+Auto-complete des destinataires dans `À`/`Cc`/`Cci` du ComposePanel :
+
+- Suggestions issues de l'historique mail personnel (user-scoped via
+  `integration.ownerUserId`) + des Contacts RACI du workspace.
+- Ranking récence × fréquence + boost fixe RACI, match substring
+  insensible casse/accents sur email + nom.
+- UI chips + dropdown positionné, keyboard nav (↑↓/Enter/Tab/,/Esc),
+  chips invalides marqués rouge (permissif à la saisie, filtrés au send).
+- Cci devient visible dans l'UI pour la première fois.
+
+Voir `docs/superpowers/specs/2026-07-24-recipient-autocomplete-design.md`.
+
 ## 8. Fonctionnalités transverses détaillées
 
 ### Fonctionnalité : Filtre client global

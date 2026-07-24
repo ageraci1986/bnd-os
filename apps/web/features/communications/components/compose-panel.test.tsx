@@ -326,16 +326,15 @@ describe('<ComposePanel /> — send failure codes (Task 19 §8)', () => {
     render(<ComposePanel mailboxes={mailboxes} />);
     // Gate on a real render marker rather than loadDraft — in new_mail mode
     // the panel skips the draft load entirely and starts empty.
-    await waitFor(() =>
-      expect(screen.getByPlaceholderText('À (séparés par des virgules)')).toBeInTheDocument(),
-    );
-    const to = screen.getByPlaceholderText('À (séparés par des virgules)');
+    await waitFor(() => expect(screen.getByPlaceholderText('Destinataires')).toBeInTheDocument());
+    const to = screen.getByPlaceholderText('Destinataires');
     const subject = screen.getByPlaceholderText('Objet');
     await act(async () => {
       (to as HTMLInputElement).focus();
     });
     const { fireEvent } = await import('@testing-library/react');
     fireEvent.change(to, { target: { value: 'dest@example.com' } });
+    fireEvent.keyDown(to, { key: 'Enter' });
     fireEvent.change(subject, { target: { value: 'Sujet' } });
     return screen.getByRole('button', { name: /Envoyer/ });
   }

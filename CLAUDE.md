@@ -414,5 +414,6 @@ Avant chaque action :
 | 2026-07-15 | Adapter IMAP générique (Communications iter 2) + sanitize partagé + tokens design system respectés                     | Angelo L. + Claude |
 | 2026-07-16 | Mail send V1 (Communications iter 3) — Graph + IMAP SMTP + drafts + signatures + outbox pattern                        | Angelo L. + Claude |
 | 2026-07-17 | Mail attachments V1.5 (Communications iter 4) — Storage + ClamAV self-hosted + Forward reprise + hasAttachments denorm | Angelo L. + Claude |
+| 2026-07-24 | Recipient autocomplete V1.6 (Communications iter 5) — chips + dropdown, mail history + Contacts                        | Angelo L. + Claude |
 
 > **Règle :** chaque modification de ce fichier ajoute une ligne ici.
