@@ -18,12 +18,12 @@ import { dedupeByEmail, scoreRow, type RecipientRow } from '../lib/recipient-mat
  *
  * SQL deviations from the plan's sketch (see plan Task 3 "Adaptation
  * authority"):
- *  1. Dropped `unaccent()` — the extension is available on the target
- *     Supabase project but NOT installed (`list_extensions` confirms
- *     `installed_version: null`), and this task is explicitly scoped as
- *     "no DB migration". Matching falls back to plain case-insensitive
- *     `ILIKE` (no diacritic folding). Follow-up: enable `unaccent` via a
- *     migration in a later iter and reinstate accent-insensitive matching.
+ *  1. `unaccent()` is applied to both sides of every ILIKE comparison and
+ *     to the dedup key, so "elena" finds "Éléna" and vice versa. The
+ *     extension is enabled by migration
+ *     `packages/db/prisma/migrations/20260724150000_enable_unaccent/` —
+ *     added in the V2 follow-up after V1.6 shipped with a plain-ILIKE
+ *     fallback.
  *  2. Added `deleted_at IS NULL` to the `email_messages` scan — the plan's
  *     sketch omitted it, which would have surfaced soft-deleted mail
  *     (Graph `@removed` delta) as recipient suggestions.
@@ -124,7 +124,7 @@ export async function searchRecipients(
         AND deleted_at IS NULL
     ),
     mail_stats AS (
-      SELECT lower(email) AS key,
+      SELECT lower(unaccent(email)) AS key,
              (array_agg(email ORDER BY received_at DESC))[1] AS email,
              (array_agg(name) FILTER (WHERE name IS NOT NULL))[1] AS name,
              'mail'::text AS source,
@@ -134,12 +134,12 @@ export async function searchRecipients(
              NULL::text AS client_name,
              NULL::text AS raci
       FROM mail_addresses
-      WHERE email ILIKE '%' || ${query} || '%'
-         OR name ILIKE '%' || ${query} || '%'
-      GROUP BY lower(email)
+      WHERE lower(unaccent(email)) LIKE '%' || lower(unaccent(${query})) || '%'
+         OR lower(unaccent(coalesce(name, ''))) LIKE '%' || lower(unaccent(${query})) || '%'
+      GROUP BY lower(unaccent(email))
     ),
     contact_stats AS (
-      SELECT lower(c.email) AS key,
+      SELECT lower(unaccent(c.email)) AS key,
              c.email,
              c.first_name || ' ' || c.last_name AS name,
              'contact'::text AS source,
@@ -159,8 +159,8 @@ export async function searchRecipients(
       WHERE c.workspace_id = ${ctx.workspaceId}::uuid
         AND c.email IS NOT NULL
         AND c.deleted_at IS NULL
-        AND ( c.email ILIKE '%' || ${query} || '%'
-              OR (c.first_name || ' ' || c.last_name) ILIKE '%' || ${query} || '%' )
+        AND ( lower(unaccent(c.email)) LIKE '%' || lower(unaccent(${query})) || '%'
+              OR lower(unaccent(c.first_name || ' ' || c.last_name)) LIKE '%' || lower(unaccent(${query})) || '%' )
     )
     SELECT * FROM mail_stats
     UNION ALL
