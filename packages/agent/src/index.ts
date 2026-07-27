@@ -9,3 +9,4 @@ export type {
   ToolCall,
   ToolSpec,
 } from './types';
+export { ToolRegistry, defineTool, type DefineToolInput, type ExecuteResult } from './registry';

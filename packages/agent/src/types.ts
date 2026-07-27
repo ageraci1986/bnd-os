@@ -56,6 +56,12 @@ export interface ToolSpec {
   readonly gated: boolean;
   /** true = réservé au rôle admin ; refus propre sinon, sans exécution. */
   readonly adminOnly: boolean;
+  /**
+   * Paramètre typé `never` (variance contravariante) pour qu'un handler concret
+   * `(input: T) => Promise<string>` soit assignable ici. Construire les tools via
+   * `defineTool()` (registry.ts), qui vérifie handler ↔ inputSchema et porte
+   * l'unique cast.
+   */
   readonly handler: (input: never) => Promise<string>;
 }
 
