@@ -318,5 +318,62 @@ export async function buildReadTools(ctx: AuthContext): Promise<ToolSpec[]> {
           });
         }),
     }),
+
+    defineTool({
+      name: 'get_team_members',
+      description: 'Membres du workspace (id, email, rôle) — nécessaire pour assigner une carte.',
+      inputSchema: z.object({}),
+      jsonSchema: { type: 'object', properties: {} },
+      handler: async () =>
+        safeDb('get_team_members', async () => {
+          const members = await prisma.membership.findMany({
+            where: { workspaceId },
+            select: {
+              role: true,
+              user: { select: { id: true, email: true, firstName: true, lastName: true } },
+            },
+            take: 50,
+          });
+          return JSON.stringify(
+            members.map((m) => ({
+              userId: m.user.id,
+              email: m.user.email,
+              name: [m.user.firstName, m.user.lastName].filter(Boolean).join(' ') || null,
+              role: m.role,
+            })),
+          );
+        }),
+    }),
+
+    defineTool({
+      name: 'get_card',
+      description:
+        "Détail d'une carte : titre, description, colonne, échéance, assignés, checklist.",
+      inputSchema: z.object({ cardId: uuid }),
+      jsonSchema: { type: 'object', properties: { cardId: UUID_JSON }, required: ['cardId'] },
+      handler: async (input) =>
+        safeDb('get_card', async () => {
+          const card = await prisma.card.findFirst({
+            where: { id: input.cardId, workspaceId, deletedAt: null, ...scopedCardWhere(scope) },
+            select: {
+              id: true,
+              title: true,
+              description: true,
+              dueDate: true,
+              shortRef: true,
+              column: { select: { id: true, name: true, isBlockedSystem: true } },
+              project: { select: { id: true, name: true } },
+              assignees: { select: { userId: true, raci: true } },
+              checklistItems: {
+                select: { title: true, isChecked: true },
+                orderBy: { position: 'asc' },
+                take: 50,
+              },
+            },
+          });
+          if (card === null) return 'Erreur : carte introuvable ou hors de votre périmètre.';
+          return JSON.stringify(card);
+        }),
+    }),
   ];
 }

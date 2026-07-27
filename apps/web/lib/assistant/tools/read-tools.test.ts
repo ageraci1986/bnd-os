@@ -5,12 +5,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // would be referenced before initialization (see repo convention in
 // features/communications/actions/*.test.ts).
 const prismaMock = vi.hoisted(() => ({
-  card: { count: vi.fn(), findMany: vi.fn() },
+  card: { count: vi.fn(), findMany: vi.fn(), findFirst: vi.fn() },
   project: { findMany: vi.fn(), findFirst: vi.fn() },
   emailMessage: { count: vi.fn(), findMany: vi.fn(), findFirst: vi.fn() },
   notification: { count: vi.fn() },
   client: { findMany: vi.fn() },
   column: { findMany: vi.fn() },
+  membership: { findMany: vi.fn() },
 }));
 vi.mock('@nexushub/db', () => ({ prisma: prismaMock }));
 
@@ -44,11 +45,13 @@ beforeEach(() => {
 });
 
 describe('buildReadTools', () => {
-  it('expose les 7 tools de lecture, aucun gated ni adminOnly', async () => {
+  it('expose les 9 tools de lecture, aucun gated ni adminOnly', async () => {
     const tools = await buildReadTools(ctx);
     expect(tools.map((t) => t.name).sort()).toEqual([
+      'get_card',
       'get_current_datetime',
       'get_project_board',
+      'get_team_members',
       'get_today_overview',
       'list_clients',
       'list_projects',
@@ -214,6 +217,50 @@ describe('buildReadTools', () => {
     );
     expect(out.body.endsWith(' […corps tronqué]')).toBe(true);
     expect(out.body.length).toBe(5000 + ' […corps tronqué]'.length);
+  });
+
+  it('get_team_members renvoie userId/email/name/role, scoped au workspace', async () => {
+    prismaMock.membership.findMany.mockResolvedValue([
+      {
+        role: 'admin',
+        user: { id: 'u1', email: 'a@acme.com', firstName: 'Ada', lastName: 'Lovelace' },
+      },
+      { role: 'user', user: { id: 'u2', email: 'b@acme.com', firstName: null, lastName: null } },
+    ]);
+    const out = JSON.parse(await execute('get_team_members', {}));
+    expect(out).toEqual([
+      { userId: 'u1', email: 'a@acme.com', name: 'Ada Lovelace', role: 'admin' },
+      { userId: 'u2', email: 'b@acme.com', name: null, role: 'user' },
+    ]);
+    expect(prismaMock.membership.findMany.mock.calls[0]?.[0]?.where?.workspaceId).toBe('w1');
+  });
+
+  it('get_card renvoie le détail scoped, ou une erreur si carte introuvable', async () => {
+    prismaMock.card.findFirst.mockResolvedValue(null);
+    const out = await execute('get_card', { cardId: '4c9d3f0a-2222-4444-8888-aaaaaaaaaaaa' });
+    expect(out).toContain('introuvable');
+    const where = prismaMock.card.findFirst.mock.calls[0]?.[0]?.where;
+    expect(where?.workspaceId).toBe('w1');
+    expect(where?.deletedAt).toBeNull();
+    expect(scopeMocks.scopedCardWhere).toHaveBeenCalled();
+  });
+
+  it('get_card renvoie titre, colonne, projet, assignés et checklist', async () => {
+    prismaMock.card.findFirst.mockResolvedValue({
+      id: 'c1',
+      title: 'Créer le devis',
+      description: null,
+      dueDate: null,
+      shortRef: 42,
+      column: { id: 'col1', name: 'À faire', isBlockedSystem: false },
+      project: { id: 'p1', name: 'Site' },
+      assignees: [{ userId: 'u1', raci: 'responsible' }],
+      checklistItems: [{ title: 'Étape 1', isChecked: false }],
+    });
+    const out = JSON.parse(await execute('get_card', { cardId: 'c1' }));
+    expect(out.title).toBe('Créer le devis');
+    expect(out.assignees).toEqual([{ userId: 'u1', raci: 'responsible' }]);
+    expect(out.checklistItems).toEqual([{ title: 'Étape 1', isChecked: false }]);
   });
 
   it('erreur Prisma → message utilisateur, pas de fuite du message brut', async () => {
