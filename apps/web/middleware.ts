@@ -106,6 +106,7 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
     pathname === '/overview' ||
     pathname.startsWith('/projects') ||
     pathname.startsWith('/communications') ||
+    pathname.startsWith('/assistant') ||
     pathname.startsWith('/clients') ||
     pathname.startsWith('/templates') ||
     pathname.startsWith('/team') ||
