@@ -74,6 +74,9 @@ export interface ToolSpec {
   /**
    * Description humaine de l'action pour le dialog de confirmation ; à défaut,
    * `describeAction` générique (run-turn.ts) est utilisée.
+   * Contrat : montrable et concise — elle transite en clair côté client (SSE).
+   * Ne jamais y mettre plus que ce que l'utilisateur voit déjà (pas de corps
+   * de message brut, pas de tokens) ; l'audit ne journalise que le nom du tool.
    */
   readonly describeForConfirm?: (input: never) => string;
 }

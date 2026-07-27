@@ -22,14 +22,17 @@ export interface DefineToolInput<T> {
   /**
    * Description humaine de l'action pour le dialog de confirmation ; à défaut,
    * `describeAction` générique (run-turn.ts) est utilisée.
+   * Contrat : montrable et concise — elle transite en clair côté client (SSE).
+   * Ne jamais y mettre plus que ce que l'utilisateur voit déjà (pas de corps
+   * de message brut, pas de tokens) ; l'audit ne journalise que le nom du tool.
    */
   readonly describeForConfirm?: (input: T) => string;
 }
 
 /**
  * Fabrique type-safe d'un ToolSpec : le handler est vérifié contre le schéma Zod
- * du tool, et l'unique cast vers `ToolSpec['handler']` (paramètre `never`) vit ici,
- * pas dans chaque définition de tool.
+ * du tool, et les deux casts (`handler` et `describeForConfirm`, paramètre
+ * `never`) vivent ici, pas dans chaque définition de tool.
  */
 export function defineTool<T>(spec: DefineToolInput<T>): ToolSpec {
   return {
