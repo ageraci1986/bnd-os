@@ -11,6 +11,7 @@ import {
   scopedProjectWhere,
 } from '@/lib/auth/scope';
 import { startOfTodayUtc } from '@/features/projects/lib/card-filter';
+import { fetchMailBody } from '@/features/communications/actions/fetch-mail-body';
 
 const uuid = z.string().uuid();
 const UUID_JSON = { type: 'string', format: 'uuid' } as const;
@@ -301,14 +302,33 @@ export async function buildReadTools(ctx: AuthContext): Promise<ToolSpec[]> {
           if (mail === null) {
             return "Erreur : mail introuvable, ou situé dans la boîte d'un autre membre (le corps des mails n'est lisible que par le propriétaire de la boîte).";
           }
+          let bodyText = mail.bodyText;
+          let bodyHtmlSanitized = mail.bodyHtmlSanitized;
+          // Même critère d'« inutilisable » que `cachedIsUsable` dans
+          // fetch-mail-body.ts : bodyText null/vide ET bodyHtmlSanitized null.
+          const hasUsableBody =
+            (bodyText !== null && bodyText.length > 0) || bodyHtmlSanitized !== null;
+          if (!hasUsableBody) {
+            // Chargement paresseux : le corps n'a pas été récupéré au moment
+            // du sync (voir fetch-mail-body.ts). L'ownership y est revalidé
+            // en interne, et le résultat est mis en cache en DB.
+            // Note : fetchMailBody appelle requireUser() en interne et lève
+            // NEXT_REDIRECT si la session a expiré ; cette exception remonte
+            // à travers `safeDb`, qui la transforme déjà en message générique
+            // — acceptable ici, pas besoin d'un try/catch dédié.
+            const fetched = await fetchMailBody({ emailId: input.emailId });
+            if (!fetched.ok) return `Erreur : ${fetched.message}`;
+            bodyText = fetched.bodyText;
+            bodyHtmlSanitized = fetched.bodyHtmlSanitized;
+          }
           const rawBody =
-            mail.bodyText ??
-            (mail.bodyHtmlSanitized !== null
-              ? mail.bodyHtmlSanitized
+            bodyText ??
+            (bodyHtmlSanitized !== null
+              ? bodyHtmlSanitized
                   .replace(/<[^>]+>/g, ' ')
                   .replace(/\s+/g, ' ')
                   .trim()
-              : "(corps non chargé — il sera récupéré à l'ouverture du mail dans Communications)");
+              : '(ce mail ne contient aucun corps de texte)');
           const body =
             rawBody.length > MAIL_BODY_MAX_CHARS
               ? `${rawBody.slice(0, MAIL_BODY_MAX_CHARS)} […corps tronqué]`
@@ -342,6 +362,7 @@ export async function buildReadTools(ctx: AuthContext): Promise<ToolSpec[]> {
               role: true,
               user: { select: { id: true, email: true, firstName: true, lastName: true } },
             },
+            orderBy: { user: { email: 'asc' } },
             take: TEAM_MEMBERS_MAX,
           });
           return JSON.stringify({
