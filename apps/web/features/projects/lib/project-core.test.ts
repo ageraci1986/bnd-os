@@ -1,0 +1,282 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { UserScope } from '@nexushub/domain';
+
+// `vi.mock` factories are hoisted above regular top-level statements, so the
+// mock object itself must be created via `vi.hoisted` — see repo convention
+// in card-core.test.ts.
+const prismaMock = vi.hoisted(() => {
+  class PrismaClientKnownRequestError extends Error {
+    code: string;
+    constructor(message: string, code: string) {
+      super(message);
+      this.code = code;
+    }
+  }
+  return {
+    client: { findFirst: vi.fn() },
+    kanbanTemplate: { findFirst: vi.fn() },
+    $transaction: vi.fn(),
+    Prisma: { PrismaClientKnownRequestError },
+  };
+});
+vi.mock('@nexushub/db', () => ({
+  prisma: {
+    client: prismaMock.client,
+    kanbanTemplate: prismaMock.kanbanTemplate,
+    $transaction: prismaMock.$transaction,
+  },
+  Prisma: prismaMock.Prisma,
+}));
+
+const scopeMocks = vi.hoisted(() => ({
+  loadUserScope: vi.fn<() => Promise<UserScope>>(async () => ({ kind: 'workspace' as const })),
+}));
+vi.mock('@/lib/auth/scope', () => scopeMocks);
+
+import { createProjectCore } from './project-core';
+import { SCOPE_ERROR_MESSAGE, VIEWER_READ_ONLY_MESSAGE } from './scope-error';
+import type { CreateProjectInput } from './schemas';
+
+const WORKSPACE_ID = 'ws-1';
+const CLIENT_ID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+const TEMPLATE_ID = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+
+const adminCtx = {
+  userId: 'u-1',
+  email: 'admin@test',
+  workspaceId: WORKSPACE_ID,
+  role: 'admin' as const,
+  isSuperAdmin: false,
+};
+
+const viewerCtx = { ...adminCtx, role: 'viewer' as const };
+
+function baseInput(overrides: Partial<CreateProjectInput> = {}): CreateProjectInput {
+  return {
+    name: 'New project',
+    clientId: CLIENT_ID,
+    description: null,
+    startDate: null,
+    endDate: null,
+    typeId: null,
+    templateId: 'creative',
+    ...overrides,
+  };
+}
+
+/** Minimal tx double covering every call made inside the transaction. */
+function makeTx(overrides: Partial<Record<string, unknown>> = {}) {
+  return {
+    projectType: {
+      findUnique: vi.fn().mockResolvedValue(null),
+      create: vi.fn().mockResolvedValue({ id: 'type-row-1' }),
+    },
+    project: {
+      create: vi.fn().mockResolvedValue({ id: 'project-1' }),
+    },
+    column: {
+      createMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
+    projectMember: {
+      create: vi.fn().mockResolvedValue({ id: 'member-1' }),
+    },
+    ...overrides,
+  };
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  scopeMocks.loadUserScope.mockResolvedValue({ kind: 'workspace' as const });
+  prismaMock.client.findFirst.mockResolvedValue({ id: CLIENT_ID });
+  prismaMock.$transaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) =>
+    fn(makeTx()),
+  );
+});
+
+describe('createProjectCore', () => {
+  it('creates a project from a built-in template: type upsert, columns incl. Bloqué, lead member', async () => {
+    let capturedColumns: { name: string; position: number; isBlockedSystem: boolean }[] = [];
+    let capturedMember: { userId: string; role: string } | undefined;
+    const tx = makeTx({
+      column: {
+        createMany: vi.fn().mockImplementation((args: { data: typeof capturedColumns }) => {
+          capturedColumns = args.data;
+          return Promise.resolve({ count: args.data.length });
+        }),
+      },
+      projectMember: {
+        create: vi.fn().mockImplementation((args: { data: typeof capturedMember }) => {
+          capturedMember = args.data;
+          return Promise.resolve({ id: 'member-1' });
+        }),
+      },
+    });
+    prismaMock.$transaction.mockImplementationOnce(async (fn: (tx: unknown) => Promise<unknown>) =>
+      fn(tx),
+    );
+
+    const result = await createProjectCore(adminCtx, baseInput({ templateId: 'creative' }));
+
+    expect(result).toEqual({ ok: true, projectId: 'project-1' });
+    expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
+
+    const names = capturedColumns.map((c) => c.name);
+    expect(names).toEqual(['Brief', 'Créa', 'Validation', 'Production', 'Done', 'Bloqué']);
+    const blocked = capturedColumns.find((c) => c.name === 'Bloqué');
+    expect(blocked).toEqual({
+      projectId: 'project-1',
+      name: 'Bloqué',
+      position: 9999,
+      isBlockedSystem: true,
+      stepChecklist: [],
+    });
+
+    expect(capturedMember).toEqual({
+      projectId: 'project-1',
+      userId: adminCtx.userId,
+      role: 'lead',
+    });
+  });
+
+  it('resolves a built-in typeId via ProjectType upsert-by-find (existing row reused)', async () => {
+    const tx = makeTx({
+      projectType: {
+        findUnique: vi.fn().mockResolvedValue({ id: 'existing-type' }),
+        create: vi.fn(),
+      },
+      project: {
+        create: vi
+          .fn()
+          .mockImplementation((args: { data: { typeId?: string } }) =>
+            Promise.resolve({ id: 'project-1', typeId: args.data.typeId }),
+          ),
+      },
+    });
+    prismaMock.$transaction.mockImplementationOnce(async (fn: (tx: unknown) => Promise<unknown>) =>
+      fn(tx),
+    );
+
+    const result = await createProjectCore(adminCtx, baseInput({ typeId: 'campagne' }));
+
+    expect(result.ok).toBe(true);
+    expect(tx.projectType.findUnique).toHaveBeenCalledWith({
+      where: { workspaceId_name: { workspaceId: WORKSPACE_ID, name: 'Campagne' } },
+      select: { id: true },
+    });
+    expect(tx.projectType.create).not.toHaveBeenCalled();
+  });
+
+  it('uses a DB Kanban template: snapshots defaultCardTemplateId + user columns + Bloqué appended', async () => {
+    prismaMock.kanbanTemplate.findFirst.mockResolvedValueOnce({
+      id: TEMPLATE_ID,
+      defaultCardTemplateId: 'card-tpl-1',
+      columns: [
+        { name: 'Idea', stepChecklist: ['a'] },
+        { name: 'Done', stepChecklist: [] },
+      ],
+    });
+    let capturedColumns: { name: string; position: number; stepChecklist: string[] }[] = [];
+    let capturedProjectData: { defaultCardTemplateId?: string } | undefined;
+    const tx = makeTx({
+      project: {
+        create: vi.fn().mockImplementation((args: { data: typeof capturedProjectData }) => {
+          capturedProjectData = args.data;
+          return Promise.resolve({ id: 'project-1' });
+        }),
+      },
+      column: {
+        createMany: vi.fn().mockImplementation((args: { data: typeof capturedColumns }) => {
+          capturedColumns = args.data;
+          return Promise.resolve({ count: args.data.length });
+        }),
+      },
+    });
+    prismaMock.$transaction.mockImplementationOnce(async (fn: (tx: unknown) => Promise<unknown>) =>
+      fn(tx),
+    );
+
+    const result = await createProjectCore(adminCtx, baseInput({ templateId: TEMPLATE_ID }));
+
+    expect(result).toEqual({ ok: true, projectId: 'project-1' });
+    expect(capturedProjectData?.defaultCardTemplateId).toBe('card-tpl-1');
+    expect(capturedColumns.map((c) => c.name)).toEqual(['Idea', 'Done', 'Bloqué']);
+    expect(capturedColumns[0]).toEqual({
+      projectId: 'project-1',
+      name: 'Idea',
+      position: 1024,
+      isBlockedSystem: false,
+      stepChecklist: ['a'],
+    });
+    const blocked = capturedColumns.find((c) => c.name === 'Bloqué');
+    expect(blocked).toEqual({
+      projectId: 'project-1',
+      name: 'Bloqué',
+      position: 9999,
+      isBlockedSystem: true,
+      stepChecklist: [],
+    });
+  });
+
+  it('returns "Template Kanban introuvable." when the DB template lookup misses', async () => {
+    prismaMock.kanbanTemplate.findFirst.mockResolvedValueOnce(null);
+    const result = await createProjectCore(adminCtx, baseInput({ templateId: TEMPLATE_ID }));
+    expect(result).toEqual({ ok: false, message: 'Template Kanban introuvable.' });
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('returns "Template Kanban inconnu." for an unknown built-in template id', async () => {
+    const result = await createProjectCore(adminCtx, baseInput({ templateId: 'not-a-template' }));
+    expect(result).toEqual({ ok: false, message: 'Template Kanban inconnu.' });
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('throws NotFoundError("Client") when the client does not belong to the workspace', async () => {
+    prismaMock.client.findFirst.mockResolvedValueOnce(null);
+    await expect(createProjectCore(adminCtx, baseInput())).rejects.toThrow(/Client/);
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('denies restricted scope that does not include the client', async () => {
+    scopeMocks.loadUserScope.mockResolvedValueOnce({
+      kind: 'restricted' as const,
+      clientIds: ['other-client'],
+      projectIds: [],
+    });
+    const result = await createProjectCore(adminCtx, baseInput());
+    expect(result).toEqual({ ok: false, message: SCOPE_ERROR_MESSAGE });
+    expect(prismaMock.client.findFirst).not.toHaveBeenCalled();
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('allows restricted scope that includes the client', async () => {
+    scopeMocks.loadUserScope.mockResolvedValueOnce({
+      kind: 'restricted' as const,
+      clientIds: [CLIENT_ID],
+      projectIds: [],
+    });
+    const result = await createProjectCore(adminCtx, baseInput());
+    expect(result.ok).toBe(true);
+  });
+
+  it('returns "Un projet porte déjà ce nom." on a P2002 unique-constraint error', async () => {
+    prismaMock.$transaction.mockImplementationOnce(async () => {
+      throw new prismaMock.Prisma.PrismaClientKnownRequestError('duplicate', 'P2002');
+    });
+    const result = await createProjectCore(adminCtx, baseInput());
+    expect(result).toEqual({ ok: false, message: 'Un projet porte déjà ce nom.' });
+  });
+
+  it('rethrows non-P2002 errors from the transaction', async () => {
+    prismaMock.$transaction.mockImplementationOnce(async () => {
+      throw new Error('boom');
+    });
+    await expect(createProjectCore(adminCtx, baseInput())).rejects.toThrow('boom');
+  });
+
+  it('rejects Viewer with VIEWER_READ_ONLY_MESSAGE and performs no lookup', async () => {
+    const result = await createProjectCore(viewerCtx, baseInput());
+    expect(result).toEqual({ ok: false, message: VIEWER_READ_ONLY_MESSAGE });
+    expect(scopeMocks.loadUserScope).not.toHaveBeenCalled();
+    expect(prismaMock.client.findFirst).not.toHaveBeenCalled();
+  });
+});
