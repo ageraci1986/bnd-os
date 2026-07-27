@@ -10,3 +10,11 @@ export type {
   ToolSpec,
 } from './types';
 export { ToolRegistry, defineTool, type DefineToolInput, type ExecuteResult } from './registry';
+export {
+  MAX_TOOL_ROUNDS,
+  autoDeny,
+  describeAction,
+  runTurn,
+  type RunTurnDeps,
+  type RunTurnResult,
+} from './run-turn';

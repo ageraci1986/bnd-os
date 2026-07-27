@@ -1,0 +1,268 @@
+import { describe, expect, it, vi } from 'vitest';
+import { z } from 'zod';
+import { ToolRegistry } from './registry';
+import { MAX_TOOL_ROUNDS, autoDeny, describeAction, runTurn } from './run-turn';
+import type { ChatMessage, Provider, ProviderTurnResult, ToolSpec } from './types';
+
+function textResult(text: string): ProviderTurnResult {
+  return {
+    content: [{ type: 'text', text }],
+    text,
+    stopReason: 'end_turn',
+    toolCalls: [],
+    inputTokens: 10,
+    outputTokens: 5,
+  };
+}
+
+function toolUseResult(name: string, input: unknown, id = 'tu_1'): ProviderTurnResult {
+  return {
+    content: [{ type: 'tool_use', id, name, input }],
+    text: '',
+    stopReason: 'tool_use',
+    toolCalls: [{ id, name, input }],
+    inputTokens: 10,
+    outputTokens: 5,
+  };
+}
+
+function scriptedProvider(results: ProviderTurnResult[]): Provider {
+  let call = 0;
+  return {
+    streamTurn: vi.fn(async ({ onText }) => {
+      const result = results[call];
+      if (result === undefined) throw new Error('provider script exhausted');
+      call += 1;
+      if (onText !== undefined && result.text !== '') onText(result.text);
+      return result;
+    }),
+  };
+}
+
+function makeRegistry(specs: Partial<ToolSpec>[] = []): ToolRegistry {
+  const registry = new ToolRegistry();
+  for (const [i, spec] of specs.entries()) {
+    registry.register({
+      name: `tool_${String(i)}`,
+      description: 'test tool',
+      inputSchema: z.object({}).passthrough(),
+      jsonSchema: { type: 'object', properties: {} },
+      gated: false,
+      adminOnly: false,
+      handler: (async () => 'ok') as ToolSpec['handler'],
+      ...spec,
+    });
+  }
+  return registry;
+}
+
+function deps(
+  provider: Provider,
+  registry: ToolRegistry,
+  extra: Partial<Parameters<typeof runTurn>[2]> = {},
+) {
+  return {
+    provider,
+    registry,
+    system: 'système',
+    confirmer: autoDeny,
+    role: 'user' as const,
+    ...extra,
+  };
+}
+
+describe('runTurn', () => {
+  it('tour simple sans tool : renvoie le texte et un historique complet', async () => {
+    const provider = scriptedProvider([textResult('Bonjour !')]);
+    const result = await runTurn([], 'Salut', deps(provider, makeRegistry()));
+    expect(result.text).toBe('Bonjour !');
+    expect(result.history).toEqual([
+      { role: 'user', content: 'Salut' },
+      { role: 'assistant', content: [{ type: 'text', text: 'Bonjour !' }] },
+    ]);
+    expect(result.inputTokens).toBe(10);
+    expect(result.outputTokens).toBe(5);
+  });
+
+  it('round de tool : exécute, réinjecte le résultat, continue', async () => {
+    const handler = vi.fn(async () => 'résultat-tool');
+    const registry = makeRegistry([{ name: 'lookup', handler: handler as ToolSpec['handler'] }]);
+    const provider = scriptedProvider([toolUseResult('lookup', { q: 'x' }), textResult('Fini')]);
+    const events: unknown[] = [];
+    const result = await runTurn(
+      [],
+      'Question',
+      deps(provider, registry, { onEvent: (e) => void events.push(e) }),
+    );
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(result.text).toBe('Fini');
+    // Le tool_result est réinjecté comme message user
+    const toolResultMsg = result.history[2];
+    expect(toolResultMsg?.role).toBe('user');
+    expect(toolResultMsg?.content).toEqual([
+      { type: 'tool_result', tool_use_id: 'tu_1', content: 'résultat-tool', is_error: false },
+    ]);
+    expect(events).toEqual([
+      { type: 'tool_start', name: 'lookup' },
+      { type: 'tool_end', name: 'lookup', isError: false },
+    ]);
+  });
+
+  it('cumule les tokens sur plusieurs rounds', async () => {
+    const registry = makeRegistry([{ name: 'lookup' }]);
+    const provider = scriptedProvider([toolUseResult('lookup', {}), textResult('Fini')]);
+    const result = await runTurn([], 'Q', deps(provider, registry));
+    expect(result.inputTokens).toBe(20);
+    expect(result.outputTokens).toBe(10);
+  });
+
+  it('tool gated + confirmer refuse → le tool ne tourne pas, note claire au modèle', async () => {
+    const handler = vi.fn(async () => 'jamais');
+    const registry = makeRegistry([
+      { name: 'danger', gated: true, handler: handler as ToolSpec['handler'] },
+    ]);
+    const provider = scriptedProvider([
+      toolUseResult('danger', {}),
+      textResult("D'accord, j'annule."),
+    ]);
+    const confirmer = vi.fn(async () => false);
+    const result = await runTurn([], 'Vas-y', deps(provider, registry, { confirmer }));
+    expect(confirmer).toHaveBeenCalledOnce();
+    expect(handler).not.toHaveBeenCalled();
+    const toolResultMsg = result.history[2];
+    expect(JSON.stringify(toolResultMsg?.content)).toContain('refusée');
+  });
+
+  it('tool gated + confirmer accepte → exécution (un oui = une exécution)', async () => {
+    const handler = vi.fn(async () => 'fait');
+    const registry = makeRegistry([
+      { name: 'danger', gated: true, handler: handler as ToolSpec['handler'] },
+    ]);
+    const provider = scriptedProvider([
+      toolUseResult('danger', {}, 'tu_1'),
+      toolUseResult('danger', {}, 'tu_2'),
+      textResult('Fini'),
+    ]);
+    const confirmer = vi.fn(async () => true);
+    await runTurn([], 'Deux fois', deps(provider, registry, { confirmer }));
+    // Chaque exécution redemande : 2 appels au confirmer pour 2 tool calls
+    expect(confirmer).toHaveBeenCalledTimes(2);
+    expect(handler).toHaveBeenCalledTimes(2);
+  });
+
+  it('émet confirm_request avant de demander', async () => {
+    const registry = makeRegistry([{ name: 'danger', gated: true }]);
+    const provider = scriptedProvider([toolUseResult('danger', { a: 1 }), textResult('ok')]);
+    const events: { type: string }[] = [];
+    await runTurn(
+      [],
+      'x',
+      deps(provider, registry, {
+        confirmer: async () => true,
+        onEvent: (e) => void events.push(e),
+      }),
+    );
+    expect(events.map((e) => e.type)).toEqual(['confirm_request', 'tool_start', 'tool_end']);
+  });
+
+  it('tool adminOnly appelé par un non-admin → refus propre sans exécution ni confirmation', async () => {
+    const handler = vi.fn(async () => 'jamais');
+    const confirmer = vi.fn(async () => true);
+    const registry = makeRegistry([
+      {
+        name: 'admin_thing',
+        adminOnly: true,
+        gated: true,
+        handler: handler as ToolSpec['handler'],
+      },
+    ]);
+    const provider = scriptedProvider([toolUseResult('admin_thing', {}), textResult('ok')]);
+    const result = await runTurn([], 'x', deps(provider, registry, { role: 'user', confirmer }));
+    expect(handler).not.toHaveBeenCalled();
+    expect(confirmer).not.toHaveBeenCalled();
+    expect(JSON.stringify(result.history[2]?.content)).toContain('administrateur');
+  });
+
+  it('tool adminOnly + role admin → exécution normale', async () => {
+    const handler = vi.fn(async () => 'fait');
+    const registry = makeRegistry([
+      { name: 'admin_thing', adminOnly: true, handler: handler as ToolSpec['handler'] },
+    ]);
+    const provider = scriptedProvider([toolUseResult('admin_thing', {}), textResult('ok')]);
+    await runTurn([], 'x', deps(provider, registry, { role: 'admin' }));
+    expect(handler).toHaveBeenCalledTimes(1);
+  });
+
+  it('garde-fou MAX_TOOL_ROUNDS : stoppe avec un message d excuse', async () => {
+    const registry = makeRegistry([{ name: 'loop' }]);
+    const provider = scriptedProvider(
+      Array.from({ length: MAX_TOOL_ROUNDS }, (_, i) =>
+        toolUseResult('loop', {}, `tu_${String(i)}`),
+      ),
+    );
+    const result = await runTurn([], 'x', deps(provider, registry));
+    expect(result.text).toContain('reformuler');
+    expect(result.history.at(-1)).toEqual({ role: 'assistant', content: result.text });
+  });
+
+  it('stopReason refusal sans texte → message de refus par défaut', async () => {
+    const provider = scriptedProvider([{ ...textResult(''), stopReason: 'refusal' }]);
+    const result = await runTurn([], 'x', deps(provider, makeRegistry()));
+    expect(result.text).not.toBe('');
+    expect(result.history.at(-1)?.role).toBe('assistant');
+  });
+
+  it('stopReason refusal avec texte → réutilise le texte du modèle', async () => {
+    const provider = scriptedProvider([
+      { ...textResult('Je ne peux pas faire ça.'), stopReason: 'refusal' },
+    ]);
+    const result = await runTurn([], 'x', deps(provider, makeRegistry()));
+    expect(result.text).toBe('Je ne peux pas faire ça.');
+  });
+
+  it('transmet onText au provider quand fourni', async () => {
+    const provider = scriptedProvider([textResult('Bonjour')]);
+    const onText = vi.fn();
+    await runTurn([], 'x', deps(provider, makeRegistry(), { onText }));
+    expect(onText).toHaveBeenCalledWith('Bonjour');
+  });
+
+  it("échec provider → l'historique d'entrée n'est pas modifié", async () => {
+    const provider: Provider = {
+      streamTurn: async () => {
+        throw new Error('réseau KO');
+      },
+    };
+    const history: ChatMessage[] = [{ role: 'user', content: 'avant' }];
+    await expect(runTurn(history, 'x', deps(provider, makeRegistry()))).rejects.toThrow(
+      'réseau KO',
+    );
+    expect(history).toEqual([{ role: 'user', content: 'avant' }]);
+  });
+
+  it('concatène le texte de tous les rounds dans la réponse finale', async () => {
+    const registry = makeRegistry([{ name: 'lookup' }]);
+    const provider = scriptedProvider([
+      {
+        ...toolUseResult('lookup', {}),
+        text: 'Je regarde…',
+        content: [
+          { type: 'text', text: 'Je regarde…' },
+          { type: 'tool_use', id: 'tu_1', name: 'lookup', input: {} },
+        ],
+      },
+      textResult('Voilà.'),
+    ]);
+    const result = await runTurn([], 'x', deps(provider, registry));
+    expect(result.text).toBe('Je regarde…\nVoilà.');
+  });
+
+  it('autoDeny refuse toujours', async () => {
+    await expect(autoDeny('peu importe')).resolves.toBe(false);
+  });
+
+  it('describeAction avec une entrée non-objet (ex: string ou null) tombe sur String(input)', () => {
+    expect(describeAction('ping', 'juste-un-texte')).toBe('ping (juste-un-texte)');
+    expect(describeAction('ping', null)).toBe('ping (null)');
+  });
+});
