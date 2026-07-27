@@ -129,6 +129,113 @@ describe('AssistantChat', () => {
     expect(screen.queryByText('consulte les projets…')).not.toBeInTheDocument();
   });
 
+  it('confirm_request → dialog visible ; Autoriser → POST /confirm puis confirm_resolved le ferme', async () => {
+    const confirmId = 'a'.repeat(32);
+    // Stream contrôlé : confirm_request, puis (après le clic) confirm_resolved + done.
+    let pushSecondHalf: () => void = () => undefined;
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        const enc = new TextEncoder();
+        controller.enqueue(
+          enc.encode(
+            `data: ${JSON.stringify({ type: 'confirm_request', id: confirmId, description: 'delete_card (cardId="c1")' })}\n\n`,
+          ),
+        );
+        pushSecondHalf = () => {
+          controller.enqueue(
+            enc.encode(
+              `data: ${JSON.stringify({ type: 'confirm_resolved', id: confirmId, allowed: true })}\n\n` +
+                `data: ${JSON.stringify({ type: 'done', text: 'Carte supprimée.' })}\n\n`,
+            ),
+          );
+          controller.close();
+        };
+      },
+    });
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      if (String(url).endsWith('/api/assistant/confirm')) {
+        return Response.json({ ok: true });
+      }
+      return new Response(stream, {
+        status: 200,
+        headers: { 'Content-Type': 'text/event-stream' },
+      });
+    });
+
+    render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
+    await userEvent.type(screen.getByRole('textbox'), 'supprime la carte c1');
+    await userEvent.click(screen.getByRole('button', { name: /envoyer/i }));
+
+    // Le dialog apparaît avec la description et les deux boutons
+    const allowButton = await screen.findByRole('button', { name: /autoriser/i });
+    expect(screen.getByText(/delete_card/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /refuser/i })).toBeInTheDocument();
+
+    await userEvent.click(allowButton);
+    await waitFor(() => {
+      const confirmCall = fetchMock.mock.calls.find(([u]) =>
+        String(u).endsWith('/api/assistant/confirm'),
+      );
+      expect(confirmCall).toBeDefined();
+      const [, init] = confirmCall ?? [];
+      expect(JSON.parse(String(init?.body))).toEqual({ id: confirmId, allowed: true });
+      expect((init?.headers as Record<string, string>)['x-csrf-token']).toBe('tok');
+    });
+
+    pushSecondHalf();
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: /autoriser/i })).not.toBeInTheDocument();
+      expect(screen.getByText('Carte supprimée.')).toBeInTheDocument();
+    });
+  });
+
+  it('confirm renvoie 409 (déjà répondu) → aucune erreur affichée', async () => {
+    const confirmId = 'b'.repeat(32);
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      if (String(url).endsWith('/api/assistant/confirm')) {
+        return Response.json({ ok: false }, { status: 409 });
+      }
+      return sseResponse([
+        { type: 'confirm_request', id: confirmId, description: 'delete_card (cardId="c1")' },
+      ]);
+    });
+
+    render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
+    await userEvent.type(screen.getByRole('textbox'), 'supprime la carte c1');
+    await userEvent.click(screen.getByRole('button', { name: /envoyer/i }));
+
+    const allowButton = await screen.findByRole('button', { name: /autoriser/i });
+    await userEvent.click(allowButton);
+
+    // Laisse le temps à la promesse fetch de se résoudre.
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
+  });
+
+  it('confirm renvoie 500 → message d erreur affiché', async () => {
+    const confirmId = 'c'.repeat(32);
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      if (String(url).endsWith('/api/assistant/confirm')) {
+        return Response.json({ ok: false }, { status: 500 });
+      }
+      return sseResponse([
+        { type: 'confirm_request', id: confirmId, description: 'delete_card (cardId="c1")' },
+      ]);
+    });
+
+    render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
+    await userEvent.type(screen.getByRole('textbox'), 'supprime la carte c1');
+    await userEvent.click(screen.getByRole('button', { name: /envoyer/i }));
+
+    const allowButton = await screen.findByRole('button', { name: /autoriser/i });
+    await userEvent.click(allowButton);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Impossible de transmettre la réponse — réessayez.'),
+      ).toBeInTheDocument();
+    });
+  });
+
   it('annule la requête en cours au démontage', async () => {
     let signal: AbortSignal | undefined;
     vi.spyOn(globalThis, 'fetch').mockImplementation((_input, init) => {

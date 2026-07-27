@@ -33,17 +33,51 @@ export function AssistantChat({ csrfToken, firstName }: AssistantChatProps) {
   const [activity, setActivity] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [pendingConfirm, setPendingConfirm] = useState<{
+    id: string;
+    description: string;
+  } | null>(null);
   const historyRef = useRef<DisplayMessage[]>([]);
   const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const listRef = useRef<HTMLDivElement | null>(null);
 
   // Annule la requête en cours au démontage (navigation) — silencieux côté UI.
   useEffect(() => () => abortRef.current?.abort(), []);
 
   useEffect(() => {
-    // `?.` sur la méthode : jsdom ne l'implémente pas.
-    bottomRef.current?.scrollIntoView?.({ block: 'end' });
-  }, [messages, streamText]);
+    // Ne recolle en bas que si l'utilisateur y était déjà — laisse la lecture
+    // d'un historique remonté tranquille pendant un stream en cours.
+    const list = listRef.current;
+    if (list === null) return;
+    const nearBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 120;
+    if (nearBottom) {
+      // `?.` sur la méthode : jsdom ne l'implémente pas.
+      bottomRef.current?.scrollIntoView?.({ block: 'end' });
+    }
+  }, [messages, streamText, pendingConfirm]);
+
+  const answerConfirm = useCallback(
+    async (id: string, allowed: boolean) => {
+      try {
+        const res = await fetch('/api/assistant/confirm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken },
+          body: JSON.stringify({ id, allowed }),
+        });
+        // Le dialog se ferme à la réception de confirm_resolved (source de vérité serveur).
+        if (!res.ok) {
+          // 404/409 : course avec le timeout serveur (voir confirm-store) — le
+          // dialog est déjà résolu ou en passe de l'être, rien à signaler.
+          if (res.status === 404 || res.status === 409) return;
+          setError('Impossible de transmettre la réponse — réessayez.');
+        }
+      } catch {
+        setError('Impossible de transmettre la réponse — réessayez.');
+      }
+    },
+    [csrfToken],
+  );
 
   const send = useCallback(async () => {
     const text = input.trim();
@@ -101,6 +135,9 @@ export function AssistantChat({ csrfToken, firstName }: AssistantChatProps) {
           }
           if (event.type === 'tool_start') setActivity(ACTIVITY_LABELS[event.name] ?? 'travaille…');
           if (event.type === 'tool_end') setActivity(null);
+          if (event.type === 'confirm_request')
+            setPendingConfirm({ id: event.id, description: event.description });
+          if (event.type === 'confirm_resolved') setPendingConfirm(null);
           if (event.type === 'done') finalText = event.text;
           if (event.type === 'error') setError(event.message);
         }
@@ -142,7 +179,7 @@ export function AssistantChat({ csrfToken, firstName }: AssistantChatProps) {
         Demandez votre briefing, interrogez vos projets et vos mails.
       </p>
 
-      <div className="flex w-full flex-1 flex-col gap-2 overflow-y-auto">
+      <div ref={listRef} className="flex w-full flex-1 flex-col gap-2 overflow-y-auto">
         {/* Seule la liste commitée est annoncée : la réponse finale est lue une
             fois, sans spammer les lecteurs d'écran à chaque chunk streamé. */}
         <div className="flex flex-col gap-2" aria-live="polite">
@@ -168,6 +205,44 @@ export function AssistantChat({ csrfToken, firstName }: AssistantChatProps) {
           )}
           {activity !== null && (
             <p className="text-xs font-semibold text-[color:var(--color-text-ghost)]">{activity}</p>
+          )}
+          {pendingConfirm !== null && (
+            <div
+              role="alertdialog"
+              aria-label="Confirmation requise"
+              className="w-full self-start rounded-2xl border-2 px-4 py-3 text-sm"
+              style={{ borderColor: 'var(--accent-primary)', background: 'var(--color-bg-card)' }}
+            >
+              <p
+                className="text-xs font-bold uppercase tracking-wide"
+                style={{ color: 'var(--accent-primary)' }}
+              >
+                ⚡ Confirmation requise
+              </p>
+              <p className="mt-1 break-words text-[color:var(--color-text-main)]">
+                {pendingConfirm.description}
+              </p>
+              <div className="mt-3 flex gap-2">
+                <button
+                  type="button"
+                  className="rounded-full px-4 py-1.5 text-xs font-bold text-white"
+                  style={{ background: 'var(--accent-gradient)' }}
+                  onClick={() => void answerConfirm(pendingConfirm.id, true)}
+                >
+                  Autoriser
+                </button>
+                <button
+                  type="button"
+                  className="rounded-full border border-[color:var(--color-border-light)] px-4 py-1.5 text-xs font-bold text-[color:var(--color-text-muted)]"
+                  onClick={() => void answerConfirm(pendingConfirm.id, false)}
+                >
+                  Refuser
+                </button>
+                <span className="ml-auto self-center text-xs text-[color:var(--color-text-ghost)]">
+                  refus automatique dans 2 min
+                </span>
+              </div>
+            </div>
           )}
         </div>
         {error !== null && (
