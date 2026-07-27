@@ -92,12 +92,90 @@ describe('buildKanbanTools', () => {
     }
   });
 
-  it('jsonSchema.required correspond aux clés requises du schéma Zod, pour chaque tool', () => {
+  it('jsonSchema (required + properties) correspond au schéma Zod, pour chaque tool', () => {
     for (const t of tools()) {
-      const jsonRequired = [...((t.jsonSchema as { required?: string[] }).required ?? [])].sort();
+      const json = t.jsonSchema as { required?: string[]; properties?: Record<string, unknown> };
+      const jsonRequired = [...(json.required ?? [])].sort();
       const zodRequired = requiredKeys(t.inputSchema as z.ZodTypeAny).sort();
-      expect(jsonRequired, `mismatch on ${t.name}`).toEqual(zodRequired);
+      expect(jsonRequired, `required mismatch on ${t.name}`).toEqual(zodRequired);
+
+      const zodSchema = t.inputSchema as z.ZodTypeAny;
+      if (!(zodSchema instanceof z.ZodObject)) throw new Error(`expected ZodObject on ${t.name}`);
+      const jsonKeys = Object.keys(json.properties ?? {}).sort();
+      const zodKeys = Object.keys(zodSchema.shape as Record<string, unknown>).sort();
+      expect(jsonKeys, `properties mismatch on ${t.name}`).toEqual(zodKeys);
     }
+  });
+
+  it('safeMutation : erreur brute (ex. Prisma) → message générique, aucune fuite du message', async () => {
+    cardCoreMocks.createCardCore.mockRejectedValue(
+      Object.assign(new Error("Can't reach database server at db.xxx.supabase.co"), {}),
+    );
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const out = await run('create_card', {
+      projectId: PROJECT_ID,
+      columnId: COLUMN_ID,
+      title: 'X',
+    });
+    expect(out).toBe("Erreur interne pendant l'action — réessayez dans un instant.");
+    expect(out).not.toContain('supabase.co');
+    // Log serveur redigé : étiquette du tool uniquement, jamais l'erreur brute.
+    expect(consoleError).toHaveBeenCalledWith('[assistant] tool mutation error', {
+      tool: 'create_card',
+    });
+    consoleError.mockRestore();
+  });
+
+  it('safeMutation : digest NEXT_REDIRECT (requireUser sans session) → message session expirée', async () => {
+    moveCardMocks.moveCard.mockRejectedValue(
+      Object.assign(new Error('redirect'), { digest: 'NEXT_REDIRECT;push;/login' }),
+    );
+    const out = await run('move_card', {
+      cardId: CARD_ID,
+      targetColumnId: COLUMN_ID,
+      targetIndex: 0,
+    });
+    expect(out).toBe('Échec : session expirée — reconnectez-vous.');
+  });
+
+  it('safeMutation : NotFoundError (code NOT_FOUND) → message périmètre, sans fuite du resource name', async () => {
+    dueDateMocks.updateCardDueDate.mockRejectedValue(
+      Object.assign(new Error('Card not found'), { code: 'NOT_FOUND' }),
+    );
+    const out = await run('set_card_due_date', { cardId: CARD_ID, dueDate: '2026-08-01' });
+    expect(out).toBe('Échec : élément introuvable ou hors de votre périmètre.');
+  });
+
+  it('set_card_due_date : le schéma refuse un format non YYYY-MM-DD et accepte date valide ou null', () => {
+    const schema = getTool('set_card_due_date').inputSchema as z.ZodTypeAny;
+    const bad = schema.safeParse({ cardId: CARD_ID, dueDate: 'demain' });
+    expect(bad.success).toBe(false);
+    if (!bad.success) {
+      expect(bad.error.issues[0]?.message).toBe('Format attendu : YYYY-MM-DD');
+    }
+    expect(schema.safeParse({ cardId: CARD_ID, dueDate: '2026-08-01' }).success).toBe(true);
+    expect(schema.safeParse({ cardId: CARD_ID, dueDate: null }).success).toBe(true);
+  });
+
+  it('create_project : le schéma du tool refuse startDate/endDate hors format YYYY-MM-DD', () => {
+    const schema = getTool('create_project').inputSchema as z.ZodTypeAny;
+    const base = { name: 'P', clientId: CLIENT_ID, templateId: 'creative' };
+    expect(schema.safeParse({ ...base, startDate: 'demain' }).success).toBe(false);
+    expect(schema.safeParse({ ...base, endDate: '01/08/2026' }).success).toBe(false);
+    expect(
+      schema.safeParse({ ...base, startDate: '2026-08-01', endDate: '2026-09-01' }).success,
+    ).toBe(true);
+  });
+
+  it('create_project : la description énumère les templates et types built-in (anti-dérive)', () => {
+    const tool = getTool('create_project');
+    // Valeurs actuelles de BUILTIN_TEMPLATES / BUILTIN_PROJECT_TYPES — la
+    // description est construite depuis les constantes domain.
+    expect(tool.description).toContain('creative');
+    expect(tool.description).toContain('campagne');
+    const typeIdJson = (tool.jsonSchema as { properties: { typeId: { enum: string[] } } })
+      .properties.typeId;
+    expect(typeIdJson.enum).toContain('campagne');
   });
 
   it('create_card transmet ctx + input parsé au core et renvoie un JSON avec cardId', async () => {
@@ -175,6 +253,14 @@ describe('buildKanbanTools', () => {
     updateCardMocks.updateCard.mockResolvedValueOnce({ ok: false, message: 'Carte introuvable.' });
     const fail = await run('update_card', { cardId: CARD_ID, title: 'X' });
     expect(fail).toBe('Échec : Carte introuvable.');
+  });
+
+  it('update_card : categoryTag null est transmis (effacement), les clés absentes ne le sont pas', async () => {
+    updateCardMocks.updateCard.mockResolvedValue({ ok: true });
+    await run('update_card', { cardId: CARD_ID, categoryTag: null });
+    // Pin du conditional-spread : null ≠ undefined — la clé doit être présente
+    // avec la valeur null, et title/description absents.
+    expect(updateCardMocks.updateCard).toHaveBeenCalledWith({ cardId: CARD_ID, categoryTag: null });
   });
 
   it('set_card_due_date avec autoUnblocked:true → JSON reflète le déblocage', async () => {
