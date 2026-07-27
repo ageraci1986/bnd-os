@@ -33,6 +33,8 @@
     "removeComments": false,
 
     "paths": {
+      "@nexushub/agent": ["./packages/agent/src/index.ts"],
+      "@nexushub/agent/*": ["./packages/agent/src/*"],
       "@nexushub/db": ["./packages/db/src/index.ts"],
       "@nexushub/db/*": ["./packages/db/src/*"],
       "@nexushub/domain": ["./packages/domain/src/index.ts"],
