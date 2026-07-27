@@ -27,8 +27,7 @@ CREATE TABLE "public"."assistant_memory" (
 CREATE UNIQUE INDEX "assistant_memory_workspace_id_user_id_name_key"
   ON "public"."assistant_memory" ("workspace_id", "user_id", "name");
 
-CREATE INDEX "assistant_memory_workspace_id_user_id_idx"
-  ON "public"."assistant_memory" ("workspace_id", "user_id");
+-- Pas d'index (workspace_id, user_id) séparé : le préfixe de l'unique le couvre.
 
 -- RLS — personal, not workspace-shared: every policy requires BOTH workspace
 -- membership (public.workspace_ids_for_current_user(), cf. migration

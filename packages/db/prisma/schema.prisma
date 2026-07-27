@@ -910,8 +910,8 @@ model AssistantMemory {
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  // Pas d'index (workspaceId, userId) séparé : le préfixe de l'unique le couvre.
   @@unique([workspaceId, userId, name])
-  @@index([workspaceId, userId])
   @@map("assistant_memory")
 }
 
