@@ -14,6 +14,7 @@ const redisMocks = vi.hoisted(() => ({
   set: vi.fn(),
   del: vi.fn(),
 }));
+redisMocks.set.mockResolvedValue('OK');
 
 vi.mock('@upstash/redis', () => ({
   Redis: class {
@@ -108,6 +109,16 @@ describe('ConfirmStore (backend mémoire)', () => {
     expect(a).not.toBe(b);
     expect(a).toMatch(/^[0-9a-f]{32}$/);
   });
+
+  it('deux answer() concurrents (même id) → exactement un ok et un already_answered (SET NX atomique)', async () => {
+    const id = await store.createPending('u1');
+    const [first, second] = await Promise.all([
+      store.answer(id, 'u1', true),
+      store.answer(id, 'u1', false),
+    ]);
+    const outcomes = [first, second].sort();
+    expect(outcomes).toEqual(['already_answered', 'ok']);
+  });
 });
 
 describe('RedisConfirmBackend (client Upstash mocké)', () => {
@@ -117,22 +128,53 @@ describe('RedisConfirmBackend (client Upstash mocké)', () => {
 
   it('set écrit sous KEY_PREFIX avec TTL 150 s', async () => {
     const backend = new RedisConfirmBackend(new Redis({ url: 'https://x.upstash.io', token: 't' }));
-    await backend.set('abc123', { userId: 'u1', status: 'pending' });
+    await backend.set('abc123', { userId: 'u1' });
     expect(redisMocks.set).toHaveBeenCalledTimes(1);
     expect(redisMocks.set).toHaveBeenCalledWith(
       'assistant:confirm:abc123',
-      { userId: 'u1', status: 'pending' },
+      { userId: 'u1' },
       { ex: 150 },
     );
   });
 
   it('get retourne le record désérialisé par le client (round-trip JSON auto), null sinon', async () => {
     const backend = new RedisConfirmBackend(new Redis({ url: 'https://x.upstash.io', token: 't' }));
-    redisMocks.get.mockResolvedValueOnce({ userId: 'u1', status: 'allowed' });
-    await expect(backend.get('abc123')).resolves.toEqual({ userId: 'u1', status: 'allowed' });
+    redisMocks.get.mockResolvedValueOnce({ userId: 'u1' });
+    await expect(backend.get('abc123')).resolves.toEqual({ userId: 'u1' });
     expect(redisMocks.get).toHaveBeenCalledWith('assistant:confirm:abc123');
     redisMocks.get.mockResolvedValueOnce(null);
     await expect(backend.get('absent')).resolves.toBeNull();
+  });
+
+  it('setAnswerIfAbsent écrit sous la clé :answer en SET NX avec TTL, OK → true', async () => {
+    const backend = new RedisConfirmBackend(new Redis({ url: 'https://x.upstash.io', token: 't' }));
+    redisMocks.set.mockResolvedValueOnce('OK');
+    await expect(backend.setAnswerIfAbsent('abc123', true)).resolves.toBe(true);
+    expect(redisMocks.set).toHaveBeenCalledWith('assistant:confirm:abc123:answer', true, {
+      nx: true,
+      ex: 150,
+    });
+  });
+
+  it('setAnswerIfAbsent → null (clé déjà présente) → false', async () => {
+    const backend = new RedisConfirmBackend(new Redis({ url: 'https://x.upstash.io', token: 't' }));
+    redisMocks.set.mockResolvedValueOnce(null);
+    await expect(backend.setAnswerIfAbsent('abc123', false)).resolves.toBe(false);
+  });
+
+  it('getAnswer lit la clé :answer, null si absente', async () => {
+    const backend = new RedisConfirmBackend(new Redis({ url: 'https://x.upstash.io', token: 't' }));
+    redisMocks.get.mockResolvedValueOnce(true);
+    await expect(backend.getAnswer('abc123')).resolves.toBe(true);
+    expect(redisMocks.get).toHaveBeenCalledWith('assistant:confirm:abc123:answer');
+    redisMocks.get.mockResolvedValueOnce(null);
+    await expect(backend.getAnswer('abc123')).resolves.toBeNull();
+  });
+
+  it('deleteAnswer supprime la clé :answer', async () => {
+    const backend = new RedisConfirmBackend(new Redis({ url: 'https://x.upstash.io', token: 't' }));
+    await backend.deleteAnswer('abc123');
+    expect(redisMocks.del).toHaveBeenCalledWith('assistant:confirm:abc123:answer');
   });
 });
 

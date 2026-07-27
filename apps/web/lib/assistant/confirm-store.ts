@@ -10,13 +10,16 @@ const DEFAULT_TIMEOUT_MS = 120_000;
 
 interface PendingRecord {
   readonly userId: string;
-  readonly status: 'pending' | 'allowed' | 'denied';
 }
 
 export interface ConfirmBackend {
   get(id: string): Promise<PendingRecord | null>;
   set(id: string, record: PendingRecord): Promise<void>;
   delete(id: string): Promise<void>;
+  /** SET NX sur la clé de réponse dédiée : true si écrit (premier arrivé), false si déjà présent. */
+  setAnswerIfAbsent(id: string, allowed: boolean): Promise<boolean>;
+  getAnswer(id: string): Promise<boolean | null>;
+  deleteAnswer(id: string): Promise<void>;
 }
 
 /** Backend Upstash (prod). */
@@ -31,11 +34,25 @@ export class RedisConfirmBackend implements ConfirmBackend {
   async delete(id: string): Promise<void> {
     await this.redis.del(KEY_PREFIX + id);
   }
+  async setAnswerIfAbsent(id: string, allowed: boolean): Promise<boolean> {
+    const result = await this.redis.set(KEY_PREFIX + id + ':answer', allowed, {
+      nx: true,
+      ex: TTL_SECONDS,
+    });
+    return result === 'OK';
+  }
+  async getAnswer(id: string): Promise<boolean | null> {
+    return (await this.redis.get<boolean>(KEY_PREFIX + id + ':answer')) ?? null;
+  }
+  async deleteAnswer(id: string): Promise<void> {
+    await this.redis.del(KEY_PREFIX + id + ':answer');
+  }
 }
 
 /** Backend mémoire (dev/tests) — un seul process, comme le fallback rate-limit. */
 export class MemoryConfirmBackend implements ConfirmBackend {
   private readonly map = new Map<string, PendingRecord>();
+  private readonly answers = new Map<string, boolean>();
   async get(id: string): Promise<PendingRecord | null> {
     return this.map.get(id) ?? null;
   }
@@ -44,6 +61,17 @@ export class MemoryConfirmBackend implements ConfirmBackend {
   }
   async delete(id: string): Promise<void> {
     this.map.delete(id);
+  }
+  async setAnswerIfAbsent(id: string, allowed: boolean): Promise<boolean> {
+    if (this.answers.has(id)) return false;
+    this.answers.set(id, allowed);
+    return true;
+  }
+  async getAnswer(id: string): Promise<boolean | null> {
+    return this.answers.get(id) ?? null;
+  }
+  async deleteAnswer(id: string): Promise<void> {
+    this.answers.delete(id);
   }
 }
 
@@ -54,18 +82,22 @@ export class ConfirmStore {
 
   async createPending(userId: string): Promise<string> {
     const id = randomBytes(16).toString('hex');
-    await this.backend.set(id, { userId, status: 'pending' });
+    await this.backend.set(id, { userId });
     return id;
   }
 
-  /** Un oui = une exécution : la première réponse gagne, les suivantes sont rejetées. */
+  /**
+   * Un oui = une exécution : la réponse est écrite atomiquement (SET NX) sur une
+   * clé dédiée — la première réponse gagne, les suivantes voient `already_answered`
+   * même en cas de course (deux requêtes concurrentes). Le record `pending` ne sert
+   * plus qu'à vérifier existence/propriété, il n'est jamais muté.
+   */
   async answer(id: string, userId: string, allowed: boolean): Promise<AnswerOutcome> {
     const record = await this.backend.get(id);
     if (record === null) return 'not_found';
     if (record.userId !== userId) return 'forbidden';
-    if (record.status !== 'pending') return 'already_answered';
-    await this.backend.set(id, { userId, status: allowed ? 'allowed' : 'denied' });
-    return 'ok';
+    const written = await this.backend.setAnswerIfAbsent(id, allowed);
+    return written ? 'ok' : 'already_answered';
   }
 
   /**
@@ -89,15 +121,14 @@ export class ConfirmStore {
     try {
       for (;;) {
         if (opts?.signal?.aborted === true) return false;
-        const record = await this.backend.get(id);
-        if (record === null) return false;
-        if (record.status === 'allowed') return true;
-        if (record.status === 'denied') return false;
+        const answer = await this.backend.getAnswer(id);
+        if (answer !== null) return answer;
         if (Date.now() >= deadline) return false;
         await new Promise((resolve) => setTimeout(resolve, pollMs));
       }
     } finally {
       await this.backend.delete(id).catch(() => undefined);
+      await this.backend.deleteAnswer(id).catch(() => undefined);
     }
   }
 }
