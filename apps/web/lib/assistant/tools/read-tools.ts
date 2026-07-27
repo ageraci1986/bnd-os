@@ -304,8 +304,9 @@ export async function buildReadTools(ctx: AuthContext): Promise<ToolSpec[]> {
           }
           let bodyText = mail.bodyText;
           let bodyHtmlSanitized = mail.bodyHtmlSanitized;
-          // Même critère d'« inutilisable » que `cachedIsUsable` dans
-          // fetch-mail-body.ts : bodyText null/vide ET bodyHtmlSanitized null.
+          // Critère volontairement plus simple que `cachedIsUsable` de
+          // fetch-mail-body.ts : absence totale de corps uniquement (un cache
+          // mojibake/MIME non parsé n'est pas re-réparé ici — l'UI le fait).
           const hasUsableBody =
             (bodyText !== null && bodyText.length > 0) || bodyHtmlSanitized !== null;
           if (!hasUsableBody) {
