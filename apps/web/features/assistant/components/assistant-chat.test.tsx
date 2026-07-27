@@ -189,6 +189,104 @@ describe('AssistantChat', () => {
     });
   });
 
+  it('verrouille les deux boutons au premier clic — un seul POST /confirm', async () => {
+    const confirmId = 'e'.repeat(32);
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation((url) => {
+      if (String(url).endsWith('/api/assistant/confirm')) {
+        return new Promise<Response>(() => undefined); // réponse jamais résolue : en vol
+      }
+      return Promise.resolve(
+        sseResponse([
+          { type: 'confirm_request', id: confirmId, description: 'delete_card (cardId="c1")' },
+        ]),
+      );
+    });
+
+    render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
+    await userEvent.type(screen.getByRole('textbox'), 'supprime la carte c1');
+    await userEvent.click(screen.getByRole('button', { name: /envoyer/i }));
+
+    const allowButton = await screen.findByRole('button', { name: /autoriser/i });
+    const denyButton = screen.getByRole('button', { name: /refuser/i });
+    await userEvent.click(allowButton);
+    await userEvent.click(denyButton); // désactivé après le premier clic → sans effet
+
+    expect(denyButton).toBeDisabled();
+    // Le bouton cliqué affiche « envoi… » pendant la transmission.
+    expect(screen.getByRole('button', { name: /envoi…/i })).toBeInTheDocument();
+    const confirmCalls = fetchMock.mock.calls.filter(([u]) =>
+      String(u).endsWith('/api/assistant/confirm'),
+    );
+    expect(confirmCalls).toHaveLength(1);
+  });
+
+  it('place le focus sur Refuser à l ouverture du dialog', async () => {
+    const confirmId = 'd'.repeat(32);
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      sseResponse([
+        { type: 'confirm_request', id: confirmId, description: 'delete_card (cardId="c1")' },
+      ]),
+    );
+
+    render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
+    await userEvent.type(screen.getByRole('textbox'), 'supprime la carte c1');
+    await userEvent.click(screen.getByRole('button', { name: /envoyer/i }));
+
+    const denyButton = await screen.findByRole('button', { name: /refuser/i });
+    await waitFor(() => {
+      expect(denyButton).toHaveFocus();
+    });
+  });
+
+  it('ne recolle pas en bas quand l utilisateur a remonté le fil', async () => {
+    const scrollSpy = vi.fn();
+    const proto = window.HTMLElement.prototype as unknown as { scrollIntoView?: unknown };
+    proto.scrollIntoView = scrollSpy;
+    try {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        sseResponse([{ type: 'done', text: 'Réponse.' }]),
+      );
+      const { container } = render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
+      const list = container.querySelector('.overflow-y-auto');
+      expect(list).not.toBeNull();
+      // Simule un utilisateur remonté dans le fil : 800px au-dessus du bas (> seuil 120).
+      Object.defineProperty(list, 'scrollHeight', { value: 1000, configurable: true });
+      Object.defineProperty(list, 'clientHeight', { value: 200, configurable: true });
+      Object.defineProperty(list, 'scrollTop', { value: 0, configurable: true });
+      scrollSpy.mockClear();
+
+      await userEvent.type(screen.getByRole('textbox'), 'x');
+      await userEvent.click(screen.getByRole('button', { name: /envoyer/i }));
+      await screen.findByText('Réponse.');
+
+      expect(scrollSpy).not.toHaveBeenCalled();
+    } finally {
+      delete proto.scrollIntoView;
+    }
+  });
+
+  it('confirm renvoie 404 (clé expirée) → aucune erreur affichée', async () => {
+    const confirmId = 'f'.repeat(32);
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      if (String(url).endsWith('/api/assistant/confirm')) {
+        return Response.json({ ok: false }, { status: 404 });
+      }
+      return sseResponse([
+        { type: 'confirm_request', id: confirmId, description: 'delete_card (cardId="c1")' },
+      ]);
+    });
+
+    render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
+    await userEvent.type(screen.getByRole('textbox'), 'supprime la carte c1');
+    await userEvent.click(screen.getByRole('button', { name: /envoyer/i }));
+
+    const allowButton = await screen.findByRole('button', { name: /autoriser/i });
+    await userEvent.click(allowButton);
+
+    // Laisse le temps à la promesse fetch de se résoudre.
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
+  });
+
   it('confirm renvoie 409 (déjà répondu) → aucune erreur affichée', async () => {
     const confirmId = 'b'.repeat(32);
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {

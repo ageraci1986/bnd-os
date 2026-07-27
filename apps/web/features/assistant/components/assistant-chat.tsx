@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { parseSseLines } from '../lib/sse';
 
 interface DisplayMessage {
@@ -37,13 +37,36 @@ export function AssistantChat({ csrfToken, firstName }: AssistantChatProps) {
     id: string;
     description: string;
   } | null>(null);
+  // Verrou anti double-envoi : mémorise quel bouton a été cliqué, désactive les deux.
+  const [answering, setAnswering] = useState<'allow' | 'deny' | null>(null);
   const historyRef = useRef<DisplayMessage[]>([]);
   const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
+  const allowRef = useRef<HTMLButtonElement | null>(null);
+  const denyRef = useRef<HTMLButtonElement | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const confirmWasOpen = useRef(false);
+  const escNoteId = useId();
 
   // Annule la requête en cours au démontage (navigation) — silencieux côté UI.
   useEffect(() => () => abortRef.current?.abort(), []);
+
+  // Gestion du focus (WCAG AA) : à l'ouverture du dialog, focus sur Refuser
+  // (défaut sûr pour une action destructive) ; à sa fermeture, retour au champ
+  // de saisie — une fois le stream terminé, car un input `disabled` ne peut pas
+  // recevoir le focus.
+  useEffect(() => {
+    if (pendingConfirm !== null) {
+      confirmWasOpen.current = true;
+      denyRef.current?.focus();
+      return;
+    }
+    if (confirmWasOpen.current && !busy) {
+      confirmWasOpen.current = false;
+      inputRef.current?.focus();
+    }
+  }, [pendingConfirm, busy]);
 
   useEffect(() => {
     // Ne recolle en bas que si l'utilisateur y était déjà — laisse la lecture
@@ -59,6 +82,7 @@ export function AssistantChat({ csrfToken, firstName }: AssistantChatProps) {
 
   const answerConfirm = useCallback(
     async (id: string, allowed: boolean) => {
+      setAnswering(allowed ? 'allow' : 'deny');
       try {
         const res = await fetch('/api/assistant/confirm', {
           method: 'POST',
@@ -71,9 +95,11 @@ export function AssistantChat({ csrfToken, firstName }: AssistantChatProps) {
           // dialog est déjà résolu ou en passe de l'être, rien à signaler.
           if (res.status === 404 || res.status === 409) return;
           setError('Impossible de transmettre la réponse — réessayez.');
+          setAnswering(null); // déverrouille pour permettre un nouvel essai
         }
       } catch {
         setError('Impossible de transmettre la réponse — réessayez.');
+        setAnswering(null);
       }
     },
     [csrfToken],
@@ -135,9 +161,14 @@ export function AssistantChat({ csrfToken, firstName }: AssistantChatProps) {
           }
           if (event.type === 'tool_start') setActivity(ACTIVITY_LABELS[event.name] ?? 'travaille…');
           if (event.type === 'tool_end') setActivity(null);
-          if (event.type === 'confirm_request')
+          if (event.type === 'confirm_request') {
             setPendingConfirm({ id: event.id, description: event.description });
-          if (event.type === 'confirm_resolved') setPendingConfirm(null);
+            setAnswering(null);
+          }
+          if (event.type === 'confirm_resolved') {
+            setPendingConfirm(null);
+            setAnswering(null);
+          }
           if (event.type === 'done') finalText = event.text;
           if (event.type === 'error') setError(event.message);
         }
@@ -210,8 +241,20 @@ export function AssistantChat({ csrfToken, firstName }: AssistantChatProps) {
             <div
               role="alertdialog"
               aria-label="Confirmation requise"
+              aria-describedby={escNoteId}
               className="w-full self-start rounded-2xl border-2 px-4 py-3 text-sm"
               style={{ borderColor: 'var(--accent-primary)', background: 'var(--color-bg-card)' }}
+              onKeyDown={(e) => {
+                // Piège de focus minimal : Tab / Maj+Tab cyclent entre les deux
+                // boutons ; Échap est neutralisé — le refus doit être explicite.
+                if (e.key === 'Tab') {
+                  e.preventDefault();
+                  const target =
+                    document.activeElement === denyRef.current ? allowRef.current : denyRef.current;
+                  target?.focus();
+                }
+                if (e.key === 'Escape') e.preventDefault();
+              }}
             >
               <p
                 className="text-xs font-bold uppercase tracking-wide"
@@ -222,24 +265,32 @@ export function AssistantChat({ csrfToken, firstName }: AssistantChatProps) {
               <p className="mt-1 break-words text-[color:var(--color-text-main)]">
                 {pendingConfirm.description}
               </p>
+              <p id={escNoteId} className="sr-only">
+                La touche Échap ne ferme pas cette demande — répondez avec Autoriser ou Refuser.
+                Sans réponse, elle sera refusée automatiquement.
+              </p>
               <div className="mt-3 flex gap-2">
                 <button
+                  ref={allowRef}
                   type="button"
-                  className="rounded-full px-4 py-1.5 text-xs font-bold text-white"
+                  className="rounded-full px-4 py-1.5 text-xs font-bold text-white disabled:opacity-50"
                   style={{ background: 'var(--accent-gradient)' }}
+                  disabled={answering !== null}
                   onClick={() => void answerConfirm(pendingConfirm.id, true)}
                 >
-                  Autoriser
+                  {answering === 'allow' ? 'envoi…' : 'Autoriser'}
                 </button>
                 <button
+                  ref={denyRef}
                   type="button"
-                  className="rounded-full border border-[color:var(--color-border-light)] px-4 py-1.5 text-xs font-bold text-[color:var(--color-text-muted)]"
+                  className="rounded-full border border-[color:var(--color-border-light)] px-4 py-1.5 text-xs font-bold text-[color:var(--color-text-muted)] disabled:opacity-50"
+                  disabled={answering !== null}
                   onClick={() => void answerConfirm(pendingConfirm.id, false)}
                 >
-                  Refuser
+                  {answering === 'deny' ? 'envoi…' : 'Refuser'}
                 </button>
                 <span className="ml-auto self-center text-xs text-[color:var(--color-text-ghost)]">
-                  refus automatique dans 2 min
+                  refusée automatiquement après 2 min sans réponse
                 </span>
               </div>
             </div>
@@ -261,6 +312,7 @@ export function AssistantChat({ csrfToken, firstName }: AssistantChatProps) {
         }}
       >
         <input
+          ref={inputRef}
           className="flex-1 bg-transparent text-sm text-[color:var(--color-text-main)] outline-none"
           placeholder="Demandez quelque chose, ou dictez une série d'actions…"
           aria-label="Message"
