@@ -10,19 +10,13 @@ import { getConfirmStore } from '@/lib/assistant/confirm-store';
 import { createAnthropicProvider, ProviderError } from '@/lib/assistant/provider';
 import { buildSystemPrompt } from '@/lib/assistant/system-prompt';
 import { buildRegistry } from '@/lib/assistant/tools';
+import { WIDGET_TOOL_SET } from '@/lib/assistant/widget-tools';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 // Budget ~2 fenêtres de confirmation (120 s) + rounds modèle ; Vercel Fluid.
 export const maxDuration = 300;
 
-/** Tools de lecture dont la sortie JSON est assez structurée pour un widget déterministe. */
-const WIDGET_TOOLS = new Set([
-  'get_today_overview',
-  'get_project_board',
-  'search_mails',
-  'list_projects',
-]);
 const WIDGET_DATA_MAX_CHARS = 8_000;
 
 function sse(event: ChatSseEvent): string {
@@ -184,7 +178,7 @@ export async function POST(req: Request): Promise<Response> {
               // Widget déterministe : whitelist stricte + plafond de taille + JSON valide
               // uniquement. Une sortie non-JSON ou trop longue reste du texte simple.
               if (
-                WIDGET_TOOLS.has(event.name) &&
+                WIDGET_TOOL_SET.has(event.name) &&
                 !event.isError &&
                 event.output.length <= WIDGET_DATA_MAX_CHARS
               ) {
