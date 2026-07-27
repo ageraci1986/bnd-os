@@ -1227,6 +1227,8 @@ git commit -m "feat(assistant): system prompt builder with anti-injection rules"
 
 Sept tools ⚡ : `get_current_datetime`, `get_today_overview`, `list_projects`, `get_project_board`, `list_clients`, `search_mails`, `read_mail`. Tous scoped par `ctx.workspaceId` + `loadUserScope`. Les handlers renvoient du JSON compact (`JSON.stringify`) — le modèle le lit très bien.
 
+> **Note (post-Task 3, revue qualité)** : construire chaque tool via la factory `defineTool()` de `@nexushub/agent` — PAS en objet littéral avec cast `as ToolSpec['handler']` comme dans l'exemple ci-dessous (écrit avant l'ajout de la factory). `defineTool` vérifie le handler contre le schéma Zod et porte l'unique cast. Contrat des handlers : ne laisser échapper que des messages montrables à l'utilisateur (reformuler les erreurs DB/réseau).
+
 - [ ] **Step 1: Test — `apps/web/lib/assistant/tools/read-tools.test.ts`**
 
 Prisma est mocké via `vi.mock('@nexushub/db', ...)` (pattern existant dans les tests d'actions du repo — copier le style de `apps/web/features/communications/actions/*.test.ts`).

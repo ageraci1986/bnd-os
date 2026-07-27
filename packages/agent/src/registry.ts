@@ -13,6 +13,11 @@ export interface DefineToolInput<T> {
   readonly jsonSchema: Record<string, unknown>;
   readonly gated?: boolean;
   readonly adminOnly?: boolean;
+  /**
+   * Contrat : tout message qui s'échappe du handler (throw compris) doit être
+   * montrable à l'utilisateur — attraper et reformuler les erreurs internes
+   * (DB, réseau) avant de les laisser remonter.
+   */
   readonly handler: (input: T) => Promise<string>;
 }
 
