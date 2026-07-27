@@ -79,8 +79,13 @@ describe('<MailListWidget />', () => {
     expect(screen.getAllByRole('link')).toHaveLength(10);
   });
 
-  it('renders nothing when the data shape is invalid', () => {
+  it('renders nothing and warns when the data shape is invalid', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const { container } = render(<MailListWidget data={{}} />);
     expect(container.firstChild).toBeNull();
+    expect(warn).toHaveBeenCalledWith('[assistant] widget data invalide', {
+      tool: 'search_mails',
+    });
+    warn.mockRestore();
   });
 });

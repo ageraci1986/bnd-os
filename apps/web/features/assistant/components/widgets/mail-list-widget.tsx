@@ -1,5 +1,7 @@
 import { z } from 'zod';
 import Link from 'next/link';
+import { formatReceivedAt } from './format-date';
+import { parseWidgetData } from './parse-widget-data';
 
 /** Nb max de mails affichés (au-delà, la liste est déjà bornée par le tool). */
 const MAILS_SHOWN_MAX = 10;
@@ -21,21 +23,11 @@ export interface MailListWidgetProps {
   readonly data: unknown;
 }
 
-function formatReceivedAt(receivedAt: string): string {
-  const date = new Date(receivedAt);
-  if (Number.isNaN(date.getTime())) return receivedAt;
-  const now = new Date();
-  const sameDay = date.toDateString() === now.toDateString();
-  return sameDay
-    ? new Intl.DateTimeFormat('fr-FR', { timeStyle: 'short' }).format(date)
-    : new Intl.DateTimeFormat('fr-FR', { dateStyle: 'short' }).format(date);
-}
-
 /** Liste de mails pour `search_mails` — lignes expéditeur / objet / date / pastille non-lu. */
 export function MailListWidget({ data }: MailListWidgetProps) {
-  const parsed = MailListSchema.safeParse(data);
-  if (!parsed.success) return null;
-  const mails = parsed.data.slice(0, MAILS_SHOWN_MAX);
+  const parsed = parseWidgetData('search_mails', MailListSchema, data);
+  if (parsed === null) return null;
+  const mails = parsed.slice(0, MAILS_SHOWN_MAX);
 
   return (
     <div className="w-full rounded-2xl border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] p-3">

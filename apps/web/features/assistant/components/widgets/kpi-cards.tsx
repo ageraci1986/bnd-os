@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { MetricCard } from '@nexushub/ui';
+import { parseWidgetData } from './parse-widget-data';
 
 /** Shape produite par le tool `get_today_overview` (read-tools.ts). Extras tolérés. */
 const TodayOverviewSchema = z.object({
@@ -13,22 +13,41 @@ export interface KpiCardsProps {
   readonly data: unknown;
 }
 
-/** Rangée de 4 `MetricCard` pour `get_today_overview`. Parse KO → `null` (silencieux). */
+interface KpiTileProps {
+  readonly label: string;
+  readonly value: number;
+  readonly danger?: boolean;
+}
+
+/** Tuile compacte calquée sur `.ap-kpi` du mockup assistant validé (2026-07-27). */
+function KpiTile({ label, value, danger = false }: KpiTileProps) {
+  return (
+    <div className="flex-1 rounded-2xl border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] px-3 py-2.5 shadow-[var(--shadow-card)]">
+      <p className="text-[9px] font-extrabold uppercase tracking-[0.5px] text-[color:var(--color-text-ghost)]">
+        {label}
+      </p>
+      <p
+        className="mt-0.5 text-[13px] font-bold"
+        style={{ color: danger ? 'var(--color-danger)' : 'var(--color-text-main)' }}
+      >
+        {value}
+      </p>
+    </div>
+  );
+}
+
+/** Rangée de 4 tuiles KPI compactes pour `get_today_overview`. Parse KO → `null`. */
 export function KpiCards({ data }: KpiCardsProps) {
-  const parsed = TodayOverviewSchema.safeParse(data);
-  if (!parsed.success) return null;
-  const { blockedCards, dueTodayCards, unreadMails, unreadNotifications } = parsed.data;
+  const parsed = parseWidgetData('get_today_overview', TodayOverviewSchema, data);
+  if (parsed === null) return null;
+  const { blockedCards, dueTodayCards, unreadMails, unreadNotifications } = parsed;
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-      <MetricCard
-        label="Bloquées"
-        value={blockedCards}
-        valueTone={blockedCards > 0 ? 'danger' : 'neutral'}
-      />
-      <MetricCard label="Dues aujourd'hui" value={dueTodayCards} />
-      <MetricCard label="Mails non lus" value={unreadMails} />
-      <MetricCard label="Notifications" value={unreadNotifications} />
+    <div className="flex w-full gap-2">
+      <KpiTile label="Bloquées" value={blockedCards} danger={blockedCards > 0} />
+      <KpiTile label="Dues aujourd'hui" value={dueTodayCards} />
+      <KpiTile label="Mails non lus" value={unreadMails} />
+      <KpiTile label="Notifications" value={unreadNotifications} />
     </div>
   );
 }

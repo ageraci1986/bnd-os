@@ -73,8 +73,11 @@ describe('renderWidget', () => {
 
   it('delegates the invalid-data silent fallback to the routed widget', () => {
     // renderWidget always returns an element for a whitelisted tool name — the
-    // widget itself is responsible for rendering nothing on a bad data shape.
+    // widget itself is responsible for rendering nothing on a bad data shape
+    // (with a dev warn, silenced here).
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const { container } = render(<>{renderWidget('get_today_overview', {})}</>);
     expect(container.textContent).toBe('');
+    warn.mockRestore();
   });
 });

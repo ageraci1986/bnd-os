@@ -60,8 +60,27 @@ describe('<BoardWidget />', () => {
     expect(screen.getByText('+3 autres')).toBeInTheDocument();
   });
 
-  it('renders nothing when the data shape is invalid', () => {
+  it('appends "(liste partielle)" when the column is truncated server-side', () => {
+    render(
+      <BoardWidget
+        data={{
+          id: PROJECT_ID,
+          name: 'Projet',
+          columns: [
+            { id: 'col-1', name: 'Backlog', blocked: false, cards: makeCards(7), truncated: true },
+          ],
+        }}
+      />,
+    );
+    expect(screen.getByText('+2 autres (liste partielle)')).toBeInTheDocument();
+  });
+
+  it('renders nothing and warns when the data shape is invalid', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const { container } = render(<BoardWidget data={{ foo: 'bar' }} />);
     expect(container.firstChild).toBeNull();
+    expect(warn).toHaveBeenCalledWith('[assistant] widget data invalide', {
+      tool: 'get_project_board',
+    });
   });
 });

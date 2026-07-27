@@ -1,5 +1,7 @@
 import { z } from 'zod';
 import Link from 'next/link';
+import { formatDue } from './format-date';
+import { parseWidgetData } from './parse-widget-data';
 
 /** Nb max de cartes affichées par colonne avant le résumé « +N autres ». */
 const CARDS_SHOWN_PER_COLUMN = 5;
@@ -29,17 +31,10 @@ export interface BoardWidgetProps {
   readonly data: unknown;
 }
 
-function formatDue(due: string): string {
-  const date = new Date(due);
-  if (Number.isNaN(date.getTime())) return due;
-  return new Intl.DateTimeFormat('fr-FR', { dateStyle: 'short' }).format(date);
-}
-
 /** Mini-Kanban pour `get_project_board` : colonnes en flex horizontal scrollable. */
 export function BoardWidget({ data }: BoardWidgetProps) {
-  const parsed = ProjectBoardSchema.safeParse(data);
-  if (!parsed.success) return null;
-  const board = parsed.data;
+  const board = parseWidgetData('get_project_board', ProjectBoardSchema, data);
+  if (board === null) return null;
 
   return (
     <div className="w-full rounded-2xl border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] p-4">
@@ -89,7 +84,7 @@ export function BoardWidget({ data }: BoardWidgetProps) {
               </ul>
               {extra > 0 && (
                 <p className="mt-1 text-[10px] font-semibold text-[color:var(--color-text-ghost)]">
-                  +{extra} autres{column.truncated === true ? '+' : ''}
+                  +{extra} autres{column.truncated === true ? ' (liste partielle)' : ''}
                 </p>
               )}
             </div>
