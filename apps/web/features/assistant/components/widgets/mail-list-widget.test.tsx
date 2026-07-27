@@ -79,6 +79,11 @@ describe('<MailListWidget />', () => {
     expect(screen.getAllByRole('link')).toHaveLength(10);
   });
 
+  it('renders nothing for an empty result list', () => {
+    const { container } = render(<MailListWidget data={[]} />);
+    expect(container.firstChild).toBeNull();
+  });
+
   it('renders nothing and warns when the data shape is invalid', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const { container } = render(<MailListWidget data={{}} />);

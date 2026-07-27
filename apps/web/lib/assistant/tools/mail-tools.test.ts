@@ -332,7 +332,7 @@ describe('buildMailTools', () => {
       });
       const out = await run('send_mail', baseInput);
       expect(out).not.toContain('internal-host');
-      expect(out).toBe("Échec : échec de l'envoi — réessayez dans un instant.");
+      expect(out).toBe("Échec : l'envoi a échoué — réessayez dans un instant.");
     });
 
     it('code whitelisté (SEND_FAILED_UNSUPPORTED) → le message FR du serveur est relayé', async () => {
@@ -348,7 +348,7 @@ describe('buildMailTools', () => {
     it('code whitelisté sans message → message générique montrable', async () => {
       sendMailMocks.sendMail.mockResolvedValue({ ok: false, code: 'SEND_FAILED_TOO_LARGE' });
       const out = await run('send_mail', baseInput);
-      expect(out).toBe("Échec : échec de l'envoi — réessayez dans un instant.");
+      expect(out).toBe("Échec : l'envoi a échoué — réessayez dans un instant.");
     });
 
     describe('describeForConfirm', () => {
@@ -416,6 +416,38 @@ describe('buildMailTools', () => {
         expect(description).toContain('dest4@acme.com');
         expect(description).not.toContain('dest5@acme.com');
         expect(description).toContain('+2 autres');
+      });
+
+      it('input invalide (brut, pré-validation) → description de refus, sans aucun champ de l’input', () => {
+        const description = describe_({
+          mode: 'inconnu',
+          bodyHtml: '<script>alert(1)</script>',
+        });
+        expect(description).toBe('Envoi de mail (paramètres invalides — refusez).');
+      });
+
+      it('budget dépassé (20 Cci très longues + À/Cc chargés) → repli compté ≤ 1900 chars avec les comptes exacts', () => {
+        const longAddr = (prefix: string, i: number) =>
+          `${prefix}${i}-${'a'.repeat(80)}@${'b'.repeat(60)}.com`;
+        const to = Array.from({ length: 20 }, (_, i) => longAddr('to', i));
+        const cc = Array.from({ length: 20 }, (_, i) => longAddr('cc', i));
+        const bcc = Array.from({ length: 20 }, (_, i) => longAddr('bcc', i));
+        const description = describe_({
+          fromIntegrationId: INTEGRATION_ID,
+          mode: 'new_mail',
+          toRecipients: to,
+          ccRecipients: cc,
+          bccRecipients: bcc,
+          subject: 'S'.repeat(300),
+          bodyHtml: `<p>${'contenu '.repeat(50)}</p>`,
+        });
+        expect(description.length).toBeLessThanOrEqual(1900);
+        expect(description).toContain('refusez si vous ne les avez pas dictés');
+        expect(description).toContain('20 destinataires');
+        expect(description).toContain('20 en copie,');
+        expect(description).toContain('20 en copie cachée');
+        // L'objet reste présent, borné à 150 chars.
+        expect(description).toContain(`« ${'S'.repeat(150)}…`);
       });
 
       it('sans cc ni cci, aucun segment Cc/Cci', () => {

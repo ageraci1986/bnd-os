@@ -10,7 +10,7 @@ import { getConfirmStore } from '@/lib/assistant/confirm-store';
 import { createAnthropicProvider, ProviderError } from '@/lib/assistant/provider';
 import { buildSystemPrompt } from '@/lib/assistant/system-prompt';
 import { buildRegistry } from '@/lib/assistant/tools';
-import { WIDGET_TOOL_SET } from '@/lib/assistant/widget-tools';
+import { isWidgetTool } from '@/lib/assistant/widget-tools';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -178,7 +178,7 @@ export async function POST(req: Request): Promise<Response> {
               // Widget déterministe : whitelist stricte + plafond de taille + JSON valide
               // uniquement. Une sortie non-JSON ou trop longue reste du texte simple.
               if (
-                WIDGET_TOOL_SET.has(event.name) &&
+                isWidgetTool(event.name) &&
                 !event.isError &&
                 event.output.length <= WIDGET_DATA_MAX_CHARS
               ) {

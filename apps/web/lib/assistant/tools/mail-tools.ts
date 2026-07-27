@@ -26,6 +26,18 @@ const BODY_HTML_MAX_CHARS = 100_000;
 const CONFIRM_EXCERPT_MAX_CHARS = 200;
 /** Nb max d'adresses affichées avant troncature « +n autres » — to/cc uniquement, JAMAIS Cci. */
 const CONFIRM_RECIPIENTS_SHOWN_MAX = 5;
+/**
+ * Budget total de la description de confirmation. La route coupe à 2000
+ * chars : si on comptait sur cette coupe, ce serait précisément la FIN de la
+ * description — le segment Cci — qui disparaîtrait, trahissant la garantie
+ * « chaque destinataire caché est visible ». On reste donc en-dessous, et en
+ * cas de dépassement on bascule sur un repli compté (voir describeForConfirm).
+ */
+const CONFIRM_DESCRIPTION_MAX_CHARS = 1900;
+/** Cap d'affichage par adresse dans le dialog de confirmation. */
+const CONFIRM_ADDRESS_MAX_CHARS = 60;
+/** Cap d'affichage de l'objet dans le dialog de confirmation. */
+const CONFIRM_SUBJECT_MAX_CHARS = 150;
 
 const recipientsJson = (description: string) => ({
   type: 'array' as const,
@@ -118,14 +130,18 @@ function failure(message: string): string {
   return `Échec : ${message}`;
 }
 
-/** Messages FR montrables par code d'échec `sendMail` (send-mail.ts). */
+/**
+ * Messages FR montrables par code d'échec `sendMail` (send-mail.ts).
+ * Rédaction : chaque message doit se lire naturellement après le préfixe
+ * « Échec : » ajouté par `failure()` — pas de « Échec : échec… ».
+ */
 const SEND_FAILURE_MESSAGES: Partial<
   Record<Extract<SendMailResult, { ok: false }>['code'], string>
 > = {
-  RATE_LIMIT: "quota d'envoi atteint — réessayez plus tard",
-  MAILBOX_NOT_FOUND: 'boîte introuvable ou non connectée',
-  SMTP_NOT_CONFIGURED: 'SMTP non configuré pour cette boîte',
-  TOO_MANY_RECIPIENTS: 'trop de destinataires (max 20)',
+  RATE_LIMIT: "quota d'envoi atteint — réessayez plus tard.",
+  MAILBOX_NOT_FOUND: 'boîte introuvable ou non connectée.',
+  SMTP_NOT_CONFIGURED: 'SMTP non configuré pour cette boîte.',
+  TOO_MANY_RECIPIENTS: 'trop de destinataires (max 20).',
 };
 
 /**
@@ -141,9 +157,10 @@ function describeSendFailure(result: Extract<SendMailResult, { ok: false }>): st
   const known = SEND_FAILURE_MESSAGES[result.code];
   if (known !== undefined) return known;
   if (RELAYABLE_MESSAGE_CODES.has(result.code) && result.message !== undefined) {
-    return `échec de l'envoi — ${result.message}`;
+    // Phrase FR complète rédigée côté send-mail.ts — relayée telle quelle.
+    return result.message;
   }
-  return "échec de l'envoi — réessayez dans un instant.";
+  return "l'envoi a échoué — réessayez dans un instant.";
 }
 
 /**
@@ -162,10 +179,18 @@ function excerptOf(bodyHtml: string): string {
     : text;
 }
 
-/** Liste d'adresses avec troncature « +n autres » — pour À/Cc uniquement, jamais Cci. */
+/** Tronque un texte affiché avec ellipse — pour borner adresses et objet dans le dialog. */
+function capped(text: string, max: number): string {
+  return text.length > max ? `${text.slice(0, max)}…` : text;
+}
+
+/** Liste d'adresses (chacune bornée) avec troncature « +n autres » — pour À/Cc uniquement, jamais Cci. */
 function joinShown(addrs: readonly string[]): string {
-  if (addrs.length <= CONFIRM_RECIPIENTS_SHOWN_MAX) return addrs.join(', ');
-  const shown = addrs.slice(0, CONFIRM_RECIPIENTS_SHOWN_MAX).join(', ');
+  const shown = addrs
+    .slice(0, CONFIRM_RECIPIENTS_SHOWN_MAX)
+    .map((a) => capped(a, CONFIRM_ADDRESS_MAX_CHARS))
+    .join(', ');
+  if (addrs.length <= CONFIRM_RECIPIENTS_SHOWN_MAX) return shown;
   return `${shown} +${addrs.length - CONFIRM_RECIPIENTS_SHOWN_MAX} autres`;
 }
 
@@ -305,25 +330,41 @@ export function buildMailTools(ctx: AuthContext): ToolSpec[] {
       },
       gated: true,
       // Consentement éclairé : le dialog énumère TOUT ce qui part — mode,
-      // destinataires (Cci JAMAIS tronqué : l'utilisateur doit voir chaque
-      // destinataire caché ; troncature « +n autres » tolérée pour À/Cc),
-      // objet, extrait texte. JAMAIS le bodyHtml brut : la description
-      // transite en clair côté client (SSE) — contrat `describeForConfirm`
-      // (types.ts). La boîte émettrice n'est pas nommée ici : l'input ne
-      // porte que son id, et résoudre le libellé exigerait un appel DB — hors
-      // contrat d'une description synchrone (suivi M3, revue 2b).
-      describeForConfirm: (input: SendMailToolInput) => {
-        const segments = [
-          `Envoyer un mail (${SEND_MODE_LABELS[input.mode]}) à ${joinShown(input.toRecipients)}`,
-        ];
-        if (input.ccRecipients !== undefined && input.ccRecipients.length > 0) {
-          segments.push(`Cc : ${joinShown(input.ccRecipients)}`);
+      // destinataires (liste Cci JAMAIS tronquée : l'utilisateur doit voir
+      // chaque destinataire caché ; troncature « +n autres » tolérée pour
+      // À/Cc ; chaque adresse et l'objet sont bornés en affichage), objet,
+      // extrait texte. JAMAIS le bodyHtml brut : la description transite en
+      // clair côté client (SSE) — contrat `describeForConfirm` (types.ts).
+      // La boîte émettrice n'est pas nommée ici : l'input ne porte que son
+      // id, et résoudre le libellé exigerait un appel DB — hors contrat d'une
+      // description synchrone (suivi M3, revue 2b).
+      describeForConfirm: (input: unknown): string => {
+        // Le gate précède la validation du registry : l'input arrive BRUT.
+        // Re-parse local — sans quoi un input invalide ferait lever la
+        // description, et le repli generique `describeAction` (run-turn.ts)
+        // sérialiserait le bodyHtml brut dans le dialog.
+        const parsed = sendMailInputSchema.safeParse(input);
+        if (!parsed.success) return 'Envoi de mail (paramètres invalides — refusez).';
+        const v: SendMailToolInput = parsed.data;
+        const modeLabel = SEND_MODE_LABELS[v.mode];
+        const subject = capped(v.subject, CONFIRM_SUBJECT_MAX_CHARS);
+        const segments = [`Envoyer un mail (${modeLabel}) à ${joinShown(v.toRecipients)}`];
+        if (v.ccRecipients !== undefined && v.ccRecipients.length > 0) {
+          segments.push(`Cc : ${joinShown(v.ccRecipients)}`);
         }
-        if (input.bccRecipients !== undefined && input.bccRecipients.length > 0) {
-          segments.push(`Cci : ${input.bccRecipients.join(', ')}`);
+        if (v.bccRecipients !== undefined && v.bccRecipients.length > 0) {
+          segments.push(
+            `Cci : ${v.bccRecipients.map((a) => capped(a, CONFIRM_ADDRESS_MAX_CHARS)).join(', ')}`,
+          );
         }
-        segments.push(`objet « ${input.subject} »`);
-        return `${segments.join(' — ')} : ${excerptOf(input.bodyHtml)}`;
+        segments.push(`objet « ${subject} »`);
+        const full = `${segments.join(' — ')} : ${excerptOf(v.bodyHtml)}`;
+        if (full.length <= CONFIRM_DESCRIPTION_MAX_CHARS) return full;
+        // Repli compté : au-delà du budget, on remplace le détail par des
+        // comptes exacts plutôt que de laisser la route couper la fin (Cci).
+        const ccCount = v.ccRecipients?.length ?? 0;
+        const bccCount = v.bccRecipients?.length ?? 0;
+        return `Envoyer un mail (${modeLabel}) à ${v.toRecipients.length} destinataires, ${ccCount} en copie, ${bccCount} en copie cachée — liste trop longue pour être affichée intégralement : refusez si vous ne les avez pas dictés vous-même — objet « ${subject} »`;
       },
       handler: async (input) =>
         safeMutation('send_mail', async () => {

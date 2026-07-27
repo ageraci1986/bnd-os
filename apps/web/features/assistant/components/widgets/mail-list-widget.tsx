@@ -26,7 +26,9 @@ export interface MailListWidgetProps {
 /** Liste de mails pour `search_mails` — lignes expéditeur / objet / date / pastille non-lu. */
 export function MailListWidget({ data }: MailListWidgetProps) {
   const parsed = parseWidgetData('search_mails', MailListSchema, data);
-  if (parsed === null) return null;
+  // Liste vide : rien à montrer — le texte du modèle explique déjà l'absence
+  // de résultats, un cadre vide n'apporterait que du bruit.
+  if (parsed === null || parsed.length === 0) return null;
   const mails = parsed.slice(0, MAILS_SHOWN_MAX);
 
   return (
