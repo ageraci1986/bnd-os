@@ -121,6 +121,8 @@ export async function createCardCore(
       select: { position: true },
     }),
   ]);
+  // Throw (pas {ok:false}) : convention du repo pour les lookups secondaires —
+  // une colonne absente ici signifie un columnId d'un autre projet, cas anormal.
   if (!column) throw new NotFoundError('Column');
 
   const position = computeCardPosition({
