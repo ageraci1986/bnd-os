@@ -17,4 +17,9 @@ describe('parseSseLines', () => {
     const { events } = parseSseLines('data: pas-du-json\n\n');
     expect(events).toEqual([]);
   });
+
+  it('rejette un événement de type inconnu (validation Zod)', () => {
+    const { events } = parseSseLines('data: {"type":"hack","payload":"x"}\n\n');
+    expect(events).toEqual([]);
+  });
 });
