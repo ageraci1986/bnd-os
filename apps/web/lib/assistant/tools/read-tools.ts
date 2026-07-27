@@ -19,6 +19,12 @@ const UUID_JSON = { type: 'string', format: 'uuid' } as const;
 const BOARD_CARDS_PER_COLUMN = 100;
 /** Longueur max du corps de mail renvoyé par read_mail. */
 const MAIL_BODY_MAX_CHARS = 5000;
+/** Longueur max de la description de carte renvoyée par get_card. */
+const CARD_DESCRIPTION_MAX_CHARS = 5000;
+/** Nb max de membres renvoyés par get_team_members. */
+const TEAM_MEMBERS_MAX = 50;
+/** Nb max d'items de checklist renvoyés par get_card. */
+const CARD_CHECKLIST_MAX = 50;
 
 /**
  * Exécute une requête DB en reformulant toute erreur en message montrable.
@@ -315,6 +321,78 @@ export async function buildReadTools(ctx: AuthContext): Promise<ToolSpec[]> {
             receivedAt: mail.receivedAt,
             isRead: mail.isRead,
             body,
+          });
+        }),
+    }),
+
+    defineTool({
+      name: 'get_team_members',
+      description: 'Membres du workspace (id, email, rôle) — nécessaire pour assigner une carte.',
+      inputSchema: z.object({}),
+      jsonSchema: { type: 'object', properties: {} },
+      handler: async () =>
+        safeDb('get_team_members', async () => {
+          // Les emails des membres sont visibles à tout le workspace : même
+          // précédent que les pickers assignés/RACI des pages projets, qui les
+          // exposent déjà à tout Membre via requireUser
+          // (cf. app/(app)/projects/[id]/page.tsx).
+          const members = await prisma.membership.findMany({
+            where: { workspaceId },
+            select: {
+              role: true,
+              user: { select: { id: true, email: true, firstName: true, lastName: true } },
+            },
+            take: TEAM_MEMBERS_MAX,
+          });
+          return JSON.stringify({
+            members: members.map((m) => ({
+              userId: m.user.id,
+              email: m.user.email,
+              name: [m.user.firstName, m.user.lastName].filter(Boolean).join(' ') || null,
+              role: m.role,
+            })),
+            ...(members.length === TEAM_MEMBERS_MAX ? { truncated: true } : {}),
+          });
+        }),
+    }),
+
+    defineTool({
+      name: 'get_card',
+      description:
+        "Détail d'une carte : titre, description, colonne, échéance, assignés, checklist.",
+      inputSchema: z.object({ cardId: uuid }),
+      jsonSchema: { type: 'object', properties: { cardId: UUID_JSON }, required: ['cardId'] },
+      handler: async (input) =>
+        safeDb('get_card', async () => {
+          const card = await prisma.card.findFirst({
+            where: { id: input.cardId, workspaceId, deletedAt: null, ...scopedCardWhere(scope) },
+            select: {
+              id: true,
+              title: true,
+              description: true,
+              dueDate: true,
+              shortRef: true,
+              column: { select: { id: true, name: true, isBlockedSystem: true } },
+              project: { select: { id: true, name: true } },
+              assignees: { select: { userId: true, raci: true } },
+              checklistItems: {
+                select: { title: true, isChecked: true },
+                orderBy: { position: 'asc' },
+                take: CARD_CHECKLIST_MAX,
+              },
+            },
+          });
+          if (card === null) return 'Erreur : carte introuvable ou hors de votre périmètre.';
+          const description =
+            card.description !== null && card.description.length > CARD_DESCRIPTION_MAX_CHARS
+              ? `${card.description.slice(0, CARD_DESCRIPTION_MAX_CHARS)} […tronqué]`
+              : card.description;
+          return JSON.stringify({
+            ...card,
+            description,
+            ...(card.checklistItems.length === CARD_CHECKLIST_MAX
+              ? { checklistTruncated: true }
+              : {}),
           });
         }),
     }),

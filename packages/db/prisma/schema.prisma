@@ -150,6 +150,9 @@ enum AuditAction {
   attachment_scanned_dirty
   attachment_downloaded
   attachment_rejected_upload
+  assistant_turn
+  assistant_gate
+  assistant_tool_run
 }
 
 // =====================================================================

@@ -22,10 +22,23 @@ export const ChatRequestSchema = z
 
 export type ChatRequest = z.infer<typeof ChatRequestSchema>;
 
-/** Événements SSE envoyés au client. */
-export type ChatSseEvent =
-  | { type: 'chunk'; text: string }
-  | { type: 'tool_start'; name: string }
-  | { type: 'tool_end'; name: string; isError: boolean }
-  | { type: 'done'; text: string }
-  | { type: 'error'; message: string };
+/** Événements SSE — validés côté client (confirm_request est sensible). */
+export const ChatSseEventSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('chunk'), text: z.string() }),
+  z.object({ type: z.literal('tool_start'), name: z.string() }),
+  z.object({ type: z.literal('tool_end'), name: z.string(), isError: z.boolean() }),
+  z.object({
+    type: z.literal('confirm_request'),
+    id: z.string().regex(/^[0-9a-f]{32}$/),
+    description: z.string().max(2000),
+  }),
+  z.object({
+    type: z.literal('confirm_resolved'),
+    id: z.string().regex(/^[0-9a-f]{32}$/),
+    allowed: z.boolean(),
+  }),
+  z.object({ type: z.literal('done'), text: z.string() }),
+  z.object({ type: z.literal('error'), message: z.string() }),
+]);
+
+export type ChatSseEvent = z.infer<typeof ChatSseEventSchema>;

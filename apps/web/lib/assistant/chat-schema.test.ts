@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ChatRequestSchema } from './chat-schema';
+import { ChatRequestSchema, ChatSseEventSchema } from './chat-schema';
 
 describe('ChatRequestSchema', () => {
   it('accepte un historique texte et un message', () => {
@@ -46,5 +46,23 @@ describe('ChatRequestSchema', () => {
         message: 'ok',
       }).success,
     ).toBe(false);
+  });
+});
+
+describe('ChatSseEventSchema', () => {
+  it('accepte les 7 types et rejette un type inconnu ou un id malformé', () => {
+    expect(ChatSseEventSchema.safeParse({ type: 'chunk', text: 'x' }).success).toBe(true);
+    expect(
+      ChatSseEventSchema.safeParse({
+        type: 'confirm_request',
+        id: 'a'.repeat(32),
+        description: 'd',
+      }).success,
+    ).toBe(true);
+    expect(
+      ChatSseEventSchema.safeParse({ type: 'confirm_request', id: 'court', description: 'd' })
+        .success,
+    ).toBe(false);
+    expect(ChatSseEventSchema.safeParse({ type: 'hack', foo: 1 }).success).toBe(false);
   });
 });

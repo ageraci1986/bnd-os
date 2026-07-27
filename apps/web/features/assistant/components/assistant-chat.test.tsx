@@ -13,6 +13,26 @@ function sseResponse(events: object[]): Response {
   });
 }
 
+/**
+ * Flux SSE volontairement jamais fermé : le dialog de confirmation n'est retiré
+ * qu'à confirm_resolved ou à la fin du flux — les tests qui interagissent avec
+ * lui doivent garder le flux ouvert pendant les clics.
+ */
+function openSseResponse(events: object[]): Response {
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      for (const e of events) {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify(e)}\n\n`));
+      }
+    },
+  });
+  return new Response(stream as unknown as BodyInit, {
+    status: 200,
+    headers: { 'Content-Type': 'text/event-stream' },
+  });
+}
+
 describe('AssistantChat', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -127,6 +147,233 @@ describe('AssistantChat', () => {
       expect(screen.getByText('Deux projets.')).toBeInTheDocument();
     });
     expect(screen.queryByText('consulte les projets…')).not.toBeInTheDocument();
+  });
+
+  it('confirm_request → dialog visible ; Autoriser → POST /confirm puis confirm_resolved le ferme', async () => {
+    const confirmId = 'a'.repeat(32);
+    // Stream contrôlé : confirm_request, puis (après le clic) confirm_resolved + done.
+    let pushSecondHalf: () => void = () => undefined;
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        const enc = new TextEncoder();
+        controller.enqueue(
+          enc.encode(
+            `data: ${JSON.stringify({ type: 'confirm_request', id: confirmId, description: 'delete_card (cardId="c1")' })}\n\n`,
+          ),
+        );
+        pushSecondHalf = () => {
+          controller.enqueue(
+            enc.encode(
+              `data: ${JSON.stringify({ type: 'confirm_resolved', id: confirmId, allowed: true })}\n\n` +
+                `data: ${JSON.stringify({ type: 'done', text: 'Carte supprimée.' })}\n\n`,
+            ),
+          );
+          controller.close();
+        };
+      },
+    });
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      if (String(url).endsWith('/api/assistant/confirm')) {
+        return Response.json({ ok: true });
+      }
+      return new Response(stream, {
+        status: 200,
+        headers: { 'Content-Type': 'text/event-stream' },
+      });
+    });
+
+    render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
+    await userEvent.type(screen.getByRole('textbox'), 'supprime la carte c1');
+    await userEvent.click(screen.getByRole('button', { name: /envoyer/i }));
+
+    // Le dialog apparaît avec la description et les deux boutons
+    const allowButton = await screen.findByRole('button', { name: /autoriser/i });
+    expect(screen.getByText(/delete_card/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /refuser/i })).toBeInTheDocument();
+
+    await userEvent.click(allowButton);
+    await waitFor(() => {
+      const confirmCall = fetchMock.mock.calls.find(([u]) =>
+        String(u).endsWith('/api/assistant/confirm'),
+      );
+      expect(confirmCall).toBeDefined();
+      const [, init] = confirmCall ?? [];
+      expect(JSON.parse(String(init?.body))).toEqual({ id: confirmId, allowed: true });
+      expect((init?.headers as Record<string, string>)['x-csrf-token']).toBe('tok');
+    });
+
+    pushSecondHalf();
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: /autoriser/i })).not.toBeInTheDocument();
+      expect(screen.getByText('Carte supprimée.')).toBeInTheDocument();
+    });
+  });
+
+  it('verrouille les deux boutons au premier clic — un seul POST /confirm', async () => {
+    const confirmId = 'e'.repeat(32);
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation((url) => {
+      if (String(url).endsWith('/api/assistant/confirm')) {
+        return new Promise<Response>(() => undefined); // réponse jamais résolue : en vol
+      }
+      return Promise.resolve(
+        openSseResponse([
+          { type: 'confirm_request', id: confirmId, description: 'delete_card (cardId="c1")' },
+        ]),
+      );
+    });
+
+    render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
+    await userEvent.type(screen.getByRole('textbox'), 'supprime la carte c1');
+    await userEvent.click(screen.getByRole('button', { name: /envoyer/i }));
+
+    const allowButton = await screen.findByRole('button', { name: /autoriser/i });
+    const denyButton = screen.getByRole('button', { name: /refuser/i });
+    await userEvent.click(allowButton);
+    await userEvent.click(denyButton); // désactivé après le premier clic → sans effet
+
+    expect(denyButton).toBeDisabled();
+    // Le bouton cliqué affiche « envoi… » pendant la transmission.
+    expect(screen.getByRole('button', { name: /envoi…/i })).toBeInTheDocument();
+    const confirmCalls = fetchMock.mock.calls.filter(([u]) =>
+      String(u).endsWith('/api/assistant/confirm'),
+    );
+    expect(confirmCalls).toHaveLength(1);
+  });
+
+  it('place le focus sur Refuser à l ouverture du dialog', async () => {
+    const confirmId = 'd'.repeat(32);
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      openSseResponse([
+        { type: 'confirm_request', id: confirmId, description: 'delete_card (cardId="c1")' },
+      ]),
+    );
+
+    render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
+    await userEvent.type(screen.getByRole('textbox'), 'supprime la carte c1');
+    await userEvent.click(screen.getByRole('button', { name: /envoyer/i }));
+
+    const denyButton = await screen.findByRole('button', { name: /refuser/i });
+    await waitFor(() => {
+      expect(denyButton).toHaveFocus();
+    });
+  });
+
+  it('ne recolle pas en bas quand l utilisateur a remonté le fil', async () => {
+    const scrollSpy = vi.fn();
+    const proto = window.HTMLElement.prototype as unknown as { scrollIntoView?: unknown };
+    proto.scrollIntoView = scrollSpy;
+    try {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        sseResponse([{ type: 'done', text: 'Réponse.' }]),
+      );
+      const { container } = render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
+      const list = container.querySelector('.overflow-y-auto');
+      expect(list).not.toBeNull();
+      // Simule un utilisateur remonté dans le fil : 800px au-dessus du bas (> seuil 120).
+      Object.defineProperty(list, 'scrollHeight', { value: 1000, configurable: true });
+      Object.defineProperty(list, 'clientHeight', { value: 200, configurable: true });
+      Object.defineProperty(list, 'scrollTop', { value: 0, configurable: true });
+      scrollSpy.mockClear();
+
+      await userEvent.type(screen.getByRole('textbox'), 'x');
+      await userEvent.click(screen.getByRole('button', { name: /envoyer/i }));
+      await screen.findByText('Réponse.');
+
+      expect(scrollSpy).not.toHaveBeenCalled();
+    } finally {
+      delete proto.scrollIntoView;
+    }
+  });
+
+  it('retire le dialog si le flux se termine sans confirm_resolved', async () => {
+    const confirmId = '0'.repeat(32);
+    // Flux qui se ferme juste après confirm_request : plus aucun serveur n'attend
+    // la réponse → le dialog périmé doit disparaître à la fin du send().
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      sseResponse([
+        { type: 'confirm_request', id: confirmId, description: 'delete_card (cardId="c1")' },
+      ]),
+    );
+
+    render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
+    await userEvent.type(screen.getByRole('textbox'), 'supprime la carte c1');
+    await userEvent.click(screen.getByRole('button', { name: /envoyer/i }));
+
+    // send() terminé : input ré-activé…
+    await waitFor(() => {
+      expect(screen.getByRole('textbox')).not.toBeDisabled();
+    });
+    // …et le dialog n'est plus là.
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+  });
+
+  it('confirm renvoie 404 (clé expirée) → aucune erreur affichée', async () => {
+    const confirmId = 'f'.repeat(32);
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      if (String(url).endsWith('/api/assistant/confirm')) {
+        return Response.json({ ok: false }, { status: 404 });
+      }
+      return openSseResponse([
+        { type: 'confirm_request', id: confirmId, description: 'delete_card (cardId="c1")' },
+      ]);
+    });
+
+    render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
+    await userEvent.type(screen.getByRole('textbox'), 'supprime la carte c1');
+    await userEvent.click(screen.getByRole('button', { name: /envoyer/i }));
+
+    const allowButton = await screen.findByRole('button', { name: /autoriser/i });
+    await userEvent.click(allowButton);
+
+    // Laisse le temps à la promesse fetch de se résoudre.
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
+  });
+
+  it('confirm renvoie 409 (déjà répondu) → aucune erreur affichée', async () => {
+    const confirmId = 'b'.repeat(32);
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      if (String(url).endsWith('/api/assistant/confirm')) {
+        return Response.json({ ok: false }, { status: 409 });
+      }
+      return openSseResponse([
+        { type: 'confirm_request', id: confirmId, description: 'delete_card (cardId="c1")' },
+      ]);
+    });
+
+    render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
+    await userEvent.type(screen.getByRole('textbox'), 'supprime la carte c1');
+    await userEvent.click(screen.getByRole('button', { name: /envoyer/i }));
+
+    const allowButton = await screen.findByRole('button', { name: /autoriser/i });
+    await userEvent.click(allowButton);
+
+    // Laisse le temps à la promesse fetch de se résoudre.
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
+  });
+
+  it('confirm renvoie 500 → message d erreur affiché', async () => {
+    const confirmId = 'c'.repeat(32);
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      if (String(url).endsWith('/api/assistant/confirm')) {
+        return Response.json({ ok: false }, { status: 500 });
+      }
+      return openSseResponse([
+        { type: 'confirm_request', id: confirmId, description: 'delete_card (cardId="c1")' },
+      ]);
+    });
+
+    render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
+    await userEvent.type(screen.getByRole('textbox'), 'supprime la carte c1');
+    await userEvent.click(screen.getByRole('button', { name: /envoyer/i }));
+
+    const allowButton = await screen.findByRole('button', { name: /autoriser/i });
+    await userEvent.click(allowButton);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Impossible de transmettre la réponse — réessayez.'),
+      ).toBeInTheDocument();
+    });
   });
 
   it('annule la requête en cours au démontage', async () => {

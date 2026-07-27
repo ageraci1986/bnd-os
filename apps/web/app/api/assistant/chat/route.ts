@@ -1,16 +1,20 @@
 import { runTurn, type ToolRegistry } from '@nexushub/agent';
 import { prisma } from '@nexushub/db';
+import { recordAudit } from '@/lib/audit';
 import { getAuthContext } from '@/lib/auth';
 import { assertCsrfHeader } from '@/lib/csrf';
 import { getServerEnv } from '@/lib/env';
 import { getRateLimiter } from '@/lib/rate-limit';
 import { ChatRequestSchema, type ChatSseEvent } from '@/lib/assistant/chat-schema';
+import { getConfirmStore } from '@/lib/assistant/confirm-store';
 import { createAnthropicProvider, ProviderError } from '@/lib/assistant/provider';
 import { buildSystemPrompt } from '@/lib/assistant/system-prompt';
 import { buildRegistry } from '@/lib/assistant/tools';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+// Budget ~2 fenêtres de confirmation (120 s) + rounds modèle ; Vercel Fluid.
+export const maxDuration = 300;
 
 function sse(event: ChatSseEvent): string {
   return `data: ${JSON.stringify(event)}\n\n`;
@@ -123,10 +127,31 @@ export async function POST(req: Request): Promise<Response> {
           provider: createAnthropicProvider(),
           registry,
           system,
-          // Plan 1 : aucun tool "gated" n'est encore enregistré. Si un tool gated
-          // apparaissait malgré tout, on refuse systématiquement (fail closed) — la
-          // confirmation utilisateur temps réel arrivera dans un plan ultérieur.
-          confirmer: async () => false,
+          confirmer: async (description) => {
+            const store = getConfirmStore();
+            const id = await store.createPending(ctx.userId);
+            send({ type: 'confirm_request', id, description: description.slice(0, 2000) });
+            // Invariant UI : après un confirm_request, un confirm_resolved suit TOUJOURS
+            // (sinon dialog orphelin). Si l'attente échoue (backend Redis en panne…),
+            // on résout à false côté client puis on relance : executeGated fail-close
+            // avec CONFIRM_UNAVAILABLE_OUTPUT — pas d'audit ici, c'est lui qui gère.
+            let allowed = false;
+            try {
+              allowed = await store.awaitAnswer(id, { signal: req.signal });
+            } catch (error) {
+              send({ type: 'confirm_resolved', id, allowed: false });
+              throw error;
+            }
+            send({ type: 'confirm_resolved', id, allowed });
+            await recordAudit({
+              action: 'assistant_gate',
+              workspaceId: ctx.workspaceId,
+              actorId: ctx.userId,
+              // nom du tool uniquement — pas les arguments (PII possible)
+              data: { tool: description.split(' ')[0] ?? '', allowed },
+            });
+            return allowed;
+          },
           role: ctx.role,
           // Propagation de la déconnexion client : stoppe la boucle de rounds
           // et annule la requête provider en cours (pas de tokens brûlés à vide).
@@ -139,8 +164,22 @@ export async function POST(req: Request): Promise<Response> {
               send({ type: 'tool_start', name: event.name });
             } else if (event.type === 'tool_end') {
               send({ type: 'tool_end', name: event.name, isError: event.isError });
+              // Fire-and-forget sûr : onEvent est synchrone, et chaque tool_end est
+              // suivi d'au moins un round provider awaité — l'insert a le temps d'aboutir.
+              void recordAudit({
+                action: 'assistant_tool_run',
+                workspaceId: ctx.workspaceId,
+                actorId: ctx.userId,
+                data: { tool: event.name, isError: event.isError },
+              });
             }
           },
+        });
+        await recordAudit({
+          action: 'assistant_turn',
+          workspaceId: ctx.workspaceId,
+          actorId: ctx.userId,
+          data: { inputTokens: result.inputTokens, outputTokens: result.outputTokens },
         });
         send({ type: 'done', text: result.text });
       } catch (error) {
