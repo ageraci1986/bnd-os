@@ -39,11 +39,13 @@ describe('toTurnResult', () => {
 });
 
 describe('toProviderError', () => {
-  it('erreur d authentification → message clé API', () => {
+  it('erreur d authentification → message générique sans nom de variable', () => {
     const err = Object.create(
       Anthropic.AuthenticationError.prototype,
     ) as Anthropic.AuthenticationError;
-    expect(toProviderError(err).message).toContain('clé API');
+    const message = toProviderError(err).message;
+    expect(message).toContain('administrateur');
+    expect(message).not.toContain('ANTHROPIC_API_KEY');
   });
 
   it('rate limit → message patienter', () => {

@@ -57,7 +57,10 @@ export function toProviderError(error: unknown): ProviderError {
     return error;
   }
   if (error instanceof Anthropic.AuthenticationError) {
-    return new ProviderError('Ma clé API a été rejetée — vérifiez ANTHROPIC_API_KEY côté serveur.');
+    // SECURITY : pas de nom de variable d'env dans un message montré aux membres.
+    return new ProviderError(
+      "L'assistant n'est pas configuré correctement. Contactez un administrateur.",
+    );
   }
   if (error instanceof Anthropic.RateLimitError) {
     return new ProviderError('Le modèle est très sollicité — réessayez dans un instant.');
