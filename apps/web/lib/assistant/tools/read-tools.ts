@@ -19,6 +19,12 @@ const UUID_JSON = { type: 'string', format: 'uuid' } as const;
 const BOARD_CARDS_PER_COLUMN = 100;
 /** Longueur max du corps de mail renvoyé par read_mail. */
 const MAIL_BODY_MAX_CHARS = 5000;
+/** Longueur max de la description de carte renvoyée par get_card. */
+const CARD_DESCRIPTION_MAX_CHARS = 5000;
+/** Nb max de membres renvoyés par get_team_members. */
+const TEAM_MEMBERS_MAX = 50;
+/** Nb max d'items de checklist renvoyés par get_card. */
+const CARD_CHECKLIST_MAX = 50;
 
 /**
  * Exécute une requête DB en reformulant toute erreur en message montrable.
@@ -326,22 +332,27 @@ export async function buildReadTools(ctx: AuthContext): Promise<ToolSpec[]> {
       jsonSchema: { type: 'object', properties: {} },
       handler: async () =>
         safeDb('get_team_members', async () => {
+          // Les emails des membres sont visibles à tout le workspace : même
+          // précédent que les pickers assignés/RACI des pages projets, qui les
+          // exposent déjà à tout Membre via requireUser
+          // (cf. app/(app)/projects/[id]/page.tsx).
           const members = await prisma.membership.findMany({
             where: { workspaceId },
             select: {
               role: true,
               user: { select: { id: true, email: true, firstName: true, lastName: true } },
             },
-            take: 50,
+            take: TEAM_MEMBERS_MAX,
           });
-          return JSON.stringify(
-            members.map((m) => ({
+          return JSON.stringify({
+            members: members.map((m) => ({
               userId: m.user.id,
               email: m.user.email,
               name: [m.user.firstName, m.user.lastName].filter(Boolean).join(' ') || null,
               role: m.role,
             })),
-          );
+            ...(members.length === TEAM_MEMBERS_MAX ? { truncated: true } : {}),
+          });
         }),
     }),
 
@@ -367,12 +378,22 @@ export async function buildReadTools(ctx: AuthContext): Promise<ToolSpec[]> {
               checklistItems: {
                 select: { title: true, isChecked: true },
                 orderBy: { position: 'asc' },
-                take: 50,
+                take: CARD_CHECKLIST_MAX,
               },
             },
           });
           if (card === null) return 'Erreur : carte introuvable ou hors de votre périmètre.';
-          return JSON.stringify(card);
+          const description =
+            card.description !== null && card.description.length > CARD_DESCRIPTION_MAX_CHARS
+              ? `${card.description.slice(0, CARD_DESCRIPTION_MAX_CHARS)} […tronqué]`
+              : card.description;
+          return JSON.stringify({
+            ...card,
+            description,
+            ...(card.checklistItems.length === CARD_CHECKLIST_MAX
+              ? { checklistTruncated: true }
+              : {}),
+          });
         }),
     }),
   ];
