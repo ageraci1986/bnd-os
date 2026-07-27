@@ -188,6 +188,10 @@ export function AssistantChat({ csrfToken, firstName }: AssistantChatProps) {
       abortRef.current = null;
       setStreamText(null);
       setActivity(null);
+      // Flux terminé sans confirm_resolved (coupure, erreur) : plus aucun serveur
+      // n'attend la réponse — un dialog restant serait du bruit (clic → 404 muet).
+      setPendingConfirm(null);
+      setAnswering(null);
       setBusy(false);
     }
   }, [busy, csrfToken, input]);

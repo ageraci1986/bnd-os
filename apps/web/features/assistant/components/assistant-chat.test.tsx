@@ -13,6 +13,26 @@ function sseResponse(events: object[]): Response {
   });
 }
 
+/**
+ * Flux SSE volontairement jamais fermé : le dialog de confirmation n'est retiré
+ * qu'à confirm_resolved ou à la fin du flux — les tests qui interagissent avec
+ * lui doivent garder le flux ouvert pendant les clics.
+ */
+function openSseResponse(events: object[]): Response {
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      for (const e of events) {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify(e)}\n\n`));
+      }
+    },
+  });
+  return new Response(stream as unknown as BodyInit, {
+    status: 200,
+    headers: { 'Content-Type': 'text/event-stream' },
+  });
+}
+
 describe('AssistantChat', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -196,7 +216,7 @@ describe('AssistantChat', () => {
         return new Promise<Response>(() => undefined); // réponse jamais résolue : en vol
       }
       return Promise.resolve(
-        sseResponse([
+        openSseResponse([
           { type: 'confirm_request', id: confirmId, description: 'delete_card (cardId="c1")' },
         ]),
       );
@@ -223,7 +243,7 @@ describe('AssistantChat', () => {
   it('place le focus sur Refuser à l ouverture du dialog', async () => {
     const confirmId = 'd'.repeat(32);
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      sseResponse([
+      openSseResponse([
         { type: 'confirm_request', id: confirmId, description: 'delete_card (cardId="c1")' },
       ]),
     );
@@ -265,13 +285,35 @@ describe('AssistantChat', () => {
     }
   });
 
+  it('retire le dialog si le flux se termine sans confirm_resolved', async () => {
+    const confirmId = '0'.repeat(32);
+    // Flux qui se ferme juste après confirm_request : plus aucun serveur n'attend
+    // la réponse → le dialog périmé doit disparaître à la fin du send().
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      sseResponse([
+        { type: 'confirm_request', id: confirmId, description: 'delete_card (cardId="c1")' },
+      ]),
+    );
+
+    render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
+    await userEvent.type(screen.getByRole('textbox'), 'supprime la carte c1');
+    await userEvent.click(screen.getByRole('button', { name: /envoyer/i }));
+
+    // send() terminé : input ré-activé…
+    await waitFor(() => {
+      expect(screen.getByRole('textbox')).not.toBeDisabled();
+    });
+    // …et le dialog n'est plus là.
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+  });
+
   it('confirm renvoie 404 (clé expirée) → aucune erreur affichée', async () => {
     const confirmId = 'f'.repeat(32);
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
       if (String(url).endsWith('/api/assistant/confirm')) {
         return Response.json({ ok: false }, { status: 404 });
       }
-      return sseResponse([
+      return openSseResponse([
         { type: 'confirm_request', id: confirmId, description: 'delete_card (cardId="c1")' },
       ]);
     });
@@ -293,7 +335,7 @@ describe('AssistantChat', () => {
       if (String(url).endsWith('/api/assistant/confirm')) {
         return Response.json({ ok: false }, { status: 409 });
       }
-      return sseResponse([
+      return openSseResponse([
         { type: 'confirm_request', id: confirmId, description: 'delete_card (cardId="c1")' },
       ]);
     });
@@ -315,7 +357,7 @@ describe('AssistantChat', () => {
       if (String(url).endsWith('/api/assistant/confirm')) {
         return Response.json({ ok: false }, { status: 500 });
       }
-      return sseResponse([
+      return openSseResponse([
         { type: 'confirm_request', id: confirmId, description: 'delete_card (cardId="c1")' },
       ]);
     });
