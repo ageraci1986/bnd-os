@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import Anthropic from '@anthropic-ai/sdk';
-import { ProviderError, toProviderError, toTurnResult } from './provider';
+import { ProviderError, safeOnText, toProviderError, toTurnResult } from './provider';
 
 function fakeFinalMessage(overrides: Record<string, unknown> = {}) {
   return {
@@ -60,9 +60,52 @@ describe('toProviderError', () => {
     expect(toProviderError(err).message).toContain('joindre');
   });
 
+  it('erreur API générique → message avec le statut HTTP', () => {
+    // Object.create saute le constructeur — status posé manuellement.
+    // Comme APIConnectionError, BadRequestError n'est pas ré-exportée comme
+    // type dans le namespace de cette version du SDK — InstanceType<>.
+    const err = Object.assign(Object.create(Anthropic.BadRequestError.prototype) as object, {
+      status: 400,
+    }) as InstanceType<typeof Anthropic.BadRequestError>;
+    expect(toProviderError(err).message).toContain('400');
+  });
+
+  it('ProviderError déjà mappée → retourne la MÊME instance, message intact', () => {
+    const original = new ProviderError('clé manquante');
+    const mapped = toProviderError(original);
+    expect(mapped).toBe(original);
+    expect(mapped.message).toBe('clé manquante');
+  });
+
   it('erreur inconnue → message générique, instance ProviderError', () => {
     const mapped = toProviderError(new Error('interne'));
     expect(mapped).toBeInstanceOf(ProviderError);
     expect(mapped.message).toContain('réessayer');
+  });
+});
+
+describe('safeOnText', () => {
+  it('transmet chaque chunk au callback', () => {
+    const onText = vi.fn();
+    const guarded = safeOnText(onText);
+    guarded('Bon');
+    guarded('jour');
+    expect(onText).toHaveBeenNthCalledWith(1, 'Bon');
+    expect(onText).toHaveBeenNthCalledWith(2, 'jour');
+  });
+
+  it('avale une exception du callback (ex: écriture SSE sur client déconnecté)', () => {
+    const onText = vi.fn(() => {
+      throw new Error('SSE write failed');
+    });
+    const guarded = safeOnText(onText);
+    expect(() => {
+      guarded('chunk-1');
+    }).not.toThrow();
+    // Le stream continue : les chunks suivants atteignent toujours le callback.
+    expect(() => {
+      guarded('chunk-2');
+    }).not.toThrow();
+    expect(onText).toHaveBeenCalledTimes(2);
   });
 });

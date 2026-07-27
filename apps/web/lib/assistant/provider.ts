@@ -74,6 +74,23 @@ export function toProviderError(error: unknown): ProviderError {
   return new ProviderError('Une erreur inattendue est survenue — veuillez réessayer.');
 }
 
+/**
+ * Protège le listener `text` : le SDK invoque les listeners de façon synchrone
+ * et non protégée — si le callback lève (ex: écriture SSE vers un client
+ * déconnecté), tout le tour rejetterait en erreur générique et le texte déjà
+ * streamé serait perdu. On avale donc l'erreur du callback : le stream doit
+ * continuer, et le texte complet revient de toute façon via finalMessage().
+ */
+export function safeOnText(onText: (chunk: string) => void): (chunk: string) => void {
+  return (chunk) => {
+    try {
+      onText(chunk);
+    } catch {
+      // Erreur du consommateur (pas du modèle) — volontairement ignorée.
+    }
+  };
+}
+
 /** Seule implémentation de `Provider` du repo ; seul fichier qui importe le SDK. */
 export function createAnthropicProvider(): Provider {
   return {
@@ -87,9 +104,7 @@ export function createAnthropicProvider(): Provider {
           ...(tools.length > 0 ? { tools: tools as unknown as Anthropic.Tool[] } : {}),
         });
         if (onText !== undefined) {
-          stream.on('text', (delta) => {
-            onText(delta);
-          });
+          stream.on('text', safeOnText(onText));
         }
         const final = await stream.finalMessage();
         return toTurnResult(final);
