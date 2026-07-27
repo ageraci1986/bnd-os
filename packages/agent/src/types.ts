@@ -45,6 +45,8 @@ export interface Provider {
     readonly messages: readonly ChatMessage[];
     readonly tools: readonly ProviderToolDef[];
     readonly onText?: (chunk: string) => void;
+    /** Annulation amont (ex: client SSE déconnecté) — le provider doit interrompre la requête. */
+    readonly signal?: AbortSignal;
   }): Promise<ProviderTurnResult>;
 }
 

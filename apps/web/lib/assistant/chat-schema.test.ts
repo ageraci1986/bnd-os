@@ -26,4 +26,25 @@ describe('ChatRequestSchema', () => {
       }).success,
     ).toBe(false);
   });
+
+  it('refuse un message d historique au contenu vide', () => {
+    expect(
+      ChatRequestSchema.safeParse({
+        messages: [{ role: 'assistant', content: '' }],
+        message: 'ok',
+      }).success,
+    ).toBe(false);
+  });
+
+  it('refuse une requête dépassant le volume total (10 × 20k chars)', () => {
+    expect(
+      ChatRequestSchema.safeParse({
+        messages: Array.from({ length: 10 }, () => ({
+          role: 'user',
+          content: 'x'.repeat(20_000),
+        })),
+        message: 'ok',
+      }).success,
+    ).toBe(false);
+  });
 });

@@ -2,6 +2,7 @@ import { runTurn, type ToolRegistry } from '@nexushub/agent';
 import { prisma } from '@nexushub/db';
 import { getAuthContext } from '@/lib/auth';
 import { assertCsrfHeader } from '@/lib/csrf';
+import { getServerEnv } from '@/lib/env';
 import { getRateLimiter } from '@/lib/rate-limit';
 import { ChatRequestSchema, type ChatSseEvent } from '@/lib/assistant/chat-schema';
 import { createAnthropicProvider, ProviderError } from '@/lib/assistant/provider';
@@ -61,6 +62,15 @@ export async function POST(req: Request): Promise<Response> {
     );
   }
 
+  // Probe config AVANT d'ouvrir le flux : sans clé API, le provider échouerait
+  // après le début du stream, où on ne peut plus renvoyer un statut HTTP propre.
+  if (getServerEnv().ANTHROPIC_API_KEY === undefined) {
+    return Response.json(
+      { ok: false, message: "L'assistant n'est pas configuré. Contactez un administrateur." },
+      { status: 500 },
+    );
+  }
+
   const system = buildSystemPrompt({
     userFirstName: ctx.email.split('@')[0] ?? 'utilisateur',
     role: ctx.role,
@@ -68,6 +78,8 @@ export async function POST(req: Request): Promise<Response> {
     // Le champ s'appelle `nowIso` (contrat de buildSystemPrompt) mais on lui passe une
     // date lisible en français plutôt qu'un ISO brut : plus naturel pour un assistant
     // conversationnel/vocal et pour le raisonnement "aujourd'hui" du modèle.
+    // TODO: renommer `nowIso` → `nowLabel` et utiliser la locale/timezone de
+    // l'utilisateur (CLAUDE.md §8) quand l'intégration Settings arrivera.
     nowIso: new Intl.DateTimeFormat('fr-FR', {
       timeZone: 'Europe/Paris',
       dateStyle: 'full',
@@ -116,6 +128,9 @@ export async function POST(req: Request): Promise<Response> {
           // confirmation utilisateur temps réel arrivera dans un plan ultérieur.
           confirmer: async () => false,
           role: ctx.role,
+          // Propagation de la déconnexion client : stoppe la boucle de rounds
+          // et annule la requête provider en cours (pas de tokens brûlés à vide).
+          signal: req.signal,
           onText: (chunk) => {
             send({ type: 'chunk', text: chunk });
           },

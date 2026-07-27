@@ -320,6 +320,59 @@ describe('runTurn', () => {
     expect(result.text).toBe('Désolé.');
   });
 
+  it('signal aborté entre deux rounds → stoppe à la frontière, provider appelé une seule fois', async () => {
+    const controller = new AbortController();
+    const registry = makeRegistry([
+      {
+        name: 'lookup',
+        // Le client se déconnecte pendant l'exécution du tool du round 1.
+        handler: (async () => {
+          controller.abort();
+          return 'résultat';
+        }) as ToolSpec['handler'],
+      },
+    ]);
+    const provider = scriptedProvider([
+      {
+        ...toolUseResult('lookup', {}),
+        text: 'Je regarde…',
+        content: [
+          { type: 'text', text: 'Je regarde…' },
+          { type: 'tool_use', id: 'tu_1', name: 'lookup', input: {} },
+        ],
+      },
+      textResult('jamais atteint'),
+    ]);
+    const result = await runTurn([], 'x', deps(provider, registry, { signal: controller.signal }));
+    expect(provider.streamTurn).toHaveBeenCalledTimes(1);
+    expect(result.text).toBe('Je regarde…');
+    // L'historique reste API-valide : le tool_use du round 1 a son tool_result.
+    expect(result.history.at(-1)?.role).toBe('user');
+    expect(JSON.stringify(result.history.at(-1)?.content)).toContain('tool_result');
+    expect(result.inputTokens).toBe(10);
+    expect(result.outputTokens).toBe(5);
+  });
+
+  it('signal fourni et non aborté → transmis au provider, comportement inchangé', async () => {
+    const controller = new AbortController();
+    const provider = scriptedProvider([textResult('Bonjour')]);
+    const result = await runTurn(
+      [],
+      'x',
+      deps(provider, makeRegistry(), { signal: controller.signal }),
+    );
+    expect(result.text).toBe('Bonjour');
+    const streamTurnMock = provider.streamTurn as ReturnType<typeof vi.fn>;
+    expect(streamTurnMock.mock.calls[0]?.[0]?.signal).toBe(controller.signal);
+  });
+
+  it('signal absent → aucun signal transmis au provider', async () => {
+    const provider = scriptedProvider([textResult('Bonjour')]);
+    await runTurn([], 'x', deps(provider, makeRegistry()));
+    const streamTurnMock = provider.streamTurn as ReturnType<typeof vi.fn>;
+    expect('signal' in (streamTurnMock.mock.calls[0]?.[0] as object)).toBe(false);
+  });
+
   it('deux appels gated dans un même round : oui puis non → une seule exécution, deux tool_results', async () => {
     const handler = vi.fn(async () => 'fait');
     const registry = makeRegistry([

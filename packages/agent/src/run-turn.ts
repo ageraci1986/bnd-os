@@ -31,6 +31,12 @@ export interface RunTurnDeps {
   readonly role: AgentRole;
   readonly onEvent?: (event: AgentEvent) => void;
   readonly onText?: (chunk: string) => void;
+  /**
+   * Annulation amont (ex: client SSE déconnecté). Vérifié en tête de chaque
+   * round et propagé au provider — évite de brûler jusqu'à MAX_TOOL_ROUNDS
+   * appels modèle pour un client déjà parti.
+   */
+  readonly signal?: AbortSignal;
 }
 
 export interface RunTurnResult {
@@ -69,11 +75,17 @@ export async function runTurn(
   let outputTokens = 0;
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round += 1) {
+    // Client parti : on s'arrête à la frontière de round (l'historique y est
+    // API-valide : chaque tool_use a déjà reçu son tool_result).
+    if (deps.signal?.aborted === true) {
+      return { text: spokenParts.join('\n'), history: messages, inputTokens, outputTokens };
+    }
     const result: ProviderTurnResult = await deps.provider.streamTurn({
       system: deps.system,
       messages,
       tools,
       ...(deps.onText !== undefined ? { onText: deps.onText } : {}),
+      ...(deps.signal !== undefined ? { signal: deps.signal } : {}),
     });
     inputTokens += result.inputTokens;
     outputTokens += result.outputTokens;

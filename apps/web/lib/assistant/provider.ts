@@ -16,9 +16,8 @@ function getClient(): Anthropic {
   if (client === null) {
     const key = getServerEnv().ANTHROPIC_API_KEY;
     if (key === undefined) {
-      throw new ProviderError(
-        "L'assistant n'est pas configuré (ANTHROPIC_API_KEY manquante). Contactez un administrateur.",
-      );
+      // SECURITY: message générique, sans nom de variable d'env (montré aux membres).
+      throw new ProviderError("L'assistant n'est pas configuré. Contactez un administrateur.");
     }
     client = new Anthropic({ apiKey: key });
   }
@@ -94,15 +93,20 @@ export function safeOnText(onText: (chunk: string) => void): (chunk: string) => 
 /** Seule implémentation de `Provider` du repo ; seul fichier qui importe le SDK. */
 export function createAnthropicProvider(): Provider {
   return {
-    async streamTurn({ system, messages, tools, onText }) {
+    async streamTurn({ system, messages, tools, onText, signal }) {
       try {
-        const stream = getClient().messages.stream({
-          model: getServerEnv().ASSISTANT_MODEL ?? DEFAULT_MODEL,
-          max_tokens: MAX_TOKENS,
-          system,
-          messages: messages as unknown as Anthropic.MessageParam[],
-          ...(tools.length > 0 ? { tools: tools as unknown as Anthropic.Tool[] } : {}),
-        });
+        const stream = getClient().messages.stream(
+          {
+            model: getServerEnv().ASSISTANT_MODEL ?? DEFAULT_MODEL,
+            max_tokens: MAX_TOKENS,
+            system,
+            messages: messages as unknown as Anthropic.MessageParam[],
+            ...(tools.length > 0 ? { tools: tools as unknown as Anthropic.Tool[] } : {}),
+          },
+          // `RequestOptions.signal` (SDK) accepte AbortSignal | undefined | null :
+          // annule la requête HTTP en cours si le client SSE se déconnecte.
+          { signal },
+        );
         if (onText !== undefined) {
           stream.on('text', safeOnText(onText));
         }
