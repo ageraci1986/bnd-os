@@ -151,7 +151,12 @@ export function isProjectCardFilterEmpty(f: ProjectCardFilter): boolean {
 
 // ---------- Prisma `where` builder ---------------------------------------
 
-function startOfTodayUtc(): Date {
+/**
+ * Minuit UTC du jour courant — convention du repo pour « dû aujourd'hui » :
+ * les échéances sont stockées à minuit UTC. Exporté pour être réutilisé par
+ * les tools de l'assistant (lib/assistant/tools/read-tools.ts).
+ */
+export function startOfTodayUtc(): Date {
   const now = new Date();
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 }

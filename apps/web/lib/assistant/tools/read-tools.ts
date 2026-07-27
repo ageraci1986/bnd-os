@@ -10,17 +10,15 @@ import {
   scopedClientWhere,
   scopedProjectWhere,
 } from '@/lib/auth/scope';
+import { startOfTodayUtc } from '@/features/projects/lib/card-filter';
 
 const uuid = z.string().uuid();
 const UUID_JSON = { type: 'string', format: 'uuid' } as const;
 
-function dayRange(now: Date): { start: Date; endExclusive: Date } {
-  const start = new Date(now);
-  start.setHours(0, 0, 0, 0);
-  const endExclusive = new Date(start);
-  endExclusive.setDate(endExclusive.getDate() + 1);
-  return { start, endExclusive };
-}
+/** Nb max de cartes renvoyées par colonne dans get_project_board. */
+const BOARD_CARDS_PER_COLUMN = 100;
+/** Longueur max du corps de mail renvoyé par read_mail. */
+const MAIL_BODY_MAX_CHARS = 5000;
 
 /**
  * Exécute une requête DB en reformulant toute erreur en message montrable.
@@ -29,11 +27,15 @@ function dayRange(now: Date): { start: Date; endExclusive: Date } {
  * Retourne (plutôt que de relancer) le message sûr : chaque handler ci-dessous
  * renvoie toujours une `string`, donc l'appelant récupère directement le texte
  * affichable sans avoir à intercepter une exception.
+ *
+ * `tool` sert uniquement d'étiquette de log serveur — jamais le contenu de
+ * l'erreur ni la requête (PII / secrets, CLAUDE.md §4.7).
  */
-async function safeDb(work: () => Promise<string>): Promise<string> {
+async function safeDb(tool: string, work: () => Promise<string>): Promise<string> {
   try {
     return await work();
   } catch {
+    console.error('[assistant] tool db error', { tool });
     return 'Erreur interne en consultant les données — réessayez dans un instant.';
   }
 }
@@ -45,10 +47,19 @@ export async function buildReadTools(ctx: AuthContext): Promise<ToolSpec[]> {
   return [
     defineTool({
       name: 'get_current_datetime',
-      description: 'Date et heure actuelles (ISO). À utiliser avant tout calcul de date.',
+      description:
+        "Date et heure actuelles : `iso` (UTC) et `parisLocal` (heure de Paris). Utiliser `parisLocal` pour raisonner sur « aujourd'hui » / « demain », `iso` pour les calculs.",
       inputSchema: z.object({}),
       jsonSchema: { type: 'object', properties: {} },
-      handler: async () => new Date().toISOString(),
+      handler: async () => {
+        const now = new Date();
+        const parisLocal = new Intl.DateTimeFormat('fr-FR', {
+          timeZone: 'Europe/Paris',
+          dateStyle: 'full',
+          timeStyle: 'short',
+        }).format(now);
+        return JSON.stringify({ iso: now.toISOString(), parisLocal });
+      },
     }),
 
     defineTool({
@@ -58,8 +69,12 @@ export async function buildReadTools(ctx: AuthContext): Promise<ToolSpec[]> {
       inputSchema: z.object({}),
       jsonSchema: { type: 'object', properties: {} },
       handler: async () =>
-        safeDb(async () => {
-          const { start, endExclusive } = dayRange(new Date());
+        safeDb('get_today_overview', async () => {
+          // Convention repo (card-filter.ts) : les échéances sont stockées à
+          // minuit UTC — « dû aujourd'hui » = [minuit UTC, minuit UTC + 1 j).
+          const start = startOfTodayUtc();
+          const endExclusive = new Date(start);
+          endExclusive.setUTCDate(endExclusive.getUTCDate() + 1);
           const [blockedCards, dueTodayCards, unreadMails, unreadNotifications] = await Promise.all(
             [
               prisma.card.count({
@@ -95,7 +110,7 @@ export async function buildReadTools(ctx: AuthContext): Promise<ToolSpec[]> {
       inputSchema: z.object({}),
       jsonSchema: { type: 'object', properties: {} },
       handler: async () =>
-        safeDb(async () => {
+        safeDb('list_projects', async () => {
           const projects = await prisma.project.findMany({
             where: { workspaceId, deletedAt: null, ...scopedProjectWhere(scope) },
             select: {
@@ -125,7 +140,7 @@ export async function buildReadTools(ctx: AuthContext): Promise<ToolSpec[]> {
       inputSchema: z.object({ projectId: uuid }),
       jsonSchema: { type: 'object', properties: { projectId: UUID_JSON }, required: ['projectId'] },
       handler: async (input) =>
-        safeDb(async () => {
+        safeDb('get_project_board', async () => {
           const project = await prisma.project.findFirst({
             where: {
               id: input.projectId,
@@ -146,6 +161,7 @@ export async function buildReadTools(ctx: AuthContext): Promise<ToolSpec[]> {
                     where: { deletedAt: null, archivedAt: null },
                     orderBy: { position: 'asc' },
                     select: { id: true, title: true, dueDate: true },
+                    take: BOARD_CARDS_PER_COLUMN,
                   },
                 },
               },
@@ -160,6 +176,7 @@ export async function buildReadTools(ctx: AuthContext): Promise<ToolSpec[]> {
               name: c.name,
               blocked: c.isBlockedSystem,
               cards: c.cards.map((card) => ({ id: card.id, title: card.title, due: card.dueDate })),
+              ...(c.cards.length === BOARD_CARDS_PER_COLUMN ? { truncated: true } : {}),
             })),
           });
         }),
@@ -171,7 +188,7 @@ export async function buildReadTools(ctx: AuthContext): Promise<ToolSpec[]> {
       inputSchema: z.object({}),
       jsonSchema: { type: 'object', properties: {} },
       handler: async () =>
-        safeDb(async () => {
+        safeDb('list_clients', async () => {
           const clients = await prisma.client.findMany({
             where: { workspaceId, deletedAt: null, ...scopedClientWhere(scope) },
             select: {
@@ -213,7 +230,7 @@ export async function buildReadTools(ctx: AuthContext): Promise<ToolSpec[]> {
         },
       },
       handler: async (input) =>
-        safeDb(async () => {
+        safeDb('search_mails', async () => {
           const mails = await prisma.emailMessage.findMany({
             where: {
               workspaceId,
@@ -247,13 +264,22 @@ export async function buildReadTools(ctx: AuthContext): Promise<ToolSpec[]> {
 
     defineTool({
       name: 'read_mail',
-      description: 'Lit un mail complet (en-têtes + corps texte) à partir de son id.',
+      description:
+        'Lit un mail complet (en-têtes + corps texte) à partir de son id. Limité aux mails de votre propre boîte connectée.',
       inputSchema: z.object({ emailId: uuid }),
       jsonSchema: { type: 'object', properties: { emailId: UUID_JSON }, required: ['emailId'] },
       handler: async (input) =>
-        safeDb(async () => {
+        safeDb('read_mail', async () => {
+          // Convention repo (fetch-mail-body.ts) : les métadonnées mail sont
+          // visibles au workspace, les CORPS sont réservés au propriétaire de
+          // l'intégration — d'où le gate ownerUserId ci-dessous.
           const mail = await prisma.emailMessage.findFirst({
-            where: { id: input.emailId, workspaceId, deletedAt: null },
+            where: {
+              id: input.emailId,
+              workspaceId,
+              deletedAt: null,
+              integration: { workspaceId, ownerUserId: ctx.userId },
+            },
             select: {
               id: true,
               subject: true,
@@ -266,8 +292,10 @@ export async function buildReadTools(ctx: AuthContext): Promise<ToolSpec[]> {
               isRead: true,
             },
           });
-          if (mail === null) return 'Erreur : mail introuvable dans ce workspace.';
-          const body =
+          if (mail === null) {
+            return "Erreur : mail introuvable, ou situé dans la boîte d'un autre membre (le corps des mails n'est lisible que par le propriétaire de la boîte).";
+          }
+          const rawBody =
             mail.bodyText ??
             (mail.bodyHtmlSanitized !== null
               ? mail.bodyHtmlSanitized
@@ -275,6 +303,10 @@ export async function buildReadTools(ctx: AuthContext): Promise<ToolSpec[]> {
                   .replace(/\s+/g, ' ')
                   .trim()
               : "(corps non chargé — il sera récupéré à l'ouverture du mail dans Communications)");
+          const body =
+            rawBody.length > MAIL_BODY_MAX_CHARS
+              ? `${rawBody.slice(0, MAIL_BODY_MAX_CHARS)} […corps tronqué]`
+              : rawBody;
           return JSON.stringify({
             id: mail.id,
             subject: mail.subject,

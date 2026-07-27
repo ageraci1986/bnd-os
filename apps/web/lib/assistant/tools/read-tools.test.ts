@@ -13,12 +13,14 @@ const prismaMock = vi.hoisted(() => ({
   column: { findMany: vi.fn() },
 }));
 vi.mock('@nexushub/db', () => ({ prisma: prismaMock }));
-vi.mock('@/lib/auth/scope', () => ({
+
+const scopeMocks = vi.hoisted(() => ({
   loadUserScope: vi.fn(async () => ({ kind: 'workspace' as const })),
   scopedProjectWhere: vi.fn(() => ({})),
   scopedCardWhere: vi.fn(() => ({})),
   scopedClientWhere: vi.fn(() => ({})),
 }));
+vi.mock('@/lib/auth/scope', () => scopeMocks);
 
 import { buildReadTools } from './read-tools';
 
@@ -56,9 +58,11 @@ describe('buildReadTools', () => {
     expect(tools.every((t) => !t.gated && !t.adminOnly)).toBe(true);
   });
 
-  it('get_current_datetime renvoie une date ISO', async () => {
-    const out = await execute('get_current_datetime', {});
-    expect(out).toMatch(/\d{4}-\d{2}-\d{2}/);
+  it('get_current_datetime renvoie iso UTC + heure de Paris', async () => {
+    const out = JSON.parse(await execute('get_current_datetime', {}));
+    expect(out.iso).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+    expect(typeof out.parisLocal).toBe('string');
+    expect(out.parisLocal.length).toBeGreaterThan(0);
   });
 
   it('get_today_overview agrège cartes bloquées, dues, mails et notifications', async () => {
@@ -74,6 +78,23 @@ describe('buildReadTools', () => {
     });
     expect(prismaMock.card.count.mock.calls[0]?.[0]?.where?.workspaceId).toBe('w1');
     expect(prismaMock.emailMessage.count.mock.calls[0]?.[0]?.where?.workspaceId).toBe('w1');
+    const notifWhere = prismaMock.notification.count.mock.calls[0]?.[0]?.where;
+    expect(notifWhere?.workspaceId).toBe('w1');
+    expect(notifWhere?.userId).toBe('u1');
+    expect(scopeMocks.scopedCardWhere).toHaveBeenCalled();
+  });
+
+  it("get_today_overview borne « dû aujourd'hui » sur minuit UTC (convention card-filter)", async () => {
+    prismaMock.card.count.mockResolvedValue(0);
+    prismaMock.emailMessage.count.mockResolvedValue(0);
+    prismaMock.notification.count.mockResolvedValue(0);
+    await execute('get_today_overview', {});
+    const dueWhere = prismaMock.card.count.mock.calls[1]?.[0]?.where?.dueDate;
+    const start: Date = dueWhere.gte;
+    const end: Date = dueWhere.lt;
+    expect(start.getUTCHours()).toBe(0);
+    expect(start.getUTCMinutes()).toBe(0);
+    expect(end.getTime() - start.getTime()).toBe(24 * 60 * 60 * 1000);
   });
 
   it('list_projects renvoie les projets scoped', async () => {
@@ -83,6 +104,7 @@ describe('buildReadTools', () => {
     const out = JSON.parse(await execute('list_projects', {}));
     expect(out[0]).toEqual({ id: 'p1', name: 'Site', client: 'Acme', cards: 4 });
     expect(prismaMock.project.findMany.mock.calls[0]?.[0]?.where?.workspaceId).toBe('w1');
+    expect(scopeMocks.scopedProjectWhere).toHaveBeenCalled();
   });
 
   it('get_project_board renvoie colonnes et cartes, ou une erreur si projet introuvable', async () => {
@@ -91,6 +113,44 @@ describe('buildReadTools', () => {
       projectId: '4c9d3f0a-2222-4444-8888-aaaaaaaaaaaa',
     });
     expect(out).toContain('introuvable');
+    const where = prismaMock.project.findFirst.mock.calls[0]?.[0]?.where;
+    expect(where?.workspaceId).toBe('w1');
+    expect(scopeMocks.scopedProjectWhere).toHaveBeenCalled();
+  });
+
+  it('get_project_board borne les cartes à 100 par colonne et signale la troncature', async () => {
+    const fullColumn = Array.from({ length: 100 }, (_, i) => ({
+      id: `c${i}`,
+      title: `Carte ${i}`,
+      dueDate: null,
+    }));
+    prismaMock.project.findFirst.mockResolvedValue({
+      id: 'p1',
+      name: 'Site',
+      columns: [
+        { id: 'col1', name: 'À faire', isBlockedSystem: false, cards: fullColumn },
+        { id: 'col2', name: 'Bloqué', isBlockedSystem: true, cards: [] },
+      ],
+    });
+    const out = JSON.parse(
+      await execute('get_project_board', { projectId: '4c9d3f0a-2222-4444-8888-aaaaaaaaaaaa' }),
+    );
+    expect(out.columns[0].truncated).toBe(true);
+    expect(out.columns[0].cards).toHaveLength(100);
+    expect(out.columns[1].truncated).toBeUndefined();
+    const cardsSelect =
+      prismaMock.project.findFirst.mock.calls[0]?.[0]?.select?.columns?.select?.cards;
+    expect(cardsSelect?.take).toBe(100);
+  });
+
+  it('list_clients renvoie les clients scoped du workspace', async () => {
+    prismaMock.client.findMany.mockResolvedValue([
+      { id: 'cl1', name: 'Acme', initials: 'AC', _count: { projects: 2, contacts: 3 } },
+    ]);
+    const out = JSON.parse(await execute('list_clients', {}));
+    expect(out[0]).toEqual({ id: 'cl1', name: 'Acme', initials: 'AC', projects: 2, contacts: 3 });
+    expect(prismaMock.client.findMany.mock.calls[0]?.[0]?.where?.workspaceId).toBe('w1');
+    expect(scopeMocks.scopedClientWhere).toHaveBeenCalled();
   });
 
   it('search_mails filtre par texte sur sujet/expéditeur', async () => {
@@ -128,10 +188,44 @@ describe('buildReadTools', () => {
     expect(out).toContain('non chargé');
   });
 
+  it('read_mail est gated sur le propriétaire de la boîte (convention fetch-mail-body)', async () => {
+    prismaMock.emailMessage.findFirst.mockResolvedValue(null);
+    const out = await execute('read_mail', { emailId: '4c9d3f0a-2222-4444-8888-aaaaaaaaaaaa' });
+    expect(out).toContain('autre membre');
+    const where = prismaMock.emailMessage.findFirst.mock.calls[0]?.[0]?.where;
+    expect(where?.workspaceId).toBe('w1');
+    expect(where?.integration).toEqual({ workspaceId: 'w1', ownerUserId: 'u1' });
+  });
+
+  it('read_mail tronque le corps à 5000 caractères', async () => {
+    prismaMock.emailMessage.findFirst.mockResolvedValue({
+      id: 'm1',
+      subject: 'Long',
+      fromEmail: 'marc@acme.com',
+      fromName: 'Marc',
+      toRecipients: ['moi@bnd.co'],
+      receivedAt: new Date(),
+      bodyText: 'x'.repeat(6000),
+      bodyHtmlSanitized: null,
+      isRead: true,
+    });
+    const out = JSON.parse(
+      await execute('read_mail', { emailId: '4c9d3f0a-2222-4444-8888-aaaaaaaaaaaa' }),
+    );
+    expect(out.body.endsWith(' […corps tronqué]')).toBe(true);
+    expect(out.body.length).toBe(5000 + ' […corps tronqué]'.length);
+  });
+
   it('erreur Prisma → message utilisateur, pas de fuite du message brut', async () => {
     prismaMock.project.findMany.mockRejectedValue(new Error('connect ECONNREFUSED 10.0.0.1:5432'));
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const out = await execute('list_projects', {});
     expect(out).not.toContain('ECONNREFUSED');
     expect(out.toLowerCase()).toContain('erreur');
+    // Log serveur redigé : étiquette du tool uniquement, jamais l'erreur brute.
+    expect(consoleError).toHaveBeenCalledWith('[assistant] tool db error', {
+      tool: 'list_projects',
+    });
+    consoleError.mockRestore();
   });
 });
