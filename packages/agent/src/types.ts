@@ -22,6 +22,12 @@ export interface ToolCall {
   readonly input: unknown;
 }
 
+/**
+ * Contrat du seam provider : `toolCalls` doit refléter exactement les blocs
+ * `tool_use` présents dans `content` (mêmes ids, même ordre) — la validité de
+ * l'historique construit par la boucle en dépend (chaque tool_use doit recevoir
+ * son tool_result, y compris sur un arrêt tronqué type max_tokens).
+ */
 export interface ProviderTurnResult {
   /** Blocs de contenu assistant, prêts à être réinjectés dans l'historique. */
   readonly content: readonly Record<string, unknown>[];

@@ -17,6 +17,8 @@ const DECLINED_OUTPUT =
   "Action refusée par l'utilisateur — elle n'a PAS été exécutée. Ne pas réessayer sans nouvelle demande explicite.";
 const ADMIN_ONLY_OUTPUT =
   'Refusé : cette action est réservée aux administrateurs du workspace. Ne pas réessayer.';
+const CONFIRM_UNAVAILABLE_OUTPUT = 'Confirmation indisponible — action non exécutée.';
+const TRUNCATED_OUTPUT = 'Tour interrompu (limite de tokens atteinte) — action non exécutée.';
 
 /** Contexte sans humain pour répondre (jobs) : on refuse, toujours. */
 export const autoDeny: Confirmer = async () => false;
@@ -86,6 +88,20 @@ export async function runTurn(
     messages.push({ role: 'assistant', content: result.content });
 
     if (result.stopReason !== 'tool_use') {
+      // Arrêt tronqué (ex: max_tokens) avec des tool_use dans le contenu : on ne
+      // les exécute PAS (entrées potentiellement incomplètes), mais on clôt chaque
+      // tool_use par un tool_result pour garder un historique valide côté API.
+      if (result.toolCalls.length > 0) {
+        messages.push({
+          role: 'user',
+          content: result.toolCalls.map((call) => ({
+            type: 'tool_result',
+            tool_use_id: call.id,
+            content: TRUNCATED_OUTPUT,
+            is_error: true,
+          })),
+        });
+      }
       return { text: spokenParts.join('\n'), history: messages, inputTokens, outputTokens };
     }
 
@@ -118,8 +134,17 @@ async function executeGated(
   if (spec !== null && spec.gated) {
     const description = describeAction(name, input);
     deps.onEvent?.({ type: 'confirm_request', description });
-    const allowed = await deps.confirmer(description);
+    let allowed: boolean;
+    try {
+      allowed = await deps.confirmer(description);
+    } catch {
+      // Fail closed : canal de confirmation cassé = action non exécutée, mais le
+      // tour continue (is_error: true, c'est une défaillance technique).
+      return { output: CONFIRM_UNAVAILABLE_OUTPUT, isError: true };
+    }
     if (!allowed) {
+      // Refus humain → is_error: false (issue normale, pas un échec à réessayer),
+      // contrairement au garde adminOnly ci-dessus (refus dur, is_error: true).
       return { output: DECLINED_OUTPUT, isError: false };
     }
   }

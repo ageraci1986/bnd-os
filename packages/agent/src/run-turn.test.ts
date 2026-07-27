@@ -265,4 +265,91 @@ describe('runTurn', () => {
     expect(describeAction('ping', 'juste-un-texte')).toBe('ping (juste-un-texte)');
     expect(describeAction('ping', null)).toBe('ping (null)');
   });
+
+  it('max_tokens avec tool_use tronqué → tool_result de clôture, pas d exécution', async () => {
+    const handler = vi.fn(async () => 'jamais');
+    const registry = makeRegistry([{ name: 'lookup', handler: handler as ToolSpec['handler'] }]);
+    const provider = scriptedProvider([
+      { ...toolUseResult('lookup', { q: 'x' }), stopReason: 'max_tokens' },
+    ]);
+    const result = await runTurn([], 'x', deps(provider, registry));
+    expect(handler).not.toHaveBeenCalled();
+    // L'historique reste valide côté API : chaque tool_use a son tool_result
+    const closing = result.history.at(-1);
+    expect(closing?.role).toBe('user');
+    expect(closing?.content).toEqual([
+      {
+        type: 'tool_result',
+        tool_use_id: 'tu_1',
+        content: 'Tour interrompu (limite de tokens atteinte) — action non exécutée.',
+        is_error: true,
+      },
+    ]);
+  });
+
+  it('stop non-tool_use sans toolCalls → pas de tool_result de clôture', async () => {
+    const provider = scriptedProvider([textResult('Bonjour')]);
+    const result = await runTurn([], 'x', deps(provider, makeRegistry()));
+    expect(result.history).toHaveLength(2);
+    expect(result.history.at(-1)?.role).toBe('assistant');
+  });
+
+  it('confirmer qui throw → fail closed, tool non exécuté, le tour continue', async () => {
+    const handler = vi.fn(async () => 'jamais');
+    const registry = makeRegistry([
+      { name: 'danger', gated: true, handler: handler as ToolSpec['handler'] },
+    ]);
+    const provider = scriptedProvider([toolUseResult('danger', {}), textResult('Compris.')]);
+    const confirmer = vi.fn(async () => {
+      throw new Error('canal de confirmation mort');
+    });
+    const result = await runTurn([], 'x', deps(provider, registry, { confirmer }));
+    expect(handler).not.toHaveBeenCalled();
+    const toolResultMsg = result.history[2];
+    expect(JSON.stringify(toolResultMsg?.content)).toContain('indisponible');
+    expect(JSON.stringify(toolResultMsg?.content)).toContain('"is_error":true');
+    expect(result.text).toBe('Compris.');
+  });
+
+  it('tool inconnu appelé par le modèle → tool_result is_error, pas de crash, le tour continue', async () => {
+    const provider = scriptedProvider([toolUseResult('does_not_exist', {}), textResult('Désolé.')]);
+    const result = await runTurn([], 'x', deps(provider, makeRegistry()));
+    const toolResultMsg = result.history[2];
+    expect(JSON.stringify(toolResultMsg?.content)).toContain('aucun tool');
+    expect(JSON.stringify(toolResultMsg?.content)).toContain('"is_error":true');
+    expect(result.text).toBe('Désolé.');
+  });
+
+  it('deux appels gated dans un même round : oui puis non → une seule exécution, deux tool_results', async () => {
+    const handler = vi.fn(async () => 'fait');
+    const registry = makeRegistry([
+      { name: 'danger', gated: true, handler: handler as ToolSpec['handler'] },
+    ]);
+    const provider = scriptedProvider([
+      {
+        content: [
+          { type: 'tool_use', id: 'tu_1', name: 'danger', input: {} },
+          { type: 'tool_use', id: 'tu_2', name: 'danger', input: {} },
+        ],
+        text: '',
+        stopReason: 'tool_use',
+        toolCalls: [
+          { id: 'tu_1', name: 'danger', input: {} },
+          { id: 'tu_2', name: 'danger', input: {} },
+        ],
+        inputTokens: 10,
+        outputTokens: 5,
+      },
+      textResult('Fini'),
+    ]);
+    const confirmer = vi.fn(async () => confirmer.mock.calls.length === 1);
+    const result = await runTurn([], 'x', deps(provider, registry, { confirmer }));
+    expect(confirmer).toHaveBeenCalledTimes(2);
+    expect(handler).toHaveBeenCalledTimes(1);
+    const toolResults = result.history[2]?.content as Record<string, unknown>[];
+    expect(toolResults).toHaveLength(2);
+    expect(toolResults[0]).toMatchObject({ tool_use_id: 'tu_1', content: 'fait' });
+    expect(JSON.stringify(toolResults[1])).toContain('refusée');
+    expect(toolResults[1]).toMatchObject({ tool_use_id: 'tu_2' });
+  });
 });
