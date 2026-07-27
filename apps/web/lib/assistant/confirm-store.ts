@@ -20,7 +20,7 @@ export interface ConfirmBackend {
 }
 
 /** Backend Upstash (prod). */
-class RedisConfirmBackend implements ConfirmBackend {
+export class RedisConfirmBackend implements ConfirmBackend {
   constructor(private readonly redis: Redis) {}
   async get(id: string): Promise<PendingRecord | null> {
     return (await this.redis.get<PendingRecord>(KEY_PREFIX + id)) ?? null;
@@ -68,7 +68,11 @@ export class ConfirmStore {
     return 'ok';
   }
 
-  /** Poll jusqu'à réponse ou timeout ; timeout = refus (fail closed). Nettoie la clé. */
+  /**
+   * Poll jusqu'à réponse ou timeout ; timeout = refus (fail closed). Nettoie la clé.
+   * Race à la frontière du timeout : une réponse qui arrive juste après le nettoyage
+   * voit `not_found` (→ 404 côté endpoint) — l'UI traite ce non-2xx comme informatif.
+   */
   async awaitAnswer(
     id: string,
     opts?: { readonly pollMs?: number; readonly timeoutMs?: number },
@@ -98,10 +102,27 @@ export function getConfirmStore(): ConfirmStore {
   if (instance === null) {
     const url = process.env['UPSTASH_REDIS_REST_URL'];
     const token = process.env['UPSTASH_REDIS_REST_TOKEN'];
-    instance =
-      url !== undefined && url !== '' && token !== undefined && token !== ''
-        ? new ConfirmStore(new RedisConfirmBackend(new Redis({ url, token })))
-        : new ConfirmStore(new MemoryConfirmBackend());
+    if (url !== undefined && url !== '' && token !== undefined && token !== '') {
+      instance = new ConfirmStore(new RedisConfirmBackend(new Redis({ url, token })));
+    } else {
+      // Même politique que lib/rate-limit : seule la *vraie* production
+      // (VERCEL_ENV=production) exige Upstash — le fallback mémoire ne survit
+      // pas aux invocations serverless (chaque confirmation timeouterait en
+      // refus silencieux). Preview/dev/test tombent sur la mémoire.
+      if (process.env['VERCEL_ENV'] === 'production') {
+        throw new Error(
+          'ConfirmStore requires Upstash Redis in production. ' +
+            'Set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN.',
+        );
+      }
+      console.warn('[assistant] confirm store: in-memory fallback (single instance only)');
+      instance = new ConfirmStore(new MemoryConfirmBackend());
+    }
   }
   return instance;
+}
+
+/** Test-only : réinitialise le singleton module-level (sélection de backend). */
+export function resetConfirmStoreForTests(): void {
+  instance = null;
 }
