@@ -59,6 +59,9 @@ importers:
       '@dnd-kit/utilities':
         specifier: 3.2.2
         version: 3.2.2(react@19.2.5)
+      '@nexushub/agent':
+        specifier: workspace:*
+        version: link:../../packages/agent
       '@nexushub/db':
         specifier: workspace:*
         version: link:../../packages/db
@@ -112,10 +115,10 @@ importers:
         version: 6.2.3
       next:
         specifier: ^15.1.0
-        version: 15.5.15(@playwright/test@1.59.1)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+        version: 15.5.15(@babel/core@7.29.0)(@playwright/test@1.59.1)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       next-intl:
         specifier: ^3.26.0
-        version: 3.26.5(next@15.5.15(@playwright/test@1.59.1)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(react@19.2.5)
+        version: 3.26.5(next@15.5.15(@babel/core@7.29.0)(@playwright/test@1.59.1)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(react@19.2.5)
       react:
         specifier: ^19.0.0
         version: 19.2.5
@@ -192,6 +195,19 @@ importers:
       '@types/node':
         specifier: ^22.10.0
         version: 22.19.17
+
+  packages/agent:
+    dependencies:
+      zod:
+        specifier: ^3.24.0
+        version: 3.25.76
+    devDependencies:
+      '@vitest/coverage-v8':
+        specifier: ^2.1.0
+        version: 2.1.9(vitest@2.1.9(@types/node@22.19.17)(jsdom@29.1.1)(lightningcss@1.32.0)(msw@2.13.6(@types/node@22.19.17)(typescript@5.9.3)))
+      vitest:
+        specifier: ^2.1.0
+        version: 2.1.9(@types/node@22.19.17)(jsdom@29.1.1)(lightningcss@1.32.0)(msw@2.13.6(@types/node@22.19.17)(typescript@5.9.3))
 
   packages/db:
     dependencies:
@@ -9145,15 +9161,15 @@ snapshots:
 
   negotiator@1.0.0: {}
 
-  next-intl@3.26.5(next@15.5.15(@playwright/test@1.59.1)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(react@19.2.5):
+  next-intl@3.26.5(next@15.5.15(@babel/core@7.29.0)(@playwright/test@1.59.1)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(react@19.2.5):
     dependencies:
       '@formatjs/intl-localematcher': 0.5.10
       negotiator: 1.0.0
-      next: 15.5.15(@playwright/test@1.59.1)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+      next: 15.5.15(@babel/core@7.29.0)(@playwright/test@1.59.1)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       react: 19.2.5
       use-intl: 3.26.5(react@19.2.5)
 
-  next@15.5.15(@playwright/test@1.59.1)(react-dom@19.2.5(react@19.2.5))(react@19.2.5):
+  next@15.5.15(@babel/core@7.29.0)(@playwright/test@1.59.1)(react-dom@19.2.5(react@19.2.5))(react@19.2.5):
     dependencies:
       '@next/env': 15.5.15
       '@swc/helpers': 0.5.15
@@ -9161,7 +9177,7 @@ snapshots:
       postcss: 8.4.31
       react: 19.2.5
       react-dom: 19.2.5(react@19.2.5)
-      styled-jsx: 5.1.6(react@19.2.5)
+      styled-jsx: 5.1.6(@babel/core@7.29.0)(react@19.2.5)
     optionalDependencies:
       '@next/swc-darwin-arm64': 15.5.15
       '@next/swc-darwin-x64': 15.5.15
@@ -9975,10 +9991,12 @@ snapshots:
     dependencies:
       '@tokenizer/token': 0.3.0
 
-  styled-jsx@5.1.6(react@19.2.5):
+  styled-jsx@5.1.6(@babel/core@7.29.0)(react@19.2.5):
     dependencies:
       client-only: 0.0.1
       react: 19.2.5
+    optionalDependencies:
+      '@babel/core': 7.29.0
 
   supports-color@7.2.0:
     dependencies:
