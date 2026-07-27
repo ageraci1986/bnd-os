@@ -158,7 +158,7 @@ describe('AssistantChat', () => {
         const enc = new TextEncoder();
         controller.enqueue(
           enc.encode(
-            `data: ${JSON.stringify({ type: 'confirm_request', id: confirmId, description: 'delete_card (cardId="c1")' })}\n\n`,
+            `data: ${JSON.stringify({ type: 'confirm_request', id: confirmId, tool: 'delete_card', description: 'delete_card (cardId="c1")' })}\n\n`,
           ),
         );
         pushSecondHalf = () => {
@@ -217,7 +217,12 @@ describe('AssistantChat', () => {
       }
       return Promise.resolve(
         openSseResponse([
-          { type: 'confirm_request', id: confirmId, description: 'delete_card (cardId="c1")' },
+          {
+            type: 'confirm_request',
+            id: confirmId,
+            tool: 'delete_card',
+            description: 'delete_card (cardId="c1")',
+          },
         ]),
       );
     });
@@ -244,7 +249,12 @@ describe('AssistantChat', () => {
     const confirmId = 'd'.repeat(32);
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       openSseResponse([
-        { type: 'confirm_request', id: confirmId, description: 'delete_card (cardId="c1")' },
+        {
+          type: 'confirm_request',
+          id: confirmId,
+          tool: 'delete_card',
+          description: 'delete_card (cardId="c1")',
+        },
       ]),
     );
 
@@ -291,7 +301,12 @@ describe('AssistantChat', () => {
     // la réponse → le dialog périmé doit disparaître à la fin du send().
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       sseResponse([
-        { type: 'confirm_request', id: confirmId, description: 'delete_card (cardId="c1")' },
+        {
+          type: 'confirm_request',
+          id: confirmId,
+          tool: 'delete_card',
+          description: 'delete_card (cardId="c1")',
+        },
       ]),
     );
 
@@ -314,7 +329,12 @@ describe('AssistantChat', () => {
         return Response.json({ ok: false }, { status: 404 });
       }
       return openSseResponse([
-        { type: 'confirm_request', id: confirmId, description: 'delete_card (cardId="c1")' },
+        {
+          type: 'confirm_request',
+          id: confirmId,
+          tool: 'delete_card',
+          description: 'delete_card (cardId="c1")',
+        },
       ]);
     });
 
@@ -336,7 +356,12 @@ describe('AssistantChat', () => {
         return Response.json({ ok: false }, { status: 409 });
       }
       return openSseResponse([
-        { type: 'confirm_request', id: confirmId, description: 'delete_card (cardId="c1")' },
+        {
+          type: 'confirm_request',
+          id: confirmId,
+          tool: 'delete_card',
+          description: 'delete_card (cardId="c1")',
+        },
       ]);
     });
 
@@ -358,7 +383,12 @@ describe('AssistantChat', () => {
         return Response.json({ ok: false }, { status: 500 });
       }
       return openSseResponse([
-        { type: 'confirm_request', id: confirmId, description: 'delete_card (cardId="c1")' },
+        {
+          type: 'confirm_request',
+          id: confirmId,
+          tool: 'delete_card',
+          description: 'delete_card (cardId="c1")',
+        },
       ]);
     });
 

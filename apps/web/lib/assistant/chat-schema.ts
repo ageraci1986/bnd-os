@@ -30,6 +30,7 @@ export const ChatSseEventSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('confirm_request'),
     id: z.string().regex(/^[0-9a-f]{32}$/),
+    tool: z.string(),
     description: z.string().max(2000),
   }),
   z.object({
@@ -39,6 +40,7 @@ export const ChatSseEventSchema = z.discriminatedUnion('type', [
   }),
   z.object({ type: z.literal('done'), text: z.string() }),
   z.object({ type: z.literal('error'), message: z.string() }),
+  z.object({ type: z.literal('tool_result'), tool: z.string(), data: z.unknown() }),
 ]);
 
 export type ChatSseEvent = z.infer<typeof ChatSseEventSchema>;

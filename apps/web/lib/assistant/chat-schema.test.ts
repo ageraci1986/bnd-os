@@ -50,19 +50,47 @@ describe('ChatRequestSchema', () => {
 });
 
 describe('ChatSseEventSchema', () => {
-  it('accepte les 7 types et rejette un type inconnu ou un id malformé', () => {
+  it('accepte les 8 types et rejette un type inconnu ou un id malformé', () => {
     expect(ChatSseEventSchema.safeParse({ type: 'chunk', text: 'x' }).success).toBe(true);
+    expect(
+      ChatSseEventSchema.safeParse({
+        type: 'confirm_request',
+        id: 'a'.repeat(32),
+        tool: 'delete_card',
+        description: 'd',
+      }).success,
+    ).toBe(true);
+    expect(
+      ChatSseEventSchema.safeParse({
+        type: 'confirm_request',
+        id: 'court',
+        tool: 'delete_card',
+        description: 'd',
+      }).success,
+    ).toBe(false);
+    expect(ChatSseEventSchema.safeParse({ type: 'hack', foo: 1 }).success).toBe(false);
+  });
+
+  it('refuse confirm_request sans tool', () => {
     expect(
       ChatSseEventSchema.safeParse({
         type: 'confirm_request',
         id: 'a'.repeat(32),
         description: 'd',
       }).success,
+    ).toBe(false);
+  });
+
+  it('accepte tool_result avec des données arbitraires', () => {
+    expect(
+      ChatSseEventSchema.safeParse({
+        type: 'tool_result',
+        tool: 'get_today_overview',
+        data: { blockedCount: 2 },
+      }).success,
     ).toBe(true);
     expect(
-      ChatSseEventSchema.safeParse({ type: 'confirm_request', id: 'court', description: 'd' })
-        .success,
-    ).toBe(false);
-    expect(ChatSseEventSchema.safeParse({ type: 'hack', foo: 1 }).success).toBe(false);
+      ChatSseEventSchema.safeParse({ type: 'tool_result', tool: 'x', data: null }).success,
+    ).toBe(true);
   });
 });
