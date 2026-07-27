@@ -19,6 +19,21 @@ const UUID_JSON = { type: 'string', format: 'uuid' } as const;
 /** Format de date accepté par les tools (le seul que les schémas serveur re-valident). */
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const DATE_FORMAT_MESSAGE = 'Format attendu : YYYY-MM-DD';
+const DATE_INVALID_MESSAGE = 'Date invalide.';
+
+/**
+ * Vérifie qu'une chaîne `YYYY-MM-DD` correspond à une date réelle du
+ * calendrier. `new Date(...)` seul ne suffit pas : il « corrige »
+ * silencieusement un jour hors plage (ex. 2026-02-30 → 2 mars 2026), ce qui
+ * ferait passer une entrée invalide comme si elle était valide. On construit
+ * la date en UTC puis on vérifie que les composants round-trip à l'identique.
+ */
+function isValidCalendarDate(d: string): boolean {
+  const [y, m, day] = d.split('-').map(Number);
+  if (y === undefined || m === undefined || day === undefined) return false;
+  const dt = new Date(Date.UTC(y, m - 1, day));
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === day;
+}
 
 const RACI_VALUES = ['responsible', 'approver', 'consulted', 'informed'] as const;
 
@@ -85,8 +100,16 @@ export function buildKanbanTools(ctx: AuthContext): ToolSpec[] {
         name: z.string().trim().min(1).max(160),
         clientId: uuid,
         description: z.string().max(2000).optional(),
-        startDate: z.string().regex(DATE_RE, DATE_FORMAT_MESSAGE).optional(),
-        endDate: z.string().regex(DATE_RE, DATE_FORMAT_MESSAGE).optional(),
+        startDate: z
+          .string()
+          .regex(DATE_RE, DATE_FORMAT_MESSAGE)
+          .refine(isValidCalendarDate, DATE_INVALID_MESSAGE)
+          .optional(),
+        endDate: z
+          .string()
+          .regex(DATE_RE, DATE_FORMAT_MESSAGE)
+          .refine(isValidCalendarDate, DATE_INVALID_MESSAGE)
+          .optional(),
         typeId: z.string().optional(),
         templateId: z.string().trim().min(1),
       }),
@@ -99,12 +122,12 @@ export function buildKanbanTools(ctx: AuthContext): ToolSpec[] {
           startDate: {
             type: 'string',
             pattern: DATE_RE.source,
-            description: 'ISO 8601 (YYYY-MM-DD)',
+            description: 'ISO 8601 (YYYY-MM-DD), doit être une date réelle du calendrier',
           },
           endDate: {
             type: 'string',
             pattern: DATE_RE.source,
-            description: 'ISO 8601 (YYYY-MM-DD)',
+            description: 'ISO 8601 (YYYY-MM-DD), doit être une date réelle du calendrier',
           },
           typeId: {
             type: 'string',
@@ -174,7 +197,11 @@ export function buildKanbanTools(ctx: AuthContext): ToolSpec[] {
         "Définit (ou efface avec dueDate: null) l'échéance d'une carte, au format YYYY-MM-DD. Une échéance dépassée peut faire entrer automatiquement la carte dans la colonne Bloqué (autoBlocked) ; repousser ou effacer une échéance dépassée en sort automatiquement la carte vers sa colonne précédente (autoUnblocked).",
       inputSchema: z.object({
         cardId: uuid,
-        dueDate: z.string().regex(DATE_RE, DATE_FORMAT_MESSAGE).nullable(),
+        dueDate: z
+          .string()
+          .regex(DATE_RE, DATE_FORMAT_MESSAGE)
+          .refine(isValidCalendarDate, DATE_INVALID_MESSAGE)
+          .nullable(),
       }),
       jsonSchema: {
         type: 'object',
@@ -183,7 +210,8 @@ export function buildKanbanTools(ctx: AuthContext): ToolSpec[] {
           dueDate: {
             type: ['string', 'null'],
             pattern: DATE_RE.source,
-            description: 'ISO 8601 (YYYY-MM-DD), ou null pour effacer',
+            description:
+              'ISO 8601 (YYYY-MM-DD), doit être une date réelle du calendrier, ou null pour effacer',
           },
         },
         required: ['cardId', 'dueDate'],
