@@ -5,6 +5,15 @@ import userEvent from '@testing-library/user-event';
 import { Blob as NodeBlob } from 'node:buffer';
 import { AssistantChat } from './assistant-chat';
 
+// Les widgets liste/board font `next/link` — stub minimal comme dans widgets/index.test.tsx.
+vi.mock('next/link', () => ({
+  default: ({ children, href, ...rest }: { children: React.ReactNode; href: string }) => (
+    <a href={href} {...rest}>
+      {children}
+    </a>
+  ),
+}));
+
 function sseResponse(events: object[]): Response {
   const body = events.map((e) => `data: ${JSON.stringify(e)}\n\n`).join('');
   return new Response(new NodeBlob([body]).stream() as unknown as ReadableStream, {
@@ -417,5 +426,120 @@ describe('AssistantChat', () => {
     await userEvent.click(screen.getByRole('button', { name: /envoyer/i }));
     unmount();
     expect(signal?.aborted).toBe(true);
+  });
+
+  it('tool_result get_today_overview → widget KPI visible pendant le stream et persisté après done', async () => {
+    const encoder = new TextEncoder();
+    let push!: (e: object) => void;
+    let close!: () => void;
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        push = (e) => controller.enqueue(encoder.encode(`data: ${JSON.stringify(e)}\n\n`));
+        close = () => controller.close();
+      },
+    });
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(stream as unknown as BodyInit, {
+        status: 200,
+        headers: { 'Content-Type': 'text/event-stream' },
+      }),
+    );
+    render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
+    await userEvent.type(screen.getByRole('textbox'), 'mon briefing');
+    await userEvent.click(screen.getByRole('button', { name: /envoyer/i }));
+
+    act(() => {
+      push({
+        type: 'tool_result',
+        tool: 'get_today_overview',
+        data: { blockedCards: 2, dueTodayCards: 1, unreadMails: 3, unreadNotifications: 0 },
+      });
+    });
+    // Rendu sous la bulle en cours de stream, avant `done`.
+    await waitFor(() => {
+      expect(screen.getByText('Bloquées')).toBeInTheDocument();
+    });
+
+    act(() => {
+      push({ type: 'done', text: 'Voici votre briefing.' });
+      close();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Voici votre briefing.')).toBeInTheDocument();
+    });
+    // Toujours là une fois le message commité : le widget a survécu au commit.
+    expect(screen.getByText('Bloquées')).toBeInTheDocument();
+  });
+
+  it('tool_result pour un tool inconnu ne rend rien et ne fait pas planter', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      sseResponse([
+        { type: 'tool_result', tool: 'some_unknown_tool', data: { foo: 'bar' } },
+        { type: 'done', text: 'Réponse.' },
+      ]),
+    );
+    render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
+    await userEvent.type(screen.getByRole('textbox'), 'x');
+    await userEvent.click(screen.getByRole('button', { name: /envoyer/i }));
+    await waitFor(() => {
+      expect(screen.getByText('Réponse.')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('bar')).not.toBeInTheDocument();
+  });
+
+  it('affiche « Envoi de mail » dans l en-tête du dialog pour le tool send_mail', async () => {
+    const confirmId = '9'.repeat(32);
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      openSseResponse([
+        {
+          type: 'confirm_request',
+          id: confirmId,
+          tool: 'send_mail',
+          description: 'Envoyer un mail à a@b.test — objet « Bonjour » : Salut…',
+        },
+      ]),
+    );
+    render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
+    await userEvent.type(screen.getByRole('textbox'), 'envoie le mail');
+    await userEvent.click(screen.getByRole('button', { name: /envoyer/i }));
+
+    await screen.findByRole('button', { name: /autoriser/i });
+    expect(screen.getByText(/Envoi de mail/)).toBeInTheDocument();
+  });
+
+  it('l historique envoyé au serveur reste texte-only : jamais de clé widgets', async () => {
+    let call = 0;
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(() => {
+      call += 1;
+      if (call === 1) {
+        return Promise.resolve(
+          sseResponse([
+            {
+              type: 'tool_result',
+              tool: 'get_today_overview',
+              data: { blockedCards: 0, dueTodayCards: 0, unreadMails: 0, unreadNotifications: 0 },
+            },
+            { type: 'done', text: 'Un.' },
+          ]),
+        );
+      }
+      return Promise.resolve(sseResponse([{ type: 'done', text: 'Deux.' }]));
+    });
+    render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
+    await userEvent.type(screen.getByRole('textbox'), 'mon briefing');
+    await userEvent.click(screen.getByRole('button', { name: /envoyer/i }));
+    await screen.findByText('Un.');
+
+    await userEvent.type(screen.getByRole('textbox'), 'et ensuite ?');
+    await userEvent.click(screen.getByRole('button', { name: /envoyer/i }));
+    await screen.findByText('Deux.');
+
+    const secondCall = fetchMock.mock.calls[1];
+    const body = JSON.parse(String(secondCall?.[1]?.body)) as { messages: unknown[] };
+    expect(body.messages.length).toBeGreaterThan(0);
+    for (const m of body.messages) {
+      expect(m).not.toHaveProperty('widgets');
+    }
   });
 });

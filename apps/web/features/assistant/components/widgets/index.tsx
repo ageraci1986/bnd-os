@@ -9,8 +9,10 @@ import { ProjectListWidget } from './project-list-widget';
  * Dispatcher : route un événement `tool_result` (nom de tool + data JSON)
  * vers son composant widget. `tool` doit appartenir à `WIDGET_TOOLS`
  * (`lib/assistant/widget-tools.ts`) — même whitelist utilisée côté serveur
- * pour l'émission de l'événement SSE. Un nom inconnu (ou un data qui échoue
- * son parse Zod local dans le widget) rend `null` silencieusement.
+ * pour l'émission de l'événement SSE. Un nom inconnu rend `null` sans bruit ;
+ * un data qui échoue son parse Zod local dans le widget rend aussi `null`
+ * mais trace un `console.warn` dev (voir `parse-widget-data.ts`) pour
+ * diagnostiquer un drift de shape entre un tool serveur et son widget.
  */
 export function renderWidget(tool: string, data: unknown): ReactNode | null {
   if (!WIDGET_TOOL_SET.has(tool)) return null;

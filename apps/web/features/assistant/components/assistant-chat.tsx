@@ -1,11 +1,19 @@
 'use client';
 
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useId, useRef, useState } from 'react';
 import { parseSseLines } from '../lib/sse';
+import { renderWidget } from './widgets';
+
+interface StreamWidget {
+  readonly tool: string;
+  readonly data: unknown;
+}
 
 interface DisplayMessage {
   readonly role: 'user' | 'assistant';
   readonly content: string;
+  /** Widgets accumulés pendant le tour qui a produit ce message — jamais renvoyés au serveur. */
+  readonly widgets?: readonly StreamWidget[];
 }
 
 interface AssistantChatProps {
@@ -23,6 +31,12 @@ const ACTIVITY_LABELS: Record<string, string> = {
   get_current_datetime: 'vérifie la date…',
 };
 
+/** Libellé FR du dialog de confirmation, par nom de tool. Repli : le nom brut du tool. */
+const CONFIRM_TOOL_LABELS: Record<string, string> = {
+  delete_card: 'Suppression de carte',
+  send_mail: 'Envoi de mail',
+};
+
 /** Marge sous la limite serveur de 40 messages (ChatRequestSchema `.max(40)`). */
 const HISTORY_MAX = 38;
 
@@ -30,11 +44,13 @@ export function AssistantChat({ csrfToken, firstName }: AssistantChatProps) {
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [input, setInput] = useState('');
   const [streamText, setStreamText] = useState<string | null>(null);
+  const [streamWidgets, setStreamWidgets] = useState<StreamWidget[]>([]);
   const [activity, setActivity] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [pendingConfirm, setPendingConfirm] = useState<{
     id: string;
+    tool: string;
     description: string;
   } | null>(null);
   // Verrou anti double-envoi : mémorise quel bouton a été cliqué, désactive les deux.
@@ -78,7 +94,7 @@ export function AssistantChat({ csrfToken, firstName }: AssistantChatProps) {
       // `?.` sur la méthode : jsdom ne l'implémente pas.
       bottomRef.current?.scrollIntoView?.({ block: 'end' });
     }
-  }, [messages, streamText, pendingConfirm]);
+  }, [messages, streamText, streamWidgets, pendingConfirm]);
 
   const answerConfirm = useCallback(
     async (id: string, allowed: boolean) => {
@@ -113,19 +129,33 @@ export function AssistantChat({ csrfToken, firstName }: AssistantChatProps) {
     setInput('');
     setMessages((prev) => [...prev, { role: 'user', content: text }]);
     setStreamText('');
+    setStreamWidgets([]);
 
     const controller = new AbortController();
     abortRef.current = controller;
 
-    /** Commit l'échange (question + réponse, même partielle) en bornant l'historique. */
-    const commit = (assistantText: string): void => {
+    /**
+     * Commit l'échange (question + réponse, même partielle) en bornant
+     * l'historique. Les widgets accumulés pendant le tour sont attachés au
+     * message affiché mais JAMAIS à `historyRef` — le payload renvoyé au
+     * serveur reste texte-only (invariant CLAUDE.md §4.5 : pas de JSON
+     * arbitraire de tool dans le prompt suivant).
+     */
+    const commit = (assistantText: string, widgets: readonly StreamWidget[]): void => {
       const next: DisplayMessage[] = [
         ...historyRef.current,
         { role: 'user', content: text },
         { role: 'assistant', content: assistantText },
       ];
       historyRef.current = next.slice(-HISTORY_MAX);
-      setMessages((prev) => [...prev, { role: 'assistant', content: assistantText }]);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: assistantText,
+          ...(widgets.length > 0 ? { widgets } : {}),
+        },
+      ]);
     };
 
     let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
@@ -133,6 +163,9 @@ export function AssistantChat({ csrfToken, firstName }: AssistantChatProps) {
     // chemins d'erreur / fermeture sans `done` conservent la réponse partielle.
     let accumulated = '';
     let finalText = '';
+    // Idem pour les widgets : variable locale à jour de façon synchrone dans
+    // la boucle de lecture, utilisée par `commit()` sans dépendre du state.
+    let widgets: StreamWidget[] = [];
     try {
       const res = await fetch('/api/assistant/chat', {
         method: 'POST',
@@ -161,8 +194,12 @@ export function AssistantChat({ csrfToken, firstName }: AssistantChatProps) {
           }
           if (event.type === 'tool_start') setActivity(ACTIVITY_LABELS[event.name] ?? 'travaille…');
           if (event.type === 'tool_end') setActivity(null);
+          if (event.type === 'tool_result') {
+            widgets = [...widgets, { tool: event.tool, data: event.data }];
+            setStreamWidgets(widgets);
+          }
           if (event.type === 'confirm_request') {
-            setPendingConfirm({ id: event.id, description: event.description });
+            setPendingConfirm({ id: event.id, tool: event.tool, description: event.description });
             setAnswering(null);
           }
           if (event.type === 'confirm_resolved') {
@@ -176,17 +213,18 @@ export function AssistantChat({ csrfToken, firstName }: AssistantChatProps) {
       // Flux terminé sans `done` (erreur mi-parcours, coupure serveur) : on
       // conserve la réponse partielle plutôt que de jeter les tokens reçus.
       const answer = finalText !== '' ? finalText : accumulated;
-      if (answer !== '') commit(answer);
+      if (answer !== '') commit(answer, widgets);
     } catch (err) {
       if (reader !== null) void reader.cancel().catch(() => undefined);
       const isAbort = (err as { name?: string } | null)?.name === 'AbortError';
       if (!isAbort) {
-        if (accumulated !== '') commit(accumulated);
+        if (accumulated !== '') commit(accumulated, widgets);
         setError('Connexion interrompue — réessayez.');
       }
     } finally {
       abortRef.current = null;
       setStreamText(null);
+      setStreamWidgets([]);
       setActivity(null);
       // Flux terminé sans confirm_resolved (coupure, erreur) : plus aucun serveur
       // n'attend la réponse — un dialog restant serait du bruit (clic → 404 muet).
@@ -219,17 +257,23 @@ export function AssistantChat({ csrfToken, firstName }: AssistantChatProps) {
             fois, sans spammer les lecteurs d'écran à chaque chunk streamé. */}
         <div className="flex flex-col gap-2" aria-live="polite">
           {messages.map((m, i) => (
-            <div
-              key={i}
-              className={
-                m.role === 'user'
-                  ? 'self-end rounded-2xl px-4 py-2 text-sm text-white'
-                  : 'self-start rounded-2xl border border-[color:var(--color-border-soft)] bg-[color:var(--color-bg-card)] px-4 py-2 text-sm text-[color:var(--color-text-soft)]'
-              }
-              style={m.role === 'user' ? { background: 'var(--accent-gradient)' } : undefined}
-            >
-              {m.content}
-            </div>
+            <Fragment key={i}>
+              <div
+                className={
+                  m.role === 'user'
+                    ? 'self-end rounded-2xl px-4 py-2 text-sm text-white'
+                    : 'self-start rounded-2xl border border-[color:var(--color-border-soft)] bg-[color:var(--color-bg-card)] px-4 py-2 text-sm text-[color:var(--color-text-soft)]'
+                }
+                style={m.role === 'user' ? { background: 'var(--accent-gradient)' } : undefined}
+              >
+                {m.content}
+              </div>
+              {/* Widgets rendus pleine largeur sous la bulle, pas dedans — plus
+                  lisible pour un mini-Kanban ou une liste de mails. */}
+              {m.widgets?.map((w, wi) => (
+                <Fragment key={wi}>{renderWidget(w.tool, w.data)}</Fragment>
+              ))}
+            </Fragment>
           ))}
         </div>
         <div className="flex flex-col gap-2">
@@ -238,6 +282,9 @@ export function AssistantChat({ csrfToken, firstName }: AssistantChatProps) {
               {streamText}
             </div>
           )}
+          {streamWidgets.map((w, wi) => (
+            <Fragment key={wi}>{renderWidget(w.tool, w.data)}</Fragment>
+          ))}
           {activity !== null && (
             <p className="text-xs font-semibold text-[color:var(--color-text-ghost)]">{activity}</p>
           )}
@@ -264,7 +311,7 @@ export function AssistantChat({ csrfToken, firstName }: AssistantChatProps) {
                 className="text-xs font-bold uppercase tracking-wide"
                 style={{ color: 'var(--accent-primary)' }}
               >
-                ⚡ Confirmation requise
+                ⚡ Confirmation — {CONFIRM_TOOL_LABELS[pendingConfirm.tool] ?? pendingConfirm.tool}
               </p>
               <p className="mt-1 break-words text-[color:var(--color-text-main)]">
                 {pendingConfirm.description}
