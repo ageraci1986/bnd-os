@@ -4,7 +4,11 @@ import { z } from 'zod';
 import { prisma } from '@nexushub/db';
 import { defineTool, type ToolSpec } from '@nexushub/agent';
 import type { AuthContext } from '@/lib/auth';
-import { saveDraft, type SaveDraftInput } from '@/features/communications/actions/mail-drafts';
+import {
+  loadDraft,
+  saveDraft,
+  type SaveDraftInput,
+} from '@/features/communications/actions/mail-drafts';
 import { sendMail, type SendMailResult } from '@/features/communications/actions/send-mail';
 import { markEmailRead } from '@/features/communications/actions/mark-email-read';
 import { safeDb, safeMutation } from './safe-wrappers';
@@ -20,6 +24,8 @@ const RECIPIENTS_MAX = 20;
 const BODY_HTML_MAX_CHARS = 100_000;
 /** Longueur max de l'extrait montré dans le dialog de confirmation de send_mail. */
 const CONFIRM_EXCERPT_MAX_CHARS = 200;
+/** Nb max d'adresses affichées avant troncature « +n autres » — to/cc uniquement, JAMAIS Cci. */
+const CONFIRM_RECIPIENTS_SHOWN_MAX = 5;
 
 const recipientsJson = (description: string) => ({
   type: 'array' as const,
@@ -29,12 +35,10 @@ const recipientsJson = (description: string) => ({
 });
 
 /**
- * Champs communs à create_mail_draft et prepare_reply_draft — un brouillon
- * (kind:'new_mail' ou kind:'reply') persisté via `saveDraft`. Un seul
- * brouillon par utilisateur : chaque appel écrase le précédent (upsert côté
- * `saveDraft`).
+ * Champs communs aux trois tools de composition (create_mail_draft,
+ * prepare_reply_draft, send_mail).
  */
-const draftFieldsSchema = z.object({
+const composeFieldsSchema = z.object({
   fromIntegrationId: uuid,
   toRecipients: z.array(emailAddress).min(1).max(RECIPIENTS_MAX),
   ccRecipients: z.array(emailAddress).max(RECIPIENTS_MAX).optional(),
@@ -43,7 +47,7 @@ const draftFieldsSchema = z.object({
   bodyHtml: z.string().min(1).max(BODY_HTML_MAX_CHARS),
 });
 
-const DRAFT_JSON_PROPERTIES = {
+const COMPOSE_JSON_PROPERTIES = {
   fromIntegrationId: UUID_JSON,
   toRecipients: recipientsJson('Destinataires (À), 1 à 20 adresses email'),
   ccRecipients: recipientsJson('Destinataires en copie (Cc), jusqu’à 20 adresses email'),
@@ -56,31 +60,65 @@ const DRAFT_JSON_PROPERTIES = {
   },
 } as const;
 
-const DRAFT_JSON_REQUIRED = ['fromIntegrationId', 'toRecipients', 'subject', 'bodyHtml'];
+const COMPOSE_JSON_REQUIRED = ['fromIntegrationId', 'toRecipients', 'subject', 'bodyHtml'];
+
+/**
+ * Un seul brouillon par utilisateur (upsert côté `saveDraft`) : les deux tools
+ * de brouillon exigent `overwriteExisting: true` pour écraser un brouillon
+ * déjà présent — le refus mentionne l'objet du brouillon existant pour que le
+ * modèle puisse demander confirmation à l'utilisateur.
+ */
+const draftInputSchema = composeFieldsSchema.extend({
+  overwriteExisting: z.boolean().optional(),
+});
+
+const DRAFT_JSON_PROPERTIES = {
+  ...COMPOSE_JSON_PROPERTIES,
+  overwriteExisting: {
+    type: 'boolean',
+    description:
+      "true pour écraser explicitement le brouillon existant — uniquement après confirmation de l'utilisateur",
+  },
+} as const;
 
 const sendModeValues = ['new_mail', 'reply', 'reply_all'] as const;
 
-const sendMailInputSchema = draftFieldsSchema.extend({
-  mode: z.enum(sendModeValues),
-  replyToId: uuid.optional(),
-});
+/** Libellés FR des modes d'envoi, pour le dialog de confirmation. */
+const SEND_MODE_LABELS: Record<(typeof sendModeValues)[number], string> = {
+  new_mail: 'nouveau message',
+  reply: 'réponse',
+  reply_all: 'réponse à tous',
+};
+
+const sendMailInputSchema = composeFieldsSchema
+  .extend({
+    mode: z.enum(sendModeValues),
+    replyToId: uuid.optional(),
+  })
+  .refine((r) => r.mode === 'new_mail' || r.replyToId !== undefined, {
+    message: 'replyToId requis pour une réponse.',
+    path: ['replyToId'],
+  });
 
 type SendMailToolInput = z.infer<typeof sendMailInputSchema>;
 
 const SEND_JSON_PROPERTIES = {
-  ...DRAFT_JSON_PROPERTIES,
+  ...COMPOSE_JSON_PROPERTIES,
   mode: { type: 'string', enum: [...sendModeValues] },
-  replyToId: UUID_JSON,
+  replyToId: {
+    ...UUID_JSON,
+    description: "Id du mail d'origine — requis pour mode 'reply' ou 'reply_all'",
+  },
 } as const;
 
-const SEND_JSON_REQUIRED = [...DRAFT_JSON_REQUIRED, 'mode'];
+const SEND_JSON_REQUIRED = [...COMPOSE_JSON_REQUIRED, 'mode'];
 
 /** Reformule un échec `{ok:false, message}` en message montrable. */
 function failure(message: string): string {
   return `Échec : ${message}`;
 }
 
-/** Messages FR montrables par code d'échec `sendMail` (send-mail.ts) — pas de fuite du message brut serveur. */
+/** Messages FR montrables par code d'échec `sendMail` (send-mail.ts). */
 const SEND_FAILURE_MESSAGES: Partial<
   Record<Extract<SendMailResult, { ok: false }>['code'], string>
 > = {
@@ -90,25 +128,59 @@ const SEND_FAILURE_MESSAGES: Partial<
   TOO_MANY_RECIPIENTS: 'trop de destinataires (max 20)',
 };
 
+/**
+ * Codes dont le `message` serveur est réputé montrable (rédigé en FR côté
+ * send-mail.ts, sans détail d'infrastructure) et peut être relayé tel quel.
+ * Posture whitelist : tout autre code non mappé → message générique, même si
+ * un `message` est présent.
+ */
+const RELAYABLE_MESSAGE_CODES: ReadonlySet<Extract<SendMailResult, { ok: false }>['code']> =
+  new Set(['INVALID_INPUT', 'SEND_FAILED_TOO_LARGE', 'SEND_FAILED_UNSUPPORTED']);
+
 function describeSendFailure(result: Extract<SendMailResult, { ok: false }>): string {
   const known = SEND_FAILURE_MESSAGES[result.code];
   if (known !== undefined) return known;
-  return result.message !== undefined
-    ? `échec de l'envoi — ${result.message}`
-    : "échec de l'envoi, réessayez dans un instant.";
+  if (RELAYABLE_MESSAGE_CODES.has(result.code) && result.message !== undefined) {
+    return `échec de l'envoi — ${result.message}`;
+  }
+  return "échec de l'envoi — réessayez dans un instant.";
 }
 
 /**
  * Extrait un aperçu texte, montrable, du corps HTML : balises retirées,
- * espaces normalisés, tronqué. JAMAIS le HTML brut dans une description qui
- * transite en clair côté client (contrat `describeForConfirm`, types.ts).
+ * espaces normalisés, tronqué (ellipse UNIQUEMENT si troncature). JAMAIS le
+ * HTML brut dans une description qui transite en clair côté client (contrat
+ * `describeForConfirm`, types.ts).
  */
 function excerptOf(bodyHtml: string): string {
-  return bodyHtml
+  const text = bodyHtml
     .replace(/<[^>]+>/g, ' ')
     .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, CONFIRM_EXCERPT_MAX_CHARS);
+    .trim();
+  return text.length > CONFIRM_EXCERPT_MAX_CHARS
+    ? `${text.slice(0, CONFIRM_EXCERPT_MAX_CHARS)}…`
+    : text;
+}
+
+/** Liste d'adresses avec troncature « +n autres » — pour À/Cc uniquement, jamais Cci. */
+function joinShown(addrs: readonly string[]): string {
+  if (addrs.length <= CONFIRM_RECIPIENTS_SHOWN_MAX) return addrs.join(', ');
+  const shown = addrs.slice(0, CONFIRM_RECIPIENTS_SHOWN_MAX).join(', ');
+  return `${shown} +${addrs.length - CONFIRM_RECIPIENTS_SHOWN_MAX} autres`;
+}
+
+/**
+ * Garde anti-écrasement silencieux : le brouillon est unique par utilisateur,
+ * donc sauver sans `overwriteExisting: true` alors qu'un brouillon existe
+ * détruirait du contenu potentiellement rédigé à la main dans Communications.
+ * La garde vit ici (côté tool), PAS dans `saveDraft` : l'UI Communications,
+ * elle, écrase légitimement en continu (autosave).
+ */
+async function refuseIfDraftExists(overwriteExisting: boolean | undefined): Promise<string | null> {
+  if (overwriteExisting === true) return null;
+  const existing = await loadDraft();
+  if (existing.draft === null) return null;
+  return `Échec : un brouillon existe déjà (objet « ${existing.draft.subject} ») — demander confirmation à l'utilisateur puis rappeler avec overwriteExisting: true.`;
 }
 
 /**
@@ -157,15 +229,17 @@ export function buildMailTools(ctx: AuthContext): ToolSpec[] {
     defineTool({
       name: 'create_mail_draft',
       description:
-        'Enregistre un brouillon de nouveau mail (utiliser list_my_mailboxes pour le fromIntegrationId). ATTENTION : un seul brouillon est conservé par utilisateur — cet appel écrase le brouillon en cours, visible dans Communications. Utiliser send_mail ensuite pour l’envoyer réellement.',
-      inputSchema: draftFieldsSchema,
+        'Enregistre un brouillon de nouveau mail (utiliser list_my_mailboxes pour le fromIntegrationId). ATTENTION : un seul brouillon est conservé par utilisateur — si un brouillon existe déjà, le tool refuse sauf overwriteExisting: true (à ne passer qu’après confirmation de l’utilisateur). Le brouillon est visible dans Communications ; utiliser send_mail ensuite pour l’envoyer réellement.',
+      inputSchema: draftInputSchema,
       jsonSchema: {
         type: 'object',
         properties: DRAFT_JSON_PROPERTIES,
-        required: DRAFT_JSON_REQUIRED,
+        required: COMPOSE_JSON_REQUIRED,
       },
       handler: async (input) =>
         safeMutation('create_mail_draft', async () => {
+          const refusal = await refuseIfDraftExists(input.overwriteExisting);
+          if (refusal !== null) return refusal;
           const payload: SaveDraftInput = {
             fromIntegrationId: input.fromIntegrationId,
             kind: 'new_mail',
@@ -188,15 +262,17 @@ export function buildMailTools(ctx: AuthContext): ToolSpec[] {
     defineTool({
       name: 'prepare_reply_draft',
       description:
-        "Enregistre un brouillon de réponse à un mail existant (replyToId — voir read_mail ou search_mails). Itérer le texte de la réponse avec l'utilisateur AVANT de sauver : cet appel écrase aussi le brouillon en cours (un seul brouillon par utilisateur, visible dans Communications). Utiliser send_mail ensuite pour l'envoyer réellement.",
-      inputSchema: draftFieldsSchema.extend({ replyToId: uuid }),
+        "Enregistre un brouillon de réponse à un mail existant (replyToId — voir read_mail ou search_mails). Itérer le texte de la réponse avec l'utilisateur AVANT de sauver. Un seul brouillon par utilisateur : si un brouillon existe déjà, le tool refuse sauf overwriteExisting: true (à ne passer qu'après confirmation de l'utilisateur). Le brouillon est visible dans Communications ; utiliser send_mail ensuite pour l'envoyer réellement.",
+      inputSchema: draftInputSchema.extend({ replyToId: uuid }),
       jsonSchema: {
         type: 'object',
         properties: { ...DRAFT_JSON_PROPERTIES, replyToId: UUID_JSON },
-        required: [...DRAFT_JSON_REQUIRED, 'replyToId'],
+        required: [...COMPOSE_JSON_REQUIRED, 'replyToId'],
       },
       handler: async (input) =>
         safeMutation('prepare_reply_draft', async () => {
+          const refusal = await refuseIfDraftExists(input.overwriteExisting);
+          if (refusal !== null) return refusal;
           const payload: SaveDraftInput = {
             fromIntegrationId: input.fromIntegrationId,
             kind: 'reply',
@@ -228,15 +304,26 @@ export function buildMailTools(ctx: AuthContext): ToolSpec[] {
         required: SEND_JSON_REQUIRED,
       },
       gated: true,
-      // JAMAIS le bodyHtml brut dans la description : elle transite en clair
-      // côté client (SSE) — contrat `describeForConfirm` (types.ts). Extrait
-      // texte tronqué uniquement.
+      // Consentement éclairé : le dialog énumère TOUT ce qui part — mode,
+      // destinataires (Cci JAMAIS tronqué : l'utilisateur doit voir chaque
+      // destinataire caché ; troncature « +n autres » tolérée pour À/Cc),
+      // objet, extrait texte. JAMAIS le bodyHtml brut : la description
+      // transite en clair côté client (SSE) — contrat `describeForConfirm`
+      // (types.ts). La boîte émettrice n'est pas nommée ici : l'input ne
+      // porte que son id, et résoudre le libellé exigerait un appel DB — hors
+      // contrat d'une description synchrone (suivi M3, revue 2b).
       describeForConfirm: (input: SendMailToolInput) => {
-        const to = input.toRecipients.join(', ');
-        const ccCount = input.ccRecipients?.length ?? 0;
-        const extra = ccCount > 0 ? ` (+${ccCount} cc)` : '';
-        const excerpt = excerptOf(input.bodyHtml);
-        return `Envoyer un mail à ${to}${extra} — objet « ${input.subject} » : ${excerpt}…`;
+        const segments = [
+          `Envoyer un mail (${SEND_MODE_LABELS[input.mode]}) à ${joinShown(input.toRecipients)}`,
+        ];
+        if (input.ccRecipients !== undefined && input.ccRecipients.length > 0) {
+          segments.push(`Cc : ${joinShown(input.ccRecipients)}`);
+        }
+        if (input.bccRecipients !== undefined && input.bccRecipients.length > 0) {
+          segments.push(`Cci : ${input.bccRecipients.join(', ')}`);
+        }
+        segments.push(`objet « ${input.subject} »`);
+        return `${segments.join(' — ')} : ${excerptOf(input.bodyHtml)}`;
       },
       handler: async (input) =>
         safeMutation('send_mail', async () => {

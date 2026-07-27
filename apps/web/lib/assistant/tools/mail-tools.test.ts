@@ -10,7 +10,7 @@ const prismaMock = vi.hoisted(() => ({
 }));
 vi.mock('@nexushub/db', () => ({ prisma: prismaMock }));
 
-const draftMocks = vi.hoisted(() => ({ saveDraft: vi.fn() }));
+const draftMocks = vi.hoisted(() => ({ saveDraft: vi.fn(), loadDraft: vi.fn() }));
 vi.mock('@/features/communications/actions/mail-drafts', () => draftMocks);
 
 const sendMailMocks = vi.hoisted(() => ({ sendMail: vi.fn() }));
@@ -47,16 +47,47 @@ async function run(name: string, input: unknown): Promise<string> {
   return getTool(name).handler(input as never);
 }
 
+/** Déplie les `.refine()` (ZodEffects) jusqu'au ZodObject sous-jacent. */
+function unwrapObject(schema: z.ZodTypeAny): z.ZodObject<z.ZodRawShape> {
+  let current: z.ZodTypeAny = schema;
+  while (current instanceof z.ZodEffects) {
+    current = (current as z.ZodEffects<z.ZodTypeAny>).innerType();
+  }
+  if (!(current instanceof z.ZodObject)) throw new Error('expected a ZodObject');
+  return current as z.ZodObject<z.ZodRawShape>;
+}
+
 /** Clés Zod requises (non-optionnelles) d'un objet — pour le spot-check de parité avec jsonSchema. */
 function requiredKeys(schema: z.ZodTypeAny): string[] {
-  if (!(schema instanceof z.ZodObject)) throw new Error('expected a ZodObject');
-  return Object.entries(schema.shape as Record<string, z.ZodTypeAny>)
+  return Object.entries(unwrapObject(schema).shape)
     .filter(([, field]) => !field.isOptional())
     .map(([key]) => key);
 }
 
+/** Brouillon existant minimal tel que renvoyé par loadDraft (mail-drafts.ts). */
+function existingDraft(subject: string) {
+  return {
+    ok: true as const,
+    draft: {
+      id: 'd-existing',
+      fromIntegrationId: INTEGRATION_ID,
+      kind: 'new_mail' as const,
+      replyToId: null,
+      toRecipients: ['autre@acme.com'],
+      ccRecipients: [],
+      bccRecipients: [],
+      subject,
+      bodyHtml: '<p>déjà rédigé</p>',
+      composeAttachments: [],
+      updatedAt: '2026-07-27T10:00:00.000Z',
+    },
+  };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
+  // Défaut : aucun brouillon existant — les tests d'écrasement le surchargent.
+  draftMocks.loadDraft.mockResolvedValue({ ok: true, draft: null });
 });
 
 describe('buildMailTools', () => {
@@ -82,10 +113,9 @@ describe('buildMailTools', () => {
       const zodRequired = requiredKeys(t.inputSchema as z.ZodTypeAny).sort();
       expect(jsonRequired, `required mismatch on ${t.name}`).toEqual(zodRequired);
 
-      const zodSchema = t.inputSchema as z.ZodTypeAny;
-      if (!(zodSchema instanceof z.ZodObject)) throw new Error(`expected ZodObject on ${t.name}`);
+      const zodShape = unwrapObject(t.inputSchema as z.ZodTypeAny).shape;
       const jsonKeys = Object.keys(json.properties ?? {}).sort();
-      const zodKeys = Object.keys(zodSchema.shape as Record<string, unknown>).sort();
+      const zodKeys = Object.keys(zodShape).sort();
       expect(jsonKeys, `properties mismatch on ${t.name}`).toEqual(zodKeys);
     }
   });
@@ -162,6 +192,30 @@ describe('buildMailTools', () => {
       expect(parsed['id']).toBe('d1');
     });
 
+    it('brouillon existant sans overwriteExisting → refus mentionnant l’objet, saveDraft PAS appelé', async () => {
+      draftMocks.loadDraft.mockResolvedValue(existingDraft('Relance facture'));
+      const out = await run('create_mail_draft', baseInput);
+      expect(out).toContain('un brouillon existe déjà');
+      expect(out).toContain('Relance facture');
+      expect(out).toContain('overwriteExisting: true');
+      expect(draftMocks.saveDraft).not.toHaveBeenCalled();
+    });
+
+    it('brouillon existant + overwriteExisting:true → saveDraft appelé', async () => {
+      draftMocks.loadDraft.mockResolvedValue(existingDraft('Relance facture'));
+      draftMocks.saveDraft.mockResolvedValue({ ok: true, id: 'd1' });
+      const out = await run('create_mail_draft', { ...baseInput, overwriteExisting: true });
+      expect(draftMocks.saveDraft).toHaveBeenCalledOnce();
+      expect(JSON.parse(out)).toMatchObject({ draftSaved: true });
+    });
+
+    it('aucun brouillon existant → saveDraft appelé sans le flag', async () => {
+      draftMocks.saveDraft.mockResolvedValue({ ok: true, id: 'd1' });
+      await run('create_mail_draft', baseInput);
+      expect(draftMocks.loadDraft).toHaveBeenCalledOnce();
+      expect(draftMocks.saveDraft).toHaveBeenCalledOnce();
+    });
+
     it('échec saveDraft → message montrable', async () => {
       draftMocks.saveDraft.mockResolvedValue({
         ok: false,
@@ -195,6 +249,21 @@ describe('buildMailTools', () => {
       );
     });
 
+    it('brouillon existant sans overwriteExisting → refus, saveDraft PAS appelé', async () => {
+      draftMocks.loadDraft.mockResolvedValue(existingDraft('Brouillon en cours'));
+      const out = await run('prepare_reply_draft', baseInput);
+      expect(out).toContain('un brouillon existe déjà');
+      expect(out).toContain('Brouillon en cours');
+      expect(draftMocks.saveDraft).not.toHaveBeenCalled();
+    });
+
+    it('brouillon existant + overwriteExisting:true → saveDraft appelé', async () => {
+      draftMocks.loadDraft.mockResolvedValue(existingDraft('Brouillon en cours'));
+      draftMocks.saveDraft.mockResolvedValue({ ok: true, id: 'd2' });
+      await run('prepare_reply_draft', { ...baseInput, overwriteExisting: true });
+      expect(draftMocks.saveDraft).toHaveBeenCalledOnce();
+    });
+
     it('replyToId est requis', () => {
       const schema = getTool('prepare_reply_draft').inputSchema as z.ZodTypeAny;
       const { replyToId: _replyToId, ...withoutReplyToId } = baseInput;
@@ -215,6 +284,20 @@ describe('buildMailTools', () => {
       sendMailMocks.sendMail.mockResolvedValue({ ok: true, emailMessageId: 'm1' });
       const out = await run('send_mail', baseInput);
       expect(JSON.parse(out)).toEqual({ sent: true, emailMessageId: 'm1' });
+    });
+
+    it("le schéma exige replyToId pour mode 'reply' / 'reply_all', pas pour 'new_mail'", () => {
+      const schema = getTool('send_mail').inputSchema as z.ZodTypeAny;
+      const asReply = schema.safeParse({ ...baseInput, mode: 'reply' });
+      expect(asReply.success).toBe(false);
+      if (!asReply.success) {
+        expect(asReply.error.issues[0]?.message).toBe('replyToId requis pour une réponse.');
+      }
+      expect(schema.safeParse({ ...baseInput, mode: 'reply_all' }).success).toBe(false);
+      expect(
+        schema.safeParse({ ...baseInput, mode: 'reply', replyToId: REPLY_TO_ID }).success,
+      ).toBe(true);
+      expect(schema.safeParse(baseInput).success).toBe(true);
     });
 
     it('code RATE_LIMIT → message FR dédié', async () => {
@@ -241,53 +324,133 @@ describe('buildMailTools', () => {
       expect(out.toLowerCase()).toContain('destinataires');
     });
 
-    it('code générique (ex. SEND_FAILED) → message générique incluant le message du résultat', async () => {
+    it('code SEND_FAILED avec message → le message serveur N’est PAS relayé (hors whitelist)', async () => {
       sendMailMocks.sendMail.mockResolvedValue({
         ok: false,
         code: 'SEND_FAILED',
-        message: "Échec de récupération d'une pièce jointe. Réessaie.",
+        message: 'ETIMEDOUT smtp.internal-host.example:587',
       });
       const out = await run('send_mail', baseInput);
-      expect(out).toContain("Échec de récupération d'une pièce jointe. Réessaie.");
+      expect(out).not.toContain('internal-host');
+      expect(out).toBe("Échec : échec de l'envoi — réessayez dans un instant.");
     });
 
-    it('code générique sans message → message générique montrable', async () => {
+    it('code whitelisté (SEND_FAILED_UNSUPPORTED) → le message FR du serveur est relayé', async () => {
+      sendMailMocks.sendMail.mockResolvedValue({
+        ok: false,
+        code: 'SEND_FAILED_UNSUPPORTED',
+        message: 'Les pièces jointes ne sont pas prises en charge en réponse via Exchange.',
+      });
+      const out = await run('send_mail', baseInput);
+      expect(out).toContain('Les pièces jointes ne sont pas prises en charge');
+    });
+
+    it('code whitelisté sans message → message générique montrable', async () => {
       sendMailMocks.sendMail.mockResolvedValue({ ok: false, code: 'SEND_FAILED_TOO_LARGE' });
       const out = await run('send_mail', baseInput);
-      expect(typeof out).toBe('string');
-      expect(out.length).toBeGreaterThan(0);
+      expect(out).toBe("Échec : échec de l'envoi — réessayez dans un instant.");
     });
 
-    it('describeForConfirm : contient destinataires, cc, objet, extrait — sans balise HTML, longueur bornée', () => {
-      const tool = getTool('send_mail');
-      if (tool.describeForConfirm === undefined) throw new Error('describeForConfirm absent');
-      const description = tool.describeForConfirm({
-        fromIntegrationId: INTEGRATION_ID,
-        mode: 'new_mail',
-        toRecipients: ['dest@acme.com', 'autre@acme.com'],
-        ccRecipients: ['cc1@acme.com'],
-        subject: 'Devis signé',
-        bodyHtml: '<p>Bonjour, <b>voici</b> le devis signé.</p>'.repeat(20),
-      } as never);
-      expect(description).toContain('dest@acme.com');
-      expect(description).toContain('autre@acme.com');
-      expect(description).toContain('+1 cc');
-      expect(description).toContain('Devis signé');
-      expect(description).not.toContain('<');
-      expect(description.length).toBeLessThan(400);
-    });
+    describe('describeForConfirm', () => {
+      function describe_(input: Record<string, unknown>): string {
+        const tool = getTool('send_mail');
+        if (tool.describeForConfirm === undefined) throw new Error('describeForConfirm absent');
+        return tool.describeForConfirm(input as never);
+      }
 
-    it('describeForConfirm : sans cc, ne mentionne pas "cc"', () => {
-      const tool = getTool('send_mail');
-      if (tool.describeForConfirm === undefined) throw new Error('describeForConfirm absent');
-      const description = tool.describeForConfirm({
-        fromIntegrationId: INTEGRATION_ID,
-        mode: 'new_mail',
-        toRecipients: ['dest@acme.com'],
-        subject: 'Objet',
-        bodyHtml: '<p>Bonjour</p>',
-      } as never);
-      expect(description).not.toContain('cc');
+      it('contient mode, destinataires, cc en clair, objet, extrait — sans balise HTML', () => {
+        const description = describe_({
+          fromIntegrationId: INTEGRATION_ID,
+          mode: 'new_mail',
+          toRecipients: ['dest@acme.com', 'autre@acme.com'],
+          ccRecipients: ['cc1@acme.com', 'cc2@acme.com'],
+          subject: 'Devis signé',
+          bodyHtml: '<p>Bonjour, <b>voici</b> le devis signé.</p>',
+        });
+        expect(description).toContain('nouveau message');
+        expect(description).toContain('dest@acme.com');
+        expect(description).toContain('autre@acme.com');
+        expect(description).toContain('Cc : cc1@acme.com, cc2@acme.com');
+        expect(description).toContain('Devis signé');
+        expect(description).toContain('Bonjour, voici le devis signé.');
+        expect(description).not.toContain('<');
+      });
+
+      it("mode 'reply_all' → libellé FR « réponse à tous »", () => {
+        const description = describe_({
+          fromIntegrationId: INTEGRATION_ID,
+          mode: 'reply_all',
+          replyToId: REPLY_TO_ID,
+          toRecipients: ['dest@acme.com'],
+          subject: 'Re: Objet',
+          bodyHtml: '<p>OK</p>',
+        });
+        expect(description).toContain('réponse à tous');
+      });
+
+      it('Cci : chaque adresse apparaît en clair, JAMAIS tronquée (même à 7 adresses)', () => {
+        const bcc = Array.from({ length: 7 }, (_, i) => `cache${i}@acme.com`);
+        const description = describe_({
+          fromIntegrationId: INTEGRATION_ID,
+          mode: 'new_mail',
+          toRecipients: ['dest@acme.com'],
+          bccRecipients: bcc,
+          subject: 'Objet',
+          bodyHtml: '<p>Bonjour</p>',
+        });
+        for (const addr of bcc) {
+          expect(description).toContain(addr);
+        }
+        expect(description).toContain('Cci :');
+      });
+
+      it('À : tronqué à 5 adresses + « +n autres »', () => {
+        const to = Array.from({ length: 7 }, (_, i) => `dest${i}@acme.com`);
+        const description = describe_({
+          fromIntegrationId: INTEGRATION_ID,
+          mode: 'new_mail',
+          toRecipients: to,
+          subject: 'Objet',
+          bodyHtml: '<p>Bonjour</p>',
+        });
+        expect(description).toContain('dest4@acme.com');
+        expect(description).not.toContain('dest5@acme.com');
+        expect(description).toContain('+2 autres');
+      });
+
+      it('sans cc ni cci, aucun segment Cc/Cci', () => {
+        const description = describe_({
+          fromIntegrationId: INTEGRATION_ID,
+          mode: 'new_mail',
+          toRecipients: ['dest@acme.com'],
+          subject: 'Objet',
+          bodyHtml: '<p>Bonjour</p>',
+        });
+        expect(description).not.toContain('Cc :');
+        expect(description).not.toContain('Cci :');
+      });
+
+      it('extrait : ellipse UNIQUEMENT si le corps dépasse 200 caractères, longueur bornée', () => {
+        const short = describe_({
+          fromIntegrationId: INTEGRATION_ID,
+          mode: 'new_mail',
+          toRecipients: ['dest@acme.com'],
+          subject: 'Objet',
+          bodyHtml: '<p>Court.</p>',
+        });
+        expect(short.endsWith('Court.')).toBe(true);
+        expect(short).not.toContain('…');
+
+        const long = describe_({
+          fromIntegrationId: INTEGRATION_ID,
+          mode: 'new_mail',
+          toRecipients: ['dest@acme.com'],
+          subject: 'Objet',
+          bodyHtml: `<p>${'très long contenu '.repeat(30)}</p>`,
+        });
+        expect(long).toContain('…');
+        expect(long.length).toBeLessThan(400);
+      });
     });
   });
 
