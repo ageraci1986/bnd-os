@@ -23,7 +23,8 @@ export type RateLimitKey =
   | 'mail_attachment_upload'
   | 'mail_attachment_download'
   | 'recipient_search'
-  | 'assistant_chat';
+  | 'assistant_chat'
+  | 'assistant_confirm';
 
 export interface RateLimitResult {
   readonly success: boolean;
@@ -51,6 +52,7 @@ const WINDOWS: Record<
   mail_attachment_download: { limit: 100, window: '1 h' },
   recipient_search: { limit: 300, window: '1 m' },
   assistant_chat: { limit: 30, window: '5 m' },
+  assistant_confirm: { limit: 20, window: '1 m' },
 };
 
 /* ---------- Upstash backend ---------------------------------------------- */

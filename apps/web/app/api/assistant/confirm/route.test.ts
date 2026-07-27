@@ -4,9 +4,13 @@ const mocks = vi.hoisted(() => ({
   getAuthContext: vi.fn(),
   assertCsrfHeader: vi.fn(),
   answer: vi.fn(),
+  check: vi.fn(),
 }));
 vi.mock('@/lib/auth', () => ({ getAuthContext: mocks.getAuthContext }));
 vi.mock('@/lib/csrf', () => ({ assertCsrfHeader: mocks.assertCsrfHeader }));
+vi.mock('@/lib/rate-limit', () => ({
+  getRateLimiter: () => ({ check: mocks.check }),
+}));
 vi.mock('@/lib/assistant/confirm-store', () => ({
   getConfirmStore: () => ({ answer: mocks.answer }),
 }));
@@ -29,6 +33,7 @@ beforeEach(() => {
   mocks.getAuthContext.mockResolvedValue(ctx);
   mocks.assertCsrfHeader.mockResolvedValue(undefined);
   mocks.answer.mockResolvedValue('ok');
+  mocks.check.mockResolvedValue({ success: true, remaining: 19, reset: Date.now() + 60_000 });
 });
 
 describe('POST /api/assistant/confirm', () => {
@@ -42,6 +47,12 @@ describe('POST /api/assistant/confirm', () => {
   it('CSRF invalide → 403', async () => {
     mocks.assertCsrfHeader.mockRejectedValue(new Error('CSRF'));
     expect((await POST(makeRequest(valid))).status).toBe(403);
+  });
+
+  it('rate limit dépassé → 429, answer non appelé', async () => {
+    mocks.check.mockResolvedValue({ success: false, remaining: 0, reset: Date.now() + 60_000 });
+    expect((await POST(makeRequest(valid))).status).toBe(429);
+    expect(mocks.answer).not.toHaveBeenCalled();
   });
 
   it('body invalide → 400', async () => {

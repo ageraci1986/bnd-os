@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { getAuthContext } from '@/lib/auth';
 import { assertCsrfHeader } from '@/lib/csrf';
+import { getRateLimiter } from '@/lib/rate-limit';
 import { getConfirmStore } from '@/lib/assistant/confirm-store';
 
 export const runtime = 'nodejs';
@@ -22,6 +23,13 @@ export async function POST(req: Request): Promise<Response> {
     await assertCsrfHeader(req.headers.get('x-csrf-token'));
   } catch {
     return Response.json({ ok: false, message: 'CSRF invalide.' }, { status: 403 });
+  }
+  const limit = await getRateLimiter('assistant_confirm').check(ctx.userId);
+  if (!limit.success) {
+    return Response.json(
+      { ok: false, message: 'Trop de requêtes — patientez un instant.' },
+      { status: 429 },
+    );
   }
   const parsed = BodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
