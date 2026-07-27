@@ -226,6 +226,26 @@ describe('buildReadTools', () => {
     expect(out).toBe('Erreur : La boîte IMAP source est déconnectée.');
   });
 
+  it('read_mail utilise le HTML sanitisé en cache (strip balises) sans rappeler fetchMailBody', async () => {
+    prismaMock.emailMessage.findFirst.mockResolvedValue({
+      id: 'm1',
+      subject: 'Devis',
+      fromEmail: 'marc@acme.com',
+      fromName: 'Marc',
+      toRecipients: ['moi@bnd.co'],
+      receivedAt: new Date(),
+      bodyText: null,
+      bodyHtmlSanitized: '<p>Contenu</p>',
+      isRead: true,
+    });
+    const out = JSON.parse(
+      await execute('read_mail', { emailId: '4c9d3f0a-2222-4444-8888-aaaaaaaaaaaa' }),
+    );
+    expect(out.body).toContain('Contenu');
+    expect(out.body).not.toContain('<p>');
+    expect(fetchMailBodyMock).not.toHaveBeenCalled();
+  });
+
   it('read_mail ne rappelle pas fetchMailBody quand le corps est déjà présent en DB', async () => {
     prismaMock.emailMessage.findFirst.mockResolvedValue({
       id: 'm1',
@@ -371,6 +391,14 @@ describe('buildReadTools', () => {
     expect(out.checklistTruncated).toBe(true);
     const select = prismaMock.card.findFirst.mock.calls[0]?.[0]?.select;
     expect(select?.checklistItems?.take).toBe(50);
+  });
+
+  it('erreur NEXT_REDIRECT (session expirée) → message « session expirée » dédié', async () => {
+    prismaMock.project.findMany.mockRejectedValue(
+      Object.assign(new Error('redirect'), { digest: 'NEXT_REDIRECT;replace;/login;307;' }),
+    );
+    const out = await execute('list_projects', {});
+    expect(out).toBe('Erreur : session expirée — reconnectez-vous.');
   });
 
   it('erreur Prisma → message utilisateur, pas de fuite du message brut', async () => {

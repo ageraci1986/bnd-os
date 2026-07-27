@@ -12,6 +12,7 @@ import {
 } from '@/lib/auth/scope';
 import { startOfTodayUtc } from '@/features/projects/lib/card-filter';
 import { fetchMailBody } from '@/features/communications/actions/fetch-mail-body';
+import { safeDb } from './safe-wrappers';
 
 const uuid = z.string().uuid();
 const UUID_JSON = { type: 'string', format: 'uuid' } as const;
@@ -26,26 +27,6 @@ const CARD_DESCRIPTION_MAX_CHARS = 5000;
 const TEAM_MEMBERS_MAX = 50;
 /** Nb max d'items de checklist renvoyés par get_card. */
 const CARD_CHECKLIST_MAX = 50;
-
-/**
- * Exécute une requête DB en reformulant toute erreur en message montrable.
- * Contrat `defineTool` : seul un message user-safe peut s'échapper d'un handler —
- * les erreurs Prisma brutes (connexion, contraintes…) ne doivent jamais fuiter.
- * Retourne (plutôt que de relancer) le message sûr : chaque handler ci-dessous
- * renvoie toujours une `string`, donc l'appelant récupère directement le texte
- * affichable sans avoir à intercepter une exception.
- *
- * `tool` sert uniquement d'étiquette de log serveur — jamais le contenu de
- * l'erreur ni la requête (PII / secrets, CLAUDE.md §4.7).
- */
-async function safeDb(tool: string, work: () => Promise<string>): Promise<string> {
-  try {
-    return await work();
-  } catch {
-    console.error('[assistant] tool db error', { tool });
-    return 'Erreur interne en consultant les données — réessayez dans un instant.';
-  }
-}
 
 export async function buildReadTools(ctx: AuthContext): Promise<ToolSpec[]> {
   const scope = await loadUserScope(ctx);
@@ -315,8 +296,8 @@ export async function buildReadTools(ctx: AuthContext): Promise<ToolSpec[]> {
             // en interne, et le résultat est mis en cache en DB.
             // Note : fetchMailBody appelle requireUser() en interne et lève
             // NEXT_REDIRECT si la session a expiré ; cette exception remonte
-            // à travers `safeDb`, qui la transforme déjà en message générique
-            // — acceptable ici, pas besoin d'un try/catch dédié.
+            // à travers `safeDb` (safe-wrappers.ts), qui la reformule en
+            // « session expirée » — pas besoin d'un try/catch dédié ici.
             const fetched = await fetchMailBody({ emailId: input.emailId });
             if (!fetched.ok) return `Erreur : ${fetched.message}`;
             bodyText = fetched.bodyText;

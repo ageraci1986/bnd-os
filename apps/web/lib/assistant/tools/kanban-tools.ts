@@ -2,7 +2,7 @@ import 'server-only';
 
 import { z } from 'zod';
 import { defineTool, type ToolSpec } from '@nexushub/agent';
-import { BUILTIN_PROJECT_TYPES, BUILTIN_TEMPLATES, NotFoundError } from '@nexushub/domain';
+import { BUILTIN_PROJECT_TYPES, BUILTIN_TEMPLATES } from '@nexushub/domain';
 import type { AuthContext } from '@/lib/auth';
 import { createCardCore, deleteCardCore } from '@/features/projects/lib/card-core';
 import { createProjectCore } from '@/features/projects/lib/project-core';
@@ -11,6 +11,7 @@ import { moveCard } from '@/features/projects/actions/move-card';
 import { updateCard } from '@/features/projects/actions/update-card';
 import { updateCardDueDate } from '@/features/projects/actions/update-card-due-date';
 import { addCardAssignee, removeCardAssignee } from '@/features/projects/actions/card-assignees';
+import { safeMutation } from './safe-wrappers';
 
 const uuid = z.string().uuid();
 const UUID_JSON = { type: 'string', format: 'uuid' } as const;
@@ -32,56 +33,6 @@ const BUILTIN_TYPE_IDS = BUILTIN_PROJECT_TYPES.map((t) => t.id);
  */
 function failure(message: string): string {
   return `Échec : ${message}`;
-}
-
-/** `redirect()` de Next (ex. `requireUser` sans session) lève une erreur avec ce digest. */
-function isNextRedirect(error: unknown): boolean {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'digest' in error &&
-    typeof (error as { digest?: unknown }).digest === 'string' &&
-    (error as { digest: string }).digest.startsWith('NEXT_REDIRECT')
-  );
-}
-
-/**
- * `instanceof` + sniff par `code` : l'identité de classe peut diverger quand
- * un module est chargé deux fois (même précédent que `prismaErrorCode` dans
- * card-assignees.ts), donc on ne se repose pas uniquement sur `instanceof`.
- */
-function isNotFound(error: unknown): boolean {
-  if (error instanceof NotFoundError) return true;
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'code' in error &&
-    (error as { code?: unknown }).code === 'NOT_FOUND'
-  );
-}
-
-/**
- * Exécute une mutation en reformulant toute erreur en message montrable.
- * Pendant du `safeDb` des read tools : les actions/cores wrappés lèvent des
- * erreurs brutes (Prisma, `NotFoundError`, redirect de `requireUser`) dont le
- * message ne doit JAMAIS atteindre le modèle ni l'utilisateur.
- *
- * `tool` sert uniquement d'étiquette de log serveur — jamais le contenu de
- * l'erreur ni les arguments (PII / secrets, CLAUDE.md §4.7).
- */
-async function safeMutation(tool: string, work: () => Promise<string>): Promise<string> {
-  try {
-    return await work();
-  } catch (error) {
-    if (isNextRedirect(error)) {
-      return 'Échec : session expirée — reconnectez-vous.';
-    }
-    if (isNotFound(error)) {
-      return 'Échec : élément introuvable ou hors de votre périmètre.';
-    }
-    console.error('[assistant] tool mutation error', { tool });
-    return "Erreur interne pendant l'action — réessayez dans un instant.";
-  }
 }
 
 /**
