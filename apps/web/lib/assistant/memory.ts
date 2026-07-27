@@ -31,9 +31,26 @@ const SLUG_FALLBACK = 'fait';
 /** Nb max de noms listés dans les messages « fait introuvable ». */
 const NOT_FOUND_LIST_MAX = 10;
 
+/** Nb max de tentatives de `create` face aux courses sur la contrainte unique. */
+const REMEMBER_MAX_ATTEMPTS = 3;
+
 export interface MemoryEntry {
   readonly name: string;
   readonly fact: string;
+}
+
+/**
+ * `instanceof Prisma.PrismaClientKnownRequestError` doesn't reliably hold
+ * across Turbopack's RSC module boundary (Prisma is loaded twice and the
+ * class identity diverges), so we sniff by error.code directly — same
+ * convention as `features/projects/actions/card-assignees.ts`.
+ */
+function prismaErrorCode(err: unknown): string | null {
+  if (err && typeof err === 'object' && 'code' in err) {
+    const code = (err as { code: unknown }).code;
+    return typeof code === 'string' ? code : null;
+  }
+  return null;
 }
 
 /**
@@ -99,7 +116,7 @@ async function listExistingNames(ctx: AuthContext): Promise<string> {
     take: NOT_FOUND_LIST_MAX,
     select: { name: true },
   });
-  const names = rows.map((row) => row.name).slice(0, NOT_FOUND_LIST_MAX);
+  const names = rows.map((row) => row.name);
   return names.length > 0 ? names.join(', ') : '(aucun)';
 }
 
@@ -130,6 +147,27 @@ export async function rememberFact(
   }
 
   const baseName = slugifyFact(validated.fact);
+
+  // La recherche de suffixe puis le `create` ne sont pas atomiques : une
+  // création concurrente peut prendre le nom entre les deux (P2002 sur la
+  // contrainte unique). On re-cherche alors un nom libre, borné à
+  // REMEMBER_MAX_ATTEMPTS tentatives avant un message montrable.
+  for (let attempt = 0; attempt < REMEMBER_MAX_ATTEMPTS; attempt += 1) {
+    const name = await findFreeName(ctx, baseName);
+    try {
+      await prisma.assistantMemory.create({
+        data: { workspaceId: ctx.workspaceId, userId: ctx.userId, name, fact: validated.fact },
+      });
+      return { ok: true, name };
+    } catch (err) {
+      if (prismaErrorCode(err) !== 'P2002') throw err;
+    }
+  }
+  return { ok: false, message: 'Impossible d’enregistrer le fait — réessayez.' };
+}
+
+/** Premier nom libre dérivé du slug de base : base, puis base-2, base-3… */
+async function findFreeName(ctx: AuthContext, baseName: string): Promise<string> {
   let name = baseName;
   let suffix = 2;
   while (
@@ -141,11 +179,7 @@ export async function rememberFact(
     name = withSuffix(baseName, suffix);
     suffix += 1;
   }
-
-  await prisma.assistantMemory.create({
-    data: { workspaceId: ctx.workspaceId, userId: ctx.userId, name, fact: validated.fact },
-  });
-  return { ok: true, name };
+  return name;
 }
 
 /** Corrige le fait d'un nom existant. */

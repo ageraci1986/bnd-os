@@ -126,6 +126,43 @@ describe('rememberFact', () => {
     expect(createData.name).toBe('aime-le-cafe-3');
   });
 
+  it('course sur la contrainte unique (P2002) → re-cherche un nom libre puis réussit', async () => {
+    prismaMock.assistantMemory.count.mockResolvedValue(0);
+    prismaMock.assistantMemory.findFirst
+      .mockResolvedValueOnce(null) // attempt 1: base name looks free…
+      .mockResolvedValueOnce({ id: 'raced' }) // attempt 2: base now taken by the racer
+      .mockResolvedValueOnce(null); // attempt 2: -2 free
+    prismaMock.assistantMemory.create
+      .mockRejectedValueOnce({ code: 'P2002' }) // …but a concurrent create won the race
+      .mockResolvedValueOnce({});
+
+    const out = await rememberFact(ctx, 'Aime le café');
+
+    expect(out).toEqual({ ok: true, name: 'aime-le-cafe-2' });
+    expect(prismaMock.assistantMemory.create).toHaveBeenCalledTimes(2);
+    expect(prismaMock.assistantMemory.create.mock.calls[1]?.[0]?.data.name).toBe('aime-le-cafe-2');
+  });
+
+  it('P2002 persistant après 3 tentatives → erreur montrable, pas de throw', async () => {
+    prismaMock.assistantMemory.count.mockResolvedValue(0);
+    prismaMock.assistantMemory.findFirst.mockResolvedValue(null);
+    prismaMock.assistantMemory.create.mockRejectedValue({ code: 'P2002' });
+
+    const out = await rememberFact(ctx, 'Aime le café');
+
+    expect(out).toEqual({ ok: false, message: 'Impossible d’enregistrer le fait — réessayez.' });
+    expect(prismaMock.assistantMemory.create).toHaveBeenCalledTimes(3);
+  });
+
+  it('erreur Prisma non-P2002 lors du create → propagée (safe-wrappers la gère)', async () => {
+    prismaMock.assistantMemory.count.mockResolvedValue(0);
+    prismaMock.assistantMemory.findFirst.mockResolvedValue(null);
+    prismaMock.assistantMemory.create.mockRejectedValue(new Error('connect ECONNREFUSED'));
+
+    await expect(rememberFact(ctx, 'Aime le café')).rejects.toThrow('ECONNREFUSED');
+    expect(prismaMock.assistantMemory.create).toHaveBeenCalledTimes(1);
+  });
+
   it('refuse un fait vide', async () => {
     const out = await rememberFact(ctx, '    ');
     expect(out.ok).toBe(false);
@@ -174,21 +211,22 @@ describe('updateFact', () => {
     expect(prismaMock.assistantMemory.updateMany).not.toHaveBeenCalled();
   });
 
-  it('nom introuvable → message listant les noms existants (tronqué à 10)', async () => {
+  it('nom introuvable → message listant les noms existants (tronqué à 10 via take)', async () => {
     prismaMock.assistantMemory.updateMany.mockResolvedValue({ count: 0 });
-    const names = Array.from({ length: 12 }, (_, i) => ({ name: `fait-${i}` }));
+    // La troncature est faite au niveau DB (`take: 10`) : le mock renvoie
+    // ce que la DB renverrait après application de la limite.
+    const names = Array.from({ length: 10 }, (_, i) => ({ name: `nom-${i}` }));
     prismaMock.assistantMemory.findMany.mockResolvedValue(names);
 
     const out = await updateFact(ctx, 'inconnu', 'Un fait');
 
     expect(out.ok).toBe(false);
     if (!out.ok) {
-      for (let i = 0; i < 10; i++) expect(out.message).toContain(`fait-${i}`);
-      expect(out.message).not.toContain('fait-10');
-      expect(out.message).not.toContain('fait-11');
+      for (let i = 0; i < 10; i++) expect(out.message).toContain(`nom-${i}`);
     }
     const listCall = prismaMock.assistantMemory.findMany.mock.calls[0]?.[0];
     expect(listCall.where).toEqual({ workspaceId: 'w1', userId: 'u1' });
+    expect(listCall.take).toBe(10);
   });
 
   it('nom introuvable et aucun fait existant → "(aucun)"', async () => {
