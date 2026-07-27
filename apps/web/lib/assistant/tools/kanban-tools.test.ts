@@ -157,6 +157,15 @@ describe('buildKanbanTools', () => {
     expect(schema.safeParse({ cardId: CARD_ID, dueDate: null }).success).toBe(true);
   });
 
+  it('set_card_due_date : le schéma refuse une date calendaire inexistante (2026-02-30)', () => {
+    const schema = getTool('set_card_due_date').inputSchema as z.ZodTypeAny;
+    const bad = schema.safeParse({ cardId: CARD_ID, dueDate: '2026-02-30' });
+    expect(bad.success).toBe(false);
+    if (!bad.success) {
+      expect(bad.error.issues[0]?.message).toBe('Date invalide.');
+    }
+  });
+
   it('create_project : le schéma du tool refuse startDate/endDate hors format YYYY-MM-DD', () => {
     const schema = getTool('create_project').inputSchema as z.ZodTypeAny;
     const base = { name: 'P', clientId: CLIENT_ID, templateId: 'creative' };
@@ -165,6 +174,22 @@ describe('buildKanbanTools', () => {
     expect(
       schema.safeParse({ ...base, startDate: '2026-08-01', endDate: '2026-09-01' }).success,
     ).toBe(true);
+  });
+
+  it('create_project : le schéma du tool refuse une date calendaire inexistante (2026-02-30) sur startDate et endDate', () => {
+    const schema = getTool('create_project').inputSchema as z.ZodTypeAny;
+    const base = { name: 'P', clientId: CLIENT_ID, templateId: 'creative' };
+    const badStart = schema.safeParse({ ...base, startDate: '2026-02-30' });
+    expect(badStart.success).toBe(false);
+    if (!badStart.success) {
+      expect(badStart.error.issues[0]?.message).toBe('Date invalide.');
+    }
+    const badEnd = schema.safeParse({ ...base, endDate: '2026-02-30' });
+    expect(badEnd.success).toBe(false);
+    if (!badEnd.success) {
+      expect(badEnd.error.issues[0]?.message).toBe('Date invalide.');
+    }
+    expect(schema.safeParse(base).success).toBe(true);
   });
 
   it('create_project : la description énumère les templates et types built-in (anti-dérive)', () => {

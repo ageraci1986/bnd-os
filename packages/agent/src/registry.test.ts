@@ -40,6 +40,24 @@ describe('defineTool', () => {
     expect(tool.gated).toBe(true);
     expect(tool.adminOnly).toBe(true);
   });
+
+  it('transmet describeForConfirm quand fourni', () => {
+    const tool = defineTool({
+      name: 'danger',
+      description: 'd',
+      inputSchema: z.object({ text: z.string() }),
+      jsonSchema: { type: 'object', properties: { text: { type: 'string' } } },
+      gated: true,
+      handler: async (input) => `ok:${input.text}`,
+      describeForConfirm: (input) => `confirmer : ${input.text}`,
+    });
+    expect(tool.describeForConfirm?.({ text: 'salut' } as never)).toBe('confirmer : salut');
+  });
+
+  it('describeForConfirm absent quand non fourni', () => {
+    const tool = makeTool();
+    expect(tool.describeForConfirm).toBeUndefined();
+  });
 });
 
 describe('ToolRegistry', () => {

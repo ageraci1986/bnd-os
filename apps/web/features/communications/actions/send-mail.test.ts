@@ -146,6 +146,31 @@ describe('sendMail failure path', () => {
     const auditPayload = auditCreate.mock.calls[0]?.[0] as { data: { action: string } };
     expect(auditPayload.data.action).toBe('mail_send_failed');
   });
+
+  it('generic transport error → curated FR message, raw error kept ONLY in the sendError DB column', async () => {
+    rate.mockResolvedValueOnce({ success: true });
+    integrationFindFirst.mockResolvedValueOnce({
+      id: 'i1',
+      kind: 'graph',
+      externalAccountId: 'me@ex.com',
+      signatureHtml: null,
+    });
+    emailCreate.mockResolvedValueOnce({ id: 'e1' });
+    graphSend.mockRejectedValueOnce(new Error('ETIMEDOUT smtp.internal-host.example:587'));
+    const r = await sendMail(baseInput());
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.code).toBe('SEND_FAILED');
+      expect(r.message).toBe("L'envoi a échoué — vérifiez la connexion de la boîte et réessayez.");
+      expect(r.message).not.toContain('internal-host');
+    }
+    const failUpdate = emailUpdate.mock.calls.find(
+      (c) => (c[0] as { data?: Record<string, unknown> })?.data?.['sendStatus'] === 'failed',
+    );
+    expect((failUpdate?.[0] as { data: { sendError: string } }).data.sendError).toBe(
+      'ETIMEDOUT smtp.internal-host.example:587',
+    );
+  });
 });
 
 describe('sendMail with attachments — Graph', () => {

@@ -418,5 +418,6 @@ Avant chaque action :
 | 2026-07-24 | Recipient autocomplete V1.6 (Communications iter 5) — chips + dropdown, mail history + Contacts                                 | Angelo L. + Claude |
 | 2026-07-27 | Assistant Plan 1 — `packages/agent` (boucle + gate, 100% cov), seam `@anthropic-ai/sdk@0.115.0`, route SSE, page /assistant     | Angelo L. + Claude |
 | 2026-07-27 | Assistant Plan 2a — tools mutants Kanban + gate Allow/Deny temps réel (ConfirmStore Redis, cores extraits, audit assistant\_\*) | Angelo L. + Claude |
+| 2026-07-28 | Assistant Plan 2b — tools mail (envoi gated, confirmation exhaustive Cci), widgets structurés dans le chat, store atomique      | Angelo L. + Claude |
 
 > **Règle :** chaque modification de ce fichier ajoute une ligne ici.

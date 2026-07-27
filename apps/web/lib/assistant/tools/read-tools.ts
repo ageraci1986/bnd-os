@@ -11,6 +11,8 @@ import {
   scopedProjectWhere,
 } from '@/lib/auth/scope';
 import { startOfTodayUtc } from '@/features/projects/lib/card-filter';
+import { fetchMailBody } from '@/features/communications/actions/fetch-mail-body';
+import { safeDb } from './safe-wrappers';
 
 const uuid = z.string().uuid();
 const UUID_JSON = { type: 'string', format: 'uuid' } as const;
@@ -25,26 +27,6 @@ const CARD_DESCRIPTION_MAX_CHARS = 5000;
 const TEAM_MEMBERS_MAX = 50;
 /** Nb max d'items de checklist renvoyés par get_card. */
 const CARD_CHECKLIST_MAX = 50;
-
-/**
- * Exécute une requête DB en reformulant toute erreur en message montrable.
- * Contrat `defineTool` : seul un message user-safe peut s'échapper d'un handler —
- * les erreurs Prisma brutes (connexion, contraintes…) ne doivent jamais fuiter.
- * Retourne (plutôt que de relancer) le message sûr : chaque handler ci-dessous
- * renvoie toujours une `string`, donc l'appelant récupère directement le texte
- * affichable sans avoir à intercepter une exception.
- *
- * `tool` sert uniquement d'étiquette de log serveur — jamais le contenu de
- * l'erreur ni la requête (PII / secrets, CLAUDE.md §4.7).
- */
-async function safeDb(tool: string, work: () => Promise<string>): Promise<string> {
-  try {
-    return await work();
-  } catch {
-    console.error('[assistant] tool db error', { tool });
-    return 'Erreur interne en consultant les données — réessayez dans un instant.';
-  }
-}
 
 export async function buildReadTools(ctx: AuthContext): Promise<ToolSpec[]> {
   const scope = await loadUserScope(ctx);
@@ -301,14 +283,34 @@ export async function buildReadTools(ctx: AuthContext): Promise<ToolSpec[]> {
           if (mail === null) {
             return "Erreur : mail introuvable, ou situé dans la boîte d'un autre membre (le corps des mails n'est lisible que par le propriétaire de la boîte).";
           }
+          let bodyText = mail.bodyText;
+          let bodyHtmlSanitized = mail.bodyHtmlSanitized;
+          // Critère volontairement plus simple que `cachedIsUsable` de
+          // fetch-mail-body.ts : absence totale de corps uniquement (un cache
+          // mojibake/MIME non parsé n'est pas re-réparé ici — l'UI le fait).
+          const hasUsableBody =
+            (bodyText !== null && bodyText.length > 0) || bodyHtmlSanitized !== null;
+          if (!hasUsableBody) {
+            // Chargement paresseux : le corps n'a pas été récupéré au moment
+            // du sync (voir fetch-mail-body.ts). L'ownership y est revalidé
+            // en interne, et le résultat est mis en cache en DB.
+            // Note : fetchMailBody appelle requireUser() en interne et lève
+            // NEXT_REDIRECT si la session a expiré ; cette exception remonte
+            // à travers `safeDb` (safe-wrappers.ts), qui la reformule en
+            // « session expirée » — pas besoin d'un try/catch dédié ici.
+            const fetched = await fetchMailBody({ emailId: input.emailId });
+            if (!fetched.ok) return `Erreur : ${fetched.message}`;
+            bodyText = fetched.bodyText;
+            bodyHtmlSanitized = fetched.bodyHtmlSanitized;
+          }
           const rawBody =
-            mail.bodyText ??
-            (mail.bodyHtmlSanitized !== null
-              ? mail.bodyHtmlSanitized
+            bodyText ??
+            (bodyHtmlSanitized !== null
+              ? bodyHtmlSanitized
                   .replace(/<[^>]+>/g, ' ')
                   .replace(/\s+/g, ' ')
                   .trim()
-              : "(corps non chargé — il sera récupéré à l'ouverture du mail dans Communications)");
+              : '(ce mail ne contient aucun corps de texte)');
           const body =
             rawBody.length > MAIL_BODY_MAX_CHARS
               ? `${rawBody.slice(0, MAIL_BODY_MAX_CHARS)} […corps tronqué]`
@@ -342,6 +344,7 @@ export async function buildReadTools(ctx: AuthContext): Promise<ToolSpec[]> {
               role: true,
               user: { select: { id: true, email: true, firstName: true, lastName: true } },
             },
+            orderBy: { user: { email: 'asc' } },
             take: TEAM_MEMBERS_MAX,
           });
           return JSON.stringify({

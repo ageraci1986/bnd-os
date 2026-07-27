@@ -5,6 +5,15 @@ import userEvent from '@testing-library/user-event';
 import { Blob as NodeBlob } from 'node:buffer';
 import { AssistantChat } from './assistant-chat';
 
+// Les widgets liste/board font `next/link` — stub minimal comme dans widgets/index.test.tsx.
+vi.mock('next/link', () => ({
+  default: ({ children, href, ...rest }: { children: React.ReactNode; href: string }) => (
+    <a href={href} {...rest}>
+      {children}
+    </a>
+  ),
+}));
+
 function sseResponse(events: object[]): Response {
   const body = events.map((e) => `data: ${JSON.stringify(e)}\n\n`).join('');
   return new Response(new NodeBlob([body]).stream() as unknown as ReadableStream, {
@@ -158,7 +167,7 @@ describe('AssistantChat', () => {
         const enc = new TextEncoder();
         controller.enqueue(
           enc.encode(
-            `data: ${JSON.stringify({ type: 'confirm_request', id: confirmId, description: 'delete_card (cardId="c1")' })}\n\n`,
+            `data: ${JSON.stringify({ type: 'confirm_request', id: confirmId, tool: 'delete_card', description: 'delete_card (cardId="c1")' })}\n\n`,
           ),
         );
         pushSecondHalf = () => {
@@ -217,7 +226,12 @@ describe('AssistantChat', () => {
       }
       return Promise.resolve(
         openSseResponse([
-          { type: 'confirm_request', id: confirmId, description: 'delete_card (cardId="c1")' },
+          {
+            type: 'confirm_request',
+            id: confirmId,
+            tool: 'delete_card',
+            description: 'delete_card (cardId="c1")',
+          },
         ]),
       );
     });
@@ -244,7 +258,12 @@ describe('AssistantChat', () => {
     const confirmId = 'd'.repeat(32);
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       openSseResponse([
-        { type: 'confirm_request', id: confirmId, description: 'delete_card (cardId="c1")' },
+        {
+          type: 'confirm_request',
+          id: confirmId,
+          tool: 'delete_card',
+          description: 'delete_card (cardId="c1")',
+        },
       ]),
     );
 
@@ -291,7 +310,12 @@ describe('AssistantChat', () => {
     // la réponse → le dialog périmé doit disparaître à la fin du send().
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       sseResponse([
-        { type: 'confirm_request', id: confirmId, description: 'delete_card (cardId="c1")' },
+        {
+          type: 'confirm_request',
+          id: confirmId,
+          tool: 'delete_card',
+          description: 'delete_card (cardId="c1")',
+        },
       ]),
     );
 
@@ -314,7 +338,12 @@ describe('AssistantChat', () => {
         return Response.json({ ok: false }, { status: 404 });
       }
       return openSseResponse([
-        { type: 'confirm_request', id: confirmId, description: 'delete_card (cardId="c1")' },
+        {
+          type: 'confirm_request',
+          id: confirmId,
+          tool: 'delete_card',
+          description: 'delete_card (cardId="c1")',
+        },
       ]);
     });
 
@@ -336,7 +365,12 @@ describe('AssistantChat', () => {
         return Response.json({ ok: false }, { status: 409 });
       }
       return openSseResponse([
-        { type: 'confirm_request', id: confirmId, description: 'delete_card (cardId="c1")' },
+        {
+          type: 'confirm_request',
+          id: confirmId,
+          tool: 'delete_card',
+          description: 'delete_card (cardId="c1")',
+        },
       ]);
     });
 
@@ -358,7 +392,12 @@ describe('AssistantChat', () => {
         return Response.json({ ok: false }, { status: 500 });
       }
       return openSseResponse([
-        { type: 'confirm_request', id: confirmId, description: 'delete_card (cardId="c1")' },
+        {
+          type: 'confirm_request',
+          id: confirmId,
+          tool: 'delete_card',
+          description: 'delete_card (cardId="c1")',
+        },
       ]);
     });
 
@@ -387,5 +426,208 @@ describe('AssistantChat', () => {
     await userEvent.click(screen.getByRole('button', { name: /envoyer/i }));
     unmount();
     expect(signal?.aborted).toBe(true);
+  });
+
+  it('tool_result get_today_overview → widget KPI visible pendant le stream et persisté après done', async () => {
+    const encoder = new TextEncoder();
+    let push!: (e: object) => void;
+    let close!: () => void;
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        push = (e) => controller.enqueue(encoder.encode(`data: ${JSON.stringify(e)}\n\n`));
+        close = () => controller.close();
+      },
+    });
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(stream as unknown as BodyInit, {
+        status: 200,
+        headers: { 'Content-Type': 'text/event-stream' },
+      }),
+    );
+    render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
+    await userEvent.type(screen.getByRole('textbox'), 'mon briefing');
+    await userEvent.click(screen.getByRole('button', { name: /envoyer/i }));
+
+    act(() => {
+      push({
+        type: 'tool_result',
+        tool: 'get_today_overview',
+        data: { blockedCards: 2, dueTodayCards: 1, unreadMails: 3, unreadNotifications: 0 },
+      });
+    });
+    // Rendu sous la bulle en cours de stream, avant `done`.
+    await waitFor(() => {
+      expect(screen.getByText('Bloquées')).toBeInTheDocument();
+    });
+
+    act(() => {
+      push({ type: 'done', text: 'Voici votre briefing.' });
+      close();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Voici votre briefing.')).toBeInTheDocument();
+    });
+    // Toujours là une fois le message commité : le widget a survécu au commit.
+    expect(screen.getByText('Bloquées')).toBeInTheDocument();
+  });
+
+  it('tool_result pour un tool inconnu ne rend rien et ne fait pas planter', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      sseResponse([
+        { type: 'tool_result', tool: 'some_unknown_tool', data: { foo: 'bar' } },
+        { type: 'done', text: 'Réponse.' },
+      ]),
+    );
+    render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
+    await userEvent.type(screen.getByRole('textbox'), 'x');
+    await userEvent.click(screen.getByRole('button', { name: /envoyer/i }));
+    await waitFor(() => {
+      expect(screen.getByText('Réponse.')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('bar')).not.toBeInTheDocument();
+  });
+
+  it('affiche « Envoi de mail » dans l en-tête du dialog pour le tool send_mail', async () => {
+    const confirmId = '9'.repeat(32);
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      openSseResponse([
+        {
+          type: 'confirm_request',
+          id: confirmId,
+          tool: 'send_mail',
+          description: 'Envoyer un mail à a@b.test — objet « Bonjour » : Salut…',
+        },
+      ]),
+    );
+    render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
+    await userEvent.type(screen.getByRole('textbox'), 'envoie le mail');
+    await userEvent.click(screen.getByRole('button', { name: /envoyer/i }));
+
+    await screen.findByRole('button', { name: /autoriser/i });
+    expect(screen.getByText(/Envoi de mail/)).toBeInTheDocument();
+  });
+
+  it('les widgets commités ne sont dans aucune région aria-live (les bulles texte, si)', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      sseResponse([
+        {
+          type: 'tool_result',
+          tool: 'get_today_overview',
+          data: { blockedCards: 1, dueTodayCards: 0, unreadMails: 0, unreadNotifications: 0 },
+        },
+        { type: 'done', text: 'Briefing.' },
+      ]),
+    );
+    render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
+    await userEvent.type(screen.getByRole('textbox'), 'mon briefing');
+    await userEvent.click(screen.getByRole('button', { name: /envoyer/i }));
+    await screen.findByText('Briefing.');
+
+    // La bulle texte commitée reste annoncée par une région live…
+    let node: HTMLElement | null = screen.getByText('Briefing.');
+    let bubbleInLive = false;
+    while (node !== null) {
+      if (node.getAttribute('aria-live') !== null) bubbleInLive = true;
+      node = node.parentElement;
+    }
+    expect(bubbleInLive).toBe(true);
+
+    // …mais aucun ancêtre du widget ne porte aria-live (pas de lecture ligne à
+    // ligne) ni aria-hidden (ses liens restent dans l'arbre d'accessibilité).
+    node = screen.getByText('Bloquées');
+    while (node !== null) {
+      expect(node.getAttribute('aria-live')).toBeNull();
+      expect(node.getAttribute('aria-hidden')).toBeNull();
+      node = node.parentElement;
+    }
+  });
+
+  it('borne le fil affiché à 80 entrées — les plus anciennes sortent', async () => {
+    let call = 0;
+    vi.spyOn(globalThis, 'fetch').mockImplementation(() => {
+      call += 1;
+      return Promise.resolve(sseResponse([{ type: 'done', text: `réponse ${call}` }]));
+    });
+    render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
+    // 41 échanges = 82 entrées sans borne → DISPLAY_MAX doit tenir 80.
+    for (let i = 1; i <= 41; i += 1) {
+      await userEvent.type(screen.getByRole('textbox'), `q${i}`);
+      await userEvent.click(screen.getByRole('button', { name: /envoyer/i }));
+      await screen.findByText(`réponse ${i}`);
+    }
+    // Les 2 entrées les plus anciennes ont été évincées, le reste est là.
+    expect(screen.queryByText('q1')).not.toBeInTheDocument();
+    expect(screen.queryByText('réponse 1')).not.toBeInTheDocument();
+    expect(screen.getByText('q2')).toBeInTheDocument();
+    expect(screen.getByText('réponse 41')).toBeInTheDocument();
+  });
+
+  it('trime la donnée board stockée : 5 cartes rendues, total préservé via le compteur', async () => {
+    const cards = Array.from({ length: 100 }, (_, i) => ({
+      id: `card-${i}`,
+      title: `Carte ${i}`,
+      due: null,
+    }));
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      sseResponse([
+        {
+          type: 'tool_result',
+          tool: 'get_project_board',
+          data: {
+            id: '11111111-1111-1111-1111-111111111111',
+            name: 'Refonte',
+            columns: [{ id: 'col-1', name: 'Backlog', blocked: false, cards }],
+          },
+        },
+        { type: 'done', text: 'Voici le board.' },
+      ]),
+    );
+    render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
+    await userEvent.type(screen.getByRole('textbox'), 'montre le board');
+    await userEvent.click(screen.getByRole('button', { name: /envoyer/i }));
+    await screen.findByText('Voici le board.');
+
+    // Seules les 5 premières cartes sont conservées et affichées…
+    expect(screen.getByText('Carte 4')).toBeInTheDocument();
+    expect(screen.queryByText('Carte 5')).not.toBeInTheDocument();
+    // …mais compteur et « +N autres » reflètent toujours le total d'origine.
+    expect(screen.getByText('100')).toBeInTheDocument();
+    expect(screen.getByText('+95 autres')).toBeInTheDocument();
+  });
+
+  it('l historique envoyé au serveur reste texte-only : jamais de clé widgets', async () => {
+    let call = 0;
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(() => {
+      call += 1;
+      if (call === 1) {
+        return Promise.resolve(
+          sseResponse([
+            {
+              type: 'tool_result',
+              tool: 'get_today_overview',
+              data: { blockedCards: 0, dueTodayCards: 0, unreadMails: 0, unreadNotifications: 0 },
+            },
+            { type: 'done', text: 'Un.' },
+          ]),
+        );
+      }
+      return Promise.resolve(sseResponse([{ type: 'done', text: 'Deux.' }]));
+    });
+    render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
+    await userEvent.type(screen.getByRole('textbox'), 'mon briefing');
+    await userEvent.click(screen.getByRole('button', { name: /envoyer/i }));
+    await screen.findByText('Un.');
+
+    await userEvent.type(screen.getByRole('textbox'), 'et ensuite ?');
+    await userEvent.click(screen.getByRole('button', { name: /envoyer/i }));
+    await screen.findByText('Deux.');
+
+    const secondCall = fetchMock.mock.calls[1];
+    const body = JSON.parse(String(secondCall?.[1]?.body)) as { messages: unknown[] };
+    expect(body.messages.length).toBeGreaterThan(0);
+    for (const m of body.messages) {
+      expect(m).not.toHaveProperty('widgets');
+    }
   });
 });

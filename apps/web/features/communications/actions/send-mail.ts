@@ -267,29 +267,41 @@ export async function sendMail(raw: SendMailInput): Promise<SendMailResult> {
   } catch (err) {
     let code: Extract<SendMailResult, { ok: false }>['code'];
     let message: string;
+    // Détail technique conservé UNIQUEMENT dans la colonne DB `sendError`
+    // (diagnostic) — jamais renvoyé au client (CLAUDE.md §4.7). Par défaut il
+    // reflète le message montrable ; la branche générique SEND_FAILED le
+    // remplace par l'erreur brute du transport.
+    let sendErrorDetail: string;
     if (err instanceof GraphPayloadTooLargeError) {
       code = 'SEND_FAILED_TOO_LARGE';
       message = 'Pièce(s) jointe(s) trop volumineuse(s) pour Exchange (max 3 Mo au total).';
+      sendErrorDetail = message;
     } else if (err instanceof GraphReplyAttachmentsUnsupportedError) {
       code = 'SEND_FAILED_UNSUPPORTED';
       message =
         'Les pièces jointes ne sont pas prises en charge en réponse/transfert via Exchange dans cette version — utilise le mode « Nouveau message ».';
+      sendErrorDetail = message;
     } else {
       const raw = err instanceof Error ? err.message : 'Send failed';
       if (raw === ATTACHMENT_DOWNLOAD_FAILED) {
         code = 'SEND_FAILED';
         message = "Échec de récupération d'une pièce jointe. Réessaie.";
+        sendErrorDetail = message;
       } else if (/SMTP_NOT_CONFIGURED/.test(raw)) {
         code = 'SMTP_NOT_CONFIGURED';
         message = raw;
+        sendErrorDetail = raw;
       } else {
         code = 'SEND_FAILED';
-        message = raw;
+        // Message curé : l'erreur brute du transport (SMTP/Graph) peut
+        // contenir hôtes, adresses ou détails d'infrastructure.
+        message = "L'envoi a échoué — vérifiez la connexion de la boîte et réessayez.";
+        sendErrorDetail = raw;
       }
     }
     await prisma.emailMessage.update({
       where: { id: outboxRow.id },
-      data: { sendStatus: 'failed', sendError: message },
+      data: { sendStatus: 'failed', sendError: sendErrorDetail },
     });
     await prisma.auditLog.create({
       data: {

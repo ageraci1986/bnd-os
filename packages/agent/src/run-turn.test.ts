@@ -104,7 +104,7 @@ describe('runTurn', () => {
     ]);
     expect(events).toEqual([
       { type: 'tool_start', name: 'lookup' },
-      { type: 'tool_end', name: 'lookup', isError: false },
+      { type: 'tool_end', name: 'lookup', isError: false, output: 'résultat-tool' },
     ]);
   });
 
@@ -150,7 +150,7 @@ describe('runTurn', () => {
     expect(handler).toHaveBeenCalledTimes(2);
   });
 
-  it('émet confirm_request avant de demander', async () => {
+  it('émet confirm_request avant de demander, avec le nom du tool', async () => {
     const registry = makeRegistry([{ name: 'danger', gated: true }]);
     const provider = scriptedProvider([toolUseResult('danger', { a: 1 }), textResult('ok')]);
     const events: { type: string }[] = [];
@@ -163,6 +163,55 @@ describe('runTurn', () => {
       }),
     );
     expect(events.map((e) => e.type)).toEqual(['confirm_request', 'tool_start', 'tool_end']);
+    expect(events[0]).toMatchObject({ type: 'confirm_request', tool: 'danger' });
+  });
+
+  it('confirmer reçoit (description, name)', async () => {
+    const registry = makeRegistry([{ name: 'danger', gated: true }]);
+    const provider = scriptedProvider([toolUseResult('danger', { a: 1 }), textResult('ok')]);
+    const confirmer = vi.fn(async () => true);
+    await runTurn([], 'x', deps(provider, registry, { confirmer }));
+    expect(confirmer).toHaveBeenCalledWith('danger (a=1)', 'danger');
+  });
+
+  it('describeForConfirm du tool est utilisé pour la description quand présent', async () => {
+    const registry = makeRegistry([
+      {
+        name: 'danger',
+        gated: true,
+        describeForConfirm: ((input: { a: number }) =>
+          `envoyer ${String(input.a)}`) as ToolSpec['describeForConfirm'],
+      },
+    ]);
+    const provider = scriptedProvider([toolUseResult('danger', { a: 1 }), textResult('ok')]);
+    const confirmer = vi.fn(async () => true);
+    const events: { type: string; description?: string }[] = [];
+    await runTurn(
+      [],
+      'x',
+      deps(provider, registry, { confirmer, onEvent: (e) => void events.push(e) }),
+    );
+    expect(confirmer).toHaveBeenCalledWith('envoyer 1', 'danger');
+    expect(events[0]).toMatchObject({ type: 'confirm_request', description: 'envoyer 1' });
+  });
+
+  it('describeForConfirm qui throw → repli sur describeAction, le gate fonctionne toujours', async () => {
+    const handler = vi.fn(async () => 'fait');
+    const registry = makeRegistry([
+      {
+        name: 'danger',
+        gated: true,
+        handler: handler as ToolSpec['handler'],
+        describeForConfirm: (() => {
+          throw new Error('boom description');
+        }) as ToolSpec['describeForConfirm'],
+      },
+    ]);
+    const provider = scriptedProvider([toolUseResult('danger', { a: 1 }), textResult('ok')]);
+    const confirmer = vi.fn(async () => true);
+    await runTurn([], 'x', deps(provider, registry, { confirmer }));
+    expect(confirmer).toHaveBeenCalledWith('danger (a=1)', 'danger');
+    expect(handler).toHaveBeenCalledTimes(1);
   });
 
   it('tool adminOnly appelé par un non-admin → refus propre sans exécution ni confirmation', async () => {
@@ -257,8 +306,8 @@ describe('runTurn', () => {
     expect(result.text).toBe('Je regarde…\nVoilà.');
   });
 
-  it('autoDeny refuse toujours', async () => {
-    await expect(autoDeny('peu importe')).resolves.toBe(false);
+  it('autoDeny refuse toujours (2 args ignorés)', async () => {
+    await expect(autoDeny('peu importe', 'un_tool')).resolves.toBe(false);
   });
 
   it('describeAction avec une entrée non-objet (ex: string ou null) tombe sur String(input)', () => {

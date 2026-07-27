@@ -10,11 +10,14 @@ import { getConfirmStore } from '@/lib/assistant/confirm-store';
 import { createAnthropicProvider, ProviderError } from '@/lib/assistant/provider';
 import { buildSystemPrompt } from '@/lib/assistant/system-prompt';
 import { buildRegistry } from '@/lib/assistant/tools';
+import { isWidgetTool } from '@/lib/assistant/widget-tools';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 // Budget ~2 fenêtres de confirmation (120 s) + rounds modèle ; Vercel Fluid.
 export const maxDuration = 300;
+
+const WIDGET_DATA_MAX_CHARS = 8_000;
 
 function sse(event: ChatSseEvent): string {
   return `data: ${JSON.stringify(event)}\n\n`;
@@ -127,10 +130,10 @@ export async function POST(req: Request): Promise<Response> {
           provider: createAnthropicProvider(),
           registry,
           system,
-          confirmer: async (description) => {
+          confirmer: async (description, tool) => {
             const store = getConfirmStore();
             const id = await store.createPending(ctx.userId);
-            send({ type: 'confirm_request', id, description: description.slice(0, 2000) });
+            send({ type: 'confirm_request', id, tool, description: description.slice(0, 2000) });
             // Invariant UI : après un confirm_request, un confirm_resolved suit TOUJOURS
             // (sinon dialog orphelin). Si l'attente échoue (backend Redis en panne…),
             // on résout à false côté client puis on relance : executeGated fail-close
@@ -148,7 +151,7 @@ export async function POST(req: Request): Promise<Response> {
               workspaceId: ctx.workspaceId,
               actorId: ctx.userId,
               // nom du tool uniquement — pas les arguments (PII possible)
-              data: { tool: description.split(' ')[0] ?? '', allowed },
+              data: { tool, allowed },
             });
             return allowed;
           },
@@ -172,6 +175,19 @@ export async function POST(req: Request): Promise<Response> {
                 actorId: ctx.userId,
                 data: { tool: event.name, isError: event.isError },
               });
+              // Widget déterministe : whitelist stricte + plafond de taille + JSON valide
+              // uniquement. Une sortie non-JSON ou trop longue reste du texte simple.
+              if (
+                isWidgetTool(event.name) &&
+                !event.isError &&
+                event.output.length <= WIDGET_DATA_MAX_CHARS
+              ) {
+                try {
+                  send({ type: 'tool_result', tool: event.name, data: JSON.parse(event.output) });
+                } catch {
+                  // sortie non-JSON : pas de widget
+                }
+              }
             }
           },
         });

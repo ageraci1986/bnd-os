@@ -23,6 +23,11 @@ const scopeMocks = vi.hoisted(() => ({
 }));
 vi.mock('@/lib/auth/scope', () => scopeMocks);
 
+const fetchMailBodyMock = vi.hoisted(() => vi.fn());
+vi.mock('@/features/communications/actions/fetch-mail-body', () => ({
+  fetchMailBody: fetchMailBodyMock,
+}));
+
 import { buildReadTools } from './read-tools';
 
 const ctx = {
@@ -175,7 +180,7 @@ describe('buildReadTools', () => {
     expect(where.deletedAt).toBeNull();
   });
 
-  it('read_mail renvoie le corps stocké ou signale un corps non chargé', async () => {
+  it('read_mail charge le corps paresseusement via fetchMailBody quand absent en DB', async () => {
     prismaMock.emailMessage.findFirst.mockResolvedValue({
       id: 'm1',
       subject: 'Devis',
@@ -187,8 +192,77 @@ describe('buildReadTools', () => {
       bodyHtmlSanitized: null,
       isRead: true,
     });
+    fetchMailBodyMock.mockResolvedValue({
+      ok: true,
+      bodyText: 'Corps récupéré via IMAP',
+      bodyHtmlSanitized: null,
+    });
+    const out = JSON.parse(
+      await execute('read_mail', { emailId: '4c9d3f0a-2222-4444-8888-aaaaaaaaaaaa' }),
+    );
+    expect(out.body).toBe('Corps récupéré via IMAP');
+    expect(fetchMailBodyMock).toHaveBeenCalledWith({
+      emailId: '4c9d3f0a-2222-4444-8888-aaaaaaaaaaaa',
+    });
+  });
+
+  it('read_mail renvoie le message d’erreur de fetchMailBody quand le chargement échoue', async () => {
+    prismaMock.emailMessage.findFirst.mockResolvedValue({
+      id: 'm1',
+      subject: 'Devis',
+      fromEmail: 'marc@acme.com',
+      fromName: 'Marc',
+      toRecipients: ['moi@bnd.co'],
+      receivedAt: new Date(),
+      bodyText: null,
+      bodyHtmlSanitized: null,
+      isRead: true,
+    });
+    fetchMailBodyMock.mockResolvedValue({
+      ok: false,
+      message: 'La boîte IMAP source est déconnectée.',
+    });
     const out = await execute('read_mail', { emailId: '4c9d3f0a-2222-4444-8888-aaaaaaaaaaaa' });
-    expect(out).toContain('non chargé');
+    expect(out).toBe('Erreur : La boîte IMAP source est déconnectée.');
+  });
+
+  it('read_mail utilise le HTML sanitisé en cache (strip balises) sans rappeler fetchMailBody', async () => {
+    prismaMock.emailMessage.findFirst.mockResolvedValue({
+      id: 'm1',
+      subject: 'Devis',
+      fromEmail: 'marc@acme.com',
+      fromName: 'Marc',
+      toRecipients: ['moi@bnd.co'],
+      receivedAt: new Date(),
+      bodyText: null,
+      bodyHtmlSanitized: '<p>Contenu</p>',
+      isRead: true,
+    });
+    const out = JSON.parse(
+      await execute('read_mail', { emailId: '4c9d3f0a-2222-4444-8888-aaaaaaaaaaaa' }),
+    );
+    expect(out.body).toContain('Contenu');
+    expect(out.body).not.toContain('<p>');
+    expect(fetchMailBodyMock).not.toHaveBeenCalled();
+  });
+
+  it('read_mail ne rappelle pas fetchMailBody quand le corps est déjà présent en DB', async () => {
+    prismaMock.emailMessage.findFirst.mockResolvedValue({
+      id: 'm1',
+      subject: 'Devis',
+      fromEmail: 'marc@acme.com',
+      fromName: 'Marc',
+      toRecipients: ['moi@bnd.co'],
+      receivedAt: new Date(),
+      bodyText: 'Déjà en cache',
+      bodyHtmlSanitized: null,
+      isRead: true,
+    });
+    const out = JSON.parse(
+      await execute('read_mail', { emailId: '4c9d3f0a-2222-4444-8888-aaaaaaaaaaaa' }),
+    );
+    expect(out.body).toBe('Déjà en cache');
+    expect(fetchMailBodyMock).not.toHaveBeenCalled();
   });
 
   it('read_mail est gated sur le propriétaire de la boîte (convention fetch-mail-body)', async () => {
@@ -234,6 +308,9 @@ describe('buildReadTools', () => {
     ]);
     expect(out.truncated).toBeUndefined();
     expect(prismaMock.membership.findMany.mock.calls[0]?.[0]?.where?.workspaceId).toBe('w1');
+    expect(prismaMock.membership.findMany.mock.calls[0]?.[0]?.orderBy).toEqual({
+      user: { email: 'asc' },
+    });
   });
 
   it('get_team_members signale la troncature quand la limite de 50 est atteinte', async () => {
@@ -314,6 +391,14 @@ describe('buildReadTools', () => {
     expect(out.checklistTruncated).toBe(true);
     const select = prismaMock.card.findFirst.mock.calls[0]?.[0]?.select;
     expect(select?.checklistItems?.take).toBe(50);
+  });
+
+  it('erreur NEXT_REDIRECT (session expirée) → message « session expirée » dédié', async () => {
+    prismaMock.project.findMany.mockRejectedValue(
+      Object.assign(new Error('redirect'), { digest: 'NEXT_REDIRECT;replace;/login;307;' }),
+    );
+    const out = await execute('list_projects', {});
+    expect(out).toBe('Erreur : session expirée — reconnectez-vous.');
   });
 
   it('erreur Prisma → message utilisateur, pas de fuite du message brut', async () => {
