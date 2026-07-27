@@ -84,6 +84,10 @@ const ServerEnvSchema = z.object({
   // Public base URL of the app — used server-side to build OAuth callback URIs.
   // Falls back to NEXT_PUBLIC_APP_URL resolution at the callsite when absent.
   APP_URL: optionalUrl(),
+
+  // Assistant (agent conversationnel)
+  ANTHROPIC_API_KEY: optionalString(1),
+  ASSISTANT_MODEL: optionalString(1),
 });
 
 export type ServerEnv = z.infer<typeof ServerEnvSchema>;
