@@ -71,13 +71,23 @@ export interface ToolSpec {
    * l'unique cast.
    */
   readonly handler: (input: never) => Promise<string>;
+  /**
+   * Description humaine de l'action pour le dialog de confirmation ; à défaut,
+   * `describeAction` générique (run-turn.ts) est utilisée.
+   */
+  readonly describeForConfirm?: (input: never) => string;
 }
 
 /** Événements émis pendant un tour, consommés par les adaptateurs (SSE, tests). */
 export type AgentEvent =
   | { readonly type: 'tool_start'; readonly name: string }
-  | { readonly type: 'tool_end'; readonly name: string; readonly isError: boolean }
-  | { readonly type: 'confirm_request'; readonly description: string };
+  | {
+      readonly type: 'tool_end';
+      readonly name: string;
+      readonly isError: boolean;
+      readonly output: string;
+    }
+  | { readonly type: 'confirm_request'; readonly tool: string; readonly description: string };
 
-/** Demande de confirmation : description humaine → oui/non. */
-export type Confirmer = (description: string) => Promise<boolean>;
+/** Demande de confirmation : description humaine + nom du tool → oui/non. */
+export type Confirmer = (description: string, tool: string) => Promise<boolean>;

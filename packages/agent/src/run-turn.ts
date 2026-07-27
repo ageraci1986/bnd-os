@@ -6,6 +6,7 @@ import type {
   Confirmer,
   Provider,
   ProviderTurnResult,
+  ToolSpec,
 } from './types';
 
 export const MAX_TOOL_ROUNDS = 10;
@@ -134,6 +135,22 @@ export async function runTurn(
   return { text: STUCK_MESSAGE, history: messages, inputTokens, outputTokens };
 }
 
+/**
+ * Description pour le dialog de confirmation : `describeForConfirm` du tool si
+ * présent, sinon `describeAction` générique. Une description qui lève ne doit
+ * jamais bloquer le gate : repli générique.
+ */
+function buildConfirmDescription(spec: ToolSpec, name: string, input: unknown): string {
+  if (spec.describeForConfirm !== undefined) {
+    try {
+      return spec.describeForConfirm(input as never);
+    } catch {
+      // repli sur describeAction ci-dessous
+    }
+  }
+  return describeAction(name, input);
+}
+
 async function executeGated(
   name: string,
   input: unknown,
@@ -144,11 +161,11 @@ async function executeGated(
     return { output: ADMIN_ONLY_OUTPUT, isError: true };
   }
   if (spec !== null && spec.gated) {
-    const description = describeAction(name, input);
-    deps.onEvent?.({ type: 'confirm_request', description });
+    const description = buildConfirmDescription(spec, name, input);
+    deps.onEvent?.({ type: 'confirm_request', tool: name, description });
     let allowed: boolean;
     try {
-      allowed = await deps.confirmer(description);
+      allowed = await deps.confirmer(description, name);
     } catch {
       // Fail closed : canal de confirmation cassé = action non exécutée, mais le
       // tour continue (is_error: true, c'est une défaillance technique).
@@ -162,6 +179,6 @@ async function executeGated(
   }
   deps.onEvent?.({ type: 'tool_start', name });
   const result = await deps.registry.execute(name, input);
-  deps.onEvent?.({ type: 'tool_end', name, isError: result.isError });
+  deps.onEvent?.({ type: 'tool_end', name, isError: result.isError, output: result.output });
   return result;
 }

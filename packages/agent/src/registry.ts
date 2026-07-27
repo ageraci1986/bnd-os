@@ -19,6 +19,11 @@ export interface DefineToolInput<T> {
    * (DB, réseau) avant de les laisser remonter.
    */
   readonly handler: (input: T) => Promise<string>;
+  /**
+   * Description humaine de l'action pour le dialog de confirmation ; à défaut,
+   * `describeAction` générique (run-turn.ts) est utilisée.
+   */
+  readonly describeForConfirm?: (input: T) => string;
 }
 
 /**
@@ -35,6 +40,13 @@ export function defineTool<T>(spec: DefineToolInput<T>): ToolSpec {
     gated: spec.gated ?? false,
     adminOnly: spec.adminOnly ?? false,
     handler: spec.handler as ToolSpec['handler'],
+    ...(spec.describeForConfirm !== undefined
+      ? {
+          describeForConfirm: spec.describeForConfirm as NonNullable<
+            ToolSpec['describeForConfirm']
+          >,
+        }
+      : {}),
   };
 }
 
