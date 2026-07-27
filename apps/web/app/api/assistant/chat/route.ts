@@ -13,6 +13,8 @@ import { buildRegistry } from '@/lib/assistant/tools';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+// Budget ~2 fenêtres de confirmation (120 s) + rounds modèle ; Vercel Fluid.
+export const maxDuration = 300;
 
 function sse(event: ChatSseEvent): string {
   return `data: ${JSON.stringify(event)}\n\n`;
@@ -129,7 +131,17 @@ export async function POST(req: Request): Promise<Response> {
             const store = getConfirmStore();
             const id = await store.createPending(ctx.userId);
             send({ type: 'confirm_request', id, description: description.slice(0, 2000) });
-            const allowed = await store.awaitAnswer(id);
+            // Invariant UI : après un confirm_request, un confirm_resolved suit TOUJOURS
+            // (sinon dialog orphelin). Si l'attente échoue (backend Redis en panne…),
+            // on résout à false côté client puis on relance : executeGated fail-close
+            // avec CONFIRM_UNAVAILABLE_OUTPUT — pas d'audit ici, c'est lui qui gère.
+            let allowed = false;
+            try {
+              allowed = await store.awaitAnswer(id, { signal: req.signal });
+            } catch (error) {
+              send({ type: 'confirm_resolved', id, allowed: false });
+              throw error;
+            }
             send({ type: 'confirm_resolved', id, allowed });
             await recordAudit({
               action: 'assistant_gate',
@@ -152,6 +164,8 @@ export async function POST(req: Request): Promise<Response> {
               send({ type: 'tool_start', name: event.name });
             } else if (event.type === 'tool_end') {
               send({ type: 'tool_end', name: event.name, isError: event.isError });
+              // Fire-and-forget sûr : onEvent est synchrone, et chaque tool_end est
+              // suivi d'au moins un round provider awaité — l'insert a le temps d'aboutir.
               void recordAudit({
                 action: 'assistant_tool_run',
                 workspaceId: ctx.workspaceId,

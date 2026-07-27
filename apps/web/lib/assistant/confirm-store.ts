@@ -69,19 +69,26 @@ export class ConfirmStore {
   }
 
   /**
-   * Poll jusqu'à réponse ou timeout ; timeout = refus (fail closed). Nettoie la clé.
+   * Poll jusqu'à réponse, timeout ou abort ; timeout/abort = refus (fail closed).
+   * Nettoie la clé. `signal` (ex: déconnexion du client SSE) court-circuite le poll
+   * au lieu d'attendre le timeout complet — pas de boucle zombie de 120 s.
    * Race à la frontière du timeout : une réponse qui arrive juste après le nettoyage
    * voit `not_found` (→ 404 côté endpoint) — l'UI traite ce non-2xx comme informatif.
    */
   async awaitAnswer(
     id: string,
-    opts?: { readonly pollMs?: number; readonly timeoutMs?: number },
+    opts?: {
+      readonly pollMs?: number;
+      readonly timeoutMs?: number;
+      readonly signal?: AbortSignal;
+    },
   ): Promise<boolean> {
     const pollMs = opts?.pollMs ?? DEFAULT_POLL_MS;
     const timeoutMs = opts?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     const deadline = Date.now() + timeoutMs;
     try {
       for (;;) {
+        if (opts?.signal?.aborted === true) return false;
         const record = await this.backend.get(id);
         if (record === null) return false;
         if (record.status === 'allowed') return true;

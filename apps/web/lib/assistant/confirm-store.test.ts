@@ -76,6 +76,32 @@ describe('ConfirmStore (backend mémoire)', () => {
     expect(await store.answer(id, 'u1', false)).toBe('already_answered');
   });
 
+  it('signal déjà aborté → awaitAnswer résout false immédiatement et nettoie la clé', async () => {
+    const id = await store.createPending('u1');
+    const controller = new AbortController();
+    controller.abort();
+    // Résout au premier tour de boucle — aucune avance de timer nécessaire.
+    await expect(
+      store.awaitAnswer(id, { pollMs: 10, timeoutMs: 60_000, signal: controller.signal }),
+    ).resolves.toBe(false);
+    // Clé nettoyée : une réponse tardive voit not_found.
+    expect(await store.answer(id, 'u1', true)).toBe('not_found');
+  });
+
+  it('abort pendant l attente → résout false au poll suivant, sans attendre le timeout', async () => {
+    const id = await store.createPending('u1');
+    const controller = new AbortController();
+    const waiting = store.awaitAnswer(id, {
+      pollMs: 10,
+      timeoutMs: 60_000,
+      signal: controller.signal,
+    });
+    controller.abort();
+    await vi.advanceTimersByTimeAsync(20);
+    await expect(waiting).resolves.toBe(false);
+    expect(await store.answer(id, 'u1', true)).toBe('not_found');
+  });
+
   it('les ids sont uniques et non devinables (32 hex)', async () => {
     const a = await store.createPending('u1');
     const b = await store.createPending('u1');
