@@ -40,6 +40,8 @@ export const ChatSseEventSchema = z.discriminatedUnion('type', [
   }),
   z.object({ type: z.literal('done'), text: z.string() }),
   z.object({ type: z.literal('error'), message: z.string() }),
+  // `data` est du JSON parsé côté serveur mais PAS validé en forme — chaque
+  // widget fait son propre parse Zod du shape de son tool avant rendu (KO → null).
   z.object({ type: z.literal('tool_result'), tool: z.string(), data: z.unknown() }),
 ]);
 
