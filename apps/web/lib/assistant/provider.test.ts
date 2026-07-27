@@ -39,6 +39,15 @@ describe('toTurnResult', () => {
 });
 
 describe('toProviderError', () => {
+  it('génération interrompue (abort) → message dédié', () => {
+    const err = Object.create(Anthropic.APIUserAbortError.prototype) as InstanceType<
+      typeof Anthropic.APIUserAbortError
+    >;
+    const message = toProviderError(err).message;
+    expect(message).toContain('interrompue');
+    expect(message).not.toContain('undefined');
+  });
+
   it('erreur d authentification → message générique sans nom de variable', () => {
     const err = Object.create(
       Anthropic.AuthenticationError.prototype,

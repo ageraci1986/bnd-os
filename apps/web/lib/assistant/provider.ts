@@ -56,6 +56,9 @@ export function toProviderError(error: unknown): ProviderError {
   if (error instanceof ProviderError) {
     return error;
   }
+  if (error instanceof Anthropic.APIUserAbortError) {
+    return new ProviderError('Génération interrompue.');
+  }
   if (error instanceof Anthropic.AuthenticationError) {
     // SECURITY : pas de nom de variable d'env dans un message montré aux membres.
     return new ProviderError(
