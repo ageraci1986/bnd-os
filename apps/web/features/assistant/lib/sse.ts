@@ -10,8 +10,13 @@ export function parseSseLines(buffer: string): { events: ChatSseEvent[]; rest: s
     if (!line.startsWith('data: ')) continue;
     try {
       const parsed = ChatSseEventSchema.safeParse(JSON.parse(line.slice('data: '.length)));
-      if (parsed.success) events.push(parsed.data);
-      // événement inconnu/malformé : ignoré, la conversation continue
+      if (parsed.success) {
+        events.push(parsed.data);
+      } else {
+        // Événement inconnu/malformé : ignoré (la conversation continue), mais
+        // tracé — un confirm_request droppé laisserait le serveur attendre 120 s.
+        console.warn('[assistant] événement SSE ignoré (schéma invalide)');
+      }
     } catch {
       // ligne partielle ou corrompue : ignorée
     }

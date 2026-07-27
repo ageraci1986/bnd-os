@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { parseSseLines } from './sse';
 
 describe('parseSseLines', () => {
@@ -18,8 +18,11 @@ describe('parseSseLines', () => {
     expect(events).toEqual([]);
   });
 
-  it('rejette un événement de type inconnu (validation Zod)', () => {
+  it('rejette un événement de type inconnu (validation Zod) et le trace', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const { events } = parseSseLines('data: {"type":"hack","payload":"x"}\n\n');
     expect(events).toEqual([]);
+    expect(warn).toHaveBeenCalledOnce();
+    warn.mockRestore();
   });
 });
