@@ -508,6 +508,94 @@ describe('AssistantChat', () => {
     expect(screen.getByText(/Envoi de mail/)).toBeInTheDocument();
   });
 
+  it('les widgets commités ne sont dans aucune région aria-live (les bulles texte, si)', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      sseResponse([
+        {
+          type: 'tool_result',
+          tool: 'get_today_overview',
+          data: { blockedCards: 1, dueTodayCards: 0, unreadMails: 0, unreadNotifications: 0 },
+        },
+        { type: 'done', text: 'Briefing.' },
+      ]),
+    );
+    render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
+    await userEvent.type(screen.getByRole('textbox'), 'mon briefing');
+    await userEvent.click(screen.getByRole('button', { name: /envoyer/i }));
+    await screen.findByText('Briefing.');
+
+    // La bulle texte commitée reste annoncée par une région live…
+    let node: HTMLElement | null = screen.getByText('Briefing.');
+    let bubbleInLive = false;
+    while (node !== null) {
+      if (node.getAttribute('aria-live') !== null) bubbleInLive = true;
+      node = node.parentElement;
+    }
+    expect(bubbleInLive).toBe(true);
+
+    // …mais aucun ancêtre du widget ne porte aria-live (pas de lecture ligne à
+    // ligne) ni aria-hidden (ses liens restent dans l'arbre d'accessibilité).
+    node = screen.getByText('Bloquées');
+    while (node !== null) {
+      expect(node.getAttribute('aria-live')).toBeNull();
+      expect(node.getAttribute('aria-hidden')).toBeNull();
+      node = node.parentElement;
+    }
+  });
+
+  it('borne le fil affiché à 80 entrées — les plus anciennes sortent', async () => {
+    let call = 0;
+    vi.spyOn(globalThis, 'fetch').mockImplementation(() => {
+      call += 1;
+      return Promise.resolve(sseResponse([{ type: 'done', text: `réponse ${call}` }]));
+    });
+    render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
+    // 41 échanges = 82 entrées sans borne → DISPLAY_MAX doit tenir 80.
+    for (let i = 1; i <= 41; i += 1) {
+      await userEvent.type(screen.getByRole('textbox'), `q${i}`);
+      await userEvent.click(screen.getByRole('button', { name: /envoyer/i }));
+      await screen.findByText(`réponse ${i}`);
+    }
+    // Les 2 entrées les plus anciennes ont été évincées, le reste est là.
+    expect(screen.queryByText('q1')).not.toBeInTheDocument();
+    expect(screen.queryByText('réponse 1')).not.toBeInTheDocument();
+    expect(screen.getByText('q2')).toBeInTheDocument();
+    expect(screen.getByText('réponse 41')).toBeInTheDocument();
+  });
+
+  it('trime la donnée board stockée : 5 cartes rendues, total préservé via le compteur', async () => {
+    const cards = Array.from({ length: 100 }, (_, i) => ({
+      id: `card-${i}`,
+      title: `Carte ${i}`,
+      due: null,
+    }));
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      sseResponse([
+        {
+          type: 'tool_result',
+          tool: 'get_project_board',
+          data: {
+            id: '11111111-1111-1111-1111-111111111111',
+            name: 'Refonte',
+            columns: [{ id: 'col-1', name: 'Backlog', blocked: false, cards }],
+          },
+        },
+        { type: 'done', text: 'Voici le board.' },
+      ]),
+    );
+    render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
+    await userEvent.type(screen.getByRole('textbox'), 'montre le board');
+    await userEvent.click(screen.getByRole('button', { name: /envoyer/i }));
+    await screen.findByText('Voici le board.');
+
+    // Seules les 5 premières cartes sont conservées et affichées…
+    expect(screen.getByText('Carte 4')).toBeInTheDocument();
+    expect(screen.queryByText('Carte 5')).not.toBeInTheDocument();
+    // …mais compteur et « +N autres » reflètent toujours le total d'origine.
+    expect(screen.getByText('100')).toBeInTheDocument();
+    expect(screen.getByText('+95 autres')).toBeInTheDocument();
+  });
+
   it('l historique envoyé au serveur reste texte-only : jamais de clé widgets', async () => {
     let call = 0;
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(() => {

@@ -19,6 +19,9 @@ const BoardColumnSchema = z.object({
   blocked: z.boolean(),
   cards: z.array(BoardCardSchema),
   truncated: z.boolean().optional(),
+  // Posé par `trimWidgetData` quand les cartes stockées ont été réduites aux
+  // 5 premières : total d'origine, pour un compteur et un « +N autres » exacts.
+  totalCards: z.number().int().nonnegative().optional(),
 });
 
 const ProjectBoardSchema = z.object({
@@ -47,7 +50,8 @@ export function BoardWidget({ data }: BoardWidgetProps) {
       <div className="mt-3 flex gap-3 overflow-x-auto pb-1">
         {board.columns.map((column) => {
           const shown = column.cards.slice(0, CARDS_SHOWN_PER_COLUMN);
-          const extra = column.cards.length - shown.length;
+          const total = column.totalCards ?? column.cards.length;
+          const extra = total - shown.length;
           return (
             <div
               key={column.id}
@@ -58,7 +62,7 @@ export function BoardWidget({ data }: BoardWidgetProps) {
                   {column.name}
                 </span>
                 <span className="shrink-0 text-[10px] font-semibold text-[color:var(--color-text-muted)]">
-                  {column.cards.length}
+                  {total}
                 </span>
               </div>
               <ul className="mt-2 flex flex-col gap-1.5">

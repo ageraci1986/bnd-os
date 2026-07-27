@@ -3,6 +3,7 @@
 import { Fragment, useCallback, useEffect, useId, useRef, useState } from 'react';
 import { parseSseLines } from '../lib/sse';
 import { renderWidget } from './widgets';
+import { trimWidgetData } from './widgets/trim-widget-data';
 
 interface StreamWidget {
   readonly tool: string;
@@ -39,6 +40,13 @@ const CONFIRM_TOOL_LABELS: Record<string, string> = {
 
 /** Marge sous la limite serveur de 40 messages (ChatRequestSchema `.max(40)`). */
 const HISTORY_MAX = 38;
+
+/**
+ * Borne du fil AFFICHÉ (bulles + widgets attachés) — indépendante de
+ * `HISTORY_MAX` : sans elle, une longue session accumulerait indéfiniment
+ * messages et données de widgets en mémoire.
+ */
+const DISPLAY_MAX = 80;
 
 export function AssistantChat({ csrfToken, firstName }: AssistantChatProps) {
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
@@ -148,14 +156,16 @@ export function AssistantChat({ csrfToken, firstName }: AssistantChatProps) {
         { role: 'assistant', content: assistantText },
       ];
       historyRef.current = next.slice(-HISTORY_MAX);
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: assistantText,
-          ...(widgets.length > 0 ? { widgets } : {}),
-        },
-      ]);
+      setMessages((prev) =>
+        [
+          ...prev,
+          {
+            role: 'assistant' as const,
+            content: assistantText,
+            ...(widgets.length > 0 ? { widgets } : {}),
+          },
+        ].slice(-DISPLAY_MAX),
+      );
     };
 
     let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
@@ -195,7 +205,12 @@ export function AssistantChat({ csrfToken, firstName }: AssistantChatProps) {
           if (event.type === 'tool_start') setActivity(ACTIVITY_LABELS[event.name] ?? 'travaille…');
           if (event.type === 'tool_end') setActivity(null);
           if (event.type === 'tool_result') {
-            widgets = [...widgets, { tool: event.tool, data: event.data }];
+            // Trim à la réception : borne aussi bien l'état de stream que la
+            // donnée conservée sur le message commité (ex. board 100 cartes/colonne).
+            widgets = [
+              ...widgets,
+              { tool: event.tool, data: trimWidgetData(event.tool, event.data) },
+            ];
             setStreamWidgets(widgets);
           }
           if (event.type === 'confirm_request') {
@@ -253,20 +268,26 @@ export function AssistantChat({ csrfToken, firstName }: AssistantChatProps) {
       </p>
 
       <div ref={listRef} className="flex w-full flex-1 flex-col gap-2 overflow-y-auto">
-        {/* Seule la liste commitée est annoncée : la réponse finale est lue une
-            fois, sans spammer les lecteurs d'écran à chaque chunk streamé. */}
-        <div className="flex flex-col gap-2" aria-live="polite">
+        {/* Seul le texte commité est annoncé (région live par bulle) : la réponse
+            finale est lue une fois, sans spammer les lecteurs d'écran à chaque
+            chunk streamé. Les widgets restent HORS de toute région live — un
+            board ou une liste de mails serait lu ligne à ligne alors que le
+            texte de l'assistant porte déjà l'information ; leurs liens restent
+            pleinement accessibles (pas d'aria-hidden). */}
+        <div className="flex flex-col gap-2">
           {messages.map((m, i) => (
             <Fragment key={i}>
-              <div
-                className={
-                  m.role === 'user'
-                    ? 'self-end rounded-2xl px-4 py-2 text-sm text-white'
-                    : 'self-start rounded-2xl border border-[color:var(--color-border-soft)] bg-[color:var(--color-bg-card)] px-4 py-2 text-sm text-[color:var(--color-text-soft)]'
-                }
-                style={m.role === 'user' ? { background: 'var(--accent-gradient)' } : undefined}
-              >
-                {m.content}
+              <div className="flex flex-col" aria-live="polite">
+                <div
+                  className={
+                    m.role === 'user'
+                      ? 'self-end rounded-2xl px-4 py-2 text-sm text-white'
+                      : 'self-start rounded-2xl border border-[color:var(--color-border-soft)] bg-[color:var(--color-bg-card)] px-4 py-2 text-sm text-[color:var(--color-text-soft)]'
+                  }
+                  style={m.role === 'user' ? { background: 'var(--accent-gradient)' } : undefined}
+                >
+                  {m.content}
+                </div>
               </div>
               {/* Widgets rendus pleine largeur sous la bulle, pas dedans — plus
                   lisible pour un mini-Kanban ou une liste de mails. */}

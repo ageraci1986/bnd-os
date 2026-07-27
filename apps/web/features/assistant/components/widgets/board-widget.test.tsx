@@ -75,6 +75,29 @@ describe('<BoardWidget />', () => {
     expect(screen.getByText('+2 autres (liste partielle)')).toBeInTheDocument();
   });
 
+  it('uses totalCards (set by trimWidgetData) for the counter and "+N autres"', () => {
+    render(
+      <BoardWidget
+        data={{
+          id: PROJECT_ID,
+          name: 'Projet',
+          columns: [
+            {
+              id: 'col-1',
+              name: 'Backlog',
+              blocked: false,
+              cards: makeCards(5),
+              totalCards: 100,
+            },
+          ],
+        }}
+      />,
+    );
+    // Compteur de colonne = total d'origine, pas les 5 cartes conservées.
+    expect(screen.getByText('100')).toBeInTheDocument();
+    expect(screen.getByText('+95 autres')).toBeInTheDocument();
+  });
+
   it('renders nothing and warns when the data shape is invalid', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const { container } = render(<BoardWidget data={{ foo: 'bar' }} />);
