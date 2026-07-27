@@ -62,8 +62,6 @@ describe('toProviderError', () => {
 
   it('erreur API générique → message avec le statut HTTP', () => {
     // Object.create saute le constructeur — status posé manuellement.
-    // Comme APIConnectionError, BadRequestError n'est pas ré-exportée comme
-    // type dans le namespace de cette version du SDK — InstanceType<>.
     const err = Object.assign(Object.create(Anthropic.BadRequestError.prototype) as object, {
       status: 400,
     }) as InstanceType<typeof Anthropic.BadRequestError>;
