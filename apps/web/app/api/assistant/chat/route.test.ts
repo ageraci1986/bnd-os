@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => ({
   streamTurn: vi.fn(),
   gatedHandler: vi.fn(),
   readHandler: vi.fn(),
+  loadMemories: vi.fn(),
 }));
 
 vi.mock('server-only', () => ({}));
@@ -43,6 +44,7 @@ vi.mock('@/lib/assistant/confirm-store', () => ({
     awaitAnswer: mocks.awaitAnswer,
   }),
 }));
+vi.mock('@/lib/assistant/memory', () => ({ loadMemories: mocks.loadMemories }));
 
 vi.mock('@/lib/assistant/provider', () => ({
   createAnthropicProvider: () => ({ streamTurn: mocks.streamTurn }),
@@ -147,6 +149,7 @@ beforeEach(() => {
   mocks.workspaceFindUnique.mockResolvedValue({ name: 'Acme' });
   mocks.recordAudit.mockResolvedValue(undefined);
   mocks.createPending.mockResolvedValue('a'.repeat(32));
+  mocks.loadMemories.mockResolvedValue([]);
 });
 
 describe('POST /api/assistant/chat — confirmer', () => {
