@@ -1,0 +1,57 @@
+import 'server-only';
+
+import { prisma } from '@nexushub/db';
+import type { AuthContext } from '@/lib/auth';
+import { loadUserScope, scopedCardWhere } from '@/lib/auth/scope';
+import { startOfTodayUtc } from '@/features/projects/lib/card-filter';
+
+/**
+ * Forme EXACTE sérialisée par le tool `get_today_overview`
+ * (lib/assistant/tools/read-tools.ts) — les widgets (`KpiCards`) et la route
+ * SSE en dépendent, ne pas y toucher sans mettre à jour les deux.
+ */
+export interface TodayOverview {
+  readonly blockedCards: number;
+  readonly dueTodayCards: number;
+  readonly unreadMails: number;
+  readonly unreadNotifications: number;
+}
+
+/**
+ * Résumé du jour partagé par le tool `get_today_overview` (in-thread) et
+ * l'accueil de `/assistant` (chargé côté serveur, zéro tour d'agent — Plan 4
+ * Task 3). Recharge son propre scope, comme les autres `*-core.ts` du repo
+ * (card-core, project-core…) — pas de dépendance à un scope préchargé par un
+ * appelant.
+ */
+export async function loadTodayOverview(ctx: AuthContext): Promise<TodayOverview> {
+  const scope = await loadUserScope(ctx);
+  const workspaceId = ctx.workspaceId;
+  // Convention repo (card-filter.ts) : les échéances sont stockées à minuit
+  // UTC — « dû aujourd'hui » = [minuit UTC, minuit UTC + 1 j).
+  const start = startOfTodayUtc();
+  const endExclusive = new Date(start);
+  endExclusive.setUTCDate(endExclusive.getUTCDate() + 1);
+  const [blockedCards, dueTodayCards, unreadMails, unreadNotifications] = await Promise.all([
+    prisma.card.count({
+      where: {
+        workspaceId,
+        deletedAt: null,
+        column: { isBlockedSystem: true },
+        ...scopedCardWhere(scope),
+      },
+    }),
+    prisma.card.count({
+      where: {
+        workspaceId,
+        deletedAt: null,
+        archivedAt: null,
+        dueDate: { gte: start, lt: endExclusive },
+        ...scopedCardWhere(scope),
+      },
+    }),
+    prisma.emailMessage.count({ where: { workspaceId, deletedAt: null, isRead: false } }),
+    prisma.notification.count({ where: { workspaceId, userId: ctx.userId, readAt: null } }),
+  ]);
+  return { blockedCards, dueTodayCards, unreadMails, unreadNotifications };
+}

@@ -31,6 +31,7 @@ vi.mock('@/features/communications/actions/fetch-mail-body', () => ({
 }));
 
 import { buildReadTools } from './read-tools';
+import * as overviewCore from '@/lib/assistant/overview-core';
 
 const ctx = {
   userId: 'u1',
@@ -107,6 +108,28 @@ describe('buildReadTools', () => {
     expect(start.getUTCHours()).toBe(0);
     expect(start.getUTCMinutes()).toBe(0);
     expect(end.getTime() - start.getTime()).toBe(24 * 60 * 60 * 1000);
+  });
+
+  it('get_today_overview délègue à loadTodayOverview (overview-core.ts, partagé avec l’accueil de /assistant)', async () => {
+    // Preuve de délégation (Plan 4 Task 3) : le tool n'agrège plus lui-même —
+    // il appelle le core partagé et sérialise EXACTEMENT ce qu'il renvoie.
+    // Les deux tests précédents (agrégation, borne minuit UTC) prouvent déjà
+    // l'iso-comportement sans modification ; celui-ci pin l'architecture.
+    const spy = vi.spyOn(overviewCore, 'loadTodayOverview').mockResolvedValue({
+      blockedCards: 7,
+      dueTodayCards: 8,
+      unreadMails: 9,
+      unreadNotifications: 10,
+    });
+    const out = JSON.parse(await execute('get_today_overview', {}));
+    expect(spy).toHaveBeenCalledWith(ctx);
+    expect(out).toEqual({
+      blockedCards: 7,
+      dueTodayCards: 8,
+      unreadMails: 9,
+      unreadNotifications: 10,
+    });
+    spy.mockRestore();
   });
 
   it('list_projects renvoie les projets scoped', async () => {
