@@ -25,8 +25,13 @@ export interface DefineToolInput<T> {
    * Contrat : montrable et concise — elle transite en clair côté client (SSE).
    * Ne jamais y mettre plus que ce que l'utilisateur voit déjà (pas de corps
    * de message brut, pas de tokens) ; l'audit ne journalise que le nom du tool.
+   * Mode async (ex: lire le vrai nom en DB plutôt que les données du modèle) :
+   * l'input arrive BRUT, avant la validation Zod du registry (le gate précède
+   * `execute`) — ne pas lui faire confiance ; rester rapide et borné (la
+   * résolution bloque le tour) ; scoper toute lecture au workspace via la
+   * closure du tool.
    */
-  readonly describeForConfirm?: (input: T) => string;
+  readonly describeForConfirm?: (input: T) => string | Promise<string>;
 }
 
 /**

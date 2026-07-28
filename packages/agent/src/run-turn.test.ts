@@ -233,10 +233,12 @@ describe('runTurn', () => {
   });
 
   it('describeForConfirm async qui rejette → repli sur describeAction, pas de fuite', async () => {
+    const handler = vi.fn(async () => 'fait');
     const registry = makeRegistry([
       {
         name: 'danger',
         gated: true,
+        handler: handler as ToolSpec['handler'],
         describeForConfirm: (async () => {
           throw new Error('secret interne');
         }) as ToolSpec['describeForConfirm'],
@@ -249,6 +251,8 @@ describe('runTurn', () => {
     expect(description).not.toContain('secret interne');
     expect(description).toBe('danger (a=1)');
     expect(toolName).toBe('danger');
+    // Le repli ne doit pas empêcher l'exécution une fois confirmée (symétrie du cas sync-throw)
+    expect(handler).toHaveBeenCalledTimes(1);
   });
 
   it('tool adminOnly appelé par un non-admin → refus propre sans exécution ni confirmation', async () => {
