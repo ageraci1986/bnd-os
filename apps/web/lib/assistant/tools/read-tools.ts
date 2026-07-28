@@ -280,6 +280,7 @@ export async function buildReadTools(ctx: AuthContext): Promise<ToolSpec[]> {
             where: {
               workspaceId,
               deletedAt: null,
+              archivedAt: null,
               ...(input.unreadOnly === true ? { isRead: false } : {}),
               ...(input.query !== undefined
                 ? {

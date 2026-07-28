@@ -135,7 +135,15 @@ enum AuditAction {
   member_role_changed
   integration_connected
   integration_disconnected
+  client_created
+  client_updated
   client_deleted
+  contact_created
+  contact_updated
+  contact_deleted
+  template_created
+  template_updated
+  template_deleted
   project_deleted
   project_restored
   card_deleted
@@ -146,6 +154,10 @@ enum AuditAction {
   workspace_deleted
   mail_sent
   mail_send_failed
+  mail_archived
+  mail_deleted
+  mail_marked_read
+  mail_marked_unread
   attachment_uploaded
   attachment_scanned_dirty
   attachment_downloaded
@@ -781,6 +793,8 @@ model EmailMessage {
   /// Soft-delete: set when Graph reports the message removed (delta @removed).
   /// Filter out in queries via `where: { deletedAt: null }`.
   deletedAt         DateTime? @map("deleted_at") @db.Timestamptz(6)
+  /// Archivage local NexusHub (Plan 5b) — PAS de sync retour IMAP/Graph.
+  archivedAt        DateTime? @map("archived_at") @db.Timestamptz(6)
   /// Send status. NULL on inbound mails. Set only on outbound (folder='sent').
   /// Transitions: queued → sending → sent | failed.
   sendStatus       EmailSendStatus?  @map("send_status")
@@ -807,6 +821,7 @@ model EmailMessage {
   @@index([clientId, receivedAt])
   @@index([conversationId])
   @@index([workspaceId, deletedAt])
+  @@index([workspaceId, archivedAt])
   @@index([workspaceId, integrationId, receivedAt(sort: Desc)])
   @@index([integrationId])
   @@map("email_messages")

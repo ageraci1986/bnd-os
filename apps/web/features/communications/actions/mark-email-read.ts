@@ -4,6 +4,12 @@ import { z } from 'zod';
 import { prisma } from '@nexushub/db';
 import { requireUser } from '@/lib/auth';
 
+// Asymétrie assumée avec `mail-state-core.ts` (Plan 5b Task 7) : cette action
+// UI est mono-mail et workspace-scopée (n'importe quel membre du workspace
+// peut marquer lu un mail qu'il voit), alors que le core bulk de l'assistant
+// est owner-only (integration.ownerUserId) — décision produit V2 sur les
+// mutations mail. Ne pas aligner l'un sur l'autre sans revalidation produit.
+
 const Schema = z.object({ emailId: z.string().uuid() });
 
 export type MarkEmailReadResult =
