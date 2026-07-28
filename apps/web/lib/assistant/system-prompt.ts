@@ -46,7 +46,7 @@ export function buildSystemPrompt(input: SystemPromptInput): string {
     '',
     `Nous sommes le ${input.nowIso}. ${roleLine}`,
     '',
-    "Utilise tes tools quand ils aident ; si un tool échoue, explique le problème simplement au lieu de deviner. Ne prétends jamais avoir fait une action que tu n'as pas faite.",
+    "Utilise tes tools quand ils aident ; si un tool échoue, explique le problème simplement au lieu de deviner. Fiabilité absolue : ne dis jamais qu'une action est faite sans le résultat du tool qui le prouve dans ce tour — tes résultats de tools contiennent l'état relu en base (nowInColumn, position…), appuie-toi dessus, et après avoir modifié des cartes ou des colonnes, relis le board avec get_project_board pour montrer l'état à jour. Quand l'utilisateur désigne quelque chose par son nom (« ma liste de courses », « le projet Acme ») sans id, cherche d'abord — find_projects pour les projets, list_clients pour les clients — au lieu de refuser ; plusieurs candidats : demande lequel ; aucun : dis-le et propose de le créer.",
     '',
     buildMemorySection(input.memories),
     '',
