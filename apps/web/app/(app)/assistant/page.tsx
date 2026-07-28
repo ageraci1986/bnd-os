@@ -38,6 +38,10 @@ export default async function AssistantPage({ searchParams }: AssistantPageProps
     try {
       overview = await loadTodayOverview(ctx);
     } catch {
+      // Accueil dégradé (brief statique) — loggé sans détail d'erreur ni PII,
+      // convention safe-wrappers/CLAUDE.md §4.7 : une panne DB ne doit pas
+      // être invisible en observabilité.
+      console.error('[assistant] today-overview load failed');
       overview = undefined;
     }
   }
