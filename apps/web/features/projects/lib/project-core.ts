@@ -199,3 +199,131 @@ export async function createProjectCore(
 
   return { ok: true, projectId };
 }
+
+export interface UpdateProjectCoreInput {
+  readonly projectId: string;
+  readonly name?: string;
+  readonly description?: string | null;
+  /** `YYYY-MM-DD`, déjà validée par l'appelant (tool Zod). */
+  readonly startDate?: string | null;
+  readonly endDate?: string | null;
+}
+
+export type UpdateProjectCoreResult =
+  | {
+      readonly ok: true;
+      readonly name: string;
+      readonly description: string | null;
+      readonly startDate: string | null;
+      readonly endDate: string | null;
+    }
+  | { readonly ok: false; readonly message: string };
+
+/** `Date | null` → `YYYY-MM-DD | null`. */
+function toDateOnly(d: Date | null): string | null {
+  return d === null ? null : d.toISOString().slice(0, 10);
+}
+
+/**
+ * Update a project's editable fields (mutant tool + future settings UI).
+ * Only the keys present in `input` are written — `undefined` means
+ * "leave untouched", `null` (for description/dates) means "clear".
+ * Returns the post-write, RELU state (spec V2 §3.1: read-after-write so
+ * the caller — assistant tool or UI — reports the value actually stored,
+ * not the one requested).
+ */
+export async function updateProjectCore(
+  ctx: AuthContext,
+  input: UpdateProjectCoreInput,
+): Promise<UpdateProjectCoreResult> {
+  if (ctx.role === Roles.Viewer) {
+    return { ok: false, message: VIEWER_READ_ONLY_MESSAGE };
+  }
+
+  const project = await prisma.project.findFirst({
+    where: { id: input.projectId, workspaceId: ctx.workspaceId, deletedAt: null },
+    select: { id: true, clientId: true },
+  });
+  if (!project) throw new NotFoundError('Project');
+
+  const scope = await loadUserScope(ctx);
+  if (scope.kind === 'restricted') {
+    const allowed =
+      scope.projectIds.includes(project.id) || scope.clientIds.includes(project.clientId);
+    if (!allowed) return { ok: false, message: SCOPE_ERROR_MESSAGE };
+  }
+
+  try {
+    await prisma.project.update({
+      where: { id: project.id },
+      data: {
+        ...(input.name !== undefined ? { name: input.name } : {}),
+        ...(input.description !== undefined ? { description: input.description } : {}),
+        ...(input.startDate !== undefined
+          ? { startDate: input.startDate === null ? null : new Date(input.startDate) }
+          : {}),
+        ...(input.endDate !== undefined
+          ? { endDate: input.endDate === null ? null : new Date(input.endDate) }
+          : {}),
+      },
+    });
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      return { ok: false, message: 'Un projet porte déjà ce nom.' };
+    }
+    throw err;
+  }
+
+  // Lecture-après-écriture (spec V2 §3.1) : le post-état est RELU plutôt
+  // qu'assemblé depuis l'input, pour refléter la valeur réellement stockée.
+  const after = await prisma.project.findFirst({
+    where: { id: project.id, workspaceId: ctx.workspaceId },
+    select: { name: true, description: true, startDate: true, endDate: true },
+  });
+  if (after === null) throw new NotFoundError('Project');
+
+  return {
+    ok: true,
+    name: after.name,
+    description: after.description,
+    startDate: toDateOnly(after.startDate),
+    endDate: toDateOnly(after.endDate),
+  };
+}
+
+/**
+ * Soft-delete a project (ADR 0001 #15: corbeille 30j, restore Admin V1.5).
+ * Extracted from the `deleteProject` Server Action so the assistant's
+ * delete tool can reuse the exact same checks (Viewer refusal, scope,
+ * lookup) without the `redirect()` that only makes sense in a browser
+ * navigation. The DB row stays — only `deletedAt` flips; cards remain
+ * attached and are filtered out by the existing `deletedAt: null` guards.
+ */
+export async function deleteProjectCore(
+  ctx: AuthContext,
+  input: { readonly projectId: string },
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  if (ctx.role === Roles.Viewer) {
+    return { ok: false, message: 'Action réservée aux Admins et Users.' };
+  }
+
+  const project = await prisma.project.findFirst({
+    where: { id: input.projectId, workspaceId: ctx.workspaceId, deletedAt: null },
+    select: { id: true, clientId: true },
+  });
+  if (!project) throw new NotFoundError('Project');
+
+  const scope = await loadUserScope(ctx);
+  if (scope.kind === 'restricted') {
+    const allowed =
+      scope.projectIds.includes(project.id) || scope.clientIds.includes(project.clientId);
+    if (!allowed) return { ok: false, message: SCOPE_ERROR_MESSAGE };
+  }
+
+  await prisma.project.update({
+    where: { id: project.id },
+    data: { deletedAt: new Date() },
+  });
+
+  return { ok: true };
+}

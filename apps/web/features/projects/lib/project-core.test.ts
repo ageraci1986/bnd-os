@@ -15,6 +15,7 @@ const prismaMock = vi.hoisted(() => {
   return {
     client: { findFirst: vi.fn() },
     kanbanTemplate: { findFirst: vi.fn() },
+    project: { findFirst: vi.fn(), update: vi.fn() },
     $transaction: vi.fn(),
     Prisma: { PrismaClientKnownRequestError },
   };
@@ -23,6 +24,7 @@ vi.mock('@nexushub/db', () => ({
   prisma: {
     client: prismaMock.client,
     kanbanTemplate: prismaMock.kanbanTemplate,
+    project: prismaMock.project,
     $transaction: prismaMock.$transaction,
   },
   Prisma: prismaMock.Prisma,
@@ -33,7 +35,7 @@ const scopeMocks = vi.hoisted(() => ({
 }));
 vi.mock('@/lib/auth/scope', () => scopeMocks);
 
-import { createProjectCore } from './project-core';
+import { createProjectCore, deleteProjectCore, updateProjectCore } from './project-core';
 import { SCOPE_ERROR_MESSAGE, VIEWER_READ_ONLY_MESSAGE } from './scope-error';
 import type { CreateProjectInput } from './schemas';
 
@@ -278,5 +280,183 @@ describe('createProjectCore', () => {
     expect(result).toEqual({ ok: false, message: VIEWER_READ_ONLY_MESSAGE });
     expect(scopeMocks.loadUserScope).not.toHaveBeenCalled();
     expect(prismaMock.client.findFirst).not.toHaveBeenCalled();
+  });
+});
+
+describe('updateProjectCore', () => {
+  const PROJECT_ID = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
+
+  beforeEach(() => {
+    prismaMock.project.findFirst.mockResolvedValue({ id: PROJECT_ID, clientId: CLIENT_ID });
+    prismaMock.project.update.mockResolvedValue({});
+  });
+
+  it('writes only the fields provided and returns the RELU post-state', async () => {
+    let capturedData: Record<string, unknown> | undefined;
+    prismaMock.project.update.mockImplementationOnce((args: { data: Record<string, unknown> }) => {
+      capturedData = args.data;
+      return Promise.resolve({});
+    });
+    prismaMock.project.findFirst
+      .mockResolvedValueOnce({ id: PROJECT_ID, clientId: CLIENT_ID }) // lookup
+      .mockResolvedValueOnce({
+        name: 'New name',
+        description: null,
+        startDate: null,
+        endDate: null,
+      }); // post-write reread
+
+    const result = await updateProjectCore(adminCtx, { projectId: PROJECT_ID, name: 'New name' });
+
+    expect(capturedData).toEqual({ name: 'New name' });
+    expect(result).toEqual({
+      ok: true,
+      name: 'New name',
+      description: null,
+      startDate: null,
+      endDate: null,
+    });
+  });
+
+  it('converts a startDate string to a Date and passes null through untouched', async () => {
+    let capturedData: Record<string, unknown> | undefined;
+    prismaMock.project.update.mockImplementationOnce((args: { data: Record<string, unknown> }) => {
+      capturedData = args.data;
+      return Promise.resolve({});
+    });
+    prismaMock.project.findFirst
+      .mockResolvedValueOnce({ id: PROJECT_ID, clientId: CLIENT_ID })
+      .mockResolvedValueOnce({
+        name: 'Unchanged',
+        description: null,
+        startDate: new Date('2026-05-01T00:00:00.000Z'),
+        endDate: null,
+      });
+
+    const result = await updateProjectCore(adminCtx, {
+      projectId: PROJECT_ID,
+      startDate: '2026-05-01',
+      endDate: null,
+    });
+
+    expect(capturedData?.['startDate']).toBeInstanceOf(Date);
+    expect((capturedData?.['startDate'] as Date).toISOString().slice(0, 10)).toBe('2026-05-01');
+    expect(capturedData).toHaveProperty('endDate', null);
+    expect(result).toEqual({
+      ok: true,
+      name: 'Unchanged',
+      description: null,
+      startDate: '2026-05-01',
+      endDate: null,
+    });
+  });
+
+  it('returns "Un projet porte déjà ce nom." on a P2002 unique-constraint error', async () => {
+    prismaMock.project.update.mockImplementationOnce(() => {
+      throw new prismaMock.Prisma.PrismaClientKnownRequestError('duplicate', 'P2002');
+    });
+    const result = await updateProjectCore(adminCtx, { projectId: PROJECT_ID, name: 'Dup' });
+    expect(result).toEqual({ ok: false, message: 'Un projet porte déjà ce nom.' });
+  });
+
+  it('rethrows non-P2002 errors from the update', async () => {
+    prismaMock.project.update.mockImplementationOnce(() => {
+      throw new Error('boom');
+    });
+    await expect(updateProjectCore(adminCtx, { projectId: PROJECT_ID, name: 'X' })).rejects.toThrow(
+      'boom',
+    );
+  });
+
+  it('rejects Viewer with VIEWER_READ_ONLY_MESSAGE and performs no lookup', async () => {
+    const result = await updateProjectCore(viewerCtx, { projectId: PROJECT_ID, name: 'X' });
+    expect(result).toEqual({ ok: false, message: VIEWER_READ_ONLY_MESSAGE });
+    expect(prismaMock.project.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('denies restricted scope that does not include the project or its client', async () => {
+    scopeMocks.loadUserScope.mockResolvedValueOnce({
+      kind: 'restricted' as const,
+      clientIds: ['other-client'],
+      projectIds: ['other-project'],
+    });
+    const result = await updateProjectCore(adminCtx, { projectId: PROJECT_ID, name: 'X' });
+    expect(result).toEqual({ ok: false, message: SCOPE_ERROR_MESSAGE });
+    expect(prismaMock.project.update).not.toHaveBeenCalled();
+  });
+
+  it('allows restricted scope that includes the client', async () => {
+    scopeMocks.loadUserScope.mockResolvedValueOnce({
+      kind: 'restricted' as const,
+      clientIds: [CLIENT_ID],
+      projectIds: [],
+    });
+    prismaMock.project.findFirst
+      .mockResolvedValueOnce({ id: PROJECT_ID, clientId: CLIENT_ID })
+      .mockResolvedValueOnce({ name: 'X', description: null, startDate: null, endDate: null });
+    const result = await updateProjectCore(adminCtx, { projectId: PROJECT_ID, name: 'X' });
+    expect(result.ok).toBe(true);
+  });
+
+  it('throws NotFoundError("Project") when the project is outside the workspace', async () => {
+    prismaMock.project.findFirst.mockResolvedValueOnce(null);
+    await expect(updateProjectCore(adminCtx, { projectId: PROJECT_ID, name: 'X' })).rejects.toThrow(
+      /Project/,
+    );
+    expect(prismaMock.project.update).not.toHaveBeenCalled();
+  });
+
+  it('throws NotFoundError("Project") if the post-write reread comes back empty', async () => {
+    prismaMock.project.findFirst
+      .mockResolvedValueOnce({ id: PROJECT_ID, clientId: CLIENT_ID })
+      .mockResolvedValueOnce(null);
+    await expect(updateProjectCore(adminCtx, { projectId: PROJECT_ID, name: 'X' })).rejects.toThrow(
+      /Project/,
+    );
+  });
+});
+
+describe('deleteProjectCore', () => {
+  const PROJECT_ID = 'dddddddd-dddd-dddd-dddd-dddddddddddd';
+
+  beforeEach(() => {
+    prismaMock.project.findFirst.mockResolvedValue({ id: PROJECT_ID, clientId: CLIENT_ID });
+    prismaMock.project.update.mockResolvedValue({});
+  });
+
+  it('soft-deletes the project by flipping deletedAt', async () => {
+    let capturedData: Record<string, unknown> | undefined;
+    prismaMock.project.update.mockImplementationOnce(
+      (args: { where: { id: string }; data: Record<string, unknown> }) => {
+        capturedData = args.data;
+        return Promise.resolve({});
+      },
+    );
+    const result = await deleteProjectCore(adminCtx, { projectId: PROJECT_ID });
+    expect(result).toEqual({ ok: true });
+    expect(capturedData?.['deletedAt']).toBeInstanceOf(Date);
+  });
+
+  it("rejects Viewer with 'Action réservée aux Admins et Users.' and performs no lookup", async () => {
+    const result = await deleteProjectCore(viewerCtx, { projectId: PROJECT_ID });
+    expect(result).toEqual({ ok: false, message: 'Action réservée aux Admins et Users.' });
+    expect(prismaMock.project.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('denies restricted scope that does not include the project or its client', async () => {
+    scopeMocks.loadUserScope.mockResolvedValueOnce({
+      kind: 'restricted' as const,
+      clientIds: ['other-client'],
+      projectIds: ['other-project'],
+    });
+    const result = await deleteProjectCore(adminCtx, { projectId: PROJECT_ID });
+    expect(result).toEqual({ ok: false, message: SCOPE_ERROR_MESSAGE });
+    expect(prismaMock.project.update).not.toHaveBeenCalled();
+  });
+
+  it('throws NotFoundError("Project") when the project is outside the workspace', async () => {
+    prismaMock.project.findFirst.mockResolvedValueOnce(null);
+    await expect(deleteProjectCore(adminCtx, { projectId: PROJECT_ID })).rejects.toThrow(/Project/);
+    expect(prismaMock.project.update).not.toHaveBeenCalled();
   });
 });
