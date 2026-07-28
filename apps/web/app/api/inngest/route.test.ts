@@ -2,11 +2,12 @@ import { describe, expect, it, vi } from 'vitest';
 
 /**
  * Task 2 (socle Inngest) : `functions` démarrait vide, les 3 crons arrivant
- * aux Tasks 4-6 — `morningBriefing` (Task 4) et `blockedCardsScan` (Task 5)
- * sont ajoutées ; Task 6 (mails importants) étend encore ce registre. Le
+ * aux Tasks 4-6 — `morningBriefing` (Task 4), `blockedCardsScan` (Task 5) et
+ * `importantMails` (Task 6) sont désormais toutes les trois enregistrées. Le
  * comportement de chaque fonction est couvert par ses propres tests
  * (`lib/inngest/functions/morning-briefing.test.ts`,
- * `lib/inngest/functions/blocked-cards-scan.test.ts`) ; ce fichier couvre le
+ * `lib/inngest/functions/blocked-cards-scan.test.ts`,
+ * `lib/inngest/functions/important-mails.test.ts`) ; ce fichier couvre le
  * minimum utile à la route :
  * - la route exporte bien GET/POST/PUT (contrat App Router d'Inngest) ;
  * - `serve()` est appelé avec le client `nexushub` et le registre `functions` ;
@@ -32,9 +33,13 @@ describe('GET/POST/PUT /api/inngest', () => {
     expect(inngestClient.id).toBe('nexushub');
   });
 
-  it('registers morning-briefing (Task 4) and blocked-cards-scan (Task 5) — Task 6 extends it further', () => {
-    expect(functions).toHaveLength(2);
-    expect(functions.map((fn) => fn.id())).toEqual(['morning-briefing', 'blocked-cards-scan']);
+  it('registers all three crons: morning-briefing (Task 4), blocked-cards-scan (Task 5), important-mails (Task 6)', () => {
+    expect(functions).toHaveLength(3);
+    expect(functions.map((fn) => fn.id())).toEqual([
+      'morning-briefing',
+      'blocked-cards-scan',
+      'important-mails',
+    ]);
   });
 
   it('rejects an unauthenticated PUT (sync) request rather than registering blindly', async () => {
