@@ -68,4 +68,19 @@ describe('<NavLink />', () => {
     render(<NavLink href="/projects" icon="◱" label="Projets" count={0} />);
     expect(screen.queryByText('0')).not.toBeInTheDocument();
   });
+
+  it('renders the indicator dot when dot=true', () => {
+    render(<NavLink href="/assistant" icon="◉" label="Assistant" dot />);
+    expect(screen.getByTestId('nav-item-dot')).toBeInTheDocument();
+  });
+
+  it('does not render the indicator dot when dot=false', () => {
+    render(<NavLink href="/assistant" icon="◉" label="Assistant" dot={false} />);
+    expect(screen.queryByTestId('nav-item-dot')).not.toBeInTheDocument();
+  });
+
+  it('does not render the indicator dot when omitted', () => {
+    render(<NavLink href="/assistant" icon="◉" label="Assistant" />);
+    expect(screen.queryByTestId('nav-item-dot')).not.toBeInTheDocument();
+  });
 });

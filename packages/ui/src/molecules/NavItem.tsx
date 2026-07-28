@@ -9,6 +9,13 @@ export interface NavItemProps {
   readonly count?: number;
   /** Highlight the count as "new / unread" with the brand gradient. */
   readonly countTone?: 'neutral' | 'new';
+  /**
+   * Small animated indicator dot (ported from mockup `.ap-nav .dot`,
+   * Plan 3b Task 7) — used for a binary "there's something unread" signal
+   * (e.g. Assistant proactive notices) as opposed to `count`, which shows a
+   * number. Renders nothing when falsy/omitted.
+   */
+  readonly dot?: boolean;
   readonly active?: boolean;
   readonly className?: string;
 }
@@ -25,6 +32,7 @@ export function NavItem({
   label,
   count,
   countTone = 'neutral',
+  dot,
   active,
   className,
 }: NavItemProps) {
@@ -36,6 +44,9 @@ export function NavItem({
       <span className="label">{label}</span>
       {count !== undefined && count > 0 ? (
         <span className={cn('count', countTone === 'new' && 'new')}>{count}</span>
+      ) : null}
+      {dot === true ? (
+        <span aria-hidden="true" className="nav-item-dot" data-testid="nav-item-dot" />
       ) : null}
     </span>
   );

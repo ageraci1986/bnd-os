@@ -3,6 +3,15 @@ import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 // jsdom's global `Blob` doesn't implement `.stream()` — use Node's, which does.
 import { Blob as NodeBlob } from 'node:buffer';
+// Vitest hoists vi.mock above all imports — la closure doit passer par
+// vi.hoisted() (même convention que ailleurs dans ce fichier de tests).
+const { markNotificationReadSpy } = vi.hoisted(() => ({
+  markNotificationReadSpy: vi.fn(),
+}));
+vi.mock('@/features/notifications/actions/mark-read', () => ({
+  markNotificationRead: (...a: unknown[]) => markNotificationReadSpy(...a),
+}));
+
 import { AssistantChat } from './assistant-chat';
 
 // Les widgets liste/board font `next/link` — stub minimal comme dans widgets/index.test.tsx.
@@ -45,6 +54,8 @@ function openSseResponse(events: object[]): Response {
 describe('AssistantChat', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    markNotificationReadSpy.mockReset();
+    markNotificationReadSpy.mockResolvedValue({ ok: true, affected: 1 });
   });
 
   it('affiche le message d accueil', () => {
@@ -779,6 +790,51 @@ describe('AssistantChat', () => {
       );
       expect(screen.getByTestId('assistant-brief').closest('[aria-live]')).toBeNull();
       expect(screen.getByText('Bloquées').closest('[aria-live]')).toBeNull();
+    });
+  });
+
+  describe('pile de notices (Plan 3b Task 7)', () => {
+    const notice = {
+      id: 'n1',
+      kind: 'agent_card_blocked' as const,
+      message: '« Maquettes v2 » vient de passer en Bloqué (échéance hier) sur le projet Acme.',
+      discuss: 'Parlons de la carte card-9 passée en Bloqué',
+    };
+
+    it('sans prop `notices` : aucune notice affichée', () => {
+      render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
+      expect(screen.queryByText(notice.message)).not.toBeInTheDocument();
+    });
+
+    it('avec `notices` : affiche le bandeau et ses boutons', () => {
+      render(<AssistantChat csrfToken="tok" firstName="Angelo" notices={[notice]} />);
+      expect(screen.getByText(notice.message)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /en discuter/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /ignorer/i })).toBeInTheDocument();
+    });
+
+    it('« En discuter » injecte `notice.discuss` dans le chat via le même canal que les widgets', async () => {
+      const fetchMock = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(sseResponse([{ type: 'done', text: 'Bien sûr.' }]));
+      render(<AssistantChat csrfToken="tok" firstName="Angelo" notices={[notice]} />);
+
+      await userEvent.click(screen.getByRole('button', { name: /en discuter/i }));
+
+      await screen.findByText('Bien sûr.');
+      // Le message injecté apparaît dans le fil comme un message utilisateur normal.
+      expect(screen.getByText(notice.discuss)).toBeInTheDocument();
+      const call = fetchMock.mock.calls[0];
+      const body = JSON.parse(String(call?.[1]?.body)) as { message: string };
+      expect(body.message).toBe(notice.discuss);
+      expect(markNotificationReadSpy).toHaveBeenCalledWith({ notificationId: 'n1' });
+      // Optimiste : le bandeau disparaît immédiatement.
+      expect(screen.queryByText(notice.message)).not.toBeInTheDocument();
+    });
+
+    it('la pile de notices reste hors de toute région aria-live', () => {
+      render(<AssistantChat csrfToken="tok" firstName="Angelo" notices={[notice]} />);
+      expect(screen.getByText(notice.message).closest('[aria-live]')).toBeNull();
     });
   });
 });

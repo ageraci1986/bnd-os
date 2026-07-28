@@ -363,6 +363,21 @@
   background: var(--accent-gradient);
   color: #fff;
 }
+/* Point animé — porté de la maquette `.ap-nav .dot`
+   (docs/superpowers/specs/assets/2026-07-27-assistant-mockup.html l.28),
+   Plan 3b Task 7. Signal binaire ("il y a du nouveau"), distinct de `.count`
+   qui affiche un nombre. `@keyframes nx-blink` définie plus bas
+   (section animations partagées) et neutralisée sous
+   `prefers-reduced-motion: reduce`. */
+.nav-item-dot {
+  margin-left: auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent-secondary);
+  flex-shrink: 0;
+  animation: nx-blink 2s ease-in-out infinite;
+}
 
 /* Client rows */
 .client-row {
@@ -2212,6 +2227,20 @@
   }
 }
 
+/* Clignotement doux — porté de `@keyframes ap-blink` de la maquette
+   (2026-07-27-assistant-mockup.html). Utilisé par `.nav-item-dot`
+   (sidebar) — voir aussi la déclinaison `ap-act i`/`ap-input .ph i` du même
+   effet, non encore portées (pas de besoin identifié ailleurs pour l'instant). */
+@keyframes nx-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
 /* Orbe assistant (Plan 4) — porté de la maquette validée (blob fluide + halo).
    États par data-attribute sur .nx-orb : data-activity="idle|thinking|responding|listening".
    prefers-reduced-motion : toutes les animations remplacées par un fondu statique. */
@@ -2330,6 +2359,9 @@
   .nx-orb[data-activity='thinking'] .nx-orb-blob,
   .nx-orb[data-activity='responding'] .nx-orb-blob {
     opacity: 1;
+  }
+  .nav-item-dot {
+    animation: none;
   }
 }
 

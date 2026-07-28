@@ -5,6 +5,7 @@ import { briefParts } from '@/lib/assistant/brief-sentence';
 import type { TodayOverview } from '@/lib/assistant/overview-core';
 import { parseSseLines, type StreamWidget } from '../lib/sse';
 import { AssistantOrb, deriveOrbActivity } from './assistant-orb';
+import { NoticeStack, type AgentNotice } from './notice-stack';
 import { renderWidget, type WidgetActions } from './widgets';
 import { appendWidget } from './widgets/dedupe-widgets';
 import { KpiCards } from './widgets/kpi-cards';
@@ -26,6 +27,12 @@ interface AssistantChatProps {
    * indisponible au chargement) : le brief statique reste affiché.
    */
   readonly overview?: TodayOverview;
+  /**
+   * Notices proactives non lues (Plan 3b Task 7), chargées côté serveur par
+   * la page. Optionnel : absent → pile vide (même dégradation que
+   * `overview`, ex. panne DB au chargement de la page).
+   */
+  readonly notices?: readonly AgentNotice[];
 }
 
 /**
@@ -108,7 +115,7 @@ function widgetKey(widget: StreamWidget, index: number): string {
   return `${index}:${widget.tool}:${updatedAt}`;
 }
 
-export function AssistantChat({ csrfToken, firstName, overview }: AssistantChatProps) {
+export function AssistantChat({ csrfToken, firstName, overview, notices }: AssistantChatProps) {
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [input, setInput] = useState('');
   // Ref miroir de `input` (Plan 5c Task 6, mandat B) — `send` la lit au lieu
@@ -371,6 +378,11 @@ export function AssistantChat({ csrfToken, firstName, overview }: AssistantChatP
           Demandez votre briefing, interrogez vos projets et vos mails.
         </p>
       )}
+
+      {/* Pile de notices (Plan 3b Task 7) — entre les KPI et le fil, HORS
+          aria-live (voir notice-stack.tsx : optimiste, pas d'annonce
+          screen-reader dédiée). Rend `null` quand `notices` est vide/absent. */}
+      <NoticeStack notices={notices ?? []} actions={widgetActions} />
 
       <div ref={listRef} className="flex w-full flex-1 flex-col gap-2 overflow-y-auto">
         {/* Seul le texte commité est annoncé (région live par bulle) : la réponse
