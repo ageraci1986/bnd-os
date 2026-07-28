@@ -64,6 +64,32 @@ function communicationsHref(mail: MailRow): string {
     : `/communications?mail=${mail.id}`;
 }
 
+/**
+ * Classes des pills d'action (maquette `docs/superpowers/specs/assets/
+ * 2026-07-28-assistant-v2-widgets-mockup.html`, `.ap-btn`). `--accent-gradient`
+ * / `--accent-gradient-soft` sont les tokens design system existants
+ * (packages/ui/src/tokens/tokens.css) pour le dégradé de marque — pas de
+ * valeur ad hoc réinventée ici.
+ */
+const PILL_BASE =
+  'inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-bold disabled:opacity-50';
+const PILL_GRAD = `${PILL_BASE} bg-[image:var(--accent-gradient)] text-white shadow-[0_3px_10px_rgba(139,43,226,0.3)]`;
+const PILL_SOFT = `${PILL_BASE} bg-[image:var(--accent-gradient-soft)] text-[color:var(--color-accent-primary)]`;
+const PILL_GHOST = `${PILL_BASE} border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] text-[color:var(--color-text-muted)] hover:bg-[color:var(--color-bg-hover)]`;
+// `#fecdd3` : pas de token danger « pâle » dans tokens.css (--color-danger-bg
+// est plus saturé) — valeur reprise telle quelle de la maquette (`.ap-btn.danger`).
+const PILL_DANGER = `${PILL_BASE} border border-[#fecdd3] bg-[color:var(--color-bg-card)] text-[color:var(--color-danger)] hover:bg-[color:var(--color-danger-bg)]`;
+
+/** Séparateur vertical entre groupes d'actions (`.ap-open .acts .sep` dans la maquette). */
+function ActionsSeparator() {
+  return (
+    <span
+      aria-hidden="true"
+      className="mx-0.5 h-4 w-px shrink-0 bg-[color:var(--color-border-soft)]"
+    />
+  );
+}
+
 function renderBody(state: BodyState | undefined) {
   if (state === undefined || state.status === 'loading') {
     return <p className="text-xs text-[color:var(--color-text-muted)]">Chargement du contenu…</p>;
@@ -190,21 +216,24 @@ export function MailListWidget({ data, actions }: MailListWidgetProps) {
   const showMarkAllRead = actions !== undefined && unreadShownIds.length >= 2;
 
   return (
-    <div className="w-full rounded-2xl border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] p-3">
-      {showMarkAllRead && (
-        <div className="mb-2 flex justify-end">
+    <div className="w-full overflow-hidden rounded-2xl border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)]">
+      <div className="flex items-center gap-2 border-b border-[color:var(--color-border-soft)] px-3.5 py-2.5">
+        <span className="text-[10px] font-extrabold uppercase tracking-[0.5px] text-[color:var(--color-text-ghost)]">
+          {`✉ ${mails.length} mails — ${unreadShownIds.length} non lus`}
+        </span>
+        {showMarkAllRead && (
           <button
             type="button"
             disabled={actions.busy}
             onClick={() =>
               actions.sendMessage(`Marque comme lus ces mails : ${unreadShownIds.join(', ')}`)
             }
-            className="text-[10px] font-semibold text-[color:var(--accent-primary)] hover:underline disabled:opacity-50"
+            className={`${PILL_GHOST} ml-auto`}
           >
             Tout marquer lu
           </button>
-        </div>
-      )}
+        )}
+      </div>
       <ul className="flex flex-col divide-y divide-[color:var(--color-border-soft)]">
         {mails.map((mail) => {
           const expanded = expandedIds[mail.id] === true;
@@ -216,29 +245,29 @@ export function MailListWidget({ data, actions }: MailListWidgetProps) {
           const rowActions = actions;
 
           return (
-            <li key={mail.id} className="py-2">
-              <div className="flex items-center gap-2">
+            <li key={mail.id}>
+              <div className="flex items-center gap-2 px-3.5 py-2">
                 <button
                   type="button"
                   aria-expanded={expanded}
                   aria-controls={bodyId}
                   onClick={() => toggleExpand(mail.id)}
-                  className="flex min-w-0 flex-1 items-center gap-2 bg-transparent text-left"
+                  className="flex min-w-0 flex-1 items-center gap-2.5 bg-transparent text-left"
                 >
-                  {!read && (
-                    <span
-                      aria-label="non lu"
-                      className="h-1.5 w-1.5 shrink-0 rounded-full"
-                      style={{ background: 'var(--accent-primary)' }}
-                    />
-                  )}
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-xs font-bold text-[color:var(--color-text-main)]">
-                      {mail.fromName ?? mail.fromEmail}
-                    </span>
-                    <span className="block truncate text-xs text-[color:var(--color-text-muted)]">
-                      {mail.subject ?? '(sans objet)'}
-                    </span>
+                  <span
+                    aria-label={read ? undefined : 'non lu'}
+                    className="h-1.5 w-1.5 shrink-0 rounded-full"
+                    style={{
+                      background: read
+                        ? 'var(--color-border-light)'
+                        : 'var(--color-accent-primary)',
+                    }}
+                  />
+                  <span className="w-[104px] shrink-0 truncate text-xs font-bold text-[color:var(--color-text-main)]">
+                    {mail.fromName ?? mail.fromEmail}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-xs text-[color:var(--color-text-muted)]">
+                    {mail.subject ?? '(sans objet)'}
                   </span>
                   <span className="shrink-0 text-[10px] text-[color:var(--color-text-ghost)]">
                     {formatReceivedAt(mail.receivedAt)}
@@ -260,49 +289,79 @@ export function MailListWidget({ data, actions }: MailListWidgetProps) {
                 </Link>
               </div>
               {note !== undefined && (
-                <p className="mt-1 text-[10px] text-[color:var(--color-danger)]">{note}</p>
-              )}
-              {rowActions !== undefined && (
-                <div className="mt-1 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    disabled={rowActions.busy}
-                    onClick={() => rowActions.sendMessage(`Prépare une réponse au mail ${mail.id}`)}
-                    className="text-[10px] font-semibold text-[color:var(--color-text-muted)] hover:underline disabled:opacity-50"
-                  >
-                    Répondre
-                  </button>
-                  <button
-                    type="button"
-                    disabled={rowActions.busy}
-                    onClick={() =>
-                      rowActions.sendMessage(`Prépare un transfert du mail ${mail.id}`)
-                    }
-                    className="text-[10px] font-semibold text-[color:var(--color-text-muted)] hover:underline disabled:opacity-50"
-                  >
-                    Transférer
-                  </button>
-                  <button
-                    type="button"
-                    disabled={rowActions.busy}
-                    onClick={() => rowActions.sendMessage(`Archive le mail ${mail.id}`)}
-                    className="text-[10px] font-semibold text-[color:var(--color-text-muted)] hover:underline disabled:opacity-50"
-                  >
-                    Archiver
-                  </button>
-                  <button
-                    type="button"
-                    disabled={rowActions.busy}
-                    onClick={() => rowActions.sendMessage(`Supprime le mail ${mail.id}`)}
-                    className="text-[10px] font-semibold text-[color:var(--color-danger)] hover:underline disabled:opacity-50"
-                  >
-                    Supprimer
-                  </button>
-                </div>
+                <p className="px-3.5 pb-1 text-[10px] text-[color:var(--color-danger)]">{note}</p>
               )}
               {expanded && (
-                <div id={bodyId} className="mt-2">
-                  {renderBody(bodies[mail.id])}
+                <div
+                  id={bodyId}
+                  className="mx-2 mb-2 rounded-xl px-3.5 py-3"
+                  style={{
+                    background:
+                      'linear-gradient(135deg, rgba(139,43,226,.025), rgba(255,42,109,.025))',
+                  }}
+                >
+                  <div className="flex items-center gap-2 pb-1">
+                    <span className="text-xs font-extrabold text-[color:var(--color-text-main)]">
+                      {mail.fromName ?? mail.fromEmail}
+                    </span>
+                    {mail.fromName !== null && (
+                      <span className="text-[10.5px] text-[color:var(--color-text-ghost)]">
+                        {mail.fromEmail}
+                      </span>
+                    )}
+                    <span className="ml-auto shrink-0 text-[10px] text-[color:var(--color-text-ghost)]">
+                      {formatReceivedAt(mail.receivedAt)}
+                    </span>
+                  </div>
+                  <div className="py-1">{renderBody(bodies[mail.id])}</div>
+                  {rowActions !== undefined && (
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5 pt-1">
+                      <button
+                        type="button"
+                        disabled={rowActions.busy}
+                        onClick={() =>
+                          rowActions.sendMessage(`Prépare une réponse au mail ${mail.id}`)
+                        }
+                        className={PILL_GRAD}
+                      >
+                        ↩ Répondre
+                      </button>
+                      <button
+                        type="button"
+                        disabled={rowActions.busy}
+                        onClick={() =>
+                          rowActions.sendMessage(`Prépare un transfert du mail ${mail.id}`)
+                        }
+                        className={PILL_SOFT}
+                      >
+                        ⇥ Transférer
+                      </button>
+                      <ActionsSeparator />
+                      <button type="button" onClick={() => toggleRead(mail)} className={PILL_GHOST}>
+                        {read ? '● Lu' : '◌ Non-lu'}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={rowActions.busy}
+                        onClick={() => rowActions.sendMessage(`Archive le mail ${mail.id}`)}
+                        className={PILL_GHOST}
+                      >
+                        🗂 Archiver ⚡
+                      </button>
+                      <button
+                        type="button"
+                        disabled={rowActions.busy}
+                        onClick={() => rowActions.sendMessage(`Supprime le mail ${mail.id}`)}
+                        className={PILL_DANGER}
+                      >
+                        🗑 Supprimer ⚡
+                      </button>
+                      <ActionsSeparator />
+                      <Link href={communicationsHref(mail)} className={PILL_GHOST}>
+                        ↗ Ouvrir dans Communications
+                      </Link>
+                    </div>
+                  )}
                 </div>
               )}
             </li>
