@@ -1,17 +1,17 @@
 import 'server-only';
 import type { InngestFunction } from 'inngest';
+import { morningBriefing } from './morning-briefing';
 
 /**
  * Registre des fonctions Inngest servies par `app/api/inngest/route.ts`.
  *
- * Vide pour l'instant (Plan 3b Task 2 — socle). Les 3 crons de proactivité
- * (briefing matinal, scan horaire des cartes bloquées, mails importants)
- * sont ajoutés aux Tasks 4-6, chacun dans son propre fichier sous
- * `lib/inngest/functions/`, puis poussé dans ce tableau.
+ * `morningBriefing` (Task 4) ajouté ; les 2 crons restants (scan horaire des
+ * cartes bloquées, mails importants) arrivent aux Tasks 5-6, chacun dans son
+ * propre fichier sous `lib/inngest/functions/`, puis poussés dans ce tableau.
  *
  * PINNED (Task 4) : ces fonctions ne doivent importer AUCUN provider/registry
  * de `@nexushub/agent` — les crons ne font aucun appel Anthropic (zéro
  * token, voir Architecture du plan 3b). Le test d'import de ce module fait
- * partie de la garde.
+ * partie de la garde (`morning-briefing-imports.test.ts`).
  */
-export const functions: InngestFunction.Any[] = [];
+export const functions: InngestFunction.Any[] = [morningBriefing];

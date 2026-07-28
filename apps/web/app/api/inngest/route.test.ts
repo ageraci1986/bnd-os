@@ -1,9 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 
 /**
- * Task 2 (socle Inngest) : `functions` est vide et les 3 crons arrivent aux
- * Tasks 4-6, donc rien à exécuter ici via `InngestTestEngine` (réservé aux
- * fonctions elles-mêmes). Ce test couvre le minimum utile au socle :
+ * Task 2 (socle Inngest) : `functions` démarrait vide, les 3 crons arrivant
+ * aux Tasks 4-6 — `morningBriefing` (Task 4) est le premier ajouté. Le
+ * comportement de la fonction elle-même est couvert par
+ * `lib/inngest/functions/morning-briefing.test.ts` ; ce fichier couvre le
+ * minimum utile à la route :
  * - la route exporte bien GET/POST/PUT (contrat App Router d'Inngest) ;
  * - `serve()` est appelé avec le client `nexushub` et le registre `functions` ;
  * - une requête PUT (sync) sans signature valide échoue plutôt que de
@@ -28,8 +30,9 @@ describe('GET/POST/PUT /api/inngest', () => {
     expect(inngestClient.id).toBe('nexushub');
   });
 
-  it('starts with an empty function registry (Tasks 4-6 extend it)', () => {
-    expect(functions).toEqual([]);
+  it('registers the morning-briefing function (Task 4) — Tasks 5-6 extend it further', () => {
+    expect(functions).toHaveLength(1);
+    expect(functions[0]?.id()).toBe('morning-briefing');
   });
 
   it('rejects an unauthenticated PUT (sync) request rather than registering blindly', async () => {

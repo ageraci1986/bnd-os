@@ -1,9 +1,19 @@
 import 'server-only';
 
 import { prisma } from '@nexushub/db';
-import type { AuthContext } from '@/lib/auth';
-import { loadUserScope, scopedCardWhere } from '@/lib/auth/scope';
+import { loadUserScope, scopedCardWhere, type ScopeAuthContext } from '@/lib/auth/scope';
 import { startOfTodayUtc } from '@/features/projects/lib/card-filter';
+
+/**
+ * `loadTodayOverview` only reads `workspaceId`/`userId` directly and
+ * forwards the context to `loadUserScope` (which itself only needs
+ * `userId`/`workspaceId`/`role`/`isSuperAdmin`) — re-export the same
+ * reduced shape so callers without a real HTTP session (Inngest cron
+ * functions building a context from a `Membership` row, no `email`) don't
+ * need to fabricate one. The page/tool callers keep passing the full
+ * `AuthContext`, which satisfies this narrower type — no behavior change.
+ */
+export type OverviewAuthContext = ScopeAuthContext;
 
 /**
  * Forme EXACTE sérialisée par le tool `get_today_overview`
@@ -24,7 +34,7 @@ export interface TodayOverview {
  * (card-core, project-core…) — pas de dépendance à un scope préchargé par un
  * appelant.
  */
-export async function loadTodayOverview(ctx: AuthContext): Promise<TodayOverview> {
+export async function loadTodayOverview(ctx: OverviewAuthContext): Promise<TodayOverview> {
   const scope = await loadUserScope(ctx);
   const workspaceId = ctx.workspaceId;
   // Convention repo (card-filter.ts) : les échéances sont stockées à minuit

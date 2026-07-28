@@ -1,6 +1,7 @@
 'use client';
 
 import { Fragment, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { briefParts } from '@/lib/assistant/brief-sentence';
 import type { TodayOverview } from '@/lib/assistant/overview-core';
 import { parseSseLines, type StreamWidget } from '../lib/sse';
 import { AssistantOrb, deriveOrbActivity } from './assistant-orb';
@@ -28,25 +29,16 @@ interface AssistantChatProps {
 }
 
 /**
- * Phrase digérée de l'accueil, construite depuis `overview` — accords
- * singulier/pluriel exacts. La partie « bloquée(s) » n'apparaît que si
- * `blockedCards > 0`, colorée avec le même token danger que `KpiCards`
+ * Phrase digérée de l'accueil, construite depuis `overview` via
+ * `briefParts` (accords singulier/pluriel factorisés dans
+ * `lib/assistant/brief-sentence.ts` — partagé avec la notice de briefing
+ * matinal Inngest, Plan 3b Task 4). La partie « bloquée(s) » n'apparaît que
+ * si `blockedCards > 0`, colorée avec le même token danger que `KpiCards`
  * (widgets/kpi-cards.tsx) pour rester cohérente avec le rendu in-thread du
  * même tool (`get_today_overview`).
  */
-// Règle CLDR fr : "one" pour n = 0 ou 1 (« 0 mail », « 1 mail »), "other" au-delà.
-function isSingularFr(count: number): boolean {
-  return count === 0 || count === 1;
-}
-
 function DigestedBrief({ overview }: { readonly overview: TodayOverview }) {
-  const { dueTodayCards, blockedCards, unreadMails } = overview;
-  const taskPart = `${dueTodayCards} ${isSingularFr(dueTodayCards) ? 'tâche due' : 'tâches dues'} aujourd'hui`;
-  const mailPart = `${unreadMails} ${isSingularFr(unreadMails) ? 'mail non lu' : 'mails non lus'}`;
-  const blockedPart =
-    blockedCards > 0
-      ? `${blockedCards} ${isSingularFr(blockedCards) ? 'bloquée' : 'bloquées'}`
-      : null;
+  const { task: taskPart, blocked: blockedPart, mail: mailPart } = briefParts(overview);
   return (
     <p data-testid="assistant-brief" className="text-sm text-[color:var(--color-text-muted)]">
       {taskPart}
