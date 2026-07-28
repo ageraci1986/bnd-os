@@ -103,6 +103,24 @@ describe('runMorningBriefing', () => {
     expect(result).toEqual({ workspaces: 1, notices: 0 });
   });
 
+  it('still skips when only unreadNotifications is non-zero (notices agent ne comptent pas)', async () => {
+    // Finding de revue : inclure unreadNotifications dans la garde ferait
+    // envoyer des briefings « 0 partout » auto-entretenus par le briefing
+    // non lu de la veille.
+    const members: BriefingMember[] = [{ userId: 'u1', role: 'user', isSuperAdmin: false }];
+    const createNotice = vi.fn(async () => ({ created: true }));
+    const deps = baseDeps({
+      listBriefingOptedInMembers: async () => members,
+      loadOverview: async () => overview({ unreadNotifications: 3 }),
+      createNotice,
+    });
+
+    const result = await runMorningBriefing(deps);
+
+    expect(createNotice).not.toHaveBeenCalled();
+    expect(result).toEqual({ workspaces: 1, notices: 0 });
+  });
+
   it('creates the notice with the exact pinned message/ref/discuss when the overview is not all-zero', async () => {
     const members: BriefingMember[] = [{ userId: 'u1', role: 'user', isSuperAdmin: false }];
     const createNotice = vi.fn(async () => ({ created: true }));

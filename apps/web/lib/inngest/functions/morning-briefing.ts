@@ -90,13 +90,15 @@ export function brusselsDateStamp(now: Date): string {
   }).format(now);
 }
 
+/**
+ * « Rien à dire » = uniquement les compteurs que `briefSentence` RACONTE
+ * (tâches/bloquées/mails). `unreadNotifications` est volontairement exclu :
+ * il compte toutes les kinds — y compris les notices agent elles-mêmes — et
+ * l'inclure ferait envoyer des briefings « 0 partout » auto-entretenus par le
+ * briefing non lu de la veille (finding de revue holistique Plan 3b).
+ */
 function isAllZero(overview: TodayOverview): boolean {
-  return (
-    overview.blockedCards === 0 &&
-    overview.dueTodayCards === 0 &&
-    overview.unreadMails === 0 &&
-    overview.unreadNotifications === 0
-  );
+  return overview.blockedCards === 0 && overview.dueTodayCards === 0 && overview.unreadMails === 0;
 }
 
 export interface MorningBriefingDeps {
