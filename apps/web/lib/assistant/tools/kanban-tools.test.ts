@@ -11,8 +11,20 @@ const cardCoreMocks = vi.hoisted(() => ({
 }));
 vi.mock('@/features/projects/lib/card-core', () => cardCoreMocks);
 
-const projectCoreMocks = vi.hoisted(() => ({ createProjectCore: vi.fn() }));
+const projectCoreMocks = vi.hoisted(() => ({
+  createProjectCore: vi.fn(),
+  updateProjectCore: vi.fn(),
+  deleteProjectCore: vi.fn(),
+}));
 vi.mock('@/features/projects/lib/project-core', () => projectCoreMocks);
+
+const columnCoreMocks = vi.hoisted(() => ({
+  addColumnCore: vi.fn(),
+  renameColumnCore: vi.fn(),
+  reorderColumnsCore: vi.fn(),
+  deleteColumnCore: vi.fn(),
+}));
+vi.mock('@/features/projects/lib/column-core', () => columnCoreMocks);
 
 const moveCardMocks = vi.hoisted(() => ({ moveCard: vi.fn() }));
 vi.mock('@/features/projects/actions/move-card', () => moveCardMocks);
@@ -31,8 +43,13 @@ vi.mock('@/features/projects/actions/card-assignees', () => assigneeMocks);
 
 // Lecture-après-écriture (spec V2 §3.1) : `move_card`/`update_card` relisent
 // l'état en DB après mutation — voir repo convention dans card-core.test.ts.
+// `project.findFirst` / `column.findFirst` / `card.count` : lookups véridiques
+// des `describeForConfirm` gated (delete_project, delete_column) — anti-spoofing,
+// voir types.ts.
 const prismaMocks = vi.hoisted(() => ({
-  card: { findFirst: vi.fn() },
+  card: { findFirst: vi.fn(), count: vi.fn() },
+  project: { findFirst: vi.fn() },
+  column: { findFirst: vi.fn() },
 }));
 vi.mock('@nexushub/db', () => ({ prisma: prismaMocks }));
 
@@ -81,21 +98,28 @@ beforeEach(() => {
 });
 
 describe('buildKanbanTools', () => {
-  it('expose les 8 tools mutants, seul delete_card gated, aucun adminOnly', () => {
+  it('expose les 14 tools mutants, delete_card/delete_project/delete_column gated, aucun adminOnly', () => {
     const list = tools();
     expect(list.map((t) => t.name).sort()).toEqual([
       'add_card_assignee',
+      'add_column',
       'create_card',
       'create_project',
       'delete_card',
+      'delete_column',
+      'delete_project',
       'move_card',
       'remove_card_assignee',
+      'rename_column',
+      'reorder_columns',
       'set_card_due_date',
       'update_card',
+      'update_project',
     ]);
     expect(list.every((t) => !t.adminOnly)).toBe(true);
+    const gatedNames = new Set(['delete_card', 'delete_project', 'delete_column']);
     for (const t of list) {
-      expect(t.gated).toBe(t.name === 'delete_card');
+      expect(t.gated).toBe(gatedNames.has(t.name));
     }
   });
 
@@ -476,5 +500,246 @@ describe('buildKanbanTools', () => {
     cardCoreMocks.deleteCardCore.mockResolvedValue({ ok: false, message: 'Carte introuvable.' });
     const fail = await run('delete_card', { cardId: CARD_ID });
     expect(fail).toBe('Échec : Carte introuvable.');
+  });
+
+  it('update_project : transmet ctx + champs fournis au core (conditional-spread) et renvoie le post-état JSON', async () => {
+    projectCoreMocks.updateProjectCore.mockResolvedValue({
+      ok: true,
+      name: 'Nouveau nom',
+      description: null,
+      startDate: '2026-08-01',
+      endDate: null,
+    });
+    const out = await run('update_project', {
+      projectId: PROJECT_ID,
+      name: 'Nouveau nom',
+      startDate: '2026-08-01',
+    });
+    expect(projectCoreMocks.updateProjectCore).toHaveBeenCalledWith(ctx, {
+      projectId: PROJECT_ID,
+      name: 'Nouveau nom',
+      startDate: '2026-08-01',
+    });
+    expect(JSON.parse(out)).toEqual({
+      updated: true,
+      name: 'Nouveau nom',
+      description: null,
+      startDate: '2026-08-01',
+      endDate: null,
+    });
+  });
+
+  it('update_project : les champs absents ne sont pas transmis ; null (effacement) l’est', async () => {
+    projectCoreMocks.updateProjectCore.mockResolvedValue({
+      ok: true,
+      name: 'X',
+      description: null,
+      startDate: null,
+      endDate: null,
+    });
+    await run('update_project', { projectId: PROJECT_ID, description: null });
+    expect(projectCoreMocks.updateProjectCore).toHaveBeenCalledWith(ctx, {
+      projectId: PROJECT_ID,
+      description: null,
+    });
+  });
+
+  it('update_project : échec core → message montrable', async () => {
+    projectCoreMocks.updateProjectCore.mockResolvedValue({
+      ok: false,
+      message: 'La date de fin doit être après la date de début',
+    });
+    const out = await run('update_project', { projectId: PROJECT_ID, startDate: '2026-08-01' });
+    expect(out).toBe('Échec : La date de fin doit être après la date de début');
+  });
+
+  it('update_project : le schéma refuse une date calendaire inexistante (2026-02-30) et accepte null (effacement)', () => {
+    const schema = getTool('update_project').inputSchema as z.ZodTypeAny;
+    const bad = schema.safeParse({ projectId: PROJECT_ID, startDate: '2026-02-30' });
+    expect(bad.success).toBe(false);
+    if (!bad.success) {
+      expect(bad.error.issues[0]?.message).toBe('Date invalide.');
+    }
+    expect(schema.safeParse({ projectId: PROJECT_ID, startDate: null }).success).toBe(true);
+    expect(schema.safeParse({ projectId: PROJECT_ID, endDate: null }).success).toBe(true);
+    expect(schema.safeParse({ projectId: PROJECT_ID, description: null }).success).toBe(true);
+    expect(schema.safeParse({ projectId: PROJECT_ID }).success).toBe(true);
+  });
+
+  it('delete_project est gated:true et wrappe deleteProjectCore(ctx, …)', async () => {
+    const tool = getTool('delete_project');
+    expect(tool.gated).toBe(true);
+
+    projectCoreMocks.deleteProjectCore.mockResolvedValue({ ok: true });
+    const ok = await run('delete_project', { projectId: PROJECT_ID });
+    expect(projectCoreMocks.deleteProjectCore).toHaveBeenCalledWith(ctx, { projectId: PROJECT_ID });
+    expect(ok).toBe('Projet supprimé (corbeille 30 jours).');
+
+    projectCoreMocks.deleteProjectCore.mockResolvedValue({
+      ok: false,
+      message: 'Projet introuvable.',
+    });
+    const fail = await run('delete_project', { projectId: PROJECT_ID });
+    expect(fail).toBe('Échec : Projet introuvable.');
+  });
+
+  it('delete_project : describeForConfirm lit le nom + le compte de cartes réels en DB (input = id seul, jamais de nom fourni), et reste prudent si introuvable', async () => {
+    const tool = getTool('delete_project');
+    const describe = tool.describeForConfirm as (input: unknown) => Promise<string>;
+
+    prismaMocks.project.findFirst.mockResolvedValueOnce({
+      name: 'Campagne été',
+      _count: { cards: 3 },
+    });
+    const found = await describe({ projectId: PROJECT_ID });
+    expect(prismaMocks.project.findFirst).toHaveBeenCalledWith({
+      where: { id: PROJECT_ID, workspaceId: ctx.workspaceId, deletedAt: null },
+      select: { name: true, _count: { select: { cards: { where: { deletedAt: null } } } } },
+    });
+    expect(found).toBe('Supprimer le projet « Campagne été » (3 cartes) — restaurable 30 jours ?');
+
+    prismaMocks.project.findFirst.mockResolvedValueOnce({
+      name: 'Solo',
+      _count: { cards: 1 },
+    });
+    const singular = await describe({ projectId: PROJECT_ID });
+    expect(singular).toBe('Supprimer le projet « Solo » (1 carte) — restaurable 30 jours ?');
+
+    prismaMocks.project.findFirst.mockResolvedValueOnce(null);
+    const missing = await describe({ projectId: PROJECT_ID });
+    expect(missing).toBe('Supprimer un projet introuvable dans ce workspace ?');
+  });
+
+  it('add_column : transmet ctx + input au core et renvoie {created, columnId, columns}', async () => {
+    columnCoreMocks.addColumnCore.mockResolvedValue({
+      ok: true,
+      columnId: 'col-1',
+      columns: [{ id: 'col-1', name: 'Idée', position: 1024 }],
+    });
+    const out = await run('add_column', { projectId: PROJECT_ID, name: 'Idée' });
+    expect(columnCoreMocks.addColumnCore).toHaveBeenCalledWith(ctx, {
+      projectId: PROJECT_ID,
+      name: 'Idée',
+    });
+    expect(JSON.parse(out)).toEqual({
+      created: true,
+      columnId: 'col-1',
+      columns: [{ id: 'col-1', name: 'Idée', position: 1024 }],
+    });
+  });
+
+  it('add_column : échec core → message montrable', async () => {
+    columnCoreMocks.addColumnCore.mockResolvedValue({
+      ok: false,
+      message: 'Nom de colonne requis.',
+    });
+    const out = await run('add_column', { projectId: PROJECT_ID, name: 'X' });
+    expect(out).toBe('Échec : Nom de colonne requis.');
+  });
+
+  it('rename_column : transmet ctx + input au core et renvoie {renamed, name}', async () => {
+    columnCoreMocks.renameColumnCore.mockResolvedValue({ ok: true, name: 'Créa v2' });
+    const out = await run('rename_column', { columnId: COLUMN_ID, name: 'Créa v2' });
+    expect(columnCoreMocks.renameColumnCore).toHaveBeenCalledWith(ctx, {
+      columnId: COLUMN_ID,
+      name: 'Créa v2',
+    });
+    expect(JSON.parse(out)).toEqual({ renamed: true, name: 'Créa v2' });
+  });
+
+  it('rename_column : échec core (Bloqué verrouillée) → message montrable', async () => {
+    columnCoreMocks.renameColumnCore.mockResolvedValue({
+      ok: false,
+      message: 'La colonne « Bloqué » est gérée par le système et ne peut pas être modifiée.',
+    });
+    const out = await run('rename_column', { columnId: COLUMN_ID, name: 'X' });
+    expect(out).toBe(
+      'Échec : La colonne « Bloqué » est gérée par le système et ne peut pas être modifiée.',
+    );
+  });
+
+  it('reorder_columns : transmet ctx + input au core et renvoie {reordered, columns}', async () => {
+    const orderedColumnIds = [COLUMN_ID, PROJECT_ID];
+    columnCoreMocks.reorderColumnsCore.mockResolvedValue({ ok: true, columns: [] });
+    const out = await run('reorder_columns', { projectId: PROJECT_ID, orderedColumnIds });
+    expect(columnCoreMocks.reorderColumnsCore).toHaveBeenCalledWith(ctx, {
+      projectId: PROJECT_ID,
+      orderedColumnIds,
+    });
+    expect(JSON.parse(out)).toEqual({ reordered: true, columns: [] });
+  });
+
+  it('reorder_columns : échec core (liste incomplète/doublon) → message montrable', async () => {
+    columnCoreMocks.reorderColumnsCore.mockResolvedValue({
+      ok: false,
+      message:
+        'La liste doit contenir exactement toutes les colonnes du projet (hors « Bloqué »), sans doublon.',
+    });
+    const out = await run('reorder_columns', {
+      projectId: PROJECT_ID,
+      orderedColumnIds: [COLUMN_ID],
+    });
+    expect(out).toBe(
+      'Échec : La liste doit contenir exactement toutes les colonnes du projet (hors « Bloqué »), sans doublon.',
+    );
+  });
+
+  it('delete_column est gated:true et wrappe deleteColumnCore(ctx, …)', async () => {
+    const tool = getTool('delete_column');
+    expect(tool.gated).toBe(true);
+
+    columnCoreMocks.deleteColumnCore.mockResolvedValue({
+      ok: true,
+      movedCards: 2,
+      movedTo: 'Brief',
+      columns: [],
+    });
+    const out = await run('delete_column', { columnId: COLUMN_ID });
+    expect(columnCoreMocks.deleteColumnCore).toHaveBeenCalledWith(ctx, { columnId: COLUMN_ID });
+    expect(JSON.parse(out)).toEqual({
+      deleted: true,
+      movedCards: 2,
+      movedTo: 'Brief',
+      columns: [],
+    });
+
+    columnCoreMocks.deleteColumnCore.mockResolvedValue({
+      ok: false,
+      message: 'Impossible de supprimer la dernière colonne du projet.',
+    });
+    const fail = await run('delete_column', { columnId: COLUMN_ID });
+    expect(fail).toBe('Échec : Impossible de supprimer la dernière colonne du projet.');
+  });
+
+  it('delete_column : describeForConfirm lit le nom + le compte de cartes réels en DB (input = id seul), colonne vide vs non vide vs introuvable', async () => {
+    const tool = getTool('delete_column');
+    const describe = tool.describeForConfirm as (input: unknown) => Promise<string>;
+
+    prismaMocks.column.findFirst.mockResolvedValueOnce({ name: 'Brief', isBlockedSystem: false });
+    prismaMocks.card.count.mockResolvedValueOnce(0);
+    const empty = await describe({ columnId: COLUMN_ID });
+    expect(prismaMocks.column.findFirst).toHaveBeenCalledWith({
+      where: { id: COLUMN_ID, project: { workspaceId: ctx.workspaceId, deletedAt: null } },
+      select: { name: true, isBlockedSystem: true },
+    });
+    expect(empty).toBe('Supprimer la colonne vide « Brief » ?');
+
+    prismaMocks.column.findFirst.mockResolvedValueOnce({ name: 'Créa', isBlockedSystem: false });
+    prismaMocks.card.count.mockResolvedValueOnce(4);
+    const nonEmpty = await describe({ columnId: COLUMN_ID });
+    expect(nonEmpty).toBe(
+      'Supprimer la colonne « Créa » et déplacer ses 4 cartes vers la première colonne du projet ?',
+    );
+
+    prismaMocks.column.findFirst.mockResolvedValueOnce({ name: 'Solo', isBlockedSystem: false });
+    prismaMocks.card.count.mockResolvedValueOnce(1);
+    const singular = await describe({ columnId: COLUMN_ID });
+    expect(singular).toBe(
+      'Supprimer la colonne « Solo » et déplacer ses 1 carte vers la première colonne du projet ?',
+    );
+
+    prismaMocks.column.findFirst.mockResolvedValueOnce(null);
+    const missing = await describe({ columnId: COLUMN_ID });
+    expect(missing).toBe('Supprimer une colonne introuvable dans ce workspace ?');
   });
 });
