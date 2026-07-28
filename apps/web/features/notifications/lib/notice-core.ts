@@ -76,6 +76,12 @@ export async function createAgentNotice(input: AgentNoticeInput): Promise<{ crea
     const unread = await prisma.notification.findMany({
       where: { userId: input.userId, kind: input.kind, readAt: null },
       select: { data: true },
+      // Deterministic ordering: without it, Postgres does not guarantee any
+      // particular row order, so truncation at DEDUP_SCAN_LIMIT could drop
+      // an arbitrary subset once a user has more than 50 unread notices of
+      // the same kind. Most-recent-first keeps the scan meaningful (the
+      // notices most likely to still be relevant/duplicated are kept).
+      orderBy: { createdAt: 'desc' },
       take: DEDUP_SCAN_LIMIT,
     });
     const isDuplicate = unread.some((notification) => {

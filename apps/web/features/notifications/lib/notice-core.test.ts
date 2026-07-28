@@ -135,6 +135,7 @@ describe('createAgentNotice', () => {
     expect(prismaMock.notification.findMany).toHaveBeenCalledWith({
       where: { userId: USER_ID, kind: 'agent_card_blocked', readAt: null },
       select: { data: true },
+      orderBy: { createdAt: 'desc' },
       take: 50,
     });
     expect(prismaMock.notification.create).not.toHaveBeenCalled();
