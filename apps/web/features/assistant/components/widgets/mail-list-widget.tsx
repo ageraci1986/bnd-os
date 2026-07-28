@@ -15,6 +15,11 @@ const MailRowSchema = z.object({
   receivedAt: z.string(),
   isRead: z.boolean(),
   folder: z.string(),
+  // Optionnel : tolérant aux données produites par un tour antérieur à
+  // l'ajout d'`integrationId` côté search_mails (Plan 5c Task 3). Utilisé par
+  // le rendu interactif du widget (Task 4) pour le deep-link
+  // `?mailbox=<integrationId>&mail=<id>` — pas encore consommé ici.
+  integrationId: z.string().optional(),
 });
 
 const MailListSchema = z.array(MailRowSchema);

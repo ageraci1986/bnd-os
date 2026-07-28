@@ -247,6 +247,7 @@ describe('buildReadTools', () => {
         receivedAt: new Date('2026-07-26T10:00:00Z'),
         isRead: false,
         folder: 'inbox',
+        integrationId: 'int-1',
       },
     ]);
     const out = JSON.parse(await execute('search_mails', { query: 'devis' }));
@@ -261,6 +262,50 @@ describe('buildReadTools', () => {
     await execute('search_mails', { query: 'devis' });
     const where = prismaMock.emailMessage.findMany.mock.calls[0]?.[0]?.where;
     expect(where.archivedAt).toBeNull();
+  });
+
+  it('search_mails select `integrationId` (nécessaire au deep-link du widget mail)', async () => {
+    prismaMock.emailMessage.findMany.mockResolvedValue([]);
+    await execute('search_mails', { query: 'devis' });
+    const select = prismaMock.emailMessage.findMany.mock.calls[0]?.[0]?.select;
+    expect(select).toEqual({
+      id: true,
+      subject: true,
+      fromEmail: true,
+      fromName: true,
+      receivedAt: true,
+      isRead: true,
+      folder: true,
+      integrationId: true,
+    });
+  });
+
+  it('search_mails renvoie `integrationId` dans le JSON de sortie de chaque mail', async () => {
+    prismaMock.emailMessage.findMany.mockResolvedValue([
+      {
+        id: 'm1',
+        subject: 'Devis',
+        fromEmail: 'marc@acme.com',
+        fromName: 'Marc',
+        receivedAt: new Date('2026-07-26T10:00:00Z'),
+        isRead: false,
+        folder: 'inbox',
+        integrationId: 'int-1',
+      },
+    ]);
+    const out = JSON.parse(await execute('search_mails', { query: 'devis' }));
+    expect(out).toEqual([
+      {
+        id: 'm1',
+        subject: 'Devis',
+        fromEmail: 'marc@acme.com',
+        fromName: 'Marc',
+        receivedAt: '2026-07-26T10:00:00.000Z',
+        isRead: false,
+        folder: 'inbox',
+        integrationId: 'int-1',
+      },
+    ]);
   });
 
   it('read_mail charge le corps paresseusement via fetchMailBody quand absent en DB', async () => {

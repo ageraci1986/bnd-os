@@ -79,6 +79,48 @@ describe('<MailListWidget />', () => {
     expect(screen.getAllByRole('link')).toHaveLength(10);
   });
 
+  it('parses data WITH integrationId without any regression in rendering', () => {
+    render(
+      <MailListWidget
+        data={[
+          {
+            id: 'mail-1',
+            subject: 'Point client',
+            fromEmail: 'alice@acme.test',
+            fromName: 'Alice',
+            receivedAt: '2026-07-27T10:00:00.000Z',
+            isRead: false,
+            folder: 'inbox',
+            integrationId: 'int-1',
+          },
+        ]}
+      />,
+    );
+    expect(screen.getByText('Alice')).toBeInTheDocument();
+    expect(screen.getByText('Point client')).toBeInTheDocument();
+    expect(screen.getAllByRole('link')).toHaveLength(1);
+  });
+
+  it('parses data WITHOUT integrationId (older turns / tolerant field)', () => {
+    render(
+      <MailListWidget
+        data={[
+          {
+            id: 'mail-1',
+            subject: 'Point client',
+            fromEmail: 'alice@acme.test',
+            fromName: 'Alice',
+            receivedAt: '2026-07-27T10:00:00.000Z',
+            isRead: false,
+            folder: 'inbox',
+          },
+        ]}
+      />,
+    );
+    expect(screen.getByText('Alice')).toBeInTheDocument();
+    expect(screen.getAllByRole('link')).toHaveLength(1);
+  });
+
   it('renders nothing for an empty result list', () => {
     const { container } = render(<MailListWidget data={[]} />);
     expect(container.firstChild).toBeNull();
