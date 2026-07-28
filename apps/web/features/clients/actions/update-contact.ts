@@ -1,13 +1,10 @@
 'use server';
 import 'server-only';
 import { revalidatePath } from 'next/cache';
-import { Prisma, prisma } from '@nexushub/db';
-import { NotFoundError } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
-import { loadUserScope } from '@/lib/auth/scope';
 import { assertCsrfFromFormData } from '@/lib/csrf';
-import { SCOPE_ERROR_MESSAGE } from '@/features/projects/lib/scope-error';
 import { UpdateContactSchema } from '../lib/schemas';
+import { updateContactCore } from '../lib/client-core';
 
 export type UpdateContactState =
   | { readonly status: 'idle' }
@@ -41,41 +38,20 @@ export async function updateContact(
   }
   const data = parsed.data;
 
-  const contact = await prisma.contact.findFirst({
-    where: { id: data.contactId, workspaceId: ctx.workspaceId, deletedAt: null },
-    select: { id: true, clientId: true },
+  const result = await updateContactCore(ctx, {
+    contactId: data.contactId,
+    firstName: data.name.firstName,
+    lastName: data.name.lastName,
+    jobTitle: data.jobTitle,
+    email: data.email,
+    phone: data.phone,
+    raci: data.raci ?? null,
+    notes: data.notes,
   });
-  if (!contact) return { status: 'error', message: 'Contact introuvable.' };
-
-  const scope = await loadUserScope(ctx);
-  if (scope.kind === 'restricted') {
-    const allowed = scope.clientIds.includes(contact.clientId);
-    if (!allowed) return { status: 'error', message: SCOPE_ERROR_MESSAGE };
+  if (!result.ok) {
+    return { status: 'error', message: result.message };
   }
 
-  try {
-    await prisma.contact.update({
-      where: {
-        id: data.contactId,
-        workspaceId: ctx.workspaceId,
-        deletedAt: null,
-      },
-      data: {
-        firstName: data.name.firstName,
-        lastName: data.name.lastName,
-        jobTitle: data.jobTitle,
-        email: data.email,
-        phone: data.phone,
-        raci: data.raci ?? null,
-        notes: data.notes,
-      },
-    });
-    revalidatePath('/clients');
-    return { status: 'success' };
-  } catch (err) {
-    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
-      throw new NotFoundError('Contact');
-    }
-    throw err;
-  }
+  revalidatePath('/clients');
+  return { status: 'success' };
 }

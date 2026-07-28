@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => ({
   streamTurn: vi.fn(),
   gatedHandler: vi.fn(),
   readHandler: vi.fn(),
+  adminHandler: vi.fn(),
   loadMemories: vi.fn(),
 }));
 
@@ -78,6 +79,22 @@ vi.mock('@/lib/assistant/tools', async () => {
           inputSchema: z.object({}),
           jsonSchema: { type: 'object', properties: {} },
           handler: async () => mocks.readHandler(),
+        }),
+      );
+      // Tool adminOnly + gated factice (Plan 5b Task 5, ex: change_member_role) —
+      // exerce le vrai chemin `run-turn.ts` : le garde adminOnly précède le gate
+      // de confirmation, donc un rôle non-admin est refusé AVANT tout
+      // confirm_request/exécution.
+      registry.register(
+        defineTool({
+          name: 'fake_admin_tool',
+          description: 'Tool admin-only factice pour les tests.',
+          inputSchema: z.object({}),
+          jsonSchema: { type: 'object', properties: {} },
+          adminOnly: true,
+          gated: true,
+          describeForConfirm: () => 'Exécuter le tool admin-only factice.',
+          handler: async () => mocks.adminHandler(),
         }),
       );
       return registry;
@@ -336,5 +353,47 @@ describe('POST /api/assistant/chat — tool_result (widgets)', () => {
       name: 'search_mails',
       isError: false,
     });
+  });
+});
+
+describe('POST /api/assistant/chat — garde adminOnly (Plan 5b Task 5)', () => {
+  it('rôle user + tool adminOnly appelé → refus dur du registry, sans confirm_request ni exécution', async () => {
+    // ctx par défaut (beforeEach) a role: 'user' — pas besoin de le redéfinir.
+    mocks.streamTurn
+      .mockResolvedValueOnce(toolUseRound('fake_admin_tool'))
+      .mockResolvedValueOnce(endTurnRound());
+
+    const res = await POST(makeRequest({ messages: [], message: 'Change le rôle de Bob.' }));
+    expect(res.status).toBe(200);
+    const events = await readEvents(res);
+
+    // Le garde adminOnly (`executeGated` dans run-turn.ts) précède le gate de
+    // confirmation : aucun dialog n'est jamais proposé pour un tool que le
+    // rôle courant ne peut de toute façon pas exécuter.
+    expect(findEvent(events, 'confirm_request')).toBeUndefined();
+    expect(findEvent(events, 'confirm_resolved')).toBeUndefined();
+    expect(findEvent(events, 'tool_start')).toBeUndefined();
+    expect(findEvent(events, 'tool_end')).toBeUndefined();
+    expect(mocks.adminHandler).not.toHaveBeenCalled();
+    expect(findEvent(events, 'done')).toBeDefined();
+
+    // Pas d'audit assistant_gate (jamais atteint : le refus se joue avant le
+    // confirmer côté route) — seul assistant_turn est journalisé.
+    expect(mocks.recordAudit).not.toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'assistant_gate' }),
+    );
+    expect(mocks.recordAudit).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'assistant_turn' }),
+    );
+
+    // Le refus (message user-safe, sans PII) est bien renvoyé au modèle comme
+    // résultat du tool_use, quelque part dans l'historique reconstruit.
+    // Note : `messages` est le même tableau muté en place au fil des rounds
+    // (run-turn.ts pousse dedans après chaque round) — l'inspecter après coup
+    // via `mock.calls` en donne l'état FINAL, pas l'état au moment de l'appel ;
+    // c'est pourquoi on cherche dans tout le tableau plutôt qu'à une position
+    // fixe (ex: `.at(-1)`, qui pointerait vers le texte final « Fait. »).
+    const secondCall = mocks.streamTurn.mock.calls[1]?.[0] as { messages: unknown[] } | undefined;
+    expect(JSON.stringify(secondCall?.messages)).toContain('administrateur');
   });
 });

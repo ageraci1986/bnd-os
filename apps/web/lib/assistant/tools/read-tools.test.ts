@@ -256,6 +256,13 @@ describe('buildReadTools', () => {
     expect(where.deletedAt).toBeNull();
   });
 
+  it('search_mails exclut les mails archivés (archivedAt: null)', async () => {
+    prismaMock.emailMessage.findMany.mockResolvedValue([]);
+    await execute('search_mails', { query: 'devis' });
+    const where = prismaMock.emailMessage.findMany.mock.calls[0]?.[0]?.where;
+    expect(where.archivedAt).toBeNull();
+  });
+
   it('read_mail charge le corps paresseusement via fetchMailBody quand absent en DB', async () => {
     prismaMock.emailMessage.findFirst.mockResolvedValue({
       id: 'm1',

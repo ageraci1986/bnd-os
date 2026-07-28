@@ -109,6 +109,7 @@ export default async function CommunicationsPage({ searchParams }: PageProps) {
   const emailWhere = {
     workspaceId: ctx.workspaceId,
     deletedAt: null,
+    archivedAt: null,
     ...(clientFilter ? { clientId: clientFilter } : {}),
     ...(mailboxFilter ? { integrationId: mailboxFilter } : {}),
   };

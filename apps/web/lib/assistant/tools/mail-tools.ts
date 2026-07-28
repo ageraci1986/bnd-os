@@ -11,6 +11,11 @@ import {
 } from '@/features/communications/actions/mail-drafts';
 import { sendMail, type SendMailResult } from '@/features/communications/actions/send-mail';
 import { markEmailRead } from '@/features/communications/actions/mark-email-read';
+import {
+  setMailStateCore,
+  MAIL_BULK_MAX,
+  type MailStateOp,
+} from '@/features/communications/lib/mail-state-core';
 import { safeDb, safeMutation } from './safe-wrappers';
 
 const uuid = z.string().uuid();
@@ -128,6 +133,112 @@ const SEND_JSON_REQUIRED = [...COMPOSE_JSON_REQUIRED, 'mode'];
 /** Reformule un échec `{ok:false, message}` en message montrable. */
 function failure(message: string): string {
   return `Échec : ${message}`;
+}
+
+/**
+ * Schéma commun aux 4 tools mail-state (Plan 5b Task 8) — même plafond que le
+ * core (`MAIL_BULK_MAX`, mail-state-core.ts).
+ */
+const mailBulkInputSchema = z.object({
+  mailIds: z.array(uuid).min(1).max(MAIL_BULK_MAX),
+});
+type MailBulkInput = z.infer<typeof mailBulkInputSchema>;
+
+const MAIL_BULK_JSON_PROPERTIES = {
+  mailIds: {
+    type: 'array',
+    items: UUID_JSON,
+    minItems: 1,
+    maxItems: MAIL_BULK_MAX,
+    description: `Ids de mails (1 à ${MAIL_BULK_MAX}), obtenus via search_mails`,
+  },
+} as const;
+const MAIL_BULK_JSON_REQUIRED = ['mailIds'];
+
+/**
+ * Note rappelée dans les descriptions/dialogs d'archive_mail et delete_mail :
+ * ces deux opérations sont LOCALES à NexusHub (comme le core, cf.
+ * mail-state-core.ts) — le mail persiste côté serveur (IMAP/Graph) et une
+ * synchronisation ultérieure peut donc faire réapparaître l'état d'origine.
+ */
+const MAIL_LOCAL_NOTE =
+  'ils restent sur le serveur mail et peuvent réapparaître après une synchronisation';
+
+function pluralS(n: number): string {
+  return n > 1 ? 's' : '';
+}
+
+/**
+ * Formule en ÉTAT (pas en action) : « Archiver N mail(s)… » décrit ce qui
+ * VA se passer une fois confirmé, indépendamment du fait que l'opération soit
+ * idempotente côté core (affected peut inclure des mails déjà archivés).
+ */
+function describeArchiveConfirm(total: number, owned: number): string {
+  const label = `${total} mail${pluralS(total)}`;
+  if (owned === total) {
+    return `Archiver ${label} de vos boîtes dans NexusHub ? (archivage local — ${MAIL_LOCAL_NOTE})`;
+  }
+  return `Archiver ${label} ? Seuls ${owned} vous appartiennent et seront archivés (les autres seront ignorés). (archivage local — ${MAIL_LOCAL_NOTE})`;
+}
+
+function describeDeleteConfirm(total: number, owned: number): string {
+  const label = `${total} mail${pluralS(total)}`;
+  if (owned === total) {
+    return `Masquer ${label} dans NexusHub (suppression locale : ${MAIL_LOCAL_NOTE}) ?`;
+  }
+  return `Masquer ${label} ? Seuls ${owned} vous appartiennent et seront masqués (les autres seront ignorés). (suppression locale : ${MAIL_LOCAL_NOTE})`;
+}
+
+/**
+ * Fabrique `describeForConfirm` pour archive_mail/delete_mail : re-parse
+ * BRUT (le gate précède la validation du registry — même rationnel que
+ * send_mail/delete_column), puis compte en DB avec EXACTEMENT le même `where`
+ * owner-only que `setMailStateCore` (mail-state-core.ts) pour annoncer
+ * fidèlement combien de mails appartiennent réellement à l'utilisateur avant
+ * confirmation.
+ */
+function buildMailBulkDescribeForConfirm(
+  ctx: AuthContext,
+  invalidMessage: string,
+  render: (total: number, owned: number) => string,
+): (input: unknown) => Promise<string> {
+  return async (input: unknown): Promise<string> => {
+    const parsed = mailBulkInputSchema.safeParse(input);
+    if (!parsed.success) return invalidMessage;
+    const mailIds = [...new Set(parsed.data.mailIds)];
+    const owned = await prisma.emailMessage.count({
+      where: {
+        id: { in: mailIds },
+        workspaceId: ctx.workspaceId,
+        deletedAt: null,
+        integration: { ownerUserId: ctx.userId },
+      },
+    });
+    return render(mailIds.length, owned);
+  };
+}
+
+/**
+ * Handler commun aux 4 tools mail-state : délègue à `setMailStateCore`
+ * (ownership + plafond + idempotence gérés côté core) et reformule en JSON
+ * `{done, affected, skipped}` — `skipped` reste volontairement agrégé sans
+ * cause distinguable (le core ne les distingue pas non plus).
+ */
+function buildMailStateHandler(
+  ctx: AuthContext,
+  toolName: string,
+  op: MailStateOp,
+): (input: MailBulkInput) => Promise<string> {
+  return async (input: MailBulkInput) =>
+    safeMutation(toolName, async () => {
+      const result = await setMailStateCore(ctx, { mailIds: input.mailIds, op });
+      if (!result.ok) return failure(result.message);
+      return JSON.stringify({
+        done: true,
+        affected: result.affected,
+        skipped: result.skipped,
+      });
+    });
 }
 
 /**
@@ -385,7 +496,8 @@ export function buildMailTools(ctx: AuthContext): ToolSpec[] {
 
     defineTool({
       name: 'mark_email_read',
-      description: 'Marque un mail comme lu.',
+      description:
+        "Marque UN mail comme lu (n'importe quel mail visible du workspace). Pour un lot ou vos boîtes uniquement, voir mark_mail_read.",
       inputSchema: z.object({ emailId: uuid }),
       jsonSchema: { type: 'object', properties: { emailId: UUID_JSON }, required: ['emailId'] },
       handler: async (input) =>
@@ -394,6 +506,70 @@ export function buildMailTools(ctx: AuthContext): ToolSpec[] {
           if (!result.ok) return failure(result.message);
           return JSON.stringify({ marked: true });
         }),
+    }),
+
+    defineTool({
+      name: 'mark_mail_read',
+      description:
+        'Marque un lot de mails comme lus (vos boîtes uniquement, ids via search_mails). Réversible. Pour un seul mail du workspace (y compris d’un autre membre), voir mark_email_read.',
+      inputSchema: mailBulkInputSchema,
+      jsonSchema: {
+        type: 'object',
+        properties: MAIL_BULK_JSON_PROPERTIES,
+        required: MAIL_BULK_JSON_REQUIRED,
+      },
+      handler: buildMailStateHandler(ctx, 'mark_mail_read', 'read'),
+    }),
+
+    defineTool({
+      name: 'mark_mail_unread',
+      description:
+        "Marque un lot de mails comme non lus (vos boîtes uniquement, ids via search_mails). Réversible — l'état lu/non-lu peut être re-synchronisé depuis le serveur mail. Il n’existe pas d’équivalent mono-mail workspace pour non-lu.",
+      inputSchema: mailBulkInputSchema,
+      jsonSchema: {
+        type: 'object',
+        properties: MAIL_BULK_JSON_PROPERTIES,
+        required: MAIL_BULK_JSON_REQUIRED,
+      },
+      handler: buildMailStateHandler(ctx, 'mark_mail_unread', 'unread'),
+    }),
+
+    defineTool({
+      name: 'archive_mail',
+      description:
+        'Archive un lot de mails (vos boîtes uniquement, ids via search_mails, max 100) — action LOCALE à NexusHub : le mail reste sur le serveur mail et peut réapparaître après une synchronisation. Action sensible : confirmation utilisateur requise.',
+      inputSchema: mailBulkInputSchema,
+      jsonSchema: {
+        type: 'object',
+        properties: MAIL_BULK_JSON_PROPERTIES,
+        required: MAIL_BULK_JSON_REQUIRED,
+      },
+      gated: true,
+      describeForConfirm: buildMailBulkDescribeForConfirm(
+        ctx,
+        'Archiver des mails ? (données invalides)',
+        describeArchiveConfirm,
+      ),
+      handler: buildMailStateHandler(ctx, 'archive_mail', 'archive'),
+    }),
+
+    defineTool({
+      name: 'delete_mail',
+      description:
+        'Masque (supprime localement) un lot de mails dans NexusHub (vos boîtes uniquement, ids via search_mails, max 100) — action LOCALE : le mail reste sur le serveur mail et peut réapparaître après une synchronisation. Action sensible : confirmation utilisateur requise.',
+      inputSchema: mailBulkInputSchema,
+      jsonSchema: {
+        type: 'object',
+        properties: MAIL_BULK_JSON_PROPERTIES,
+        required: MAIL_BULK_JSON_REQUIRED,
+      },
+      gated: true,
+      describeForConfirm: buildMailBulkDescribeForConfirm(
+        ctx,
+        'Masquer des mails ? (données invalides)',
+        describeDeleteConfirm,
+      ),
+      handler: buildMailStateHandler(ctx, 'delete_mail', 'delete'),
     }),
   ];
 }

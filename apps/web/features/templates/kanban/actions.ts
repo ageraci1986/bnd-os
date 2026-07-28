@@ -5,11 +5,14 @@ import { z } from 'zod';
 import { prisma, type Prisma } from '@nexushub/db';
 import {
   NotFoundError,
+  Roles,
   validateKanbanTemplateColumns,
   validateKanbanTemplateName,
   type KanbanTemplateColumnDef,
 } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
+import { recordAudit } from '@/lib/audit';
+import { VIEWER_READ_ONLY_MESSAGE } from '@/features/projects/lib/scope-error';
 
 function prismaErrorCode(err: unknown): string | null {
   if (err && typeof err === 'object' && 'code' in err) {
@@ -89,6 +92,9 @@ export async function createKanbanTemplate(input: {
   defaultCardTemplateId?: string | null;
 }): Promise<KanbanTemplateMutationResult> {
   const ctx = await requireUser();
+  if (ctx.role === Roles.Viewer) {
+    return { ok: false, message: VIEWER_READ_ONLY_MESSAGE };
+  }
   const parsed = CreateSchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, message: parsed.error.issues[0]?.message ?? 'Données invalides.' };
@@ -117,6 +123,13 @@ export async function createKanbanTemplate(input: {
       },
       select: { id: true },
     });
+    await recordAudit({
+      action: 'template_created',
+      workspaceId: ctx.workspaceId,
+      actorId: ctx.userId,
+      subjectType: 'template',
+      subjectId: created.id,
+    });
     revalidatePath('/templates/kanban');
     return { ok: true, id: created.id };
   } catch (err) {
@@ -134,6 +147,9 @@ export async function updateKanbanTemplate(input: {
   defaultCardTemplateId?: string | null;
 }): Promise<KanbanTemplateMutationResult> {
   const ctx = await requireUser();
+  if (ctx.role === Roles.Viewer) {
+    return { ok: false, message: VIEWER_READ_ONLY_MESSAGE };
+  }
   const parsed = UpdateSchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, message: parsed.error.issues[0]?.message ?? 'Données invalides.' };
@@ -174,6 +190,13 @@ export async function updateKanbanTemplate(input: {
         });
       }
     });
+    await recordAudit({
+      action: 'template_updated',
+      workspaceId: ctx.workspaceId,
+      actorId: ctx.userId,
+      subjectType: 'template',
+      subjectId: tpl.id,
+    });
     revalidatePath('/templates/kanban');
     return { ok: true, id: tpl.id };
   } catch (err) {
@@ -188,6 +211,9 @@ export async function deleteKanbanTemplate(input: {
   id: string;
 }): Promise<{ ok: true } | { ok: false; message: string }> {
   const ctx = await requireUser();
+  if (ctx.role === Roles.Viewer) {
+    return { ok: false, message: VIEWER_READ_ONLY_MESSAGE };
+  }
   const parsed = DeleteSchema.safeParse(input);
   if (!parsed.success) return { ok: false, message: 'Identifiant invalide.' };
 
@@ -200,6 +226,13 @@ export async function deleteKanbanTemplate(input: {
     return { ok: false, message: 'Les templates système ne peuvent pas être supprimés.' };
 
   await prisma.kanbanTemplate.delete({ where: { id: tpl.id } });
+  await recordAudit({
+    action: 'template_deleted',
+    workspaceId: ctx.workspaceId,
+    actorId: ctx.userId,
+    subjectType: 'template',
+    subjectId: tpl.id,
+  });
   revalidatePath('/templates/kanban');
   return { ok: true };
 }
@@ -208,6 +241,9 @@ export async function duplicateKanbanTemplate(input: {
   id: string;
 }): Promise<KanbanTemplateMutationResult> {
   const ctx = await requireUser();
+  if (ctx.role === Roles.Viewer) {
+    return { ok: false, message: VIEWER_READ_ONLY_MESSAGE };
+  }
   const parsed = DuplicateSchema.safeParse(input);
   if (!parsed.success) return { ok: false, message: 'Identifiant invalide.' };
 
