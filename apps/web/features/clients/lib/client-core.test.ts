@@ -337,6 +337,17 @@ describe('deleteClientCore', () => {
     );
   });
 
+  it('allows restricted scope that includes the client', async () => {
+    scopeMocks.loadUserScope.mockResolvedValueOnce({
+      kind: 'restricted' as const,
+      clientIds: [CLIENT_ID],
+      projectIds: [],
+    });
+    const result = await deleteClientCore(adminCtx, { clientId: CLIENT_ID });
+    expect(result).toEqual({ ok: true });
+    expect(prismaMock.$transaction).toHaveBeenCalledOnce();
+  });
+
   it('audits without ip/userAgent when the caller (e.g. an assistant tool) does not supply them', async () => {
     await deleteClientCore(adminCtx, { clientId: CLIENT_ID });
     const auditCall = auditMocks.recordAudit.mock.calls[0]![0] as {
@@ -408,6 +419,17 @@ describe('createContactCore', () => {
     const result = await createContactCore(adminCtx, baseCreateContactInput());
     expect(result).toEqual({ ok: false, message: SCOPE_ERROR_MESSAGE });
     expect(prismaMock.contact.create).not.toHaveBeenCalled();
+  });
+
+  it('allows restricted scope that includes the client', async () => {
+    scopeMocks.loadUserScope.mockResolvedValueOnce({
+      kind: 'restricted' as const,
+      clientIds: [CLIENT_ID],
+      projectIds: [],
+    });
+    const result = await createContactCore(adminCtx, baseCreateContactInput());
+    expect(result).toEqual({ ok: true, contactId: 'contact-1' });
+    expect(prismaMock.contact.create).toHaveBeenCalledOnce();
   });
 });
 
@@ -497,6 +519,17 @@ describe('updateContactCore', () => {
     expect(result).toEqual({ ok: false, message: SCOPE_ERROR_MESSAGE });
     expect(prismaMock.contact.update).not.toHaveBeenCalled();
   });
+
+  it('allows restricted scope that includes the contact client', async () => {
+    scopeMocks.loadUserScope.mockResolvedValueOnce({
+      kind: 'restricted' as const,
+      clientIds: [CLIENT_ID],
+      projectIds: [],
+    });
+    const result = await updateContactCore(adminCtx, { contactId: CONTACT_ID, lastName: 'X' });
+    expect(result.ok).toBe(true);
+    expect(prismaMock.contact.update).toHaveBeenCalledOnce();
+  });
 });
 
 // =====================================================================
@@ -550,5 +583,16 @@ describe('deleteContactCore', () => {
     const result = await deleteContactCore(adminCtx, { contactId: CONTACT_ID });
     expect(result).toEqual({ ok: false, message: SCOPE_ERROR_MESSAGE });
     expect(prismaMock.contact.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('allows restricted scope that includes the contact client', async () => {
+    scopeMocks.loadUserScope.mockResolvedValueOnce({
+      kind: 'restricted' as const,
+      clientIds: [CLIENT_ID],
+      projectIds: [],
+    });
+    const result = await deleteContactCore(adminCtx, { contactId: CONTACT_ID });
+    expect(result).toEqual({ ok: true });
+    expect(prismaMock.contact.updateMany).toHaveBeenCalledOnce();
   });
 });
