@@ -14,7 +14,7 @@ export default async function CardTemplatesPage({
 }) {
   const ctx = await requireUser();
   const sp = await searchParams;
-  const requestedTemplateId = typeof sp.template === 'string' ? sp.template : null;
+  const requestedTemplateId = typeof sp['template'] === 'string' ? sp['template'] : null;
 
   const rows = await prisma.cardTemplate.findMany({
     where: { workspaceId: ctx.workspaceId, deletedAt: null },
