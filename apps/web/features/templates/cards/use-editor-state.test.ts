@@ -135,3 +135,25 @@ describe('reduceEditorState', () => {
     expect(s3.templates.find((t) => t.id === 't1')?.name).toBe('Renommé');
   });
 });
+
+describe('makeInitialState — deep-link initialSelectedId', () => {
+  const tplA = { id: 'tpl-a', name: 'A', items: [], isDefault: true };
+  const tplB = { id: 'tpl-b', name: 'B', items: [], isDefault: false };
+
+  it('selects the requested template when it exists', () => {
+    const s = makeInitialState([tplA, tplB], 'tpl-b');
+    expect(s.selectedId).toBe('tpl-b');
+    expect(s.draft?.name).toBe('B');
+    expect(s.draft?.isDefault).toBe(false);
+  });
+
+  it('falls back to the default template when the requested id is unknown', () => {
+    const s = makeInitialState([tplA, tplB], 'tpl-dead');
+    expect(s.selectedId).toBe('tpl-a');
+  });
+
+  it('keeps current behaviour when no id is requested', () => {
+    const s = makeInitialState([tplA, tplB], null);
+    expect(s.selectedId).toBe('tpl-a');
+  });
+});

@@ -423,5 +423,6 @@ Avant chaque action :
 | 2026-07-28 | Assistant Plan 5a — fiabilité (lecture-après-écriture, confirm async véridique), find_projects, CRUD projets/colonnes/checklist             | Angelo L. + Claude |
 | 2026-07-28 | Assistant Plan 5b — CRUD clients/contacts/équipe/templates + mails en masse (tools équipe adminOnly+gated, bulk owner-only, audit étendu)   | Angelo L. + Claude |
 | 2026-07-28 | Assistant Plan 5c — widgets mail interactifs (client embarqué), brouillon éditeur live DB + send_draft à jeton de fraîcheur, deep-link mail | Angelo L. + Claude |
+| 2026-07-28 | Template de carte : deep-link éditeur, lien modal, bootstrap défaut « Standard » + backfill                                                 | Angelo L. + Claude |
 
 > **Règle :** chaque modification de ce fichier ajoute une ligne ici.

@@ -46,12 +46,19 @@ export type Action =
   | { type: 'created'; template: TemplateDTO }
   | { type: 'deleted'; id: string };
 
-export function makeInitialState(templates: readonly TemplateDTO[]): EditorState {
-  // Auto-select the workspace default template on first paint so the
-  // editor isn't blank when arriving on /templates/cards. If no default
-  // is set, fall back to the first template — there's always something
-  // to look at as long as the workspace has any template.
-  const auto = templates.find((t) => t.isDefault) ?? templates[0] ?? null;
+export function makeInitialState(
+  templates: readonly TemplateDTO[],
+  initialSelectedId?: string | null,
+): EditorState {
+  // Deep-link (?template=<id>) wins; otherwise auto-select the workspace
+  // default template on first paint so the editor isn't blank when arriving
+  // on /templates/cards. If no default is set, fall back to the first
+  // template — there's always something to look at as long as the
+  // workspace has any template.
+  const requested = initialSelectedId
+    ? templates.find((t) => t.id === initialSelectedId)
+    : undefined;
+  const auto = requested ?? templates.find((t) => t.isDefault) ?? templates[0] ?? null;
   if (!auto) {
     return { templates, selectedId: null, draft: null, editingItemId: null, isDirty: false };
   }
@@ -240,9 +247,9 @@ export function reduceEditorState(state: EditorState, action: Action): EditorSta
   }
 }
 
-export function useEditorState(initial: readonly TemplateDTO[]) {
+export function useEditorState(initial: readonly TemplateDTO[], initialSelectedId?: string | null) {
   const [state, dispatch] = useReducer(reduceEditorState, undefined, () =>
-    makeInitialState(initial),
+    makeInitialState(initial, initialSelectedId),
   );
   const selectedTemplate = useMemo(
     () =>

@@ -11,11 +11,13 @@ import { createCardTemplate, updateCardTemplate, deleteCardTemplate } from './ac
 
 export interface EditorShellProps {
   readonly initialTemplates: readonly TemplateDTO[];
+  /** Deep-link (?template=<id>) — template to open on first paint. */
+  readonly initialSelectedId?: string | null;
 }
 
-export function EditorShell({ initialTemplates }: EditorShellProps) {
+export function EditorShell({ initialTemplates, initialSelectedId = null }: EditorShellProps) {
   const router = useRouter();
-  const { state, dispatch } = useEditorState(initialTemplates);
+  const { state, dispatch } = useEditorState(initialTemplates, initialSelectedId);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
