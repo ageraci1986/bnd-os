@@ -13,6 +13,7 @@ import type { CardTemplateItem } from '@nexushub/domain';
 import { AssigneesSide, type CardAssignment, type WorkspaceMemberOption } from './assignees-side';
 import { TemplateItemsRender } from './template-items-render';
 import { TemplatePicker, type TemplateOption } from './template-picker';
+import { TemplateEditLink } from './template-edit-link';
 import {
   createChecklistItem,
   deleteChecklistItem,
@@ -437,6 +438,7 @@ export function CardModal({
                   Changer le template ré-organise les champs structurés. Les valeurs des champs
                   conservés sont préservées.
                 </p>
+                {!isReadOnly ? <TemplateEditLink templateId={card.templateId} /> : null}
               </div>
 
               {!isReadOnly ? (
