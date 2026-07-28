@@ -32,6 +32,8 @@ const ACTIVITY_LABELS: Record<string, string> = {
 const CONFIRM_TOOL_LABELS: Record<string, string> = {
   delete_card: 'Suppression de carte',
   send_mail: 'Envoi de mail',
+  delete_project: 'Suppression de projet',
+  delete_column: 'Suppression de colonne',
 };
 
 /** Marge sous la limite serveur de 40 messages (ChatRequestSchema `.max(40)`). */
