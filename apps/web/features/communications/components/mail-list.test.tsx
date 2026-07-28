@@ -1,3 +1,4 @@
+import { StrictMode } from 'react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MailList } from './mail-list';
@@ -73,5 +74,77 @@ describe('<MailList /> attachment badge', () => {
   it('does not show the badge on a row without attachments', () => {
     render(<MailList mails={[mail({ id: 'm1', hasAttachments: false })]} />);
     expect(screen.queryByLabelText('Pièce jointe')).not.toBeInTheDocument();
+  });
+});
+
+describe('<MailList /> initialSelectedId (deep-link)', () => {
+  it('selects the mail matching initialSelectedId instead of the first one', () => {
+    render(
+      <MailList
+        mails={[
+          mail({ id: 'm1', subject: 'Premier', isRead: true }),
+          mail({ id: 'm2', subject: 'Deuxième', isRead: true }),
+        ]}
+        initialSelectedId="m2"
+      />,
+    );
+    expect(screen.getByRole('heading', { name: 'Deuxième' })).toBeInTheDocument();
+  });
+
+  it('marks the deep-linked mail read exactly once when it was unread', () => {
+    render(
+      <MailList
+        mails={[
+          mail({ id: 'm1', subject: 'Premier', isRead: true }),
+          mail({ id: 'm2', subject: 'Deuxième', isRead: false }),
+        ]}
+        initialSelectedId="m2"
+      />,
+    );
+    expect(markEmailReadSpy).toHaveBeenCalledTimes(1);
+    expect(markEmailReadSpy).toHaveBeenCalledWith({ emailId: 'm2' });
+  });
+
+  it('does not call markEmailRead when the deep-linked mail is already read', () => {
+    render(
+      <MailList
+        mails={[
+          mail({ id: 'm1', subject: 'Premier', isRead: true }),
+          mail({ id: 'm2', subject: 'Deuxième', isRead: true }),
+        ]}
+        initialSelectedId="m2"
+      />,
+    );
+    expect(markEmailReadSpy).not.toHaveBeenCalled();
+  });
+
+  it('calls markEmailRead exactly once under StrictMode double-effect (ref guard)', () => {
+    render(
+      <StrictMode>
+        <MailList
+          mails={[
+            mail({ id: 'm1', subject: 'Premier', isRead: true }),
+            mail({ id: 'm2', subject: 'Deuxième', isRead: false }),
+          ]}
+          initialSelectedId="m2"
+        />
+      </StrictMode>,
+    );
+    expect(markEmailReadSpy).toHaveBeenCalledTimes(1);
+    expect(markEmailReadSpy).toHaveBeenCalledWith({ emailId: 'm2' });
+  });
+
+  it('falls back to the first mail when initialSelectedId is absent from the list', () => {
+    render(
+      <MailList
+        mails={[
+          mail({ id: 'm1', subject: 'Premier', isRead: true }),
+          mail({ id: 'm2', subject: 'Deuxième', isRead: true }),
+        ]}
+        initialSelectedId="does-not-exist"
+      />,
+    );
+    expect(screen.getByRole('heading', { name: 'Premier' })).toBeInTheDocument();
+    expect(markEmailReadSpy).not.toHaveBeenCalled();
   });
 });

@@ -3,8 +3,24 @@ import { isWidgetTool } from '@/lib/assistant/widget-tools';
 import { KpiCards } from './kpi-cards';
 import { BoardWidget } from './board-widget';
 import { MailListWidget } from './mail-list-widget';
+import { MailDraftWidget } from './mail-draft-widget';
 import { MemoryWidget } from './memory-widget';
 import { ProjectListWidget } from './project-list-widget';
+
+/**
+ * Canal d'interactivité fourni par `assistant-chat` aux widgets qui en ont
+ * besoin (Plan 5c). `sendMessage` injecte un message utilisateur dans le chat
+ * comme si l'utilisateur l'avait tapé lui-même — même chemin que la saisie
+ * manuelle (voir `send(textOverride)` dans `assistant-chat.tsx`), donc même
+ * historique texte-only, mêmes gardes. `busy` reflète un tour en cours : les
+ * widgets doivent désactiver leurs boutons d'action pendant ce temps.
+ */
+export interface WidgetActions {
+  /** Injecte un message utilisateur dans le chat (comme si l'utilisateur l'avait tapé). */
+  readonly sendMessage: (text: string) => void;
+  /** True pendant un tour en cours — les widgets doivent désactiver leurs boutons. */
+  readonly busy: boolean;
+}
 
 /**
  * Dispatcher : route un événement `tool_result` (nom de tool + data JSON)
@@ -14,8 +30,17 @@ import { ProjectListWidget } from './project-list-widget';
  * un data qui échoue son parse Zod local dans le widget rend aussi `null`
  * mais trace un `console.warn` dev (voir `parse-widget-data.ts`) pour
  * diagnostiquer un drift de shape entre un tool serveur et son widget.
+ *
+ * `actions` (Plan 5c) est optionnel et transmis tel quel aux widgets qui le
+ * consomment : `MailListWidget` (search_mails, Task 4) et `MailDraftWidget`
+ * (create_mail_draft/prepare_reply_draft, Task 6). Les autres widgets
+ * l'ignorent encore. Un appel à 2 arguments reste entièrement valide.
  */
-export function renderWidget(tool: string, data: unknown): ReactNode | null {
+export function renderWidget(
+  tool: string,
+  data: unknown,
+  actions?: WidgetActions,
+): ReactNode | null {
   if (!isWidgetTool(tool)) return null;
   switch (tool) {
     case 'get_today_overview':
@@ -23,7 +48,10 @@ export function renderWidget(tool: string, data: unknown): ReactNode | null {
     case 'get_project_board':
       return <BoardWidget data={data} />;
     case 'search_mails':
-      return <MailListWidget data={data} />;
+      // `exactOptionalPropertyTypes` interdit `actions={actions}` quand
+      // `actions` peut être `undefined` explicite — spread conditionnel pour
+      // omettre la prop plutôt que de la valoir `undefined`.
+      return <MailListWidget data={data} {...(actions !== undefined ? { actions } : {})} />;
     case 'list_projects':
       return <ProjectListWidget data={data} />;
     case 'find_projects':
@@ -36,6 +64,18 @@ export function renderWidget(tool: string, data: unknown): ReactNode | null {
       // Visibilité déterministe des écritures mémoire : le chip s'affiche
       // quoi que raconte le modèle (voir memory-widget.tsx).
       return <MemoryWidget tool={tool} data={data} />;
+    case 'create_mail_draft':
+      return <MailDraftWidget data={data} {...(actions !== undefined ? { actions } : {})} />;
+    case 'prepare_reply_draft':
+      // Sortie structurée IDENTIQUE à create_mail_draft — même widget, nom du
+      // tool réel transmis pour que les logs `parseWidgetData` restent précis.
+      return (
+        <MailDraftWidget
+          data={data}
+          tool="prepare_reply_draft"
+          {...(actions !== undefined ? { actions } : {})}
+        />
+      );
     default:
       return null;
   }

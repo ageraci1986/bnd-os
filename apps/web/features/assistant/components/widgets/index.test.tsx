@@ -9,7 +9,7 @@ vi.mock('next/link', () => ({
   ),
 }));
 
-import { renderWidget } from './index';
+import { renderWidget, type WidgetActions } from './index';
 
 describe('renderWidget', () => {
   it('routes get_today_overview to KpiCards', () => {
@@ -105,6 +105,27 @@ describe('renderWidget', () => {
   it('routes forget_fact to MemoryWidget', () => {
     render(<>{renderWidget('forget_fact', { forgotten: true, name: 'aime-le-cafe' })}</>);
     expect(screen.getByText(/oublié \(aime-le-cafe\)/)).toBeInTheDocument();
+  });
+
+  it('accepts an optional WidgetActions 3rd argument without changing existing widget output (rétrocompatibilité)', () => {
+    const actions: WidgetActions = { sendMessage: vi.fn(), busy: false };
+    const { unmount } = render(
+      <>
+        {renderWidget(
+          'get_project_board',
+          { id: 'p1', name: 'Refonte site', columns: [] },
+          actions,
+        )}
+      </>,
+    );
+    // Même rendu qu'un appel à 2 arguments — BoardWidget n'ignore pas encore `actions`.
+    expect(screen.getByText('Refonte site')).toBeInTheDocument();
+    unmount();
+
+    render(
+      <>{renderWidget('get_project_board', { id: 'p1', name: 'Refonte site', columns: [] })}</>,
+    );
+    expect(screen.getByText('Refonte site')).toBeInTheDocument();
   });
 
   it('returns null for an unknown tool name', () => {

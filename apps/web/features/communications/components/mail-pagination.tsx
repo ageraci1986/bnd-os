@@ -11,6 +11,11 @@ interface Props {
  * URL-driven pagination for /communications. Emits `?page=N` and preserves
  * every other query param (client filter, mailbox filter, etc.) so the
  * pagination composes cleanly with the existing filters.
+ *
+ * Exception: the `?mail=` deep-link param is CONSUMED by the first
+ * pagination move — page.tsx recomputes the page from the mail whenever
+ * the param is present, so keeping it would pin every Next/Previous click
+ * back to the deep-linked mail's page.
  */
 export function MailPagination({ page, totalPages, totalCount }: Props) {
   const router = useRouter();
@@ -19,6 +24,7 @@ export function MailPagination({ page, totalPages, totalCount }: Props) {
 
   const goto = (next: number): void => {
     const params = new URLSearchParams(searchParams.toString());
+    params.delete('mail');
     if (next <= 1) params.delete('page');
     else params.set('page', String(next));
     router.push(`${pathname}${params.toString() ? `?${params}` : ''}`);

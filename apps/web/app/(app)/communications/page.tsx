@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { z } from 'zod';
 import { prisma } from '@nexushub/db';
 import { requireUser } from '@/lib/auth';
 import {
@@ -9,6 +10,7 @@ import {
 import { syncGraphInbox } from '@/features/communications/actions/sync-graph-inbox';
 import { syncImapInbox } from '@/features/communications/actions/sync-imap-inbox';
 import { toMailDTO } from '@/features/communications/lib/mail-dto';
+import { resolveMailPage } from '@/features/communications/lib/resolve-mail-page';
 import { EmptyNoIntegration } from '@/features/communications/components/empty-no-integration';
 import { MailTabs } from '@/features/communications/components/mail-tabs';
 import { MailList } from '@/features/communications/components/mail-list';
@@ -104,7 +106,7 @@ export default async function CommunicationsPage({ searchParams }: PageProps) {
   // URL-driven pagination: ?page=N (1-based). Composes with client + mailbox
   // filters — MailPagination preserves the other query params on nav.
   const pageParam = Number(readSearchParamString(sp['page']) ?? '1');
-  const page = Number.isFinite(pageParam) && pageParam > 0 ? Math.max(1, Math.floor(pageParam)) : 1;
+  let page = Number.isFinite(pageParam) && pageParam > 0 ? Math.max(1, Math.floor(pageParam)) : 1;
 
   const emailWhere = {
     workspaceId: ctx.workspaceId,
@@ -113,6 +115,32 @@ export default async function CommunicationsPage({ searchParams }: PageProps) {
     ...(clientFilter ? { clientId: clientFilter } : {}),
     ...(mailboxFilter ? { integrationId: mailboxFilter } : {}),
   };
+
+  // ?mail=<emailId> deep-link (Plan 5c Task 2): jump straight to the page
+  // containing that mail, overriding `?page=N`. The id is validated loosely
+  // (uuid shape) — an invalid or unmatched value is silently ignored and
+  // pagination falls back to `?page=N` / page 1, same as today.
+  const mailParam = readSearchParamString(sp['mail']);
+  const mailIdCandidate =
+    mailParam && z.string().uuid().safeParse(mailParam).success ? mailParam : null;
+  let mailId: string | null = null;
+  if (mailIdCandidate) {
+    const target = await prisma.emailMessage.findFirst({
+      where: { ...emailWhere, id: mailIdCandidate },
+      select: { id: true, receivedAt: true },
+    });
+    if (target) {
+      mailId = target.id;
+      // Listing orderBy is `receivedAt: 'desc'` with no tie-break column, so
+      // this count uses the same ordering key. On the rare exact-timestamp
+      // tie, the resolved page can be off by one — acceptable for a "land
+      // near it" deep-link rather than a byte-exact seek.
+      const newerCount = await prisma.emailMessage.count({
+        where: { ...emailWhere, receivedAt: { gt: target.receivedAt } },
+      });
+      page = resolveMailPage({ newerCount, pageSize: PAGE_SIZE });
+    }
+  }
 
   const [rows, totalCount] = await Promise.all([
     prisma.emailMessage.findMany({
@@ -195,7 +223,14 @@ export default async function CommunicationsPage({ searchParams }: PageProps) {
             Aucun mail à afficher pour l&apos;instant.
           </div>
         ) : (
-          <MailList key={page} mails={mails} showMailboxBadge={!mailboxFilter} />
+          <MailList
+            // mailId dans la key : ?mail=A → ?mail=B résolvant la MÊME page
+            // doit quand même remonter le composant pour resélectionner/marquer.
+            key={`${page}-${mailId ?? ''}`}
+            mails={mails}
+            showMailboxBadge={!mailboxFilter}
+            {...(mailId ? { initialSelectedId: mailId } : {})}
+          />
         )}
         {totalCount > PAGE_SIZE ? (
           <MailPagination page={page} totalPages={totalPages} totalCount={totalCount} />

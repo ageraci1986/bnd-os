@@ -300,6 +300,13 @@ export async function buildReadTools(ctx: AuthContext): Promise<ToolSpec[]> {
               receivedAt: true,
               isRead: true,
               folder: true,
+              // Nécessaire au widget mail-list-widget.tsx (Plan 5c Task 3)
+              // pour construire le deep-link `?mailbox=<integrationId>&mail=<id>`
+              // vers /communications (Task 2, déjà mergée). Budget widget :
+              // un uuid ajoute ~50 chars JSON par mail (clé + guillemets +
+              // valeur) ; au plafond de 25 mails (`limit` max ci-dessus) ça
+              // reste largement sous les 8 Ko de cap widgets.
+              integrationId: true,
             },
             orderBy: { receivedAt: 'desc' },
             take: input.limit ?? 10,

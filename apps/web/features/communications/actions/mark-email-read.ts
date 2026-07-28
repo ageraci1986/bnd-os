@@ -9,6 +9,12 @@ import { requireUser } from '@/lib/auth';
 // peut marquer lu un mail qu'il voit), alors que le core bulk de l'assistant
 // est owner-only (integration.ownerUserId) — décision produit V2 sur les
 // mutations mail. Ne pas aligner l'un sur l'autre sans revalidation produit.
+//
+// Contraste avec `mark-email-unread.ts` (Plan 5c Task 3) : ce fichier reste
+// l'action historique mono-mail workspace-scopée décrite ci-dessus — SON
+// COMPORTEMENT N'A PAS CHANGÉ. `markEmailUnread`, elle, délègue directement au
+// core bulk owner-only (mêmes règles que mark_mail_unread côté assistant) —
+// asymétrie assumée entre les deux toggles, pas un oubli.
 
 const Schema = z.object({ emailId: z.string().uuid() });
 
