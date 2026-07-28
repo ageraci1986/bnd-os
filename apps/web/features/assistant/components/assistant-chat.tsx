@@ -2,6 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { parseSseLines, type StreamWidget } from '../lib/sse';
+import { AssistantOrb, deriveOrbActivity } from './assistant-orb';
 import { renderWidget, type WidgetActions } from './widgets';
 import { appendWidget } from './widgets/dedupe-widgets';
 import { trimWidgetData } from './widgets/trim-widget-data';
@@ -319,14 +320,8 @@ export function AssistantChat({ csrfToken, firstName }: AssistantChatProps) {
 
   return (
     <div className="mx-auto flex h-full max-w-2xl flex-col items-center gap-4 px-6 py-8">
-      {/* Placeholder orbe — remplacé par le blob animé au Plan 4 */}
-      <div
-        aria-hidden
-        className="h-20 w-20 rounded-full"
-        style={{
-          background: 'var(--accent-gradient)',
-          boxShadow: '0 14px 40px rgba(139,43,226,.32)',
-        }}
+      <AssistantOrb
+        activity={deriveOrbActivity({ busy, streaming: streamText !== null && streamText !== '' })}
       />
       <h1 className="text-lg font-bold text-[color:var(--color-text-main)]">
         Bonjour {firstName} 👋

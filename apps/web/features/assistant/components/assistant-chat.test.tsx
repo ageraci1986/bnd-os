@@ -143,12 +143,25 @@ describe('AssistantChat', () => {
     render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
     await userEvent.type(screen.getByRole('textbox'), 'projets ?');
     await userEvent.click(screen.getByRole('button', { name: /envoyer/i }));
+    // L'orbe passe à `thinking` dès le début du tour — aucun chunk encore reçu.
+    await waitFor(() => {
+      expect(screen.getByTestId('assistant-orb')).toHaveAttribute('data-activity', 'thinking');
+    });
     act(() => push({ type: 'tool_start', name: 'list_projects' }));
     await waitFor(() => {
       expect(screen.getByText('consulte les projets…')).toBeInTheDocument();
     });
+    // Toujours `thinking` pendant l'appel outil — pas encore de texte streamé.
+    expect(screen.getByTestId('assistant-orb')).toHaveAttribute('data-activity', 'thinking');
     act(() => {
       push({ type: 'tool_end', name: 'list_projects', isError: false });
+      push({ type: 'chunk', text: 'Deux ' });
+    });
+    // Le premier chunk fait passer l'orbe à `responding`.
+    await waitFor(() => {
+      expect(screen.getByTestId('assistant-orb')).toHaveAttribute('data-activity', 'responding');
+    });
+    act(() => {
       push({ type: 'done', text: 'Deux projets.' });
       close();
     });
@@ -156,6 +169,8 @@ describe('AssistantChat', () => {
       expect(screen.getByText('Deux projets.')).toBeInTheDocument();
     });
     expect(screen.queryByText('consulte les projets…')).not.toBeInTheDocument();
+    // Le tour est terminé — retour à `idle`.
+    expect(screen.getByTestId('assistant-orb')).toHaveAttribute('data-activity', 'idle');
   });
 
   it('confirm_request → dialog visible ; Autoriser → POST /confirm puis confirm_resolved le ferme', async () => {
