@@ -12,6 +12,8 @@ const prismaMock = vi.hoisted(() => ({
   client: { findMany: vi.fn() },
   column: { findMany: vi.fn() },
   membership: { findMany: vi.fn() },
+  $queryRaw: vi.fn(),
+  $queryRawUnsafe: vi.fn(),
 }));
 vi.mock('@nexushub/db', () => ({ prisma: prismaMock }));
 
@@ -50,9 +52,10 @@ beforeEach(() => {
 });
 
 describe('buildReadTools', () => {
-  it('expose les 9 tools de lecture, aucun gated ni adminOnly', async () => {
+  it('expose les 10 tools de lecture, aucun gated ni adminOnly', async () => {
     const tools = await buildReadTools(ctx);
     expect(tools.map((t) => t.name).sort()).toEqual([
+      'find_projects',
       'get_card',
       'get_current_datetime',
       'get_project_board',
@@ -113,6 +116,43 @@ describe('buildReadTools', () => {
     expect(out[0]).toEqual({ id: 'p1', name: 'Site', client: 'Acme', cards: 4 });
     expect(prismaMock.project.findMany.mock.calls[0]?.[0]?.where?.workspaceId).toBe('w1');
     expect(scopeMocks.scopedProjectWhere).toHaveBeenCalled();
+  });
+
+  it('cherche via unaccent et ne renvoie que les projets du workspace visibles par le scope', async () => {
+    const PROJECT_ID = '4c9d3f0a-2222-4444-8888-aaaaaaaaaaaa';
+    prismaMock.$queryRaw.mockResolvedValue([{ id: PROJECT_ID }]);
+    prismaMock.project.findMany.mockResolvedValue([
+      {
+        id: PROJECT_ID,
+        name: 'Liste de course',
+        client: { name: 'Perso' },
+        _count: { cards: 3 },
+      },
+    ]);
+    const out = JSON.parse(await execute('find_projects', { query: 'liste de courses' }));
+    expect(out).toEqual([{ id: PROJECT_ID, name: 'Liste de course', client: 'Perso', cards: 3 }]);
+    const call = prismaMock.project.findMany.mock.calls[0]?.[0];
+    expect(call?.where?.workspaceId).toBe('w1');
+    expect(call?.where?.deletedAt).toBeNull();
+    expect(call?.where?.id).toEqual({ in: [PROJECT_ID] });
+    expect(scopeMocks.scopedProjectWhere).toHaveBeenCalled();
+  });
+
+  it('find_projects : zéro candidat → tableau vide sans requête findMany', async () => {
+    prismaMock.$queryRaw.mockResolvedValue([]);
+    const out = JSON.parse(await execute('find_projects', { query: 'introuvable' }));
+    expect(out).toEqual([]);
+    expect(prismaMock.project.findMany).not.toHaveBeenCalled();
+  });
+
+  it('find_projects : la requête SQL est un tagged template paramétré ($queryRaw, pas $queryRawUnsafe)', async () => {
+    prismaMock.$queryRaw.mockResolvedValue([]);
+    await execute('find_projects', { query: 'course' });
+    expect(prismaMock.$queryRaw).toHaveBeenCalledTimes(1);
+    expect(prismaMock.$queryRawUnsafe).not.toHaveBeenCalled();
+    const firstArg = prismaMock.$queryRaw.mock.calls[0]?.[0] as TemplateStringsArray;
+    expect(Array.isArray(firstArg)).toBe(true);
+    expect(Array.isArray(firstArg.raw)).toBe(true);
   });
 
   it('get_project_board renvoie colonnes et cartes, ou une erreur si projet introuvable', async () => {
