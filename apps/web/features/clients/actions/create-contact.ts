@@ -1,13 +1,10 @@
 'use server';
 import 'server-only';
 import { revalidatePath } from 'next/cache';
-import { prisma } from '@nexushub/db';
-import { NotFoundError } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
-import { loadUserScope } from '@/lib/auth/scope';
 import { assertCsrfFromFormData } from '@/lib/csrf';
-import { SCOPE_ERROR_MESSAGE } from '@/features/projects/lib/scope-error';
 import { CreateContactSchema } from '../lib/schemas';
+import { createContactCore } from '../lib/client-core';
 
 export type CreateContactState =
   | { readonly status: 'idle' }
@@ -39,36 +36,12 @@ export async function createContact(
       message: parsed.error.issues[0]?.message ?? 'Données invalides.',
     };
   }
-  const data = parsed.data;
 
-  // Defence in depth: confirm the client belongs to this workspace.
-  const client = await prisma.client.findFirst({
-    where: { id: data.clientId, workspaceId: ctx.workspaceId, deletedAt: null },
-    select: { id: true },
-  });
-  if (!client) throw new NotFoundError('Client');
-
-  const scope = await loadUserScope(ctx);
-  if (scope.kind === 'restricted') {
-    const allowed = scope.clientIds.includes(data.clientId);
-    if (!allowed) return { status: 'error', message: SCOPE_ERROR_MESSAGE };
+  const result = await createContactCore(ctx, parsed.data);
+  if (!result.ok) {
+    return { status: 'error', message: result.message };
   }
 
-  const created = await prisma.contact.create({
-    data: {
-      workspaceId: ctx.workspaceId,
-      clientId: data.clientId,
-      firstName: data.name.firstName,
-      lastName: data.name.lastName,
-      jobTitle: data.jobTitle,
-      email: data.email,
-      phone: data.phone,
-      raci: data.raci ?? null,
-      notes: data.notes,
-    },
-    select: { id: true },
-  });
-
   revalidatePath('/clients');
-  return { status: 'success', contactId: created.id };
+  return { status: 'success', contactId: result.contactId };
 }

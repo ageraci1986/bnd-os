@@ -1,13 +1,10 @@
 'use server';
 import 'server-only';
 import { revalidatePath } from 'next/cache';
-import { Prisma, prisma } from '@nexushub/db';
-import { NotFoundError } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
-import { loadUserScope } from '@/lib/auth/scope';
 import { assertCsrfFromFormData } from '@/lib/csrf';
-import { SCOPE_ERROR_MESSAGE } from '@/features/projects/lib/scope-error';
 import { UpdateClientSchema } from '../lib/schemas';
+import { updateClientCore } from '../lib/client-core';
 
 export type UpdateClientState =
   | { readonly status: 'idle' }
@@ -37,39 +34,22 @@ export async function updateClient(
   }
   const data = parsed.data;
 
-  const scope = await loadUserScope(ctx);
-  if (scope.kind === 'restricted') {
-    const allowed = scope.clientIds.includes(data.clientId);
-    if (!allowed) return { status: 'error', message: SCOPE_ERROR_MESSAGE };
+  const result = await updateClientCore(ctx, {
+    clientId: data.clientId,
+    name: data.name,
+    colorToken: data.colorToken,
+    initials: data.initials,
+    domains: data.domains,
+    notes: data.notes,
+  });
+  if (!result.ok) {
+    return { status: 'error', message: result.message };
   }
 
-  try {
-    const updated = await prisma.client.update({
-      where: {
-        id: data.clientId,
-        workspaceId: ctx.workspaceId,
-        deletedAt: null,
-      },
-      data: {
-        name: data.name,
-        colorToken: data.colorToken,
-        initials: data.initials,
-        domains: data.domains,
-        notes: data.notes,
-      },
-      select: { name: true },
-    });
-    revalidatePath('/clients');
-    revalidatePath('/(app)/layout', 'layout');
-    return {
-      status: 'success',
-      slug: updated.name.toLowerCase().replaceAll(/\s+/g, '-'),
-    };
-  } catch (err) {
-    if (err instanceof Prisma.PrismaClientKnownRequestError) {
-      if (err.code === 'P2002') return { status: 'error', message: 'Un client porte déjà ce nom.' };
-      if (err.code === 'P2025') throw new NotFoundError('Client');
-    }
-    throw err;
-  }
+  revalidatePath('/clients');
+  revalidatePath('/(app)/layout', 'layout');
+  return {
+    status: 'success',
+    slug: result.name.toLowerCase().replaceAll(/\s+/g, '-'),
+  };
 }
