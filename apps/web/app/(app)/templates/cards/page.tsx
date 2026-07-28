@@ -7,8 +7,14 @@ import type { TemplateDTO } from '@/features/templates/cards/use-editor-state';
 
 export const metadata: Metadata = { title: 'Templates Cartes' };
 
-export default async function CardTemplatesPage() {
+export default async function CardTemplatesPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const ctx = await requireUser();
+  const sp = await searchParams;
+  const requestedTemplateId = typeof sp.template === 'string' ? sp.template : null;
 
   const rows = await prisma.cardTemplate.findMany({
     where: { workspaceId: ctx.workspaceId, deletedAt: null },
@@ -38,7 +44,7 @@ export default async function CardTemplatesPage() {
         </p>
       </header>
 
-      <EditorShell initialTemplates={templates} />
+      <EditorShell initialTemplates={templates} initialSelectedId={requestedTemplateId} />
     </div>
   );
 }
