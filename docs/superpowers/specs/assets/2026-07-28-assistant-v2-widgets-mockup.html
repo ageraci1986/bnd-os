@@ -1,0 +1,155 @@
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  .ap * { box-sizing:border-box; margin:0; }
+  .ap { font-family:'Plus Jakarta Sans',system-ui,sans-serif; }
+  @keyframes ap-blink { 0%,100%{opacity:1} 50%{opacity:.35} }
+
+  .ap-col { width:660px; background:#f4f6f9;
+    background-image:radial-gradient(ellipse at top left, rgba(139,43,226,.04), transparent 50%),radial-gradient(ellipse at bottom right, rgba(255,42,109,.04), transparent 50%);
+    border:1px solid #e5e7eb; border-radius:16px; padding:20px; display:flex; flex-direction:column; gap:10px; box-shadow:0 20px 60px rgba(17,24,39,.12); }
+
+  .ap-msg-u { align-self:flex-end; max-width:78%; background:linear-gradient(135deg,#8b2be2,#a03ae8); color:#fff; font-size:12px; padding:9px 13px; border-radius:16px 16px 4px 16px; box-shadow:0 4px 12px rgba(139,43,226,.2); }
+  .ap-msg-a { align-self:flex-start; max-width:85%; background:#fff; border:1px solid #eef0f3; color:#374151; font-size:12px; padding:9px 13px; border-radius:16px 16px 16px 4px; box-shadow:0 4px 15px rgba(0,0,0,.03); line-height:1.5; }
+
+  .ap-widget { align-self:flex-start; width:96%; background:#fff; border:1px solid #eef0f3; border-radius:16px; box-shadow:0 6px 20px rgba(0,0,0,.05); overflow:hidden; }
+  .ap-wh { display:flex; align-items:center; gap:8px; padding:10px 14px; border-bottom:1px solid #f0f2f5; font-size:10px; font-weight:800; color:#9ca3af; text-transform:uppercase; letter-spacing:.5px; }
+  .ap-wh .right { margin-left:auto; display:flex; gap:6px; }
+
+  .ap-btn { font-size:10px; font-weight:700; padding:5px 11px; border-radius:999px; white-space:nowrap; cursor:default; }
+  .ap-btn.grad { background:linear-gradient(135deg,#8b2be2,#ff2a6d); color:#fff; box-shadow:0 3px 10px rgba(139,43,226,.3); }
+  .ap-btn.ghost { background:#fff; color:#6b7280; border:1px solid #e5e7eb; }
+  .ap-btn.soft { background:#f6f1fd; color:#8b2be2; }
+  .ap-btn.danger { background:#fff; color:#e11d48; border:1px solid #fecdd3; }
+
+  /* rangée mail */
+  .ap-mail { display:flex; align-items:center; gap:10px; padding:9px 14px; border-bottom:1px solid #f5f6f8; font-size:11.5px; }
+  .ap-mail .dot { width:7px; height:7px; border-radius:50%; background:#8b2be2; flex-shrink:0; }
+  .ap-mail .dot.read { background:#e5e7eb; }
+  .ap-mail .who { font-weight:700; color:#111827; width:110px; flex-shrink:0; }
+  .ap-mail .sub { color:#6b7280; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .ap-mail .when { color:#c3c8d0; font-size:10px; flex-shrink:0; }
+
+  /* mail déplié */
+  .ap-open { border-bottom:1px solid #f5f6f8; background:linear-gradient(135deg,rgba(139,43,226,.025),rgba(255,42,109,.025)); }
+  .ap-open .head { display:flex; align-items:center; gap:10px; padding:10px 14px 4px; font-size:11.5px; }
+  .ap-open .head .who { font-weight:800; color:#111827; }
+  .ap-open .head .addr { color:#9ca3af; font-size:10.5px; }
+  .ap-open .body { font-size:11.5px; color:#374151; line-height:1.6; padding:6px 14px 10px; }
+  .ap-open .acts { display:flex; gap:6px; padding:0 14px 12px; flex-wrap:wrap; align-items:center; }
+  .ap-open .acts .sep { width:1px; height:16px; background:#eef0f3; margin:0 2px; }
+
+  /* brouillon éditable */
+  .ap-draft-row { display:flex; align-items:center; gap:8px; padding:7px 14px; border-bottom:1px solid #f5f6f8; font-size:11.5px; }
+  .ap-draft-row .lbl { width:40px; color:#9ca3af; font-weight:700; font-size:10px; flex-shrink:0; }
+  .ap-chip { display:inline-flex; align-items:center; gap:5px; background:#f6f1fd; color:#8b2be2; font-weight:700; font-size:10.5px; padding:3px 9px; border-radius:999px; }
+  .ap-chip x { color:#c4a5ec; font-style:normal; }
+  .ap-field { flex:1; border:1px dashed transparent; border-radius:8px; padding:3px 6px; color:#111827; font-weight:600; }
+  .ap-field:hover, .ap-field.edit { border-color:#d8c3f5; background:#fdfbff; }
+  .ap-body-edit { font-size:11.5px; color:#374151; line-height:1.65; padding:10px 14px; border-bottom:1px solid #f5f6f8; position:relative; }
+  .ap-body-edit .caret { display:inline-block; width:1.5px; height:12px; background:#8b2be2; vertical-align:middle; animation:ap-blink 1s step-end infinite; }
+  .ap-draft-foot { display:flex; align-items:center; gap:8px; padding:10px 14px; }
+  .ap-draft-foot .hint { margin-left:auto; font-size:9.5px; color:#b6bcc6; font-style:italic; }
+  .ap-save { font-size:9.5px; color:#22c55e; font-weight:700; display:flex; align-items:center; gap:4px; }
+
+  /* board vérifié */
+  .ap-board { display:flex; gap:8px; padding:12px 14px; }
+  .ap-bcol { flex:1; background:#f8f9fb; border:1px solid #f0f2f5; border-radius:12px; padding:8px; }
+  .ap-bcol .bh { display:flex; justify-content:space-between; font-size:9.5px; font-weight:800; color:#6b7280; text-transform:uppercase; letter-spacing:.4px; padding:0 2px 6px; }
+  .ap-card { background:#fff; border:1px solid #eef0f3; border-radius:9px; padding:6px 9px; font-size:11px; font-weight:600; color:#111827; margin-bottom:6px; box-shadow:0 2px 6px rgba(0,0,0,.03); }
+  .ap-card.fresh { border-color:rgba(139,43,226,.35); background:linear-gradient(135deg,rgba(139,43,226,.05),rgba(255,42,109,.05)); }
+  .ap-verified { display:flex; align-items:center; gap:6px; font-size:9.5px; color:#22c55e; font-weight:700; padding:0 14px 10px; }
+</style>
+
+<h2>Maquette — widgets interactifs V2 dans le fil de conversation</h2>
+<p class="subtitle">Trois nouveaux rendus, dans l'ordre d'un scénario réel : ① mails embarqués avec un mail déplié + toutes ses actions · ② brouillon éditable inline (autosauvé) · ③ board rafraîchi après mutation avec l'état vérifié en DB.</p>
+
+<div class="ap" style="display:flex;justify-content:center;overflow-x:auto;padding-bottom:8px;">
+<div class="ap-col">
+
+  <div class="ap-msg-u">Montre-moi mes mails non lus</div>
+
+  <!-- ① Widget mail interactif -->
+  <div class="ap-widget">
+    <div class="ap-wh">✉ Boîte Exchange — 5 non lus
+      <span class="right"><span class="ap-btn ghost">Tout marquer lu</span></span>
+    </div>
+
+    <div class="ap-mail"><span class="dot"></span><span class="who">Marc Dupont</span><span class="sub">Re: Livraison maquettes — où en est-on ?</span><span class="when">09:12</span></div>
+
+    <!-- mail déplié -->
+    <div class="ap-open">
+      <div class="head"><span class="who">Sophie Bernard</span><span class="addr">sophie@lumen.io</span><span style="margin-left:auto;color:#c3c8d0;font-size:10px;">08:47</span></div>
+      <div class="body"><b>Brief campagne Q4</b> — Bonjour Angelo, comme convenu voici le brief pour la campagne Q4. Pouvez-vous me confirmer la faisabilité sur septembre et me proposer un créneau d'appel cette semaine ?</div>
+      <div class="acts">
+        <span class="ap-btn grad">↩ Répondre</span>
+        <span class="ap-btn soft">⇥ Transférer</span>
+        <span class="sep"></span>
+        <span class="ap-btn ghost">◌ Non-lu</span>
+        <span class="ap-btn ghost">🗂 Archiver ⚡</span>
+        <span class="ap-btn danger">🗑 Supprimer ⚡</span>
+        <span class="sep"></span>
+        <span class="ap-btn ghost">↗ Ouvrir dans Communications</span>
+      </div>
+    </div>
+
+    <div class="ap-mail"><span class="dot"></span><span class="who">GitHub</span><span class="sub">[bnd-os] PR #12 checks passed</span><span class="when">08:31</span></div>
+    <div class="ap-mail"><span class="dot read"></span><span class="who">Vercel</span><span class="sub">Deployment ready — bnd-os-web</span><span class="when">08:02</span></div>
+  </div>
+
+  <div class="ap-msg-u">Réponds à Sophie : ok pour septembre, propose mercredi 10h</div>
+
+  <div class="ap-msg-a">Voici ma proposition — vous pouvez corriger directement dedans, ou me demander une retouche :</div>
+
+  <!-- ② Brouillon éditable -->
+  <div class="ap-widget" style="border-color:rgba(139,43,226,.3);">
+    <div class="ap-wh" style="color:#8b2be2;">✏️ Brouillon — Réponse
+      <span class="right"><span class="ap-save">✓ sauvegardé</span></span>
+    </div>
+    <div class="ap-draft-row"><span class="lbl">À</span><span class="ap-chip">Sophie Bernard <x>×</x></span></div>
+    <div class="ap-draft-row"><span class="lbl">Cc</span><span style="color:#c3c8d0;font-size:10.5px;">+ ajouter</span></div>
+    <div class="ap-draft-row"><span class="lbl">Objet</span><span class="ap-field">Re: Brief campagne Q4</span></div>
+    <div class="ap-body-edit ap-field edit">Bonjour Sophie,<br><br>Merci pour le brief — c'est bien faisable sur septembre. Je vous propose un appel <b>mercredi à 10h</b> pour caler le planning<span class="caret"></span><br><br>Bien à vous,<br>Angelo</div>
+    <div class="ap-draft-foot">
+      <span class="ap-btn grad">📤 Envoyer ⚡</span>
+      <span class="ap-btn ghost">💾 Garder en brouillon</span>
+      <span class="hint">éditable ici, ou « raccourcis le 2e §, ajoute Marc en Cc… »</span>
+    </div>
+  </div>
+
+  <div class="ap-msg-u">Et déplace « Bananes » et « Couches » dans Fait</div>
+
+  <div class="ap-msg-a">Fait et vérifié — les deux cartes sont maintenant dans « Fait » :</div>
+
+  <!-- ③ Board rafraîchi + vérifié -->
+  <div class="ap-widget">
+    <div class="ap-wh">📋 Liste de course — Perso · 3 cartes</div>
+    <div class="ap-board">
+      <div class="ap-bcol">
+        <div class="bh"><span>À faire</span><span>1</span></div>
+        <div class="ap-card">Oranges</div>
+      </div>
+      <div class="ap-bcol">
+        <div class="bh"><span>Fait</span><span>2</span></div>
+        <div class="ap-card fresh">Bananes</div>
+        <div class="ap-card fresh">Couches</div>
+      </div>
+      <div class="ap-bcol">
+        <div class="bh"><span>Bloqué</span><span>0</span></div>
+      </div>
+    </div>
+    <div class="ap-verified">✓ état relu en base après le déplacement — widget remplacé (plus jamais de board périmé)</div>
+  </div>
+
+</div>
+</div>
+
+<div class="options" style="margin-top:18px;">
+  <div class="option" data-choice="valide" onclick="toggleSelect(this)">
+    <div class="letter">✓</div>
+    <div class="content"><h3>Valider la maquette</h3><p>Je fige ce design dans le spec (les ⚡ = gate Autoriser/Refuser existant).</p></div>
+  </div>
+  <div class="option" data-choice="ajuster" onclick="toggleSelect(this)">
+    <div class="letter">✎</div>
+    <div class="content"><h3>Ajuster</h3><p>Dites-moi en terminal ce que vous changeriez — densité, actions visibles, wording, placement.</p></div>
+  </div>
+</div>

@@ -140,12 +140,16 @@ export async function runTurn(
  * présent, sinon `describeAction` générique. Une description qui lève ne doit
  * jamais bloquer le gate : repli générique.
  */
-function buildConfirmDescription(spec: ToolSpec, name: string, input: unknown): string {
+async function buildConfirmDescription(
+  spec: ToolSpec,
+  name: string,
+  input: unknown,
+): Promise<string> {
   if (spec.describeForConfirm !== undefined) {
     try {
-      return spec.describeForConfirm(input as never);
+      return await spec.describeForConfirm(input as never);
     } catch {
-      // repli sur describeAction ci-dessous
+      // repli sur describeAction ci-dessous (couvre aussi un rejet de promesse)
     }
   }
   return describeAction(name, input);
@@ -161,7 +165,7 @@ async function executeGated(
     return { output: ADMIN_ONLY_OUTPUT, isError: true };
   }
   if (spec !== null && spec.gated) {
-    const description = buildConfirmDescription(spec, name, input);
+    const description = await buildConfirmDescription(spec, name, input);
     deps.onEvent?.({ type: 'confirm_request', tool: name, description });
     let allowed: boolean;
     try {

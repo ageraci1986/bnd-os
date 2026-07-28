@@ -14,11 +14,16 @@ const ProjectListSchema = z.array(ProjectRowSchema);
 
 export interface ProjectListWidgetProps {
   readonly data: unknown;
+  /**
+   * Nom du tool d'origine pour les logs `parseWidgetData` — `find_projects` a
+   * une sortie identique à `list_projects` et partage ce widget.
+   */
+  readonly tool?: 'list_projects' | 'find_projects';
 }
 
-/** Cartes compactes pour `list_projects` — nom + client + nb de cartes. */
-export function ProjectListWidget({ data }: ProjectListWidgetProps) {
-  const projects = parseWidgetData('list_projects', ProjectListSchema, data);
+/** Cartes compactes pour `list_projects`/`find_projects` — nom + client + nb de cartes. */
+export function ProjectListWidget({ data, tool = 'list_projects' }: ProjectListWidgetProps) {
+  const projects = parseWidgetData(tool, ProjectListSchema, data);
   if (projects === null) return null;
 
   return (

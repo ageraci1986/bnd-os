@@ -214,6 +214,47 @@ describe('runTurn', () => {
     expect(handler).toHaveBeenCalledTimes(1);
   });
 
+  it('accepte un describeForConfirm async et attend sa résolution avant le Confirmer', async () => {
+    const registry = makeRegistry([
+      {
+        name: 'danger',
+        gated: true,
+        describeForConfirm: (async (input: { id: string }) =>
+          `Supprimer « Vrai Nom » (${input.id}) — 3 cartes`) as ToolSpec['describeForConfirm'],
+      },
+    ]);
+    const provider = scriptedProvider([
+      toolUseResult('danger', { id: 'card_1' }),
+      textResult('ok'),
+    ]);
+    const confirmer = vi.fn(async () => true);
+    await runTurn([], 'x', deps(provider, registry, { confirmer }));
+    expect(confirmer).toHaveBeenCalledWith('Supprimer « Vrai Nom » (card_1) — 3 cartes', 'danger');
+  });
+
+  it('describeForConfirm async qui rejette → repli sur describeAction, pas de fuite', async () => {
+    const handler = vi.fn(async () => 'fait');
+    const registry = makeRegistry([
+      {
+        name: 'danger',
+        gated: true,
+        handler: handler as ToolSpec['handler'],
+        describeForConfirm: (async () => {
+          throw new Error('secret interne');
+        }) as ToolSpec['describeForConfirm'],
+      },
+    ]);
+    const provider = scriptedProvider([toolUseResult('danger', { a: 1 }), textResult('ok')]);
+    const confirmer = vi.fn(async () => true);
+    await runTurn([], 'x', deps(provider, registry, { confirmer }));
+    const [description, toolName] = confirmer.mock.calls[0] as [string, string];
+    expect(description).not.toContain('secret interne');
+    expect(description).toBe('danger (a=1)');
+    expect(toolName).toBe('danger');
+    // Le repli ne doit pas empêcher l'exécution une fois confirmée (symétrie du cas sync-throw)
+    expect(handler).toHaveBeenCalledTimes(1);
+  });
+
   it('tool adminOnly appelé par un non-admin → refus propre sans exécution ni confirmation', async () => {
     const handler = vi.fn(async () => 'jamais');
     const confirmer = vi.fn(async () => true);

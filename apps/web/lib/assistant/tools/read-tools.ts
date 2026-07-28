@@ -122,6 +122,61 @@ export async function buildReadTools(ctx: AuthContext): Promise<ToolSpec[]> {
     }),
 
     defineTool({
+      name: 'find_projects',
+      description:
+        "Recherche un projet par nom approximatif (partiel, insensible aux accents et à la casse). À utiliser dès que l'utilisateur désigne un projet par son nom (« ma liste de courses ») au lieu d'un id. Renvoie jusqu'à 10 candidats.",
+      inputSchema: z.object({ query: z.string().trim().min(1).max(120) }),
+      jsonSchema: {
+        type: 'object',
+        properties: { query: { type: 'string', minLength: 1, maxLength: 120 } },
+        required: ['query'],
+      },
+      handler: async (input) =>
+        safeDb('find_projects', async () => {
+          // Même pattern unaccent que search-recipients.ts (migration
+          // 20260724150000_enable_unaccent). Le SQL ne fait QUE présélectionner
+          // des ids dans le workspace ; la visibilité (scope) est intersectée en
+          // Prisma pour que la logique de scope reste à un seul endroit.
+          // Sur-fetch SQL (25 > 10) : des candidats hors scope ne doivent pas
+          // évincer des projets visibles avant l'intersection ci-dessous.
+          const candidates = await prisma.$queryRaw<{ id: string }[]>`
+            SELECT id FROM projects
+            WHERE workspace_id = ${workspaceId}::uuid
+              AND deleted_at IS NULL
+              AND lower(unaccent(name)) LIKE '%' || lower(unaccent(${input.query})) || '%'
+            ORDER BY name ASC
+            LIMIT 25`;
+          if (candidates.length === 0) return JSON.stringify([]);
+          const projects = await prisma.project.findMany({
+            where: {
+              workspaceId,
+              deletedAt: null,
+              // AND explicite : `scopedProjectWhere` peut renvoyer `{ id: … }`
+              // (scope restricted project-only) — un spread à plat écraserait
+              // le filtre candidats.
+              AND: [{ id: { in: candidates.map((c) => c.id) } }, scopedProjectWhere(scope)],
+            },
+            select: {
+              id: true,
+              name: true,
+              client: { select: { name: true } },
+              _count: { select: { cards: true } },
+            },
+            orderBy: { name: 'asc' },
+            take: 10,
+          });
+          return JSON.stringify(
+            projects.map((p) => ({
+              id: p.id,
+              name: p.name,
+              client: p.client.name,
+              cards: p._count.cards,
+            })),
+          );
+        }),
+    }),
+
+    defineTool({
       name: 'get_project_board',
       description:
         "Le Kanban d'un projet : colonnes ordonnées avec leurs cartes (id, titre, échéance, colonne bloquée ou non).",
@@ -131,10 +186,12 @@ export async function buildReadTools(ctx: AuthContext): Promise<ToolSpec[]> {
         safeDb('get_project_board', async () => {
           const project = await prisma.project.findFirst({
             where: {
-              id: input.projectId,
               workspaceId,
               deletedAt: null,
-              ...scopedProjectWhere(scope),
+              // AND explicite : `scopedProjectWhere` peut renvoyer `{ id: … }`
+              // (scope restricted project-only) — un spread à plat écraserait
+              // l'id demandé et renverrait un autre projet du scope.
+              AND: [{ id: input.projectId }, scopedProjectWhere(scope)],
             },
             select: {
               id: true,
@@ -362,7 +419,7 @@ export async function buildReadTools(ctx: AuthContext): Promise<ToolSpec[]> {
     defineTool({
       name: 'get_card',
       description:
-        "Détail d'une carte : titre, description, colonne, échéance, assignés, checklist.",
+        "Détail d'une carte : titre, description, colonne, échéance, assignés, checklist. Pour obtenir les ids des items de checklist (nécessaires à set_checklist_item), utiliser get_card_details.",
       inputSchema: z.object({ cardId: uuid }),
       jsonSchema: { type: 'object', properties: { cardId: UUID_JSON }, required: ['cardId'] },
       handler: async (input) =>
@@ -393,6 +450,67 @@ export async function buildReadTools(ctx: AuthContext): Promise<ToolSpec[]> {
           return JSON.stringify({
             ...card,
             description,
+            ...(card.checklistItems.length === CARD_CHECKLIST_MAX
+              ? { checklistTruncated: true }
+              : {}),
+          });
+        }),
+    }),
+
+    defineTool({
+      name: 'get_card_details',
+      description:
+        'Détails d’une carte : description, échéance, colonne, assignés RACI, et items de checklist (avec leur id, pour set_checklist_item).',
+      inputSchema: z.object({ cardId: uuid }),
+      jsonSchema: { type: 'object', properties: { cardId: UUID_JSON }, required: ['cardId'] },
+      handler: async (input) =>
+        safeDb('get_card_details', async () => {
+          const card = await prisma.card.findFirst({
+            where: {
+              workspaceId,
+              deletedAt: null,
+              // AND explicite : même précédent que get_project_board /
+              // find_projects — `scopedCardWhere` s'applique via la
+              // relation `project`, mais on garde le pattern AND pour ne
+              // jamais risquer qu'un spread à plat écrase la clé `id`.
+              AND: [{ id: input.cardId }, scopedCardWhere(scope)],
+            },
+            select: {
+              id: true,
+              title: true,
+              description: true,
+              dueDate: true,
+              column: { select: { name: true } },
+              assignees: {
+                select: { raci: true, user: { select: { firstName: true } } },
+              },
+              checklistItems: {
+                select: { id: true, title: true, isChecked: true },
+                orderBy: { position: 'asc' },
+                take: CARD_CHECKLIST_MAX,
+              },
+            },
+          });
+          if (card === null) return 'Carte introuvable.';
+          // Mêmes bornes que get_card : description 5000 chars, checklist 50
+          // items + flag de troncature — aucune sortie non bornée vers le
+          // modèle.
+          const description =
+            card.description !== null && card.description.length > CARD_DESCRIPTION_MAX_CHARS
+              ? `${card.description.slice(0, CARD_DESCRIPTION_MAX_CHARS)} […tronqué]`
+              : card.description;
+          return JSON.stringify({
+            id: card.id,
+            title: card.title,
+            description,
+            due: card.dueDate !== null ? card.dueDate.toISOString().slice(0, 10) : null,
+            column: card.column.name,
+            assignees: card.assignees.map((a) => ({ name: a.user.firstName, raci: a.raci })),
+            checklist: card.checklistItems.map((i) => ({
+              id: i.id,
+              title: i.title,
+              checked: i.isChecked,
+            })),
             ...(card.checklistItems.length === CARD_CHECKLIST_MAX
               ? { checklistTruncated: true }
               : {}),

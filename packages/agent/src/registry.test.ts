@@ -54,6 +54,21 @@ describe('defineTool', () => {
     expect(tool.describeForConfirm?.({ text: 'salut' } as never)).toBe('confirmer : salut');
   });
 
+  it('accepte un describeForConfirm async au typage (sans cast) et le transmet', async () => {
+    const tool = defineTool({
+      name: 'danger',
+      description: 'd',
+      inputSchema: z.object({ id: z.string() }),
+      jsonSchema: { type: 'object', properties: { id: { type: 'string' } } },
+      gated: true,
+      handler: async (input) => `ok:${input.id}`,
+      describeForConfirm: async (input) => `Supprimer « Vrai Nom » (${input.id})`,
+    });
+    await expect(tool.describeForConfirm?.({ id: 'p_1' } as never)).resolves.toBe(
+      'Supprimer « Vrai Nom » (p_1)',
+    );
+  });
+
   it('describeForConfirm absent quand non fourni', () => {
     const tool = makeTool();
     expect(tool.describeForConfirm).toBeUndefined();

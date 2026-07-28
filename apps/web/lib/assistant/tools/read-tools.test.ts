@@ -12,6 +12,8 @@ const prismaMock = vi.hoisted(() => ({
   client: { findMany: vi.fn() },
   column: { findMany: vi.fn() },
   membership: { findMany: vi.fn() },
+  $queryRaw: vi.fn(),
+  $queryRawUnsafe: vi.fn(),
 }));
 vi.mock('@nexushub/db', () => ({ prisma: prismaMock }));
 
@@ -50,10 +52,12 @@ beforeEach(() => {
 });
 
 describe('buildReadTools', () => {
-  it('expose les 9 tools de lecture, aucun gated ni adminOnly', async () => {
+  it('expose les 11 tools de lecture, aucun gated ni adminOnly', async () => {
     const tools = await buildReadTools(ctx);
     expect(tools.map((t) => t.name).sort()).toEqual([
+      'find_projects',
       'get_card',
+      'get_card_details',
       'get_current_datetime',
       'get_project_board',
       'get_team_members',
@@ -115,6 +119,62 @@ describe('buildReadTools', () => {
     expect(scopeMocks.scopedProjectWhere).toHaveBeenCalled();
   });
 
+  it('cherche via unaccent et ne renvoie que les projets du workspace visibles par le scope', async () => {
+    const PROJECT_ID = '4c9d3f0a-2222-4444-8888-aaaaaaaaaaaa';
+    prismaMock.$queryRaw.mockResolvedValue([{ id: PROJECT_ID }]);
+    prismaMock.project.findMany.mockResolvedValue([
+      {
+        id: PROJECT_ID,
+        name: 'Liste de course',
+        client: { name: 'Perso' },
+        _count: { cards: 3 },
+      },
+    ]);
+    const out = JSON.parse(await execute('find_projects', { query: 'liste de courses' }));
+    expect(out).toEqual([{ id: PROJECT_ID, name: 'Liste de course', client: 'Perso', cards: 3 }]);
+    const call = prismaMock.project.findMany.mock.calls[0]?.[0];
+    expect(call?.where?.workspaceId).toBe('w1');
+    expect(call?.where?.deletedAt).toBeNull();
+    expect(call?.where?.AND).toEqual([{ id: { in: [PROJECT_ID] } }, {}]);
+    expect(call?.take).toBe(10);
+    expect(scopeMocks.scopedProjectWhere).toHaveBeenCalled();
+  });
+
+  it('find_projects : le scope restricted est intersecté avec les candidats, jamais écrasé', async () => {
+    // Régression : `scopedProjectWhere` restricted « project-only » renvoie
+    // `{ id: { in: [...] } }` — spreadé à plat après `id: { in: candidates } }`,
+    // il l'écrasait et renvoyait tout le scope sans rapport avec la query.
+    const PROJECT_ID = '4c9d3f0a-2222-4444-8888-aaaaaaaaaaaa';
+    scopeMocks.scopedProjectWhere.mockReturnValueOnce({ id: { in: ['scope-p1'] } });
+    prismaMock.$queryRaw.mockResolvedValue([{ id: PROJECT_ID }]);
+    prismaMock.project.findMany.mockResolvedValue([]);
+    await execute('find_projects', { query: 'course' });
+    const where = prismaMock.project.findMany.mock.calls[0]?.[0]?.where;
+    expect(where?.AND).toEqual([{ id: { in: [PROJECT_ID] } }, { id: { in: ['scope-p1'] } }]);
+  });
+
+  it('find_projects : zéro candidat → tableau vide sans requête findMany', async () => {
+    prismaMock.$queryRaw.mockResolvedValue([]);
+    const out = JSON.parse(await execute('find_projects', { query: 'introuvable' }));
+    expect(out).toEqual([]);
+    expect(prismaMock.project.findMany).not.toHaveBeenCalled();
+  });
+
+  it('find_projects : la requête SQL est un tagged template paramétré ($queryRaw, pas $queryRawUnsafe)', async () => {
+    prismaMock.$queryRaw.mockResolvedValue([]);
+    await execute('find_projects', { query: 'course' });
+    expect(prismaMock.$queryRaw).toHaveBeenCalledTimes(1);
+    expect(prismaMock.$queryRawUnsafe).not.toHaveBeenCalled();
+    const call = prismaMock.$queryRaw.mock.calls[0] ?? [];
+    const firstArg = call[0] as TemplateStringsArray;
+    expect(Array.isArray(firstArg)).toBe(true);
+    expect(Array.isArray(firstArg.raw)).toBe(true);
+    // Les valeurs (workspaceId + query) passent en paramètres, jamais dans le texte SQL.
+    const params = call.slice(1);
+    expect(params).toContain('w1');
+    expect(params).toContain('course');
+  });
+
   it('get_project_board renvoie colonnes et cartes, ou une erreur si projet introuvable', async () => {
     prismaMock.project.findFirst.mockResolvedValue(null);
     const out = await execute('get_project_board', {
@@ -124,6 +184,22 @@ describe('buildReadTools', () => {
     const where = prismaMock.project.findFirst.mock.calls[0]?.[0]?.where;
     expect(where?.workspaceId).toBe('w1');
     expect(scopeMocks.scopedProjectWhere).toHaveBeenCalled();
+  });
+
+  it("get_project_board : le scope restricted est intersecté avec l'id demandé, jamais écrasé", async () => {
+    // Régression (Plan 1) : même écrasement que find_projects — un restricted
+    // « project-only » demandant n'importe quel uuid recevait le board du
+    // premier projet de son scope.
+    scopeMocks.scopedProjectWhere.mockReturnValueOnce({ id: { in: ['scope-p1'] } });
+    prismaMock.project.findFirst.mockResolvedValue(null);
+    await execute('get_project_board', { projectId: '4c9d3f0a-2222-4444-8888-aaaaaaaaaaaa' });
+    const where = prismaMock.project.findFirst.mock.calls[0]?.[0]?.where;
+    expect(where?.AND).toEqual([
+      { id: '4c9d3f0a-2222-4444-8888-aaaaaaaaaaaa' },
+      { id: { in: ['scope-p1'] } },
+    ]);
+    expect(where?.workspaceId).toBe('w1');
+    expect(where?.deletedAt).toBeNull();
   });
 
   it('get_project_board borne les cartes à 100 par colonne et signale la troncature', async () => {
@@ -391,6 +467,124 @@ describe('buildReadTools', () => {
     expect(out.checklistTruncated).toBe(true);
     const select = prismaMock.card.findFirst.mock.calls[0]?.[0]?.select;
     expect(select?.checklistItems?.take).toBe(50);
+  });
+
+  it('get_card_details renvoie le JSON complet (échéance, colonne, assignés, checklist ordonnée avec ids)', async () => {
+    prismaMock.card.findFirst.mockResolvedValue({
+      id: 'c1',
+      title: 'Créer le devis',
+      description: 'Devis pour le client',
+      dueDate: new Date('2026-08-01T00:00:00.000Z'),
+      column: { name: 'À faire' },
+      assignees: [{ raci: 'responsible', user: { firstName: 'Ada' } }],
+      checklistItems: [
+        { id: 'i2', title: 'Étape 2', isChecked: false },
+        { id: 'i1', title: 'Étape 1', isChecked: true },
+      ],
+    });
+    const out = JSON.parse(
+      await execute('get_card_details', { cardId: '4c9d3f0a-2222-4444-8888-aaaaaaaaaaaa' }),
+    );
+    expect(out).toEqual({
+      id: 'c1',
+      title: 'Créer le devis',
+      description: 'Devis pour le client',
+      due: '2026-08-01',
+      column: 'À faire',
+      assignees: [{ name: 'Ada', raci: 'responsible' }],
+      checklist: [
+        { id: 'i2', title: 'Étape 2', checked: false },
+        { id: 'i1', title: 'Étape 1', checked: true },
+      ],
+    });
+    // Ordre renvoyé tel quel par Prisma (orderBy position asc) — on vérifie
+    // que le select a bien demandé cet ordre plutôt que de re-trier ici.
+    // Mêmes bornes que get_card : cap 50 items côté requête.
+    const select = prismaMock.card.findFirst.mock.calls[0]?.[0]?.select;
+    expect(select?.checklistItems?.orderBy).toEqual({ position: 'asc' });
+    expect(select?.checklistItems?.take).toBe(50);
+  });
+
+  it('get_card_details tronque la description à 5000 caractères (même borne que get_card)', async () => {
+    prismaMock.card.findFirst.mockResolvedValue({
+      id: 'c1',
+      title: 'Longue',
+      description: 'x'.repeat(6000),
+      dueDate: null,
+      column: { name: 'À faire' },
+      assignees: [],
+      checklistItems: [],
+    });
+    const out = JSON.parse(
+      await execute('get_card_details', { cardId: '4c9d3f0a-2222-4444-8888-aaaaaaaaaaaa' }),
+    );
+    expect(out.description.endsWith(' […tronqué]')).toBe(true);
+    expect(out.description.length).toBe(5000 + ' […tronqué]'.length);
+  });
+
+  it('get_card_details signale la troncature de checklist quand la limite de 50 est atteinte', async () => {
+    prismaMock.card.findFirst.mockResolvedValue({
+      id: 'c1',
+      title: 'Grosse checklist',
+      description: null,
+      dueDate: null,
+      column: { name: 'À faire' },
+      assignees: [],
+      checklistItems: Array.from({ length: 50 }, (_, i) => ({
+        id: `i${i}`,
+        title: `Item ${i}`,
+        isChecked: false,
+      })),
+    });
+    const out = JSON.parse(
+      await execute('get_card_details', { cardId: '4c9d3f0a-2222-4444-8888-aaaaaaaaaaaa' }),
+    );
+    expect(out.checklist).toHaveLength(50);
+    expect(out.checklistTruncated).toBe(true);
+  });
+
+  it('get_card oriente vers get_card_details pour les ids de checklist (description anti-doublon)', async () => {
+    const tools = await buildReadTools(ctx);
+    const getCard = tools.find((t) => t.name === 'get_card');
+    expect(getCard?.description).toContain('get_card_details');
+  });
+
+  it('get_card_details : échéance nulle → due:null', async () => {
+    prismaMock.card.findFirst.mockResolvedValue({
+      id: 'c1',
+      title: 'Sans échéance',
+      description: null,
+      dueDate: null,
+      column: { name: 'À faire' },
+      assignees: [],
+      checklistItems: [],
+    });
+    const out = JSON.parse(
+      await execute('get_card_details', { cardId: '4c9d3f0a-2222-4444-8888-aaaaaaaaaaaa' }),
+    );
+    expect(out.due).toBeNull();
+  });
+
+  it('get_card_details : carte hors workspace/scope → « Carte introuvable. »', async () => {
+    prismaMock.card.findFirst.mockResolvedValue(null);
+    const out = await execute('get_card_details', {
+      cardId: '4c9d3f0a-2222-4444-8888-aaaaaaaaaaaa',
+    });
+    expect(out).toBe('Carte introuvable.');
+  });
+
+  it('get_card_details : where scope-scopé via AND explicite, jamais de spread à plat à côté de id', async () => {
+    scopeMocks.scopedCardWhere.mockReturnValueOnce({ project: { id: { in: ['scope-p1'] } } });
+    prismaMock.card.findFirst.mockResolvedValue(null);
+    await execute('get_card_details', { cardId: '4c9d3f0a-2222-4444-8888-aaaaaaaaaaaa' });
+    const where = prismaMock.card.findFirst.mock.calls[0]?.[0]?.where;
+    expect(where?.AND).toEqual([
+      { id: '4c9d3f0a-2222-4444-8888-aaaaaaaaaaaa' },
+      { project: { id: { in: ['scope-p1'] } } },
+    ]);
+    expect(where?.workspaceId).toBe('w1');
+    expect(where?.deletedAt).toBeNull();
+    expect(scopeMocks.scopedCardWhere).toHaveBeenCalled();
   });
 
   it('erreur NEXT_REDIRECT (session expirée) → message « session expirée » dédié', async () => {

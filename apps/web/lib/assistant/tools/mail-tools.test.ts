@@ -352,14 +352,16 @@ describe('buildMailTools', () => {
     });
 
     describe('describeForConfirm', () => {
-      function describe_(input: Record<string, unknown>): string {
+      // describeForConfirm peut désormais être async (string | Promise<string>) :
+      // on attend la valeur, sans changer le comportement testé.
+      async function describe_(input: Record<string, unknown>): Promise<string> {
         const tool = getTool('send_mail');
         if (tool.describeForConfirm === undefined) throw new Error('describeForConfirm absent');
         return tool.describeForConfirm(input as never);
       }
 
-      it('contient mode, destinataires, cc en clair, objet, extrait — sans balise HTML', () => {
-        const description = describe_({
+      it('contient mode, destinataires, cc en clair, objet, extrait — sans balise HTML', async () => {
+        const description = await describe_({
           fromIntegrationId: INTEGRATION_ID,
           mode: 'new_mail',
           toRecipients: ['dest@acme.com', 'autre@acme.com'],
@@ -376,8 +378,8 @@ describe('buildMailTools', () => {
         expect(description).not.toContain('<');
       });
 
-      it("mode 'reply_all' → libellé FR « réponse à tous »", () => {
-        const description = describe_({
+      it("mode 'reply_all' → libellé FR « réponse à tous »", async () => {
+        const description = await describe_({
           fromIntegrationId: INTEGRATION_ID,
           mode: 'reply_all',
           replyToId: REPLY_TO_ID,
@@ -388,9 +390,9 @@ describe('buildMailTools', () => {
         expect(description).toContain('réponse à tous');
       });
 
-      it('Cci : chaque adresse apparaît en clair, JAMAIS tronquée (même à 7 adresses)', () => {
+      it('Cci : chaque adresse apparaît en clair, JAMAIS tronquée (même à 7 adresses)', async () => {
         const bcc = Array.from({ length: 7 }, (_, i) => `cache${i}@acme.com`);
-        const description = describe_({
+        const description = await describe_({
           fromIntegrationId: INTEGRATION_ID,
           mode: 'new_mail',
           toRecipients: ['dest@acme.com'],
@@ -404,9 +406,9 @@ describe('buildMailTools', () => {
         expect(description).toContain('Cci :');
       });
 
-      it('À : tronqué à 5 adresses + « +n autres »', () => {
+      it('À : tronqué à 5 adresses + « +n autres »', async () => {
         const to = Array.from({ length: 7 }, (_, i) => `dest${i}@acme.com`);
-        const description = describe_({
+        const description = await describe_({
           fromIntegrationId: INTEGRATION_ID,
           mode: 'new_mail',
           toRecipients: to,
@@ -418,21 +420,21 @@ describe('buildMailTools', () => {
         expect(description).toContain('+2 autres');
       });
 
-      it('input invalide (brut, pré-validation) → description de refus, sans aucun champ de l’input', () => {
-        const description = describe_({
+      it('input invalide (brut, pré-validation) → description de refus, sans aucun champ de l’input', async () => {
+        const description = await describe_({
           mode: 'inconnu',
           bodyHtml: '<script>alert(1)</script>',
         });
         expect(description).toBe('Envoi de mail (paramètres invalides — refusez).');
       });
 
-      it('budget dépassé (20 Cci très longues + À/Cc chargés) → repli compté ≤ 1900 chars avec les comptes exacts', () => {
+      it('budget dépassé (20 Cci très longues + À/Cc chargés) → repli compté ≤ 1900 chars avec les comptes exacts', async () => {
         const longAddr = (prefix: string, i: number) =>
           `${prefix}${i}-${'a'.repeat(80)}@${'b'.repeat(60)}.com`;
         const to = Array.from({ length: 20 }, (_, i) => longAddr('to', i));
         const cc = Array.from({ length: 20 }, (_, i) => longAddr('cc', i));
         const bcc = Array.from({ length: 20 }, (_, i) => longAddr('bcc', i));
-        const description = describe_({
+        const description = await describe_({
           fromIntegrationId: INTEGRATION_ID,
           mode: 'new_mail',
           toRecipients: to,
@@ -450,8 +452,8 @@ describe('buildMailTools', () => {
         expect(description).toContain(`« ${'S'.repeat(150)}…`);
       });
 
-      it('sans cc ni cci, aucun segment Cc/Cci', () => {
-        const description = describe_({
+      it('sans cc ni cci, aucun segment Cc/Cci', async () => {
+        const description = await describe_({
           fromIntegrationId: INTEGRATION_ID,
           mode: 'new_mail',
           toRecipients: ['dest@acme.com'],
@@ -462,8 +464,8 @@ describe('buildMailTools', () => {
         expect(description).not.toContain('Cci :');
       });
 
-      it('extrait : ellipse UNIQUEMENT si le corps dépasse 200 caractères, longueur bornée', () => {
-        const short = describe_({
+      it('extrait : ellipse UNIQUEMENT si le corps dépasse 200 caractères, longueur bornée', async () => {
+        const short = await describe_({
           fromIntegrationId: INTEGRATION_ID,
           mode: 'new_mail',
           toRecipients: ['dest@acme.com'],
@@ -473,7 +475,7 @@ describe('buildMailTools', () => {
         expect(short.endsWith('Court.')).toBe(true);
         expect(short).not.toContain('…');
 
-        const long = describe_({
+        const long = await describe_({
           fromIntegrationId: INTEGRATION_ID,
           mode: 'new_mail',
           toRecipients: ['dest@acme.com'],
