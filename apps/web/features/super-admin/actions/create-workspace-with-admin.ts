@@ -98,7 +98,7 @@ export async function createWorkspaceWithAdmin(
       workspaceId,
       name: DEFAULT_CARD_TEMPLATE_NAME,
       isDefault: true,
-      items: defaultCardTemplateItems(),
+      items: defaultCardTemplateItems() as unknown as Prisma.InputJsonValue,
     },
   });
 
