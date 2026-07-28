@@ -8,6 +8,7 @@ import {
   buildProjectColumns,
   findTemplate,
   NotFoundError,
+  validateProjectDates,
 } from '@nexushub/domain';
 import type { AuthContext } from '@/lib/auth';
 import { loadUserScope } from '@/lib/auth/scope';
@@ -225,6 +226,14 @@ function toDateOnly(d: Date | null): string | null {
 }
 
 /**
+ * Même message que le wizard (`features/projects/lib/schemas.ts`,
+ * `CreateProjectSchema.superRefine`) — la règle métier startDate ≤ endDate
+ * doit produire un texte identique, que la violation soit détectée à la
+ * création ou à la mise à jour du projet.
+ */
+const END_BEFORE_START_MESSAGE = 'La date de fin doit être après la date de début';
+
+/**
  * Update a project's editable fields (mutant tool + future settings UI).
  * Only the keys present in `input` are written — `undefined` means
  * "leave untouched", `null` (for description/dates) means "clear".
@@ -242,7 +251,7 @@ export async function updateProjectCore(
 
   const project = await prisma.project.findFirst({
     where: { id: input.projectId, workspaceId: ctx.workspaceId, deletedAt: null },
-    select: { id: true, clientId: true },
+    select: { id: true, clientId: true, startDate: true, endDate: true },
   });
   if (!project) throw new NotFoundError('Project');
 
@@ -251,6 +260,31 @@ export async function updateProjectCore(
     const allowed =
       scope.projectIds.includes(project.id) || scope.clientIds.includes(project.clientId);
     if (!allowed) return { ok: false, message: SCOPE_ERROR_MESSAGE };
+  }
+
+  // Règle métier startDate ≤ endDate (même contrainte que le wizard,
+  // `validateProjectDates`) : évaluée sur l'état EFFECTIF post-écriture —
+  // un champ non fourni (`undefined`) garde la valeur actuelle de la ligne,
+  // un champ fourni écrase (y compris `null`, qui efface la borne et ne
+  // peut donc jamais provoquer d'inversion).
+  const effectiveStartDate =
+    input.startDate !== undefined
+      ? input.startDate === null
+        ? null
+        : new Date(input.startDate)
+      : project.startDate;
+  const effectiveEndDate =
+    input.endDate !== undefined
+      ? input.endDate === null
+        ? null
+        : new Date(input.endDate)
+      : project.endDate;
+  const dates = validateProjectDates({
+    startDate: effectiveStartDate,
+    endDate: effectiveEndDate,
+  });
+  if (!dates.ok) {
+    return { ok: false, message: END_BEFORE_START_MESSAGE };
   }
 
   try {

@@ -287,7 +287,12 @@ describe('updateProjectCore', () => {
   const PROJECT_ID = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
 
   beforeEach(() => {
-    prismaMock.project.findFirst.mockResolvedValue({ id: PROJECT_ID, clientId: CLIENT_ID });
+    prismaMock.project.findFirst.mockResolvedValue({
+      id: PROJECT_ID,
+      clientId: CLIENT_ID,
+      startDate: null,
+      endDate: null,
+    });
     prismaMock.project.update.mockResolvedValue({});
   });
 
@@ -298,7 +303,12 @@ describe('updateProjectCore', () => {
       return Promise.resolve({});
     });
     prismaMock.project.findFirst
-      .mockResolvedValueOnce({ id: PROJECT_ID, clientId: CLIENT_ID }) // lookup
+      .mockResolvedValueOnce({
+        id: PROJECT_ID,
+        clientId: CLIENT_ID,
+        startDate: null,
+        endDate: null,
+      }) // lookup
       .mockResolvedValueOnce({
         name: 'New name',
         description: null,
@@ -325,7 +335,12 @@ describe('updateProjectCore', () => {
       return Promise.resolve({});
     });
     prismaMock.project.findFirst
-      .mockResolvedValueOnce({ id: PROJECT_ID, clientId: CLIENT_ID })
+      .mockResolvedValueOnce({
+        id: PROJECT_ID,
+        clientId: CLIENT_ID,
+        startDate: null,
+        endDate: null,
+      })
       .mockResolvedValueOnce({
         name: 'Unchanged',
         description: null,
@@ -349,6 +364,91 @@ describe('updateProjectCore', () => {
       startDate: '2026-05-01',
       endDate: null,
     });
+  });
+
+  it('refuses a provided startDate that lands after the CURRENT (unrelated-write) endDate', async () => {
+    prismaMock.project.findFirst.mockResolvedValueOnce({
+      id: PROJECT_ID,
+      clientId: CLIENT_ID,
+      startDate: null,
+      endDate: new Date('2026-06-01T00:00:00.000Z'),
+    });
+
+    const result = await updateProjectCore(adminCtx, {
+      projectId: PROJECT_ID,
+      startDate: '2026-07-01',
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      message: 'La date de fin doit être après la date de début',
+    });
+    expect(prismaMock.project.update).not.toHaveBeenCalled();
+  });
+
+  it('refuses a provided endDate that lands before the CURRENT (unrelated-write) startDate', async () => {
+    prismaMock.project.findFirst.mockResolvedValueOnce({
+      id: PROJECT_ID,
+      clientId: CLIENT_ID,
+      startDate: new Date('2026-07-01T00:00:00.000Z'),
+      endDate: null,
+    });
+
+    const result = await updateProjectCore(adminCtx, {
+      projectId: PROJECT_ID,
+      endDate: '2026-06-01',
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      message: 'La date de fin doit être après la date de début',
+    });
+    expect(prismaMock.project.update).not.toHaveBeenCalled();
+  });
+
+  it('never refuses clearing (null) a bound, even against an inverted-looking remaining bound', async () => {
+    prismaMock.project.findFirst
+      .mockResolvedValueOnce({
+        id: PROJECT_ID,
+        clientId: CLIENT_ID,
+        startDate: new Date('2026-07-01T00:00:00.000Z'),
+        endDate: new Date('2026-06-01T00:00:00.000Z'),
+      })
+      .mockResolvedValueOnce({
+        name: 'X',
+        description: null,
+        startDate: new Date('2026-07-01T00:00:00.000Z'),
+        endDate: null,
+      });
+
+    const result = await updateProjectCore(adminCtx, { projectId: PROJECT_ID, endDate: null });
+
+    expect(result.ok).toBe(true);
+    expect(prismaMock.project.update).toHaveBeenCalled();
+  });
+
+  it('accepts consistent startDate + endDate both provided together', async () => {
+    prismaMock.project.findFirst
+      .mockResolvedValueOnce({
+        id: PROJECT_ID,
+        clientId: CLIENT_ID,
+        startDate: null,
+        endDate: null,
+      })
+      .mockResolvedValueOnce({
+        name: 'X',
+        description: null,
+        startDate: new Date('2026-07-01T00:00:00.000Z'),
+        endDate: new Date('2026-08-01T00:00:00.000Z'),
+      });
+
+    const result = await updateProjectCore(adminCtx, {
+      projectId: PROJECT_ID,
+      startDate: '2026-07-01',
+      endDate: '2026-08-01',
+    });
+
+    expect(result.ok).toBe(true);
   });
 
   it('returns "Un projet porte déjà ce nom." on a P2002 unique-constraint error', async () => {
@@ -392,7 +492,12 @@ describe('updateProjectCore', () => {
       projectIds: [],
     });
     prismaMock.project.findFirst
-      .mockResolvedValueOnce({ id: PROJECT_ID, clientId: CLIENT_ID })
+      .mockResolvedValueOnce({
+        id: PROJECT_ID,
+        clientId: CLIENT_ID,
+        startDate: null,
+        endDate: null,
+      })
       .mockResolvedValueOnce({ name: 'X', description: null, startDate: null, endDate: null });
     const result = await updateProjectCore(adminCtx, { projectId: PROJECT_ID, name: 'X' });
     expect(result.ok).toBe(true);
@@ -408,7 +513,12 @@ describe('updateProjectCore', () => {
 
   it('throws NotFoundError("Project") if the post-write reread comes back empty', async () => {
     prismaMock.project.findFirst
-      .mockResolvedValueOnce({ id: PROJECT_ID, clientId: CLIENT_ID })
+      .mockResolvedValueOnce({
+        id: PROJECT_ID,
+        clientId: CLIENT_ID,
+        startDate: null,
+        endDate: null,
+      })
       .mockResolvedValueOnce(null);
     await expect(updateProjectCore(adminCtx, { projectId: PROJECT_ID, name: 'X' })).rejects.toThrow(
       /Project/,
