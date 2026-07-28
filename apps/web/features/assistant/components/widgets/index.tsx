@@ -31,19 +31,15 @@ export interface WidgetActions {
  * diagnostiquer un drift de shape entre un tool serveur et son widget.
  *
  * `actions` (Plan 5c) est optionnel et transmis tel quel aux widgets qui le
- * consomment — pour l'instant AUCUN ne le fait (MailListWidget/MailDraftWidget
- * le brancheront dans les tâches suivantes du plan 5c). Un appel à 2
- * arguments reste entièrement valide.
+ * consomment. `MailListWidget` (search_mails) le branche depuis la Task 4 —
+ * les autres widgets l'ignorent encore. Un appel à 2 arguments reste
+ * entièrement valide.
  */
 export function renderWidget(
   tool: string,
   data: unknown,
   actions?: WidgetActions,
 ): ReactNode | null {
-  // Volontairement non déstructuré ici : `actions` n'est pas encore consommé
-  // par un widget (branché tâche par tâche dans le plan 5c) — ce garde évite
-  // un lint "unused parameter" sans changer le comportement.
-  void actions;
   if (!isWidgetTool(tool)) return null;
   switch (tool) {
     case 'get_today_overview':
@@ -51,7 +47,10 @@ export function renderWidget(
     case 'get_project_board':
       return <BoardWidget data={data} />;
     case 'search_mails':
-      return <MailListWidget data={data} />;
+      // `exactOptionalPropertyTypes` interdit `actions={actions}` quand
+      // `actions` peut être `undefined` explicite — spread conditionnel pour
+      // omettre la prop plutôt que de la valoir `undefined`.
+      return <MailListWidget data={data} {...(actions !== undefined ? { actions } : {})} />;
     case 'list_projects':
       return <ProjectListWidget data={data} />;
     case 'find_projects':
