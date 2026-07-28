@@ -13,11 +13,11 @@
 
 ## Décisions produit (2026-07-28)
 
-| Question | Décision |
-| --- | --- |
-| Description dans le modal | **Via template uniquement** (statu quo de rendu) — on garantit que le template par défaut contient la description |
-| Voir/modifier le template depuis une carte | **Lien vers l'éditeur existant** avec deep-link, pas d'édition inline |
-| Template par défaut garanti | **Oui** — bootstrap à la création de workspace + migration data pour l'existant, **avec backfill** des cartes sans template |
+| Question                                   | Décision                                                                                                                    |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
+| Description dans le modal                  | **Via template uniquement** (statu quo de rendu) — on garantit que le template par défaut contient la description           |
+| Voir/modifier le template depuis une carte | **Lien vers l'éditeur existant** avec deep-link, pas d'édition inline                                                       |
+| Template par défaut garanti                | **Oui** — bootstrap à la création de workspace + migration data pour l'existant, **avec backfill** des cartes sans template |
 
 ## Changements
 
@@ -51,7 +51,7 @@ prisma.cardTemplate.create({
       { id: 'checklist', type: 'checklist', items: [] },
     ],
   },
-})
+});
 ```
 
 La cascade existante de `create-card.ts` (fallback `isDefault: true`) fait le reste : toute nouvelle carte a un template avec description. Aucun changement dans la cascade.

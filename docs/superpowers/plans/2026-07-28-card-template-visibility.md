@@ -9,6 +9,7 @@
 **Tech Stack:** Next.js 15 App Router, Prisma 6 (Supabase Postgres), Vitest, pnpm workspaces (`@nexushub/domain`, `@nexushub/web`).
 
 **Conventions:**
+
 - Run web tests: `pnpm -F @nexushub/web test -- <path>` · domain tests: `pnpm -F @nexushub/domain test -- <path>`
 - All UI copy is hardcoded French in these features (existing pattern) — follow it.
 - Commits: Conventional Commits, one per task.
@@ -18,6 +19,7 @@
 ### Task 1: Domain — default card template constants
 
 **Files:**
+
 - Modify: `packages/domain/src/card-templates/index.ts` (append at end)
 - Test: `packages/domain/src/card-templates/default-template.test.ts` (create)
 
@@ -100,6 +102,7 @@ git commit -m "feat(domain): default card template constants (Standard, descript
 ### Task 2: Deep-link — `/templates/cards?template=<id>` opens that template
 
 **Files:**
+
 - Modify: `apps/web/features/templates/cards/use-editor-state.ts:49-65` (`makeInitialState`) and `:243-253` (`useEditorState`)
 - Modify: `apps/web/features/templates/cards/editor-shell.tsx:12-18` (props)
 - Modify: `apps/web/app/(app)/templates/cards/page.tsx` (read `searchParams`)
@@ -111,8 +114,18 @@ Append to `apps/web/features/templates/cards/use-editor-state.test.ts` (reuse th
 
 ```ts
 describe('makeInitialState — deep-link initialSelectedId', () => {
-  const tplA = { id: 'aaaaaaaa-0000-0000-0000-000000000001', name: 'A', items: [], isDefault: true };
-  const tplB = { id: 'aaaaaaaa-0000-0000-0000-000000000002', name: 'B', items: [], isDefault: false };
+  const tplA = {
+    id: 'aaaaaaaa-0000-0000-0000-000000000001',
+    name: 'A',
+    items: [],
+    isDefault: true,
+  };
+  const tplB = {
+    id: 'aaaaaaaa-0000-0000-0000-000000000002',
+    name: 'B',
+    items: [],
+    isDefault: false,
+  };
 
   it('selects the requested template when it exists', () => {
     const s = makeInitialState([tplA, tplB], tplB.id);
@@ -199,7 +212,7 @@ export default async function CardTemplatesPage({
   // …existing prisma query + mapping unchanged…
   return (
     // …unchanged header…
-      <EditorShell initialTemplates={templates} initialSelectedId={requestedTemplateId} />
+    <EditorShell initialTemplates={templates} initialSelectedId={requestedTemplateId} />
   );
 }
 ```
@@ -221,6 +234,7 @@ git commit -m "feat(templates): deep-link ?template=<id> opens that card templat
 ### Task 3: Card modal — « Modifier le template » link in the side rail
 
 **Files:**
+
 - Create: `apps/web/features/projects/components/template-edit-link.tsx`
 - Test: `apps/web/features/projects/components/template-edit-link.test.tsx` (create)
 - Modify: `apps/web/features/projects/components/card-modal.tsx:429-440` (Template side-row) + import block
@@ -310,19 +324,19 @@ import { TemplateEditLink } from './template-edit-link';
 Then in the Template side-row (currently lines ~429-440), after the explanatory `<p>`:
 
 ```tsx
-              <div className="side-row" hidden={isLoading}>
-                <div className="side-label">Template</div>
-                <TemplatePicker
-                  cardId={card.id}
-                  currentTemplateId={card.templateId}
-                  templates={availableTemplates}
-                />
-                <p className="mt-1 text-[10px] text-[color:var(--color-text-muted)]">
-                  Changer le template ré-organise les champs structurés. Les valeurs des champs
-                  conservés sont préservées.
-                </p>
-                {!isReadOnly ? <TemplateEditLink templateId={card.templateId} /> : null}
-              </div>
+<div className="side-row" hidden={isLoading}>
+  <div className="side-label">Template</div>
+  <TemplatePicker
+    cardId={card.id}
+    currentTemplateId={card.templateId}
+    templates={availableTemplates}
+  />
+  <p className="mt-1 text-[10px] text-[color:var(--color-text-muted)]">
+    Changer le template ré-organise les champs structurés. Les valeurs des champs conservés sont
+    préservées.
+  </p>
+  {!isReadOnly ? <TemplateEditLink templateId={card.templateId} /> : null}
+</div>
 ```
 
 - [ ] **Step 6: Typecheck + full web test sweep**
@@ -342,6 +356,7 @@ git commit -m "feat(projects): link to card-template editor from the card modal 
 ### Task 4: Bootstrap — default card template at workspace creation
 
 **Files:**
+
 - Modify: `apps/web/features/super-admin/actions/create-workspace-with-admin.ts:72-89`
 - Test: `apps/web/features/super-admin/actions/create-workspace-with-admin.test.ts` (extend)
 
@@ -355,15 +370,15 @@ In `create-workspace-with-admin.test.ts`:
 4. Add assertions to the happy-path test (`creates the workspace, fires the invitation, and audits`):
 
 ```ts
-    expect(mocks.cardTemplateCreate).toHaveBeenCalledOnce();
-    const tplArgs = mocks.cardTemplateCreate.mock.calls[0]![0];
-    expect(tplArgs.data.workspaceId).toBe(WS_ID);
-    expect(tplArgs.data.name).toBe('Standard');
-    expect(tplArgs.data.isDefault).toBe(true);
-    expect(tplArgs.data.items).toEqual([
-      { id: 'description', type: 'description' },
-      { id: 'checklist', type: 'checklist', items: [] },
-    ]);
+expect(mocks.cardTemplateCreate).toHaveBeenCalledOnce();
+const tplArgs = mocks.cardTemplateCreate.mock.calls[0]![0];
+expect(tplArgs.data.workspaceId).toBe(WS_ID);
+expect(tplArgs.data.name).toBe('Standard');
+expect(tplArgs.data.isDefault).toBe(true);
+expect(tplArgs.data.items).toEqual([
+  { id: 'description', type: 'description' },
+  { id: 'checklist', type: 'checklist', items: [] },
+]);
 ```
 
 5. Add to the duplicate-slug test: `expect(mocks.cardTemplateCreate).not.toHaveBeenCalled();`
@@ -384,19 +399,19 @@ import { DEFAULT_CARD_TEMPLATE_NAME, defaultCardTemplateItems } from '@nexushub/
 Then right after the `try/catch` that creates the workspace (after line 89, before `issueInvitation`):
 
 ```ts
-  // Bootstrap the workspace default card template so every card created in
-  // this workspace resolves to a template with a description (create-card's
-  // `isDefault: true` fallback). Best-effort like the invitation below: a
-  // failure doesn't roll back the workspace — the Admin can create/mark a
-  // default template via /templates/cards.
-  await prisma.cardTemplate.create({
-    data: {
-      workspaceId,
-      name: DEFAULT_CARD_TEMPLATE_NAME,
-      isDefault: true,
-      items: defaultCardTemplateItems(),
-    },
-  });
+// Bootstrap the workspace default card template so every card created in
+// this workspace resolves to a template with a description (create-card's
+// `isDefault: true` fallback). Best-effort like the invitation below: a
+// failure doesn't roll back the workspace — the Admin can create/mark a
+// default template via /templates/cards.
+await prisma.cardTemplate.create({
+  data: {
+    workspaceId,
+    name: DEFAULT_CARD_TEMPLATE_NAME,
+    isDefault: true,
+    items: defaultCardTemplateItems(),
+  },
+});
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
@@ -416,6 +431,7 @@ git commit -m "feat(super-admin): bootstrap Standard default card template at wo
 ### Task 5: Data migration — default template + backfill for existing workspaces
 
 **Files:**
+
 - Create: `packages/db/prisma/migrations/20260728120000_default_card_template_backfill/migration.sql`
 
 Reminder ([reference_deploy_migrations](memory)): Vercel does NOT run migrations — this SQL must be applied to Supabase (staging `yphedrhofupththvlvoa`) manually **before** merge.
@@ -506,6 +522,7 @@ git commit -m "feat(db): backfill default card template + attach template-less c
 ### Task 6: Docs, full verification
 
 **Files:**
+
 - Modify: `progress.md` (status note)
 - Modify: `CLAUDE.md` (§11 journal — one line)
 
