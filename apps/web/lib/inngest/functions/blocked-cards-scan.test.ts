@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { AgentNoticeInput } from '@/features/notifications/lib/notice-core';
 import type { NewlyBlockedCard } from '@/features/projects/lib/reconcile';
 import {
   blockedCardsScan,
@@ -7,9 +6,10 @@ import {
   type BlockedCardsScanDeps,
 } from './blocked-cards-scan';
 
-// Same stand-in used by morning-briefing.test.ts — `step.run` awaits the
-// callback directly so our own try/catch isolation (not Inngest's step
-// machinery) is what's under test.
+// `runStep` is a stand-in for Inngest's `step.run` — in production Inngest
+// MEMOIZES each step's (serializable) result across retries; here it just
+// awaits the callback directly so `runBlockedCardsScan`'s own control flow
+// (two-phase scan/notify, per-workspace isolation) is what's under test.
 function directRunStep<T>(_stepId: string, fn: () => Promise<T>): Promise<T> {
   return fn();
 }
@@ -18,8 +18,7 @@ function baseDeps(overrides: Partial<BlockedCardsScanDeps> = {}): BlockedCardsSc
   return {
     listWorkspaceIds: vi.fn(async () => ['ws-1']),
     reconcile: vi.fn(async () => ({ newlyBlocked: [] as readonly NewlyBlockedCard[] })),
-    listProjectMemberUserIds: vi.fn(async () => []),
-    createNotice: vi.fn(async () => ({ created: true })),
+    notify: vi.fn(async () => ({ notices: 0 })),
     runStep: directRunStep,
     now: () => new Date('2026-07-28T10:00:00Z'),
     ...overrides,
@@ -42,130 +41,99 @@ describe('runBlockedCardsScan', () => {
     expect(reconcile).toHaveBeenCalledWith('ws-2', { now: now() });
   });
 
-  it('notifies every member of the project for a newly-blocked card (multi-member -> one notice each)', async () => {
-    const card: NewlyBlockedCard = { cardId: 'card-1', title: 'Overdue card', projectId: 'proj-1' };
-    const listProjectMemberUserIds = vi.fn(async (projectId: string) =>
-      projectId === 'proj-1' ? ['u1', 'u2'] : [],
-    );
-    const createNotice = vi.fn(async () => ({ created: true }));
-    const deps = baseDeps({
-      reconcile: async () => ({ newlyBlocked: [card] }),
-      listProjectMemberUserIds,
-      createNotice,
-    });
-
-    const result = await runBlockedCardsScan(deps);
-
-    expect(listProjectMemberUserIds).toHaveBeenCalledWith('proj-1');
-    expect(createNotice).toHaveBeenCalledTimes(2);
-    expect(createNotice).toHaveBeenCalledWith({
-      workspaceId: 'ws-1',
-      userId: 'u1',
-      kind: 'agent_card_blocked',
-      message: '« Overdue card » est passée en Bloqué (échéance dépassée).',
-      data: { ref: 'card-1', discuss: 'Parlons de la carte card-1 passée en Bloqué' },
-    } satisfies AgentNoticeInput);
-    expect(createNotice).toHaveBeenCalledWith({
-      workspaceId: 'ws-1',
-      userId: 'u2',
-      kind: 'agent_card_blocked',
-      message: '« Overdue card » est passée en Bloqué (échéance dépassée).',
-      data: { ref: 'card-1', discuss: 'Parlons de la carte card-1 passée en Bloqué' },
-    } satisfies AgentNoticeInput);
-    expect(result.notices).toBe(2);
-  });
-
-  it('sends no notice when the project has no members (documented no-op, not an error)', async () => {
-    const card: NewlyBlockedCard = { cardId: 'card-1', title: 'Orphan card', projectId: 'proj-1' };
-    const createNotice = vi.fn(async () => ({ created: true }));
-    const deps = baseDeps({
-      reconcile: async () => ({ newlyBlocked: [card] }),
-      listProjectMemberUserIds: async () => [],
-      createNotice,
-    });
-
-    const result = await runBlockedCardsScan(deps);
-
-    expect(createNotice).not.toHaveBeenCalled();
-    expect(result.notices).toBe(0);
-  });
-
-  it('counts only the notices actually created (dedup is the core’s job, spied not reimplemented)', async () => {
-    const card: NewlyBlockedCard = { cardId: 'card-1', title: 'Card', projectId: 'proj-1' };
-    const createNotice = vi
-      .fn<(input: AgentNoticeInput) => Promise<{ created: boolean }>>()
-      .mockResolvedValueOnce({ created: true })
-      .mockResolvedValueOnce({ created: false });
-    const deps = baseDeps({
-      reconcile: async () => ({ newlyBlocked: [card] }),
-      listProjectMemberUserIds: async () => ['u1', 'u2'],
-      createNotice,
-    });
-
-    const result = await runBlockedCardsScan(deps);
-
-    expect(createNotice).toHaveBeenCalledTimes(2);
-    expect(result.notices).toBe(1);
-  });
-
-  it('runs each workspace scan through runStep with a per-workspace step id', async () => {
+  it('runs scan and notify as two SEPARATE steps per workspace (retry-safe semantics)', async () => {
+    const card: NewlyBlockedCard = { cardId: 'card-1', title: 'Overdue', projectId: 'proj-1' };
     const runStep = vi.fn(directRunStep) as BlockedCardsScanDeps['runStep'];
     const deps = baseDeps({
-      listWorkspaceIds: async () => ['ws-1', 'ws-2'],
+      reconcile: async () => ({ newlyBlocked: [card] }),
+      notify: async () => ({ notices: 1 }),
       runStep,
     });
 
     await runBlockedCardsScan(deps);
 
-    expect(runStep).toHaveBeenCalledWith('scan-ws-1', expect.any(Function));
-    expect(runStep).toHaveBeenCalledWith('scan-ws-2', expect.any(Function));
+    expect(runStep).toHaveBeenCalledTimes(2);
+    expect(runStep).toHaveBeenNthCalledWith(1, 'scan-ws-1', expect.any(Function));
+    expect(runStep).toHaveBeenNthCalledWith(2, 'notify-ws-1', expect.any(Function));
   });
 
-  it('isolates failures per workspace: one workspace throwing does not block the others', async () => {
+  it('feeds notify with the list RETURNED by the scan step — never a re-call of reconcile', async () => {
+    const cards: NewlyBlockedCard[] = [
+      { cardId: 'card-1', title: 'One', projectId: 'proj-1' },
+      { cardId: 'card-2', title: 'Two', projectId: 'proj-2' },
+    ];
+    const reconcile = vi.fn(async () => ({ newlyBlocked: cards as readonly NewlyBlockedCard[] }));
+    const notify = vi.fn(async () => ({ notices: 3 }));
+    const deps = baseDeps({ reconcile, notify });
+
+    const result = await runBlockedCardsScan(deps);
+
+    // reconcile ran exactly once per workspace (a second run would return []
+    // since the cards are already blocked) and its result IS what notify got.
+    expect(reconcile).toHaveBeenCalledTimes(1);
+    expect(notify).toHaveBeenCalledTimes(1);
+    expect(notify).toHaveBeenCalledWith('ws-1', cards);
+    expect(result).toEqual({ workspaces: 1, newlyBlocked: 2, notices: 3 });
+  });
+
+  it('skips the notify step entirely when the scan found nothing (no empty step in the run)', async () => {
+    const runStep = vi.fn(directRunStep) as BlockedCardsScanDeps['runStep'];
+    const notify = vi.fn(async () => ({ notices: 0 }));
+    const deps = baseDeps({ runStep, notify });
+
+    const result = await runBlockedCardsScan(deps);
+
+    expect(runStep).toHaveBeenCalledTimes(1);
+    expect(runStep).toHaveBeenCalledWith('scan-ws-1', expect.any(Function));
+    expect(notify).not.toHaveBeenCalled();
+    expect(result).toEqual({ workspaces: 1, newlyBlocked: 0, notices: 0 });
+  });
+
+  it('isolates failures per workspace: one workspace’s scan throwing does not block the others', async () => {
     const card: NewlyBlockedCard = { cardId: 'card-2', title: 'Card 2', projectId: 'proj-1' };
     const reconcile = vi.fn(async (workspaceId: string) => {
       if (workspaceId === 'ws-bad') throw new Error('db down');
       return { newlyBlocked: [card] as readonly NewlyBlockedCard[] };
     });
-    const createNotice = vi.fn(async () => ({ created: true }));
+    const notify = vi.fn(async () => ({ notices: 1 }));
     const deps = baseDeps({
       listWorkspaceIds: async () => ['ws-bad', 'ws-ok'],
       reconcile,
-      listProjectMemberUserIds: async () => ['u1'],
-      createNotice,
+      notify,
     });
 
     const result = await runBlockedCardsScan(deps);
 
-    expect(createNotice).toHaveBeenCalledTimes(1);
-    expect(result.notices).toBe(1);
-    expect(result.workspaces).toBe(2);
+    expect(notify).toHaveBeenCalledTimes(1);
+    expect(notify).toHaveBeenCalledWith('ws-ok', [card]);
+    expect(result).toEqual({ workspaces: 2, newlyBlocked: 1, notices: 1 });
   });
 
-  it('isolates failures per workspace when listProjectMemberUserIds throws too', async () => {
-    const card: NewlyBlockedCard = { cardId: 'card-3', title: 'Card 3', projectId: 'proj-bad' };
-    const otherCard: NewlyBlockedCard = { cardId: 'card-4', title: 'Card 4', projectId: 'proj-ok' };
+  it('isolates failures per workspace when the notify step throws too', async () => {
+    const cardBad: NewlyBlockedCard = { cardId: 'card-3', title: 'Bad', projectId: 'proj-bad' };
+    const cardOk: NewlyBlockedCard = { cardId: 'card-4', title: 'Ok', projectId: 'proj-ok' };
     const reconcile = vi.fn(async (workspaceId: string) =>
       workspaceId === 'ws-bad'
-        ? { newlyBlocked: [card] as readonly NewlyBlockedCard[] }
-        : { newlyBlocked: [otherCard] as readonly NewlyBlockedCard[] },
+        ? { newlyBlocked: [cardBad] as readonly NewlyBlockedCard[] }
+        : { newlyBlocked: [cardOk] as readonly NewlyBlockedCard[] },
     );
-    const listProjectMemberUserIds = vi.fn(async (projectId: string) => {
-      if (projectId === 'proj-bad') throw new Error('boom');
-      return ['u1'];
+    const notify = vi.fn(async (workspaceId: string) => {
+      if (workspaceId === 'ws-bad') throw new Error('boom');
+      return { notices: 1 };
     });
-    const createNotice = vi.fn(async () => ({ created: true }));
     const deps = baseDeps({
       listWorkspaceIds: async () => ['ws-bad', 'ws-ok'],
       reconcile,
-      listProjectMemberUserIds,
-      createNotice,
+      notify,
     });
 
     const result = await runBlockedCardsScan(deps);
 
-    expect(createNotice).toHaveBeenCalledTimes(1);
-    expect(result.notices).toBe(1);
+    expect(notify).toHaveBeenCalledTimes(2);
+    // ws-bad's scan still counted its newly-blocked card; only its notices
+    // are lost in this in-process run (and in production Inngest would RETRY
+    // that notify step with the memoized scan result — see module header).
+    expect(result).toEqual({ workspaces: 2, newlyBlocked: 2, notices: 1 });
   });
 
   it('returns workspaces/newlyBlocked/notices counts across multiple workspaces', async () => {
@@ -176,10 +144,11 @@ describe('runBlockedCardsScan', () => {
         ? { newlyBlocked: [cardA] as readonly NewlyBlockedCard[] }
         : { newlyBlocked: [cardB] as readonly NewlyBlockedCard[] },
     );
+    const notify = vi.fn(async () => ({ notices: 1 }));
     const deps = baseDeps({
       listWorkspaceIds: async () => ['ws-1', 'ws-2'],
       reconcile,
-      listProjectMemberUserIds: async () => ['u1'],
+      notify,
     });
 
     const result = await runBlockedCardsScan(deps);

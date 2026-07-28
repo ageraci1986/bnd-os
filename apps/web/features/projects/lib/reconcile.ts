@@ -9,11 +9,15 @@
  *
  * Trade-off: a project nobody opens stays "stale" — the metrics on the
  * sidebar / overview do reconcile on load though, so any user landing on
- * the workspace will see fresh state. When we later need *push* effects
- * (emails, Slack pings on auto-block), THAT will warrant a real cron.
+ * the workspace will see fresh state. Since Plan 3b Task 5, the hourly
+ * Inngest cron (`lib/inngest/functions/blocked-cards-scan.ts`) covers the
+ * push side (CLAUDE.md §6.3) — both paths coexist, and BOTH create the
+ * `agent_card_blocked` notices via the shared `notifyNewlyBlocked` helper
+ * (dedup handled by the notice core, so no doubles across paths).
  */
 import 'server-only';
 import { prisma } from '@nexushub/db';
+import { notifyNewlyBlocked } from '@/features/notifications/lib/blocked-card-notices';
 import { shouldRunReconcile } from './reconcile-throttle';
 import {
   computeCardPosition,
@@ -229,6 +233,16 @@ export async function applyAutoArchive(
 
 /**
  * Convenience: run both reconcile passes in one go for a route entry point.
+ *
+ * ALSO the read-path trigger for the `agent_card_blocked` notices (grouped
+ * review Tasks 4-6, fix 1): in an ACTIVE workspace the read path (throttled
+ * 60 s) blocks overdue cards long BEFORE the hourly cron ticks — without
+ * notifying here, the cron's `newlyBlocked` would almost always be empty and
+ * no notice would ever be created. Best-effort by design: a notice failure
+ * must NEVER break a page load, hence the try/catch with a label-only
+ * `console.warn` (no error object — CLAUDE.md §4.7, no PII / query params in
+ * logs). Cross-path dedup is the notice core's job (unread notice per
+ * (userId, kind, ref=cardId)).
  */
 export async function reconcileBeforeRead(
   workspaceId: string,
@@ -245,5 +259,12 @@ export async function reconcileBeforeRead(
     reconcileOverdueRouting(workspaceId, options),
     applyAutoArchive(workspaceId, options),
   ]);
+  if (routing.newlyBlocked.length > 0) {
+    try {
+      await notifyNewlyBlocked(workspaceId, routing.newlyBlocked);
+    } catch {
+      console.warn('[reconcile] notifyNewlyBlocked failed');
+    }
+  }
   return { ...routing, ...archive };
 }

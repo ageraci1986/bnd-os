@@ -40,6 +40,13 @@ import { inngestClient } from '../client';
 export interface BriefingMember {
   readonly userId: string;
   readonly role: Role;
+  /**
+   * Vrai `User.isSuperAdmin` (revue groupée 4-6, fix 3) — le contexte overview
+   * doit refléter le scope RÉEL de l'utilisateur : un super-admin membre
+   * simple d'un workspace recevrait sinon un briefing calculé avec un scope
+   * restreint, différent de ce que la page `/assistant` lui montre.
+   */
+  readonly isSuperAdmin: boolean;
 }
 
 /** Prisma leaf — aucune PII (uuids seulement). */
@@ -55,10 +62,15 @@ export async function listWorkspaceIds(): Promise<string[]> {
  * (contrat documenté dans `notice-core.ts`), pas dupliqué ici.
  */
 export async function listBriefingOptedInMembers(workspaceId: string): Promise<BriefingMember[]> {
-  return prisma.membership.findMany({
+  const rows = await prisma.membership.findMany({
     where: { workspaceId, assistantBriefingOptIn: true },
-    select: { userId: true, role: true },
+    select: { userId: true, role: true, user: { select: { isSuperAdmin: true } } },
   });
+  return rows.map((row) => ({
+    userId: row.userId,
+    role: row.role,
+    isSuperAdmin: row.user.isSuperAdmin,
+  }));
 }
 
 /**
@@ -124,7 +136,7 @@ export async function runMorningBriefing(
             workspaceId,
             userId: member.userId,
             role: member.role,
-            isSuperAdmin: false,
+            isSuperAdmin: member.isSuperAdmin,
           });
           if (isAllZero(overview)) return { created: false };
           const input: AgentNoticeInput = {

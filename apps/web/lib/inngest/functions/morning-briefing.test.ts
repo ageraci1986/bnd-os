@@ -54,7 +54,7 @@ describe('brusselsDateStamp', () => {
 
 describe('runMorningBriefing', () => {
   it('processes only the members returned by listBriefingOptedInMembers (opt-in filtering is the caller’s job)', async () => {
-    const members: BriefingMember[] = [{ userId: 'u1', role: 'admin' }];
+    const members: BriefingMember[] = [{ userId: 'u1', role: 'admin', isSuperAdmin: false }];
     const listBriefingOptedInMembers = vi.fn(async () => members);
     const loadOverview = vi.fn(async () => overview({ dueTodayCards: 1 }));
     const deps = baseDeps({ listBriefingOptedInMembers, loadOverview });
@@ -65,8 +65,8 @@ describe('runMorningBriefing', () => {
     expect(loadOverview).toHaveBeenCalledTimes(1);
   });
 
-  it('builds the overview context from Membership fields only (no email, isSuperAdmin forced false)', async () => {
-    const members: BriefingMember[] = [{ userId: 'u1', role: 'user' }];
+  it('builds the overview context from Membership fields only (no email leaked)', async () => {
+    const members: BriefingMember[] = [{ userId: 'u1', role: 'user', isSuperAdmin: false }];
     const loadOverview = vi.fn(async (_ctx: OverviewAuthContext) => overview());
     const deps = baseDeps({ listBriefingOptedInMembers: async () => members, loadOverview });
 
@@ -77,8 +77,19 @@ describe('runMorningBriefing', () => {
     expect('email' in ctx).toBe(false);
   });
 
+  it('passes the member’s REAL isSuperAdmin (grouped review fix 3 — a super-admin gets the same scope as the real page)', async () => {
+    const members: BriefingMember[] = [{ userId: 'u1', role: 'user', isSuperAdmin: true }];
+    const loadOverview = vi.fn(async (_ctx: OverviewAuthContext) => overview());
+    const deps = baseDeps({ listBriefingOptedInMembers: async () => members, loadOverview });
+
+    await runMorningBriefing(deps);
+
+    const ctx = loadOverview.mock.calls[0]?.[0] as OverviewAuthContext;
+    expect(ctx).toEqual({ workspaceId: 'ws-1', userId: 'u1', role: 'user', isSuperAdmin: true });
+  });
+
   it('skips the notice (and does not call createNotice) when the overview is all-zero', async () => {
-    const members: BriefingMember[] = [{ userId: 'u1', role: 'user' }];
+    const members: BriefingMember[] = [{ userId: 'u1', role: 'user', isSuperAdmin: false }];
     const createNotice = vi.fn(async () => ({ created: true }));
     const deps = baseDeps({
       listBriefingOptedInMembers: async () => members,
@@ -93,7 +104,7 @@ describe('runMorningBriefing', () => {
   });
 
   it('creates the notice with the exact pinned message/ref/discuss when the overview is not all-zero', async () => {
-    const members: BriefingMember[] = [{ userId: 'u1', role: 'user' }];
+    const members: BriefingMember[] = [{ userId: 'u1', role: 'user', isSuperAdmin: false }];
     const createNotice = vi.fn(async () => ({ created: true }));
     const deps = baseDeps({
       listWorkspaceIds: async () => ['ws-1'],
@@ -117,8 +128,8 @@ describe('runMorningBriefing', () => {
 
   it('counts only the notices actually created (createNotice can no-op via its own guards/dedup)', async () => {
     const members: BriefingMember[] = [
-      { userId: 'u1', role: 'user' },
-      { userId: 'u2', role: 'user' },
+      { userId: 'u1', role: 'user', isSuperAdmin: false },
+      { userId: 'u2', role: 'user', isSuperAdmin: false },
     ];
     const createNotice = vi
       .fn<(input: AgentNoticeInput) => Promise<{ created: boolean }>>()
@@ -137,8 +148,8 @@ describe('runMorningBriefing', () => {
 
   it('runs each member through runStep with a per-user step id', async () => {
     const members: BriefingMember[] = [
-      { userId: 'u1', role: 'user' },
-      { userId: 'u2', role: 'user' },
+      { userId: 'u1', role: 'user', isSuperAdmin: false },
+      { userId: 'u2', role: 'user', isSuperAdmin: false },
     ];
     const runStep = vi.fn(directRunStep) as MorningBriefingDeps['runStep'];
     const deps = baseDeps({
@@ -155,9 +166,9 @@ describe('runMorningBriefing', () => {
 
   it('isolates failures: one member throwing (loadOverview or createNotice) does not block the others', async () => {
     const members: BriefingMember[] = [
-      { userId: 'u1', role: 'user' },
-      { userId: 'u2', role: 'user' },
-      { userId: 'u3', role: 'user' },
+      { userId: 'u1', role: 'user', isSuperAdmin: false },
+      { userId: 'u2', role: 'user', isSuperAdmin: false },
+      { userId: 'u3', role: 'user', isSuperAdmin: false },
     ];
     const loadOverview = vi.fn(async (ctx: OverviewAuthContext) => {
       if (ctx.userId === 'u2') throw new Error('boom');
@@ -180,7 +191,7 @@ describe('runMorningBriefing', () => {
   it('isolates failures across workspaces too: one workspace erroring does not stop the next', async () => {
     const listBriefingOptedInMembers = vi.fn(async (workspaceId: string) => {
       if (workspaceId === 'ws-bad') throw new Error('db down');
-      return [{ userId: 'u1', role: 'user' } satisfies BriefingMember];
+      return [{ userId: 'u1', role: 'user', isSuperAdmin: false } satisfies BriefingMember];
     });
     const createNotice = vi.fn(async () => ({ created: true }));
     const deps = baseDeps({
@@ -202,7 +213,7 @@ describe('runMorningBriefing', () => {
 
   it('returns workspaces/notices counts across multiple workspaces', async () => {
     const listBriefingOptedInMembers = vi.fn(async (workspaceId: string) => [
-      { userId: `${workspaceId}-u1`, role: 'user' } satisfies BriefingMember,
+      { userId: `${workspaceId}-u1`, role: 'user', isSuperAdmin: false } satisfies BriefingMember,
     ]);
     const deps = baseDeps({
       listWorkspaceIds: async () => ['ws-1', 'ws-2'],

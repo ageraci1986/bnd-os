@@ -1,7 +1,7 @@
 import 'server-only';
 import { prisma } from '@nexushub/db';
 import { reconcileOverdueRouting, type NewlyBlockedCard } from '@/features/projects/lib/reconcile';
-import { createAgentNotice, type AgentNoticeInput } from '@/features/notifications/lib/notice-core';
+import { notifyNewlyBlocked } from '@/features/notifications/lib/blocked-card-notices';
 import { inngestClient } from '../client';
 
 /**
@@ -11,7 +11,10 @@ import { inngestClient } from '../client';
  * reconcile-on-read (`reconcileBeforeRead`, appelé par les routes juste avant
  * de lire les cartes — voir le commentaire d'en-tête de `reconcile.ts`). Le
  * reconcile-on-read RESTE en place (complémentaire : il garantit un état
- * frais dès qu'un utilisateur ouvre une vue, même entre deux ticks du cron).
+ * frais dès qu'un utilisateur ouvre une vue, même entre deux ticks du cron)
+ * et crée LUI AUSSI les notices via le helper partagé `notifyNewlyBlocked`
+ * (revue groupée 4-6, fix 1) — la dédup du notice core empêche tout doublon
+ * entre les deux chemins.
  *
  * IMPORTANT — cette fonction appelle `reconcileOverdueRouting` DIRECTEMENT,
  * PAS `reconcileBeforeRead` : `reconcileBeforeRead` applique
@@ -22,10 +25,19 @@ import { inngestClient } from '../client';
  * pourrait faire sauter un tick sur un process qui viendrait de servir une
  * requête. Le scan horaire doit reconcilier À CHAQUE tick, sans throttle.
  *
- * `reconcileOverdueRouting` (extension iso de Task 5, `reconcile.ts`) renvoie
- * désormais aussi `newlyBlocked` : les cartes que CE run a déplacées vers
- * Bloqué (pas celles déjà bloquées avant) — c'est cette liste qui déclenche
- * les notices, jamais un recomptage des cartes déjà en Bloqué.
+ * SÉMANTIQUE DE RETRY (revue groupée 4-6, fix 2) — DEUX steps par workspace :
+ *
+ *   1. `scan-<ws>` appelle `reconcileOverdueRouting` et retourne la liste
+ *      SÉRIALISABLE `newlyBlocked` (les cartes que CE run a déplacées vers
+ *      Bloqué — pas celles déjà bloquées avant). Inngest MÉMOÏSE le résultat
+ *      de chaque step réussi : au retry de la fonction, ce step n'est PAS
+ *      rejoué, la liste survit.
+ *   2. `notify-<ws>` crée les notices depuis cette liste mémoïsée.
+ *
+ * Si les deux vivaient dans le MÊME step, un échec partiel de notify
+ * rejouerait le step entier : le second reconcile ne retournerait plus les
+ * cartes (déjà en Bloqué) → notices perdues DÉFINITIVEMENT. Avec deux steps,
+ * un échec de notify est rejoué par Inngest avec la liste du scan intacte.
  *
  * PINNED (voir `blocked-cards-scan-imports.test.ts`) : ce module (et
  * `functions/index.ts`) ne doit importer NI `@nexushub/agent` NI
@@ -43,19 +55,6 @@ export async function listWorkspaceIds(): Promise<string[]> {
   return rows.map((row) => row.id);
 }
 
-/**
- * Prisma leaf — membres d'un projet (uuids seulement). Un projet sans membre
- * renvoie `[]` : c'est un no-op documenté (aucune notice envoyée), PAS une
- * erreur — voir `runBlockedCardsScan`.
- */
-export async function listProjectMemberUserIds(projectId: string): Promise<string[]> {
-  const rows = await prisma.projectMember.findMany({
-    where: { projectId },
-    select: { userId: true },
-  });
-  return rows.map((row) => row.userId);
-}
-
 export interface BlockedCardsScanDeps {
   readonly listWorkspaceIds: () => Promise<readonly string[]>;
   /**
@@ -67,8 +66,11 @@ export interface BlockedCardsScanDeps {
     workspaceId: string,
     options: { readonly now?: Date },
   ) => Promise<{ readonly newlyBlocked: readonly NewlyBlockedCard[] }>;
-  readonly listProjectMemberUserIds: (projectId: string) => Promise<readonly string[]>;
-  readonly createNotice: (input: AgentNoticeInput) => Promise<{ created: boolean }>;
+  /** `notifyNewlyBlocked` (helper partagé avec le read-path) en prod. */
+  readonly notify: (
+    workspaceId: string,
+    newlyBlocked: readonly NewlyBlockedCard[],
+  ) => Promise<{ readonly notices: number }>;
   /** `step.run` en prod ; un fake synchrone/async dans les tests. */
   readonly runStep: <T>(stepId: string, fn: () => Promise<T>) => Promise<T>;
   readonly now: () => Date;
@@ -80,26 +82,12 @@ export interface BlockedCardsScanResult {
   readonly notices: number;
 }
 
-function blockedCardMessage(card: NewlyBlockedCard): AgentNoticeInput['message'] {
-  return `« ${card.title} » est passée en Bloqué (échéance dépassée).`;
-}
-
-function blockedCardDiscuss(card: NewlyBlockedCard): string {
-  // ID + verbes SEULEMENT (contrat anti-injection de `notice-core.ts` — le
-  // titre, potentiellement écrit par un tiers via l'app, ne doit JAMAIS
-  // atterrir dans `discuss`, qui est réinjecté comme message utilisateur
-  // dans le chat de l'assistant).
-  return `Parlons de la carte ${card.cardId} passée en Bloqué`;
-}
-
 /**
  * Cœur pur de la fonction — voir le commentaire d'en-tête du fichier pour le
- * choix d'architecture. Isolation : une erreur pour UN workspace (reconcile
- * ou lookup des membres d'un projet) ne doit interrompre ni les autres
- * projets/cartes de ce workspace ni les workspaces suivants — d'où le
- * try/catch autour de chaque `runStep` par workspace (contrairement à
- * `morning-briefing.ts` où l'isolation est par MEMBRE, ici tout ce qui
- * concerne un workspace vit dans le même step : reconcile + notices).
+ * choix d'architecture (deux steps scan/notify par workspace, retry-safe).
+ * Isolation : une erreur pour UN workspace (scan ou notify) ne doit pas
+ * interrompre les workspaces suivants — d'où le try/catch autour de chaque
+ * step de chaque workspace.
  */
 export async function runBlockedCardsScan(
   deps: BlockedCardsScanDeps,
@@ -109,34 +97,32 @@ export async function runBlockedCardsScan(
   let notices = 0;
 
   for (const workspaceId of workspaceIds) {
+    // STEP 1 — scan : reconcile + retour de la liste sérialisable (mémoïsée
+    // par Inngest au retry — voir l'en-tête du fichier).
+    let newlyBlocked: readonly NewlyBlockedCard[];
     try {
-      const { newlyBlocked, notices: workspaceNotices } = await deps.runStep(
-        `scan-${workspaceId}`,
-        async () => {
-          const { newlyBlocked: cards } = await deps.reconcile(workspaceId, { now: deps.now() });
-          let created = 0;
-          for (const card of cards) {
-            const memberUserIds = await deps.listProjectMemberUserIds(card.projectId);
-            for (const userId of memberUserIds) {
-              const outcome = await deps.createNotice({
-                workspaceId,
-                userId,
-                kind: 'agent_card_blocked',
-                message: blockedCardMessage(card),
-                data: { ref: card.cardId, discuss: blockedCardDiscuss(card) },
-              });
-              if (outcome.created) created += 1;
-            }
-          }
-          return { newlyBlocked: cards.length, notices: created };
-        },
-      );
-      newlyBlockedTotal += newlyBlocked;
-      notices += workspaceNotices;
+      newlyBlocked = await deps.runStep(`scan-${workspaceId}`, async () => {
+        const result = await deps.reconcile(workspaceId, { now: deps.now() });
+        return result.newlyBlocked;
+      });
+      newlyBlockedTotal += newlyBlocked.length;
     } catch {
       // Isolation (Task 5) : aucun détail loggé ici au-delà du compte final
       // — CLAUDE.md §4.7 interdit la PII, et une stack trace par échec
       // pourrait exposer des paramètres de requête.
+      continue;
+    }
+    if (newlyBlocked.length === 0) continue;
+
+    // STEP 2 — notify : notices depuis la liste retournée par le step scan
+    // (jamais un re-appel de reconcile).
+    try {
+      const { notices: created } = await deps.runStep(`notify-${workspaceId}`, async () =>
+        deps.notify(workspaceId, newlyBlocked),
+      );
+      notices += created;
+    } catch {
+      // Même politique d'isolation — le workspace suivant continue.
     }
   }
 
@@ -149,12 +135,11 @@ export const blockedCardsScan = inngestClient.createFunction(
     const result = await runBlockedCardsScan({
       listWorkspaceIds,
       reconcile: reconcileOverdueRouting,
-      listProjectMemberUserIds,
-      createNotice: createAgentNotice,
+      notify: notifyNewlyBlocked,
       // Voir le commentaire équivalent dans `morning-briefing.ts` pour le
       // cast : `step.run`'s return type est `Promise<Jsonify<Awaited<T>>>`,
-      // structurellement identique ici (shape `{newlyBlocked, notices}`
-      // faite de nombres) mais TS ne le prouve pas à travers un générique.
+      // structurellement identique ici (liste de {cardId,title,projectId} et
+      // shape {notices}) mais TS ne le prouve pas à travers un générique.
       runStep: (stepId, fn) => step.run(stepId, fn) as ReturnType<typeof fn>,
       now: () => new Date(),
     });

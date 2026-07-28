@@ -1,11 +1,13 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
-const { cardFindMany, cardUpdate, cardUpdateMany, columnFindMany } = vi.hoisted(() => ({
-  cardFindMany: vi.fn(),
-  cardUpdate: vi.fn(),
-  cardUpdateMany: vi.fn(),
-  columnFindMany: vi.fn(),
-}));
+const { cardFindMany, cardUpdate, cardUpdateMany, columnFindMany, notifyNewlyBlockedMock } =
+  vi.hoisted(() => ({
+    cardFindMany: vi.fn(),
+    cardUpdate: vi.fn(),
+    cardUpdateMany: vi.fn(),
+    columnFindMany: vi.fn(),
+    notifyNewlyBlockedMock: vi.fn(),
+  }));
 
 vi.mock('@nexushub/db', () => ({
   prisma: {
@@ -14,7 +16,11 @@ vi.mock('@nexushub/db', () => ({
   },
 }));
 
-import { applyAutoArchive, reconcileOverdueRouting } from './reconcile';
+vi.mock('@/features/notifications/lib/blocked-card-notices', () => ({
+  notifyNewlyBlocked: notifyNewlyBlockedMock,
+}));
+
+import { applyAutoArchive, reconcileBeforeRead, reconcileOverdueRouting } from './reconcile';
 
 const TODO = '00000000-0000-4000-8000-000000000001';
 const DOING = '00000000-0000-4000-8000-000000000002';
@@ -38,6 +44,8 @@ beforeEach(() => {
   cardUpdate.mockReset();
   cardUpdateMany.mockReset();
   columnFindMany.mockReset();
+  notifyNewlyBlockedMock.mockReset();
+  notifyNewlyBlockedMock.mockResolvedValue({ notices: 0 });
 });
 
 describe('reconcileOverdueRouting', () => {
@@ -237,5 +245,68 @@ describe('applyAutoArchive', () => {
 
     expect(result).toEqual({ archived: 0 });
     expect(columnFindMany).not.toHaveBeenCalled();
+  });
+});
+
+describe('reconcileBeforeRead — notices on the read path (grouped review fix 1)', () => {
+  // `reconcileOverdueRouting` and `applyAutoArchive` run in Promise.all and
+  // both hit `prisma.card.findMany`, so `mockResolvedValueOnce` ordering is
+  // fragile. Dispatch on the `where` shape instead: the archive query filters
+  // on `movedToLastAt`, the moveCard siblings query on `columnId`, the
+  // routing scope query on neither.
+  function dispatchCardFindMany(overdueCards: unknown[], siblings: { position: number }[]) {
+    cardFindMany.mockImplementation((args: { where?: Record<string, unknown> }) => {
+      if (args.where && 'movedToLastAt' in args.where) return Promise.resolve([]);
+      if (args.where && 'columnId' in args.where) return Promise.resolve(siblings);
+      return Promise.resolve(overdueCards);
+    });
+    columnFindMany.mockResolvedValue(COLUMNS);
+  }
+
+  const OVERDUE_CARD = {
+    id: 'c1',
+    columnId: DOING,
+    previousColumnId: null,
+    dueDate: PAST,
+    archivedAt: null,
+    projectId: PROJECT,
+    title: 'Overdue card',
+  };
+
+  // NOTE: reconcileBeforeRead is throttled per workspace AND per process
+  // (reconcile-throttle, 60 s window) — each test below uses a UNIQUE
+  // workspace id so the first (and only) call always passes the throttle.
+
+  it('creates the blocked-card notices via notifyNewlyBlocked after the reconcile', async () => {
+    dispatchCardFindMany([OVERDUE_CARD], [{ position: 2000 }]);
+
+    const result = await reconcileBeforeRead('ws-read-1', { now: NOW });
+
+    expect(result.blocked).toBe(1);
+    expect(notifyNewlyBlockedMock).toHaveBeenCalledTimes(1);
+    expect(notifyNewlyBlockedMock).toHaveBeenCalledWith('ws-read-1', [
+      { cardId: 'c1', title: 'Overdue card', projectId: PROJECT },
+    ]);
+  });
+
+  it('does not call notifyNewlyBlocked when nothing was newly blocked', async () => {
+    dispatchCardFindMany([], []);
+
+    await reconcileBeforeRead('ws-read-2', { now: NOW });
+
+    expect(notifyNewlyBlockedMock).not.toHaveBeenCalled();
+  });
+
+  it('is best-effort: a notifyNewlyBlocked failure never breaks the page load (reconcile result still returned)', async () => {
+    dispatchCardFindMany([OVERDUE_CARD], [{ position: 2000 }]);
+    notifyNewlyBlockedMock.mockRejectedValueOnce(new Error('notices down'));
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    const result = await reconcileBeforeRead('ws-read-3', { now: NOW });
+
+    expect(result).toMatchObject({ blocked: 1, restored: 0, archived: 0 });
+    // Label only — no error object/PII in the log (CLAUDE.md §4.7).
+    expect(warnSpy).toHaveBeenCalledWith('[reconcile] notifyNewlyBlocked failed');
+    warnSpy.mockRestore();
   });
 });
