@@ -190,11 +190,20 @@ export function buildKanbanTools(ctx: AuthContext): ToolSpec[] {
           if (!result.ok) return failure(result.message);
           // Lecture-après-écriture (spec V2 §3.1) : l'état renvoyé est RELU
           // en DB, jamais déduit de l'input — le modèle ne peut plus
-          // affirmer un état qu'aucun tool n'a constaté.
-          const after = await prisma.card.findFirst({
-            where: { id: input.cardId, workspaceId: ctx.workspaceId, deletedAt: null },
-            select: { title: true, description: true, categoryTag: true },
-          });
+          // affirmer un état qu'aucun tool n'a constaté. La relecture est
+          // isolée de safeMutation : si elle lève alors que la mutation est
+          // committée, renvoyer le message d'échec générique ferait croire à
+          // un échec (risque de retry dupliqué). Aucun log de l'erreur brute
+          // (contrat safe-wrappers).
+          let after;
+          try {
+            after = await prisma.card.findFirst({
+              where: { id: input.cardId, workspaceId: ctx.workspaceId, deletedAt: null },
+              select: { title: true, categoryTag: true },
+            });
+          } catch {
+            return 'Mise à jour enregistrée mais vérification impossible (erreur technique).';
+          }
           if (after === null) {
             return 'Mise à jour enregistrée mais vérification impossible (carte introuvable à la relecture).';
           }
@@ -266,20 +275,30 @@ export function buildKanbanTools(ctx: AuthContext): ToolSpec[] {
         safeMutation('move_card', async () => {
           const result = await moveCard(input);
           if (!result.ok) return failure(result.message);
-          // Lecture-après-écriture (spec V2 §3.1) : l'état renvoyé est RELU
-          // en DB, jamais déduit de l'input — le modèle ne peut plus
-          // affirmer un état qu'aucun tool n'a constaté.
-          const after = await prisma.card.findFirst({
-            where: { id: input.cardId, workspaceId: ctx.workspaceId, deletedAt: null },
-            select: { columnId: true, column: { select: { name: true } } },
-          });
+          // Lecture-après-écriture (spec V2 §3.1) : l'état renvoyé (colonne
+          // ET position) est RELU en DB, jamais déduit de l'input ni du
+          // résultat de la mutation — le modèle ne peut plus affirmer un état
+          // qu'aucun tool n'a constaté. La relecture est isolée de
+          // safeMutation : si elle lève alors que la mutation est committée,
+          // renvoyer le message d'échec générique ferait croire à un échec
+          // (risque de retry dupliqué). Aucun log de l'erreur brute (contrat
+          // safe-wrappers).
+          let after;
+          try {
+            after = await prisma.card.findFirst({
+              where: { id: input.cardId, workspaceId: ctx.workspaceId, deletedAt: null },
+              select: { columnId: true, position: true, column: { select: { name: true } } },
+            });
+          } catch {
+            return 'Déplacement enregistré mais vérification impossible (erreur technique).';
+          }
           if (after === null) {
             return 'Déplacement enregistré mais vérification impossible (carte introuvable à la relecture).';
           }
           return JSON.stringify({
             moved: true,
             nowInColumn: after.column.name,
-            position: result.position,
+            position: after.position,
           });
         }),
     }),

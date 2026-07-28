@@ -281,13 +281,12 @@ describe('buildKanbanTools', () => {
     updateCardMocks.updateCard.mockResolvedValueOnce({ ok: true });
     prismaMocks.card.findFirst.mockResolvedValueOnce({
       title: 'Titre final',
-      description: null,
       categoryTag: 'design',
     });
     const ok = await run('update_card', { cardId: CARD_ID, title: 'Nouveau titre' });
     expect(prismaMocks.card.findFirst).toHaveBeenCalledWith({
       where: { id: CARD_ID, workspaceId: ctx.workspaceId, deletedAt: null },
-      select: { title: true, description: true, categoryTag: true },
+      select: { title: true, categoryTag: true },
     });
     expect(JSON.parse(ok)).toEqual({ updated: true, title: 'Titre final', categoryTag: 'design' });
 
@@ -300,7 +299,6 @@ describe('buildKanbanTools', () => {
     updateCardMocks.updateCard.mockResolvedValue({ ok: true });
     prismaMocks.card.findFirst.mockResolvedValue({
       title: 'Sans étiquette',
-      description: null,
       categoryTag: null,
     });
     const out = await run('update_card', { cardId: CARD_ID, categoryTag: null });
@@ -316,11 +314,22 @@ describe('buildKanbanTools', () => {
     expect(out).not.toContain('updated');
   });
 
+  it('update_card : mutation ok mais relecture qui LÈVE → "enregistrée … vérification impossible", pas le message générique', async () => {
+    updateCardMocks.updateCard.mockResolvedValue({ ok: true });
+    prismaMocks.card.findFirst.mockRejectedValue(
+      new Error("Can't reach database server at db.xxx.supabase.co"),
+    );
+    const out = await run('update_card', { cardId: CARD_ID, title: 'X' });
+    // La mutation est committée : l'agent ne doit PAS croire à un échec
+    // (risque de retry dupliqué) ni recevoir le message d'erreur interne.
+    expect(out).toBe('Mise à jour enregistrée mais vérification impossible (erreur technique).');
+    expect(out).not.toContain('Erreur interne');
+  });
+
   it('update_card : categoryTag null est transmis (effacement), les clés absentes ne le sont pas', async () => {
     updateCardMocks.updateCard.mockResolvedValue({ ok: true });
     prismaMocks.card.findFirst.mockResolvedValue({
       title: 'Titre',
-      description: null,
       categoryTag: null,
     });
     await run('update_card', { cardId: CARD_ID, categoryTag: null });
@@ -364,9 +373,10 @@ describe('buildKanbanTools', () => {
   });
 
   it('move_card : succès → relit la carte et renvoie nowInColumn/position depuis la DB', async () => {
-    moveCardMocks.moveCard.mockResolvedValue({ ok: true, position: 2048 });
+    moveCardMocks.moveCard.mockResolvedValue({ ok: true, position: 9999 });
     prismaMocks.card.findFirst.mockResolvedValue({
       columnId: COLUMN_ID,
+      position: 2048,
       column: { name: 'Fait' },
     });
     const out = await run('move_card', {
@@ -376,8 +386,10 @@ describe('buildKanbanTools', () => {
     });
     expect(prismaMocks.card.findFirst).toHaveBeenCalledWith({
       where: { id: CARD_ID, workspaceId: ctx.workspaceId, deletedAt: null },
-      select: { columnId: true, column: { select: { name: true } } },
+      select: { columnId: true, position: true, column: { select: { name: true } } },
     });
+    // `position` vient de la RELECTURE (2048), pas du résultat de la
+    // mutation (9999) — l'état renvoyé est intégralement constaté en DB.
     expect(JSON.parse(out)).toEqual({ moved: true, nowInColumn: 'Fait', position: 2048 });
   });
 
@@ -391,6 +403,22 @@ describe('buildKanbanTools', () => {
     });
     expect(out).toContain('vérification impossible');
     expect(out).not.toContain('moved');
+  });
+
+  it('move_card : mutation ok mais relecture qui LÈVE → "enregistré … vérification impossible", pas le message générique', async () => {
+    moveCardMocks.moveCard.mockResolvedValue({ ok: true, position: 2048 });
+    prismaMocks.card.findFirst.mockRejectedValue(
+      new Error("Can't reach database server at db.xxx.supabase.co"),
+    );
+    const out = await run('move_card', {
+      cardId: CARD_ID,
+      targetColumnId: COLUMN_ID,
+      targetIndex: 1,
+    });
+    // La mutation est committée : l'agent ne doit PAS croire à un échec
+    // (risque de retry dupliqué) ni recevoir le message d'erreur interne.
+    expect(out).toBe('Déplacement enregistré mais vérification impossible (erreur technique).');
+    expect(out).not.toContain('Erreur interne');
   });
 
   it('add_card_assignee transmet le raci tel quel', async () => {
