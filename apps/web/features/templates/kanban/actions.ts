@@ -10,6 +10,7 @@ import {
   type KanbanTemplateColumnDef,
 } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
+import { recordAudit } from '@/lib/audit';
 
 function prismaErrorCode(err: unknown): string | null {
   if (err && typeof err === 'object' && 'code' in err) {
@@ -117,6 +118,13 @@ export async function createKanbanTemplate(input: {
       },
       select: { id: true },
     });
+    await recordAudit({
+      action: 'template_created',
+      workspaceId: ctx.workspaceId,
+      actorId: ctx.userId,
+      subjectType: 'template',
+      subjectId: created.id,
+    });
     revalidatePath('/templates/kanban');
     return { ok: true, id: created.id };
   } catch (err) {
@@ -174,6 +182,13 @@ export async function updateKanbanTemplate(input: {
         });
       }
     });
+    await recordAudit({
+      action: 'template_updated',
+      workspaceId: ctx.workspaceId,
+      actorId: ctx.userId,
+      subjectType: 'template',
+      subjectId: tpl.id,
+    });
     revalidatePath('/templates/kanban');
     return { ok: true, id: tpl.id };
   } catch (err) {
@@ -200,6 +215,13 @@ export async function deleteKanbanTemplate(input: {
     return { ok: false, message: 'Les templates système ne peuvent pas être supprimés.' };
 
   await prisma.kanbanTemplate.delete({ where: { id: tpl.id } });
+  await recordAudit({
+    action: 'template_deleted',
+    workspaceId: ctx.workspaceId,
+    actorId: ctx.userId,
+    subjectType: 'template',
+    subjectId: tpl.id,
+  });
   revalidatePath('/templates/kanban');
   return { ok: true };
 }

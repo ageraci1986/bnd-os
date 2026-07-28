@@ -5,11 +5,13 @@ const mocks = vi.hoisted(() => ({
   kanbanCreate: vi.fn(),
   kanbanFindFirst: vi.fn(),
   kanbanUpdate: vi.fn(),
+  kanbanDelete: vi.fn(),
   kanbanColumnCreateMany: vi.fn(),
   kanbanColumnDeleteMany: vi.fn(),
   cardTemplateFindFirst: vi.fn(),
   transaction: vi.fn(),
   revalidatePath: vi.fn(),
+  auditCreate: vi.fn(),
 }));
 
 vi.mock('@nexushub/db', () => ({
@@ -18,19 +20,21 @@ vi.mock('@nexushub/db', () => ({
       create: mocks.kanbanCreate,
       findFirst: mocks.kanbanFindFirst,
       update: mocks.kanbanUpdate,
+      delete: mocks.kanbanDelete,
     },
     kanbanTemplateColumn: {
       createMany: mocks.kanbanColumnCreateMany,
       deleteMany: mocks.kanbanColumnDeleteMany,
     },
     cardTemplate: { findFirst: mocks.cardTemplateFindFirst },
+    auditLog: { create: mocks.auditCreate },
     $transaction: mocks.transaction,
   },
 }));
 vi.mock('@/lib/auth', () => ({ requireUser: mocks.requireUser }));
 vi.mock('next/cache', () => ({ revalidatePath: mocks.revalidatePath }));
 
-import { createKanbanTemplate, updateKanbanTemplate } from './actions';
+import { createKanbanTemplate, updateKanbanTemplate, deleteKanbanTemplate } from './actions';
 
 const KANBAN_ID = '11111111-1111-1111-1111-111111111111';
 const CARD_TPL_ID = '22222222-2222-2222-2222-222222222222';
@@ -121,5 +125,81 @@ describe('updateKanbanTemplate (defaultCardTemplateId)', () => {
     expect(res).toEqual({ ok: true, id: KANBAN_ID });
     const args = mocks.kanbanUpdate.mock.calls[0]![0];
     expect(args.data.defaultCardTemplateId).toBe(CARD_TPL_ID);
+  });
+});
+
+describe('audit (template_created / template_updated / template_deleted)', () => {
+  it('createKanbanTemplate : succès → recordAudit appelé avec template_created, sans PII', async () => {
+    const res = await createKanbanTemplate({
+      name: 'Brief',
+      columns: [{ name: 'À faire', stepChecklist: [] }],
+    });
+    expect(res).toEqual({ ok: true, id: KANBAN_ID });
+    expect(mocks.auditCreate).toHaveBeenCalledTimes(1);
+    expect(mocks.auditCreate).toHaveBeenCalledWith({
+      data: {
+        action: 'template_created',
+        workspaceId: 'ws-1',
+        actorId: 'u-1',
+        subjectType: 'template',
+        subjectId: KANBAN_ID,
+        data: {},
+        ip: null,
+        userAgent: null,
+      },
+    });
+  });
+
+  it('updateKanbanTemplate : succès → recordAudit appelé avec template_updated', async () => {
+    const res = await updateKanbanTemplate({
+      id: KANBAN_ID,
+      name: 'Brief',
+      columns: [{ name: 'À faire', stepChecklist: [] }],
+    });
+    expect(res).toEqual({ ok: true, id: KANBAN_ID });
+    expect(mocks.auditCreate).toHaveBeenCalledTimes(1);
+    expect(mocks.auditCreate).toHaveBeenCalledWith({
+      data: {
+        action: 'template_updated',
+        workspaceId: 'ws-1',
+        actorId: 'u-1',
+        subjectType: 'template',
+        subjectId: KANBAN_ID,
+        data: {},
+        ip: null,
+        userAgent: null,
+      },
+    });
+  });
+
+  it('deleteKanbanTemplate : succès → recordAudit appelé avec template_deleted', async () => {
+    mocks.kanbanFindFirst.mockResolvedValueOnce({ id: KANBAN_ID, isBuiltin: false });
+    const res = await deleteKanbanTemplate({ id: KANBAN_ID });
+    expect(res).toEqual({ ok: true });
+    expect(mocks.kanbanDelete).toHaveBeenCalledWith({ where: { id: KANBAN_ID } });
+    expect(mocks.auditCreate).toHaveBeenCalledTimes(1);
+    expect(mocks.auditCreate).toHaveBeenCalledWith({
+      data: {
+        action: 'template_deleted',
+        workspaceId: 'ws-1',
+        actorId: 'u-1',
+        subjectType: 'template',
+        subjectId: KANBAN_ID,
+        data: {},
+        ip: null,
+        userAgent: null,
+      },
+    });
+  });
+
+  it('deleteKanbanTemplate : refusé (isBuiltin) → recordAudit PAS appelé', async () => {
+    mocks.kanbanFindFirst.mockResolvedValueOnce({ id: KANBAN_ID, isBuiltin: true });
+    const res = await deleteKanbanTemplate({ id: KANBAN_ID });
+    expect(res).toEqual({
+      ok: false,
+      message: 'Les templates système ne peuvent pas être supprimés.',
+    });
+    expect(mocks.kanbanDelete).not.toHaveBeenCalled();
+    expect(mocks.auditCreate).not.toHaveBeenCalled();
   });
 });
