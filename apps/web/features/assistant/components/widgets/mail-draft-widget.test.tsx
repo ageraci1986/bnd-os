@@ -511,5 +511,70 @@ describe('MailDraftWidget', () => {
         screen.queryByText('Sauvegardé — retrouvable dans Communications.'),
       ).not.toBeInTheDocument();
     });
+
+    it('autosave échoué → « Garder » sans réédition RETENTE le save (2e appel pinné) ; succès → « Sauvegardé… »', async () => {
+      // L'autosave initial échoue ; le retry (mock par défaut) réussit.
+      saveDraftSpy.mockResolvedValueOnce({ ok: false, message: 'Impossible d’enregistrer.' });
+      await renderReady({ actions: actionsOf() });
+
+      fireEvent.change(subjectInput(), { target: { value: 'Nouvel objet' } });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2000);
+      });
+      expect(saveDraftSpy).toHaveBeenCalledTimes(1);
+      expect(screen.getByRole('status').textContent).toBe('échec de sauvegarde');
+
+      // Clic « Garder » SANS réédition : flush doit RETENTER le save au lieu
+      // de répondre true sur la foi d'un état DB périmé.
+      await act(async () => {
+        fireEvent.click(screen.getByText('💾 Garder en brouillon'));
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(saveDraftSpy).toHaveBeenCalledTimes(2);
+      expect(saveDraftSpy.mock.calls[1]?.[0]).toMatchObject({ subject: 'Nouvel objet' });
+      expect(screen.getByText('Sauvegardé — retrouvable dans Communications.')).toBeInTheDocument();
+    });
+
+    it('autosave échoué + retry qui échoue encore → note d’échec (jamais « Sauvegardé »), et « Envoyer » retente puis reste bloqué sans sendMessage', async () => {
+      saveDraftSpy.mockResolvedValue({ ok: false, message: 'Impossible d’enregistrer.' });
+      const sendMessage = vi.fn();
+      await renderReady({ actions: actionsOf({ sendMessage }) });
+
+      fireEvent.change(subjectInput(), { target: { value: 'Nouvel objet' } });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2000);
+      });
+      expect(saveDraftSpy).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        fireEvent.click(screen.getByText('💾 Garder en brouillon'));
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(saveDraftSpy).toHaveBeenCalledTimes(2);
+      expect(
+        screen.getByText('Échec de sauvegarde — le brouillon n’a pas été mis à jour.'),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText('Sauvegardé — retrouvable dans Communications.'),
+      ).not.toBeInTheDocument();
+
+      // « Envoyer » sans réédition : retente encore, échoue → bloqué.
+      await act(async () => {
+        fireEvent.click(screen.getByText('📤 Envoyer'));
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(saveDraftSpy).toHaveBeenCalledTimes(3);
+      expect(sendMessage).not.toHaveBeenCalled();
+      expect(
+        screen.getByText('Envoi bloqué : la sauvegarde du brouillon a échoué — réessayez.'),
+      ).toBeInTheDocument();
+    });
   });
 });

@@ -301,9 +301,19 @@ export function MailDraftWidget({
             // touche jamais aux pièces jointes (revue I2).
             composeAttachments: [...canonical.composeAttachments],
           });
+          if (!res.ok) {
+            // Ré-arme le retry (re-revue I1) : sans ça, `pendingRef` remis à
+            // false au départ de ce save + `inFlightRef` vidé au finally
+            // feraient répondre `true` au prochain flush() SANS réédition —
+            // Envoyer partirait avec un brouillon DB périmé et « Garder »
+            // afficherait « Sauvegardé… » à tort. Le prochain flush (Envoyer/
+            // Garder) ou le prochain autosave RETENTE le save.
+            pendingRef.current = true;
+          }
           setSaveStatus(res.ok ? 'saved' : 'error');
           return res.ok;
         } catch {
+          pendingRef.current = true; // même ré-armement que ok:false ci-dessus
           setSaveStatus('error');
           return false;
         }
