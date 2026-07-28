@@ -134,8 +134,22 @@ describe('buildReadTools', () => {
     const call = prismaMock.project.findMany.mock.calls[0]?.[0];
     expect(call?.where?.workspaceId).toBe('w1');
     expect(call?.where?.deletedAt).toBeNull();
-    expect(call?.where?.id).toEqual({ in: [PROJECT_ID] });
+    expect(call?.where?.AND).toEqual([{ id: { in: [PROJECT_ID] } }, {}]);
+    expect(call?.take).toBe(10);
     expect(scopeMocks.scopedProjectWhere).toHaveBeenCalled();
+  });
+
+  it('find_projects : le scope restricted est intersecté avec les candidats, jamais écrasé', async () => {
+    // Régression : `scopedProjectWhere` restricted « project-only » renvoie
+    // `{ id: { in: [...] } }` — spreadé à plat après `id: { in: candidates } }`,
+    // il l'écrasait et renvoyait tout le scope sans rapport avec la query.
+    const PROJECT_ID = '4c9d3f0a-2222-4444-8888-aaaaaaaaaaaa';
+    scopeMocks.scopedProjectWhere.mockReturnValueOnce({ id: { in: ['scope-p1'] } });
+    prismaMock.$queryRaw.mockResolvedValue([{ id: PROJECT_ID }]);
+    prismaMock.project.findMany.mockResolvedValue([]);
+    await execute('find_projects', { query: 'course' });
+    const where = prismaMock.project.findMany.mock.calls[0]?.[0]?.where;
+    expect(where?.AND).toEqual([{ id: { in: [PROJECT_ID] } }, { id: { in: ['scope-p1'] } }]);
   });
 
   it('find_projects : zéro candidat → tableau vide sans requête findMany', async () => {
@@ -150,9 +164,14 @@ describe('buildReadTools', () => {
     await execute('find_projects', { query: 'course' });
     expect(prismaMock.$queryRaw).toHaveBeenCalledTimes(1);
     expect(prismaMock.$queryRawUnsafe).not.toHaveBeenCalled();
-    const firstArg = prismaMock.$queryRaw.mock.calls[0]?.[0] as TemplateStringsArray;
+    const call = prismaMock.$queryRaw.mock.calls[0] ?? [];
+    const firstArg = call[0] as TemplateStringsArray;
     expect(Array.isArray(firstArg)).toBe(true);
     expect(Array.isArray(firstArg.raw)).toBe(true);
+    // Les valeurs (workspaceId + query) passent en paramètres, jamais dans le texte SQL.
+    const params = call.slice(1);
+    expect(params).toContain('w1');
+    expect(params).toContain('course');
   });
 
   it('get_project_board renvoie colonnes et cartes, ou une erreur si projet introuvable', async () => {
@@ -164,6 +183,22 @@ describe('buildReadTools', () => {
     const where = prismaMock.project.findFirst.mock.calls[0]?.[0]?.where;
     expect(where?.workspaceId).toBe('w1');
     expect(scopeMocks.scopedProjectWhere).toHaveBeenCalled();
+  });
+
+  it("get_project_board : le scope restricted est intersecté avec l'id demandé, jamais écrasé", async () => {
+    // Régression (Plan 1) : même écrasement que find_projects — un restricted
+    // « project-only » demandant n'importe quel uuid recevait le board du
+    // premier projet de son scope.
+    scopeMocks.scopedProjectWhere.mockReturnValueOnce({ id: { in: ['scope-p1'] } });
+    prismaMock.project.findFirst.mockResolvedValue(null);
+    await execute('get_project_board', { projectId: '4c9d3f0a-2222-4444-8888-aaaaaaaaaaaa' });
+    const where = prismaMock.project.findFirst.mock.calls[0]?.[0]?.where;
+    expect(where?.AND).toEqual([
+      { id: '4c9d3f0a-2222-4444-8888-aaaaaaaaaaaa' },
+      { id: { in: ['scope-p1'] } },
+    ]);
+    expect(where?.workspaceId).toBe('w1');
+    expect(where?.deletedAt).toBeNull();
   });
 
   it('get_project_board borne les cartes à 100 par colonne et signale la troncature', async () => {
