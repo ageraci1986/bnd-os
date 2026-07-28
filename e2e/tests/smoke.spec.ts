@@ -6,7 +6,8 @@ import { expect, test } from '@playwright/test';
 test('home redirects to login with brand visible', async ({ page }) => {
   await page.goto('/');
   await expect(page).toHaveURL(/\/login$/);
-  await expect(page.getByText('NexusHub', { exact: true })).toBeVisible();
+  // La marque apparaît deux fois sur /login (logo + pied) → .first() pour le mode strict.
+  await expect(page.getByText('NexusHub', { exact: true }).first()).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Bon retour parmi nous' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Se connecter' })).toBeVisible();
 });
