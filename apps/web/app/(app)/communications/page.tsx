@@ -224,7 +224,9 @@ export default async function CommunicationsPage({ searchParams }: PageProps) {
           </div>
         ) : (
           <MailList
-            key={page}
+            // mailId dans la key : ?mail=A → ?mail=B résolvant la MÊME page
+            // doit quand même remonter le composant pour resélectionner/marquer.
+            key={`${page}-${mailId ?? ''}`}
             mails={mails}
             showMailboxBadge={!mailboxFilter}
             {...(mailId ? { initialSelectedId: mailId } : {})}

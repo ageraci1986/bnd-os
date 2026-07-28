@@ -1,3 +1,4 @@
+import { StrictMode } from 'react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MailList } from './mail-list';
@@ -115,6 +116,22 @@ describe('<MailList /> initialSelectedId (deep-link)', () => {
       />,
     );
     expect(markEmailReadSpy).not.toHaveBeenCalled();
+  });
+
+  it('calls markEmailRead exactly once under StrictMode double-effect (ref guard)', () => {
+    render(
+      <StrictMode>
+        <MailList
+          mails={[
+            mail({ id: 'm1', subject: 'Premier', isRead: true }),
+            mail({ id: 'm2', subject: 'Deuxième', isRead: false }),
+          ]}
+          initialSelectedId="m2"
+        />
+      </StrictMode>,
+    );
+    expect(markEmailReadSpy).toHaveBeenCalledTimes(1);
+    expect(markEmailReadSpy).toHaveBeenCalledWith({ emailId: 'm2' });
   });
 
   it('falls back to the first mail when initialSelectedId is absent from the list', () => {
