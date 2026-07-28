@@ -499,8 +499,54 @@ describe('buildReadTools', () => {
     });
     // Ordre renvoyé tel quel par Prisma (orderBy position asc) — on vérifie
     // que le select a bien demandé cet ordre plutôt que de re-trier ici.
+    // Mêmes bornes que get_card : cap 50 items côté requête.
     const select = prismaMock.card.findFirst.mock.calls[0]?.[0]?.select;
     expect(select?.checklistItems?.orderBy).toEqual({ position: 'asc' });
+    expect(select?.checklistItems?.take).toBe(50);
+  });
+
+  it('get_card_details tronque la description à 5000 caractères (même borne que get_card)', async () => {
+    prismaMock.card.findFirst.mockResolvedValue({
+      id: 'c1',
+      title: 'Longue',
+      description: 'x'.repeat(6000),
+      dueDate: null,
+      column: { name: 'À faire' },
+      assignees: [],
+      checklistItems: [],
+    });
+    const out = JSON.parse(
+      await execute('get_card_details', { cardId: '4c9d3f0a-2222-4444-8888-aaaaaaaaaaaa' }),
+    );
+    expect(out.description.endsWith(' […tronqué]')).toBe(true);
+    expect(out.description.length).toBe(5000 + ' […tronqué]'.length);
+  });
+
+  it('get_card_details signale la troncature de checklist quand la limite de 50 est atteinte', async () => {
+    prismaMock.card.findFirst.mockResolvedValue({
+      id: 'c1',
+      title: 'Grosse checklist',
+      description: null,
+      dueDate: null,
+      column: { name: 'À faire' },
+      assignees: [],
+      checklistItems: Array.from({ length: 50 }, (_, i) => ({
+        id: `i${i}`,
+        title: `Item ${i}`,
+        isChecked: false,
+      })),
+    });
+    const out = JSON.parse(
+      await execute('get_card_details', { cardId: '4c9d3f0a-2222-4444-8888-aaaaaaaaaaaa' }),
+    );
+    expect(out.checklist).toHaveLength(50);
+    expect(out.checklistTruncated).toBe(true);
+  });
+
+  it('get_card oriente vers get_card_details pour les ids de checklist (description anti-doublon)', async () => {
+    const tools = await buildReadTools(ctx);
+    const getCard = tools.find((t) => t.name === 'get_card');
+    expect(getCard?.description).toContain('get_card_details');
   });
 
   it('get_card_details : échéance nulle → due:null', async () => {

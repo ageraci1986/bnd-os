@@ -419,7 +419,7 @@ export async function buildReadTools(ctx: AuthContext): Promise<ToolSpec[]> {
     defineTool({
       name: 'get_card',
       description:
-        "Détail d'une carte : titre, description, colonne, échéance, assignés, checklist.",
+        "Détail d'une carte : titre, description, colonne, échéance, assignés, checklist. Pour obtenir les ids des items de checklist (nécessaires à set_checklist_item), utiliser get_card_details.",
       inputSchema: z.object({ cardId: uuid }),
       jsonSchema: { type: 'object', properties: { cardId: UUID_JSON }, required: ['cardId'] },
       handler: async (input) =>
@@ -487,14 +487,22 @@ export async function buildReadTools(ctx: AuthContext): Promise<ToolSpec[]> {
               checklistItems: {
                 select: { id: true, title: true, isChecked: true },
                 orderBy: { position: 'asc' },
+                take: CARD_CHECKLIST_MAX,
               },
             },
           });
           if (card === null) return 'Carte introuvable.';
+          // Mêmes bornes que get_card : description 5000 chars, checklist 50
+          // items + flag de troncature — aucune sortie non bornée vers le
+          // modèle.
+          const description =
+            card.description !== null && card.description.length > CARD_DESCRIPTION_MAX_CHARS
+              ? `${card.description.slice(0, CARD_DESCRIPTION_MAX_CHARS)} […tronqué]`
+              : card.description;
           return JSON.stringify({
             id: card.id,
             title: card.title,
-            description: card.description,
+            description,
             due: card.dueDate !== null ? card.dueDate.toISOString().slice(0, 10) : null,
             column: card.column.name,
             assignees: card.assignees.map((a) => ({ name: a.user.firstName, raci: a.raci })),
@@ -503,6 +511,9 @@ export async function buildReadTools(ctx: AuthContext): Promise<ToolSpec[]> {
               title: i.title,
               checked: i.isChecked,
             })),
+            ...(card.checklistItems.length === CARD_CHECKLIST_MAX
+              ? { checklistTruncated: true }
+              : {}),
           });
         }),
     }),

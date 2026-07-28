@@ -32,6 +32,12 @@ export interface ChecklistItemDTO {
 export type ChecklistMutationResult =
   | {
       readonly ok: true;
+      /** Carte propriétaire des items, relue côté serveur — les consommateurs
+       *  (ex. tool assistant `set_checklist_item`) doivent s'ancrer dessus
+       *  plutôt que sur un cardId fourni par le client, qui pourrait désigner
+       *  une autre carte. Champ additif : les consommateurs existants
+       *  l'ignorent sans casse. */
+      readonly cardId: string;
       readonly items: readonly ChecklistItemDTO[];
       /** True when every item is checked AND the list is non-empty. */
       readonly allChecked: boolean;
@@ -57,7 +63,7 @@ async function readChecklist(cardId: string): Promise<ChecklistMutationResult> {
     select: { id: true, title: true, isChecked: true, position: true, columnSourceId: true },
   });
   const allChecked = items.length > 0 && items.every((i) => i.isChecked);
-  return { ok: true, items, allChecked };
+  return { ok: true, cardId, items, allChecked };
 }
 
 export async function createChecklistItem(input: {

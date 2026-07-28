@@ -362,20 +362,18 @@ export function buildKanbanTools(ctx: AuthContext): ToolSpec[] {
     defineTool({
       name: 'set_checklist_item',
       description:
-        "Coche ou décoche un item de checklist d'une carte (ids via get_card_details). Fournir cardId : si le dernier item vient d'être coché, la carte avance automatiquement de colonne (règle métier NexusHub) et le résultat l'indique.",
+        "Coche ou décoche un item de checklist d'une carte (ids des items via get_card_details). Si le dernier item vient d'être coché, la carte avance automatiquement de colonne (règle métier NexusHub) et le résultat l'indique.",
       inputSchema: z.object({
         itemId: uuid,
-        cardId: uuid,
         isChecked: z.boolean(),
       }),
       jsonSchema: {
         type: 'object',
         properties: {
           itemId: UUID_JSON,
-          cardId: UUID_JSON,
           isChecked: { type: 'boolean' },
         },
-        required: ['itemId', 'cardId', 'isChecked'],
+        required: ['itemId', 'isChecked'],
       },
       handler: async (input) =>
         safeMutation('set_checklist_item', async () => {
@@ -386,6 +384,11 @@ export function buildKanbanTools(ctx: AuthContext): ToolSpec[] {
           if (!result.ok) return failure(result.message);
           const checked = result.items.filter((i) => i.isChecked).length;
           const total = result.items.length;
+          // Ancrage anti-mismatch : la carte à avancer est celle RENVOYÉE
+          // par l'action (carte réelle de l'item, relue en DB côté serveur),
+          // jamais un cardId fourni par le modèle — un id halluciné/injecté
+          // ferait avancer une AUTRE carte.
+          const cardId = result.cardId;
 
           // L'auto-avancement (règle métier PRD §8.2) ne se déclenche QUE
           // quand on vient de cocher (jamais au décochage) ET que la
@@ -398,23 +401,32 @@ export function buildKanbanTools(ctx: AuthContext): ToolSpec[] {
             // Best-effort : un échec d'avancement ne doit jamais faire
             // passer le toggle (déjà committé) pour un échec — l'agent a
             // simplement l'info que l'auto-avancement n'a pas eu lieu.
+            let advance;
             try {
-              const advance = await advanceCard({ cardId: input.cardId });
-              if (advance.ok && advance.moved) {
+              advance = await advanceCard({ cardId });
+            } catch {
+              // Log redigé (convention safe-wrappers) : étiquette du tool
+              // uniquement, jamais l'erreur brute ni de PII — une mutation
+              // qui échoue en silence serait indiagnosticable en prod.
+              console.error('[assistant] auto-advance error', { tool: 'set_checklist_item' });
+            }
+            if (advance !== undefined && advance.ok && advance.moved) {
+              try {
                 // Lecture-après-écriture (spec V2 §3.1, même convention que
                 // move_card) : le nom de colonne est RELU en DB, jamais
                 // déduit de l'id renvoyé par advanceCard.
                 const after = await prisma.card.findFirst({
-                  where: { id: input.cardId, workspaceId: ctx.workspaceId, deletedAt: null },
+                  where: { id: cardId, workspaceId: ctx.workspaceId, deletedAt: null },
                   select: { column: { select: { name: true } } },
                 });
                 if (after !== null) {
                   autoAdvanced = true;
                   nowInColumn = after.column.name;
                 }
+              } catch {
+                // Catch silencieux (lecture pure) : autoAdvanced reste false —
+                // le toggle, lui, est déjà acquis.
               }
-            } catch {
-              // autoAdvanced reste false — le toggle, lui, est déjà acquis.
             }
           }
 
