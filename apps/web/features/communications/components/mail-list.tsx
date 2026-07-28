@@ -1,5 +1,5 @@
 'use client';
-import { useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { markEmailRead } from '../actions/mark-email-read';
 import type { MailDTO } from '../lib/mail-dto';
 import { MailReader } from './mail-reader';
@@ -7,12 +7,24 @@ import { MailReader } from './mail-reader';
 export function MailList({
   mails,
   showMailboxBadge = false,
+  initialSelectedId,
 }: {
   readonly mails: readonly MailDTO[];
   readonly showMailboxBadge?: boolean;
+  /**
+   * Deep-link target (Plan 5c Task 2, `?mail=<id>`). When it names a mail
+   * present in `mails`, it wins over the "first mail" default and — if that
+   * mail is unread — is marked read once, mirroring a manual click.
+   */
+  readonly initialSelectedId?: string;
 }) {
+  const deepLinkTarget =
+    initialSelectedId && mails.some((m) => m.id === initialSelectedId) ? initialSelectedId : null;
+
   const [items, setItems] = useState<readonly MailDTO[]>(mails);
-  const [selectedId, setSelectedId] = useState<string | null>(mails[0]?.id ?? null);
+  const [selectedId, setSelectedId] = useState<string | null>(
+    deepLinkTarget ?? mails[0]?.id ?? null,
+  );
   const [, startTransition] = useTransition();
 
   const select = (id: string): void => {
@@ -22,6 +34,24 @@ export function MailList({
       void markEmailRead({ emailId: id });
     });
   };
+
+  // Deep-link auto-read: run once on mount, guarded against React
+  // StrictMode's double-invoke of effects — a ref (not state) survives the
+  // double mount without triggering a second render/call.
+  const deepLinkHandled = useRef(false);
+  useEffect(() => {
+    if (deepLinkHandled.current) return;
+    deepLinkHandled.current = true;
+    if (!deepLinkTarget) return;
+    const target = mails.find((m) => m.id === deepLinkTarget);
+    if (!target || target.isRead) return;
+    setItems((prev) => prev.map((m) => (m.id === deepLinkTarget ? { ...m, isRead: true } : m)));
+    startTransition(() => {
+      void markEmailRead({ emailId: deepLinkTarget });
+    });
+    // Deliberately mount-only: `mails`/`deepLinkTarget` are the initial props
+    // and the ref guard above already makes this a one-shot effect.
+  }, []);
 
   const selected = items.find((m) => m.id === selectedId) ?? null;
   const unreadCount = items.filter((m) => !m.isRead).length;
