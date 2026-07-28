@@ -75,4 +75,13 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('find_projects');
     expect(prompt).toContain('cherche d');
   });
+
+  it('contient le flux brouillon mail : create_mail_draft/prepare_reply_draft, get_draft avant retouche, send_draft', () => {
+    const prompt = buildSystemPrompt(base);
+    expect(prompt).toContain('create_mail_draft');
+    expect(prompt).toContain('prepare_reply_draft');
+    expect(prompt).toContain('get_draft');
+    expect(prompt).toContain('send_draft');
+    expect(prompt).toContain('priment');
+  });
 });

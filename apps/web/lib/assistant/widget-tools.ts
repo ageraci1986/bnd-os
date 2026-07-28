@@ -15,6 +15,11 @@
  * Module volontairement sans dépendance (pas de `server-only`, pas de Prisma,
  * pas de React) : importable aussi bien côté serveur que côté client. Surface
  * minimale : le garde `isWidgetTool` est le seul point d'entrée.
+ *
+ * `create_mail_draft`/`prepare_reply_draft` (Plan 5c Task 5) rejoignent la
+ * liste pour la même raison que les tools mémoire : ce sont des mutations,
+ * mais leur sortie (JSON structuré du brouillon — voir mail-tools.ts) doit
+ * rendre un chip déterministe dans le fil plutôt que du texte libre.
  */
 const WIDGET_TOOLS = [
   'get_today_overview',
@@ -27,6 +32,8 @@ const WIDGET_TOOLS = [
   'remember_fact',
   'update_fact',
   'forget_fact',
+  'create_mail_draft',
+  'prepare_reply_draft',
 ] as const;
 
 export type WidgetTool = (typeof WIDGET_TOOLS)[number];

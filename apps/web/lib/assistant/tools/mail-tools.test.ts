@@ -98,21 +98,23 @@ beforeEach(() => {
 });
 
 describe('buildMailTools', () => {
-  it('expose les 9 tools mail, seuls send_mail/archive_mail/delete_mail gated, aucun adminOnly', () => {
+  it('expose les 11 tools mail, seuls send_mail/send_draft/archive_mail/delete_mail gated, aucun adminOnly', () => {
     const list = tools();
     expect(list.map((t) => t.name).sort()).toEqual([
       'archive_mail',
       'create_mail_draft',
       'delete_mail',
+      'get_draft',
       'list_my_mailboxes',
       'mark_email_read',
       'mark_mail_read',
       'mark_mail_unread',
       'prepare_reply_draft',
+      'send_draft',
       'send_mail',
     ]);
     expect(list.every((t) => !t.adminOnly)).toBe(true);
-    const gatedNames = new Set(['send_mail', 'archive_mail', 'delete_mail']);
+    const gatedNames = new Set(['send_mail', 'send_draft', 'archive_mail', 'delete_mail']);
     for (const t of list) {
       expect(t.gated).toBe(gatedNames.has(t.name));
     }
@@ -187,7 +189,7 @@ describe('buildMailTools', () => {
       bodyHtml: '<p>Bonjour</p>',
     };
 
-    it('passe kind:new_mail + les champs à saveDraft, et renvoie draftSaved:true', async () => {
+    it('passe kind:new_mail + les champs à saveDraft, et renvoie le brouillon structuré (sortie widget)', async () => {
       draftMocks.saveDraft.mockResolvedValue({ ok: true, id: 'd1' });
       const out = await run('create_mail_draft', baseInput);
       expect(draftMocks.saveDraft).toHaveBeenCalledWith(
@@ -199,9 +201,28 @@ describe('buildMailTools', () => {
           bodyHtml: '<p>Bonjour</p>',
         }),
       );
-      const parsed = JSON.parse(out) as Record<string, unknown>;
-      expect(parsed['draftSaved']).toBe(true);
-      expect(parsed['id']).toBe('d1');
+      expect(JSON.parse(out)).toEqual({
+        draftSaved: true,
+        kind: 'new_mail',
+        to: ['dest@acme.com'],
+        cc: [],
+        bcc: [],
+        subject: 'Objet',
+        bodyText: 'Bonjour',
+        replyToId: null,
+        fromIntegrationId: INTEGRATION_ID,
+      });
+    });
+
+    it('bodyText strippé (aucune balise) et borné à 2000 caractères, avec marqueur si tronqué', async () => {
+      draftMocks.saveDraft.mockResolvedValue({ ok: true, id: 'd1' });
+      const longHtml = `<p><b>${'a'.repeat(2100)}</b></p>`;
+      const out = await run('create_mail_draft', { ...baseInput, bodyHtml: longHtml });
+      const parsed = JSON.parse(out) as { bodyText: string };
+      expect(parsed.bodyText).not.toContain('<');
+      expect(parsed.bodyText).toContain('[…tronqué]');
+      expect(parsed.bodyText.startsWith('a'.repeat(2000))).toBe(true);
+      expect(parsed.bodyText.length).toBe(2000 + '[…tronqué]'.length);
     });
 
     it('brouillon existant sans overwriteExisting → refus mentionnant l’objet, saveDraft PAS appelé', async () => {
@@ -253,12 +274,23 @@ describe('buildMailTools', () => {
       bodyHtml: '<p>Réponse</p>',
     };
 
-    it('passe kind:reply + replyToId à saveDraft', async () => {
+    it('passe kind:reply + replyToId à saveDraft, et renvoie le brouillon structuré (sortie widget)', async () => {
       draftMocks.saveDraft.mockResolvedValue({ ok: true, id: 'd2' });
-      await run('prepare_reply_draft', baseInput);
+      const out = await run('prepare_reply_draft', baseInput);
       expect(draftMocks.saveDraft).toHaveBeenCalledWith(
         expect.objectContaining({ kind: 'reply', replyToId: REPLY_TO_ID }),
       );
+      expect(JSON.parse(out)).toEqual({
+        draftSaved: true,
+        kind: 'reply',
+        to: ['dest@acme.com'],
+        cc: [],
+        bcc: [],
+        subject: 'Re: Objet',
+        bodyText: 'Réponse',
+        replyToId: REPLY_TO_ID,
+        fromIntegrationId: INTEGRATION_ID,
+      });
     });
 
     it('brouillon existant sans overwriteExisting → refus, saveDraft PAS appelé', async () => {
@@ -496,6 +528,318 @@ describe('buildMailTools', () => {
         });
         expect(long).toContain('…');
         expect(long.length).toBeLessThan(400);
+      });
+    });
+  });
+
+  describe('get_draft', () => {
+    it('non gated, schéma et jsonSchema vides', () => {
+      const tool = getTool('get_draft');
+      expect(tool.gated).toBe(false);
+      expect(tool.jsonSchema).toEqual({ type: 'object', properties: {} });
+    });
+
+    it('aucun brouillon → {exists:false}', async () => {
+      draftMocks.loadDraft.mockResolvedValue({ ok: true, draft: null });
+      const out = await run('get_draft', {});
+      expect(JSON.parse(out)).toEqual({ exists: false });
+    });
+
+    it('brouillon existant → {exists:true, draft:{...}}, bodyText strippé, JAMAIS bodyHtml brut', async () => {
+      draftMocks.loadDraft.mockResolvedValue({
+        ok: true,
+        draft: {
+          id: 'd1',
+          fromIntegrationId: INTEGRATION_ID,
+          kind: 'reply',
+          replyToId: REPLY_TO_ID,
+          toRecipients: ['dest@acme.com'],
+          ccRecipients: ['cc@acme.com'],
+          bccRecipients: [],
+          subject: 'Re: Objet',
+          bodyHtml: '<p>Bonjour <b>le monde</b></p>',
+          composeAttachments: [],
+          updatedAt: '2026-07-27T10:00:00.000Z',
+        },
+      });
+      const out = await run('get_draft', {});
+      expect(out).not.toContain('<p>');
+      expect(out).not.toContain('<b>');
+      expect(out).not.toContain('Bonjour <b>');
+      expect(JSON.parse(out)).toEqual({
+        exists: true,
+        draft: {
+          kind: 'reply',
+          replyToId: REPLY_TO_ID,
+          to: ['dest@acme.com'],
+          cc: ['cc@acme.com'],
+          bcc: [],
+          subject: 'Re: Objet',
+          bodyText: 'Bonjour le monde',
+          updatedAt: '2026-07-27T10:00:00.000Z',
+        },
+      });
+    });
+
+    it('bodyText borné à 5000 caractères, marqueur si tronqué', async () => {
+      draftMocks.loadDraft.mockResolvedValue({
+        ok: true,
+        draft: {
+          id: 'd1',
+          fromIntegrationId: INTEGRATION_ID,
+          kind: 'new_mail',
+          replyToId: null,
+          toRecipients: ['dest@acme.com'],
+          ccRecipients: [],
+          bccRecipients: [],
+          subject: 'Objet',
+          bodyHtml: `<p>${'a'.repeat(5200)}</p>`,
+          composeAttachments: [],
+          updatedAt: '2026-07-27T10:00:00.000Z',
+        },
+      });
+      const out = await run('get_draft', {});
+      const parsed = JSON.parse(out) as { draft: { bodyText: string } };
+      expect(parsed.draft.bodyText).toContain('[…tronqué]');
+      expect(parsed.draft.bodyText.startsWith('a'.repeat(5000))).toBe(true);
+      expect(parsed.draft.bodyText.length).toBe(5000 + '[…tronqué]'.length);
+    });
+
+    it('erreur DB brute → message montrable générique, sans fuite', async () => {
+      draftMocks.loadDraft.mockRejectedValue(new Error('connect ECONNREFUSED'));
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      const out = await run('get_draft', {});
+      expect(out).not.toContain('ECONNREFUSED');
+      expect(out.toLowerCase()).toContain('erreur');
+      consoleError.mockRestore();
+    });
+  });
+
+  describe('send_draft', () => {
+    const draftBase = {
+      id: 'd1',
+      fromIntegrationId: INTEGRATION_ID,
+      toRecipients: ['dest@acme.com'],
+      ccRecipients: ['cc@acme.com'],
+      bccRecipients: ['bcc@acme.com'],
+      subject: 'Objet',
+      bodyHtml: '<p>Corps</p>',
+      composeAttachments: [],
+      updatedAt: '2026-07-27T10:00:00.000Z',
+    };
+
+    it('gated: true, schéma et jsonSchema SANS AUCUN champ (le brouillon persisté fait foi)', () => {
+      const tool = getTool('send_draft');
+      expect(tool.gated).toBe(true);
+      expect(tool.jsonSchema).toEqual({ type: 'object', properties: {} });
+    });
+
+    it('aucun brouillon → échec, sendMail PAS appelé', async () => {
+      draftMocks.loadDraft.mockResolvedValue({ ok: true, draft: null });
+      const out = await run('send_draft', {});
+      expect(out).toBe('Échec : Aucun brouillon à envoyer.');
+      expect(sendMailMocks.sendMail).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['new_mail', null, {}] as const,
+      ['reply', REPLY_TO_ID, { replyToId: REPLY_TO_ID }] as const,
+      ['reply_all', REPLY_TO_ID, { replyToId: REPLY_TO_ID }] as const,
+      ['forward', REPLY_TO_ID, { replyToId: REPLY_TO_ID }] as const,
+    ])(
+      "kind:%s → sendMail appelé avec mode:%s (mapping identité constaté dans compose-panel.tsx, y compris 'forward')",
+      async (kind, replyToId, expectedReplyTo) => {
+        draftMocks.loadDraft.mockResolvedValue({
+          ok: true,
+          draft: { ...draftBase, kind, replyToId },
+        });
+        sendMailMocks.sendMail.mockResolvedValue({ ok: true, emailMessageId: 'm1' });
+        const out = await run('send_draft', {});
+        expect(sendMailMocks.sendMail).toHaveBeenCalledWith({
+          fromIntegrationId: INTEGRATION_ID,
+          mode: kind,
+          ...expectedReplyTo,
+          toRecipients: ['dest@acme.com'],
+          ccRecipients: ['cc@acme.com'],
+          bccRecipients: ['bcc@acme.com'],
+          subject: 'Objet',
+          bodyHtml: '<p>Corps</p>',
+          composeAttachments: [],
+        });
+        expect(JSON.parse(out)).toEqual({ sent: true, emailMessageId: 'm1' });
+      },
+    );
+
+    it('succès → PAS de deleteDraft distinct appelé (sendMail supprime déjà le brouillon dans sa propre transaction)', async () => {
+      draftMocks.loadDraft.mockResolvedValue({
+        ok: true,
+        draft: { ...draftBase, kind: 'new_mail', replyToId: null },
+      });
+      sendMailMocks.sendMail.mockResolvedValue({ ok: true, emailMessageId: 'm1' });
+      await run('send_draft', {});
+      // Le mock du module mail-drafts.ts n'expose ici que loadDraft/saveDraft
+      // (voir vi.mock en tête de fichier) : si send_draft appelait deleteDraft,
+      // ce serait une erreur d'exécution — la réussite de ce test EST la preuve.
+      expect(draftMocks.loadDraft).toHaveBeenCalledTimes(1);
+    });
+
+    it('échec sendMail (code connu) → message FR curé, réutilise describeSendFailure', async () => {
+      draftMocks.loadDraft.mockResolvedValue({
+        ok: true,
+        draft: { ...draftBase, kind: 'new_mail', replyToId: null },
+      });
+      sendMailMocks.sendMail.mockResolvedValue({ ok: false, code: 'RATE_LIMIT' });
+      const out = await run('send_draft', {});
+      expect(out).toContain('quota');
+    });
+
+    it('échec sendMail (SEND_FAILED, message serveur) → message serveur NON relayé (hors whitelist)', async () => {
+      draftMocks.loadDraft.mockResolvedValue({
+        ok: true,
+        draft: { ...draftBase, kind: 'new_mail', replyToId: null },
+      });
+      sendMailMocks.sendMail.mockResolvedValue({
+        ok: false,
+        code: 'SEND_FAILED',
+        message: 'ETIMEDOUT smtp.internal-host.example:587',
+      });
+      const out = await run('send_draft', {});
+      expect(out).not.toContain('internal-host');
+      expect(out).toBe("Échec : l'envoi a échoué — réessayez dans un instant.");
+    });
+
+    describe('describeForConfirm', () => {
+      async function describe_(): Promise<string> {
+        const tool = getTool('send_draft');
+        if (tool.describeForConfirm === undefined) throw new Error('describeForConfirm absent');
+        return tool.describeForConfirm({} as never);
+      }
+
+      it('aucun brouillon → description DÉCLARATIVE de refus, sans appel sendMail', async () => {
+        draftMocks.loadDraft.mockResolvedValue({ ok: true, draft: null });
+        const description = await describe_();
+        expect(description).toBe(
+          "Envoyer un brouillon ? Aucun brouillon en cours — l'envoi sera refusé.",
+        );
+        expect(sendMailMocks.sendMail).not.toHaveBeenCalled();
+      });
+
+      it('brouillon présent → même énumération que send_mail (mode, destinataires, Cc, Cci, objet, extrait), sans balise HTML', async () => {
+        draftMocks.loadDraft.mockResolvedValue({
+          ok: true,
+          draft: {
+            ...draftBase,
+            kind: 'reply_all',
+            replyToId: REPLY_TO_ID,
+            subject: 'Devis signé',
+            bodyHtml: '<p>Bonjour, <b>voici</b> le devis signé.</p>',
+          },
+        });
+        const description = await describe_();
+        expect(description).toContain('réponse à tous');
+        expect(description).toContain('dest@acme.com');
+        expect(description).toContain('Cc : cc@acme.com');
+        expect(description).toContain('Cci : bcc@acme.com');
+        expect(description).toContain('Devis signé');
+        expect(description).toContain('Bonjour, voici le devis signé.');
+        expect(description).not.toContain('<');
+      });
+
+      it("kind 'forward' → libellé FR « Transfert »", async () => {
+        draftMocks.loadDraft.mockResolvedValue({
+          ok: true,
+          draft: {
+            ...draftBase,
+            kind: 'forward',
+            replyToId: REPLY_TO_ID,
+            ccRecipients: [],
+            bccRecipients: [],
+          },
+        });
+        const description = await describe_();
+        expect(description).toContain('Transfert');
+      });
+
+      it('Cci : chaque adresse apparaît en clair, JAMAIS tronquée (même à 7 adresses)', async () => {
+        const bcc = Array.from({ length: 7 }, (_, i) => `cache${i}@acme.com`);
+        draftMocks.loadDraft.mockResolvedValue({
+          ok: true,
+          draft: {
+            ...draftBase,
+            kind: 'new_mail',
+            replyToId: null,
+            ccRecipients: [],
+            bccRecipients: bcc,
+          },
+        });
+        const description = await describe_();
+        for (const addr of bcc) {
+          expect(description).toContain(addr);
+        }
+        expect(description).toContain('Cci :');
+      });
+
+      it('À : tronqué à 5 adresses + « +n autres »', async () => {
+        const to = Array.from({ length: 7 }, (_, i) => `dest${i}@acme.com`);
+        draftMocks.loadDraft.mockResolvedValue({
+          ok: true,
+          draft: {
+            ...draftBase,
+            kind: 'new_mail',
+            replyToId: null,
+            toRecipients: to,
+            ccRecipients: [],
+            bccRecipients: [],
+          },
+        });
+        const description = await describe_();
+        expect(description).toContain('dest4@acme.com');
+        expect(description).not.toContain('dest5@acme.com');
+        expect(description).toContain('+2 autres');
+      });
+
+      it('budget dépassé (20 Cci très longues + À/Cc chargés) → repli compté ≤ 1900 chars avec comptes exacts', async () => {
+        const longAddr = (prefix: string, i: number) =>
+          `${prefix}${i}-${'a'.repeat(80)}@${'b'.repeat(60)}.com`;
+        const to = Array.from({ length: 20 }, (_, i) => longAddr('to', i));
+        const cc = Array.from({ length: 20 }, (_, i) => longAddr('cc', i));
+        const bcc = Array.from({ length: 20 }, (_, i) => longAddr('bcc', i));
+        draftMocks.loadDraft.mockResolvedValue({
+          ok: true,
+          draft: {
+            ...draftBase,
+            kind: 'new_mail',
+            replyToId: null,
+            toRecipients: to,
+            ccRecipients: cc,
+            bccRecipients: bcc,
+            subject: 'S'.repeat(300),
+            bodyHtml: `<p>${'contenu '.repeat(50)}</p>`,
+          },
+        });
+        const description = await describe_();
+        expect(description.length).toBeLessThanOrEqual(1900);
+        expect(description).toContain('refusez si vous ne les avez pas dictés');
+        expect(description).toContain('20 destinataires');
+        expect(description).toContain('20 en copie,');
+        expect(description).toContain('20 en copie cachée');
+        expect(description).toContain(`« ${'S'.repeat(150)}…`);
+      });
+
+      it('sans cc ni cci, aucun segment Cc/Cci', async () => {
+        draftMocks.loadDraft.mockResolvedValue({
+          ok: true,
+          draft: {
+            ...draftBase,
+            kind: 'new_mail',
+            replyToId: null,
+            ccRecipients: [],
+            bccRecipients: [],
+          },
+        });
+        const description = await describe_();
+        expect(description).not.toContain('Cc :');
+        expect(description).not.toContain('Cci :');
       });
     });
   });

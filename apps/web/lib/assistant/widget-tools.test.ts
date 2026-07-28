@@ -11,4 +11,14 @@ describe('isWidgetTool', () => {
     expect(isWidgetTool('delete_card')).toBe(false);
     expect(isWidgetTool('some_unknown_tool')).toBe(false);
   });
+
+  it('accepte create_mail_draft et prepare_reply_draft (mutations à widget, comme les tools mémoire)', () => {
+    expect(isWidgetTool('create_mail_draft')).toBe(true);
+    expect(isWidgetTool('prepare_reply_draft')).toBe(true);
+  });
+
+  it('rejette get_draft/send_draft (lecture / gated, pas des widgets)', () => {
+    expect(isWidgetTool('get_draft')).toBe(false);
+    expect(isWidgetTool('send_draft')).toBe(false);
+  });
 });

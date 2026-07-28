@@ -3,6 +3,7 @@ import 'server-only';
 import { z } from 'zod';
 import { prisma } from '@nexushub/db';
 import { defineTool, type ToolSpec } from '@nexushub/agent';
+import { stripMailHtmlToText } from '@nexushub/integrations/mail';
 import type { AuthContext } from '@/lib/auth';
 import {
   loadDraft,
@@ -43,6 +44,10 @@ const CONFIRM_DESCRIPTION_MAX_CHARS = 1900;
 const CONFIRM_ADDRESS_MAX_CHARS = 60;
 /** Cap d'affichage de l'objet dans le dialog de confirmation. */
 const CONFIRM_SUBJECT_MAX_CHARS = 150;
+/** Longueur max du `bodyText` renvoyé par create_mail_draft/prepare_reply_draft (sortie widget). */
+const WIDGET_BODY_TEXT_MAX_CHARS = 2000;
+/** Longueur max du `bodyText` renvoyé par get_draft — plus généreux : le modèle relit ce texte pour composer une retouche. */
+const GET_DRAFT_BODY_TEXT_MAX_CHARS = 5000;
 
 const recipientsJson = (description: string) => ({
   type: 'array' as const,
@@ -100,12 +105,24 @@ const DRAFT_JSON_PROPERTIES = {
 
 const sendModeValues = ['new_mail', 'reply', 'reply_all'] as const;
 
-/** Libellés FR des modes d'envoi, pour le dialog de confirmation. */
-const SEND_MODE_LABELS: Record<(typeof sendModeValues)[number], string> = {
+/**
+ * Libellés FR des modes d'envoi, pour le dialog de confirmation — source
+ * unique partagée par `send_mail` (3 modes possibles côté modèle) et
+ * `send_draft` (les 4 valeurs de `DraftDto.kind`, brouillon persisté faisant
+ * foi — jamais 'forward' côté modèle : un transfert doit passer par le
+ * composer/widget, pas être improvisé). 'forward' est en capitale par choix
+ * éditorial (Task 5) — les 3 autres restent en minuscule, décision
+ * antérieure inchangée.
+ */
+const MODE_LABELS = {
   new_mail: 'nouveau message',
   reply: 'réponse',
   reply_all: 'réponse à tous',
-};
+  forward: 'Transfert',
+} as const satisfies Record<string, string>;
+
+/** Les 4 valeurs de `DraftDto.kind` (mail-drafts.ts) — clés de `MODE_LABELS`. */
+type DraftKind = keyof typeof MODE_LABELS;
 
 const sendMailInputSchema = composeFieldsSchema
   .extend({
@@ -305,6 +322,60 @@ function joinShown(addrs: readonly string[]): string {
   return `${shown} +${addrs.length - CONFIRM_RECIPIENTS_SHOWN_MAX} autres`;
 }
 
+/** Forme minimale partagée par l'input validé de `send_mail` et un `DraftDto` — tout ce dont `buildSendDescription` a besoin. */
+interface DescribableSend {
+  readonly mode: DraftKind;
+  readonly toRecipients: readonly string[];
+  readonly ccRecipients?: readonly string[] | undefined;
+  readonly bccRecipients?: readonly string[] | undefined;
+  readonly subject: string;
+  readonly bodyHtml: string;
+}
+
+/**
+ * Description de confirmation partagée par `send_mail` (input modèle validé,
+ * 3 modes) et `send_draft` (brouillon persisté relu en DB, 4 kinds dont
+ * 'forward') — seule la provenance des données diffère, l'énumération et les
+ * garanties (Cci JAMAIS tronqué, budget 1900 avec repli compté) sont
+ * identiques dans les deux cas. Extrait tel quel du describeForConfirm
+ * historique de `send_mail` (Plan 2b) — NE PAS changer son comportement pour
+ * les 3 modes existants : les tests `send_mail` inchangés en sont la preuve.
+ */
+function buildSendDescription(v: DescribableSend): string {
+  const modeLabel = MODE_LABELS[v.mode];
+  const subject = capped(v.subject, CONFIRM_SUBJECT_MAX_CHARS);
+  const segments = [`Envoyer un mail (${modeLabel}) à ${joinShown(v.toRecipients)}`];
+  if (v.ccRecipients !== undefined && v.ccRecipients.length > 0) {
+    segments.push(`Cc : ${joinShown(v.ccRecipients)}`);
+  }
+  if (v.bccRecipients !== undefined && v.bccRecipients.length > 0) {
+    segments.push(
+      `Cci : ${v.bccRecipients.map((a) => capped(a, CONFIRM_ADDRESS_MAX_CHARS)).join(', ')}`,
+    );
+  }
+  segments.push(`objet « ${subject} »`);
+  const full = `${segments.join(' — ')} : ${excerptOf(v.bodyHtml)}`;
+  if (full.length <= CONFIRM_DESCRIPTION_MAX_CHARS) return full;
+  // Repli compté : au-delà du budget, on remplace le détail par des
+  // comptes exacts plutôt que de laisser la route couper la fin (Cci).
+  const ccCount = v.ccRecipients?.length ?? 0;
+  const bccCount = v.bccRecipients?.length ?? 0;
+  return `Envoyer un mail (${modeLabel}) à ${v.toRecipients.length} destinataires, ${ccCount} en copie, ${bccCount} en copie cachée — liste trop longue pour être affichée intégralement : refusez si vous ne les avez pas dictés vous-même — objet « ${subject} »`;
+}
+
+/**
+ * Extrait un aperçu texte borné du corps HTML pour une sortie STRUCTURÉE
+ * (widget `create_mail_draft`/`prepare_reply_draft`, `get_draft`) — jamais le
+ * HTML brut. Contrairement à `excerptOf` (dialog de confirmation, 200 chars,
+ * ellipse simple), le marqueur `[…tronqué]` signale explicitement une
+ * troncature au modèle qui relit ce texte (`get_draft`), pour qu'il ne le
+ * prenne jamais pour le corps intégral.
+ */
+function boundedBodyText(bodyHtml: string, max: number): string {
+  const text = stripMailHtmlToText(bodyHtml);
+  return text.length > max ? `${text.slice(0, max)}[…tronqué]` : text;
+}
+
 /**
  * Garde anti-écrasement silencieux : le brouillon est unique par utilisateur,
  * donc sauver sans `overwriteExisting: true` alors qu'un brouillon existe
@@ -365,7 +436,7 @@ export function buildMailTools(ctx: AuthContext): ToolSpec[] {
     defineTool({
       name: 'create_mail_draft',
       description:
-        'Enregistre un brouillon de nouveau mail (utiliser list_my_mailboxes pour le fromIntegrationId). ATTENTION : un seul brouillon est conservé par utilisateur — si un brouillon existe déjà, le tool refuse sauf overwriteExisting: true (à ne passer qu’après confirmation de l’utilisateur). Le brouillon est visible dans Communications ; utiliser send_mail ensuite pour l’envoyer réellement.',
+        'Enregistre un brouillon de nouveau mail (utiliser list_my_mailboxes pour le fromIntegrationId). ATTENTION : un seul brouillon est conservé par utilisateur — si un brouillon existe déjà, le tool refuse sauf overwriteExisting: true (à ne passer qu’après confirmation de l’utilisateur). Le brouillon est visible dans Communications ; relire avec get_draft avant toute retouche, puis utiliser send_draft pour l’envoyer réellement.',
       inputSchema: draftInputSchema,
       jsonSchema: {
         type: 'object',
@@ -387,10 +458,20 @@ export function buildMailTools(ctx: AuthContext): ToolSpec[] {
           };
           const result = await saveDraft(payload);
           if (!result.ok) return failure(result.message);
+          // Sortie STRUCTURÉE (widget-tools.ts : 'create_mail_draft' est un
+          // widget-tool) — c'est ce JSON, pas `result.id`, que le widget
+          // (Task 6) autosauvera : fromIntegrationId/kind/replyToId lui sont
+          // nécessaires pour retrouver le brouillon. JAMAIS bodyHtml brut.
           return JSON.stringify({
             draftSaved: true,
-            id: result.id,
-            note: 'Brouillon enregistré — utiliser send_mail pour l’envoyer.',
+            kind: 'new_mail',
+            to: input.toRecipients,
+            cc: input.ccRecipients ?? [],
+            bcc: input.bccRecipients ?? [],
+            subject: input.subject,
+            bodyText: boundedBodyText(input.bodyHtml, WIDGET_BODY_TEXT_MAX_CHARS),
+            replyToId: null,
+            fromIntegrationId: input.fromIntegrationId,
           });
         }),
     }),
@@ -398,7 +479,7 @@ export function buildMailTools(ctx: AuthContext): ToolSpec[] {
     defineTool({
       name: 'prepare_reply_draft',
       description:
-        "Enregistre un brouillon de réponse à un mail existant (replyToId — voir read_mail ou search_mails). Itérer le texte de la réponse avec l'utilisateur AVANT de sauver. Un seul brouillon par utilisateur : si un brouillon existe déjà, le tool refuse sauf overwriteExisting: true (à ne passer qu'après confirmation de l'utilisateur). Le brouillon est visible dans Communications ; utiliser send_mail ensuite pour l'envoyer réellement.",
+        "Enregistre un brouillon de réponse à un mail existant (replyToId — voir read_mail ou search_mails). Itérer le texte de la réponse avec l'utilisateur AVANT de sauver. Un seul brouillon par utilisateur : si un brouillon existe déjà, le tool refuse sauf overwriteExisting: true (à ne passer qu'après confirmation de l'utilisateur). Le brouillon est visible dans Communications ; relire avec get_draft avant toute retouche, puis utiliser send_draft pour l'envoyer réellement.",
       inputSchema: draftInputSchema.extend({ replyToId: uuid }),
       jsonSchema: {
         type: 'object',
@@ -421,10 +502,17 @@ export function buildMailTools(ctx: AuthContext): ToolSpec[] {
           };
           const result = await saveDraft(payload);
           if (!result.ok) return failure(result.message);
+          // Même sortie structurée que create_mail_draft — voir son commentaire.
           return JSON.stringify({
             draftSaved: true,
-            id: result.id,
-            note: 'Brouillon de réponse enregistré — utiliser send_mail pour l’envoyer.',
+            kind: 'reply',
+            to: input.toRecipients,
+            cc: input.ccRecipients ?? [],
+            bcc: input.bccRecipients ?? [],
+            subject: input.subject,
+            bodyText: boundedBodyText(input.bodyHtml, WIDGET_BODY_TEXT_MAX_CHARS),
+            replyToId: input.replyToId,
+            fromIntegrationId: input.fromIntegrationId,
           });
         }),
     }),
@@ -457,25 +545,7 @@ export function buildMailTools(ctx: AuthContext): ToolSpec[] {
         const parsed = sendMailInputSchema.safeParse(input);
         if (!parsed.success) return 'Envoi de mail (paramètres invalides — refusez).';
         const v: SendMailToolInput = parsed.data;
-        const modeLabel = SEND_MODE_LABELS[v.mode];
-        const subject = capped(v.subject, CONFIRM_SUBJECT_MAX_CHARS);
-        const segments = [`Envoyer un mail (${modeLabel}) à ${joinShown(v.toRecipients)}`];
-        if (v.ccRecipients !== undefined && v.ccRecipients.length > 0) {
-          segments.push(`Cc : ${joinShown(v.ccRecipients)}`);
-        }
-        if (v.bccRecipients !== undefined && v.bccRecipients.length > 0) {
-          segments.push(
-            `Cci : ${v.bccRecipients.map((a) => capped(a, CONFIRM_ADDRESS_MAX_CHARS)).join(', ')}`,
-          );
-        }
-        segments.push(`objet « ${subject} »`);
-        const full = `${segments.join(' — ')} : ${excerptOf(v.bodyHtml)}`;
-        if (full.length <= CONFIRM_DESCRIPTION_MAX_CHARS) return full;
-        // Repli compté : au-delà du budget, on remplace le détail par des
-        // comptes exacts plutôt que de laisser la route couper la fin (Cci).
-        const ccCount = v.ccRecipients?.length ?? 0;
-        const bccCount = v.bccRecipients?.length ?? 0;
-        return `Envoyer un mail (${modeLabel}) à ${v.toRecipients.length} destinataires, ${ccCount} en copie, ${bccCount} en copie cachée — liste trop longue pour être affichée intégralement : refusez si vous ne les avez pas dictés vous-même — objet « ${subject} »`;
+        return buildSendDescription(v);
       },
       handler: async (input) =>
         safeMutation('send_mail', async () => {
@@ -490,6 +560,98 @@ export function buildMailTools(ctx: AuthContext): ToolSpec[] {
             bodyHtml: input.bodyHtml,
           });
           if (!result.ok) return failure(describeSendFailure(result));
+          return JSON.stringify({ sent: true, emailMessageId: result.emailMessageId });
+        }),
+    }),
+
+    defineTool({
+      name: 'get_draft',
+      description:
+        'Lit VOTRE brouillon en cours (celui du widget ou du composer). À appeler avant toute retouche demandée — les éditions inline de l’utilisateur priment sur ce que tu as rédigé.',
+      inputSchema: z.object({}),
+      jsonSchema: { type: 'object', properties: {} },
+      handler: async () =>
+        safeDb('get_draft', async () => {
+          const { draft } = await loadDraft();
+          if (draft === null) return JSON.stringify({ exists: false });
+          // JAMAIS bodyHtml brut (CLAUDE.md §4.5.3 — HTML utilisateur) : le
+          // modèle ne relit qu'un texte strippé et borné.
+          return JSON.stringify({
+            exists: true,
+            draft: {
+              kind: draft.kind,
+              replyToId: draft.replyToId,
+              to: draft.toRecipients,
+              cc: draft.ccRecipients,
+              bcc: draft.bccRecipients,
+              subject: draft.subject,
+              bodyText: boundedBodyText(draft.bodyHtml, GET_DRAFT_BODY_TEXT_MAX_CHARS),
+              updatedAt: draft.updatedAt,
+            },
+          });
+        }),
+    }),
+
+    defineTool({
+      name: 'send_draft',
+      description:
+        "Envoie réellement le brouillon persisté en cours (celui affiché dans le widget/composer) — action irréversible, soumise à confirmation. AUCUN champ à fournir : c'est le brouillon en base qui fait foi, jamais ce que tu proposes ici — appelle get_draft d'abord si tu veux vérifier son contenu. Échoue si aucun brouillon n'existe.",
+      // Schéma volontairement VIDE : le modèle ne peut fournir aucun champ.
+      // C'est la garantie du flux (Plan 5c Task 5) — ce qui part est
+      // exactement ce que l'utilisateur voit dans le widget/composer au
+      // moment de la confirmation, jamais une resaisie du modèle qui
+      // pourrait diverger d'une édition inline entre-temps.
+      inputSchema: z.object({}),
+      jsonSchema: { type: 'object', properties: {} },
+      gated: true,
+      // Async : relit le brouillon en DB (closure `ctx` → même utilisateur,
+      // même session que le handler) pour décrire fidèlement ce qui va
+      // partir. Réutilise `buildSendDescription` (voir send_mail ci-dessus)
+      // — même énumération, même garantie Cci exhaustif, même budget/repli.
+      describeForConfirm: async (): Promise<string> => {
+        const { draft } = await loadDraft();
+        if (draft === null) {
+          return "Envoyer un brouillon ? Aucun brouillon en cours — l'envoi sera refusé.";
+        }
+        return buildSendDescription({
+          mode: draft.kind,
+          toRecipients: draft.toRecipients,
+          ccRecipients: draft.ccRecipients,
+          bccRecipients: draft.bccRecipients,
+          subject: draft.subject,
+          bodyHtml: draft.bodyHtml,
+        });
+      },
+      handler: async () =>
+        safeMutation('send_draft', async () => {
+          const { draft } = await loadDraft();
+          if (draft === null) return failure('Aucun brouillon à envoyer.');
+          const result = await sendMail({
+            fromIntegrationId: draft.fromIntegrationId,
+            // Mapping kind→mode CONSTATÉ dans compose-panel.tsx : `kind`
+            // (mail-drafts.ts) et `mode` (send-mail.ts) partagent exactement
+            // les 4 mêmes valeurs — le composer les passe déjà en identité
+            // (`saveDraft({ kind: mode, ... })` / `sendMail({ mode, ... })`,
+            // même variable `mode` du store). 'forward' y compris : seul un
+            // brouillon PERSISTÉ (jamais l'input modèle de send_mail) peut
+            // porter ce kind.
+            mode: draft.kind,
+            ...(draft.replyToId !== null ? { replyToId: draft.replyToId } : {}),
+            toRecipients: [...draft.toRecipients],
+            ccRecipients: [...draft.ccRecipients],
+            bccRecipients: [...draft.bccRecipients],
+            subject: draft.subject,
+            bodyHtml: draft.bodyHtml,
+            composeAttachments: [...draft.composeAttachments],
+          });
+          if (!result.ok) return failure(describeSendFailure(result));
+          // Pas de deleteDraft() ici : `sendMail` (send-mail.ts) supprime déjà
+          // le brouillon en DB dans sa propre transaction de succès (brouillon
+          // unique par utilisateur) — un appel redondant introduirait une
+          // fenêtre best-effort inutile pour un état déjà cohérent. Constaté
+          // dans compose-panel.tsx : `onSend` ne rappelle PAS `deleteDraft()`
+          // après un envoi réussi (seul `onDiscard` le fait) — même
+          // comportement reproduit ici.
           return JSON.stringify({ sent: true, emailMessageId: result.emailMessageId });
         }),
     }),
