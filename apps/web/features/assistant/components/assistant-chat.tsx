@@ -46,6 +46,32 @@ const HISTORY_MAX = 38;
  */
 const DISPLAY_MAX = 80;
 
+/** Tools dont la sortie est rendue par `MailDraftWidget` (voir widgets/index.tsx). */
+const DRAFT_WIDGET_TOOLS: ReadonlySet<string> = new Set([
+  'create_mail_draft',
+  'prepare_reply_draft',
+]);
+
+/**
+ * Clé de rendu d'un widget dans le fil. Pour les widgets draft, la clé
+ * inclut `data.updatedAt` : quand la dédup (`appendWidget`) remplace un
+ * widget draft par un plus frais EN PLACE, l'index seul ne changerait pas et
+ * React réutiliserait l'instance montée — la clé updatedAt force un
+ * remount, donc un re-seed depuis `loadDraft()` (`MailDraftWidget` est un
+ * éditeur live du brouillon DB ; plusieurs widgets draft dans le fil sont
+ * plusieurs VUES du MÊME brouillon, chacune seedée à son montage).
+ */
+function widgetKey(widget: StreamWidget, index: number): string {
+  if (!DRAFT_WIDGET_TOOLS.has(widget.tool)) return String(index);
+  const updatedAt =
+    typeof widget.data === 'object' &&
+    widget.data !== null &&
+    typeof (widget.data as { updatedAt?: unknown }).updatedAt === 'string'
+      ? (widget.data as { updatedAt: string }).updatedAt
+      : '';
+  return `${index}:${widget.tool}:${updatedAt}`;
+}
+
 export function AssistantChat({ csrfToken, firstName }: AssistantChatProps) {
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [input, setInput] = useState('');
@@ -334,7 +360,9 @@ export function AssistantChat({ csrfToken, firstName }: AssistantChatProps) {
               {/* Widgets rendus pleine largeur sous la bulle, pas dedans — plus
                   lisible pour un mini-Kanban ou une liste de mails. */}
               {m.widgets?.map((w, wi) => (
-                <Fragment key={wi}>{renderWidget(w.tool, w.data, widgetActions)}</Fragment>
+                <Fragment key={widgetKey(w, wi)}>
+                  {renderWidget(w.tool, w.data, widgetActions)}
+                </Fragment>
               ))}
             </Fragment>
           ))}
@@ -346,7 +374,9 @@ export function AssistantChat({ csrfToken, firstName }: AssistantChatProps) {
             </div>
           )}
           {streamWidgets.map((w, wi) => (
-            <Fragment key={wi}>{renderWidget(w.tool, w.data, widgetActions)}</Fragment>
+            <Fragment key={widgetKey(w, wi)}>
+              {renderWidget(w.tool, w.data, widgetActions)}
+            </Fragment>
           ))}
           {activity !== null && (
             <p className="text-xs font-semibold text-[color:var(--color-text-ghost)]">{activity}</p>

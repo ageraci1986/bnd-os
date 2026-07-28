@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { parseWidgetData } from './parse-widget-data';
 import type { WidgetActions } from './index';
 import { RecipientField } from '@/features/communications/components/recipient-field';
-import { saveDraft } from '@/features/communications/actions/mail-drafts';
+import { loadDraft, saveDraft, type DraftDto } from '@/features/communications/actions/mail-drafts';
 
 /**
  * Les 4 valeurs de `DraftDto.kind` (mail-drafts.ts). `create_mail_draft`
@@ -25,9 +25,9 @@ const KIND_LABELS: Record<DraftKind, string> = {
 
 /**
  * Sortie structurée de `create_mail_draft`/`prepare_reply_draft`
- * (mail-tools.ts) — extras tolérés (ex. `draftSaved`, `updatedAt` : ce widget
- * n'en a pas besoin, le jeton de fraîcheur `send_draft` est géré côté modèle
- * via le prompt, pas ici — voir mail-tools.ts).
+ * (mail-tools.ts) — extras tolérés. Elle ne sert que de DÉCLENCHEUR et
+ * d'aperçu pendant le chargement : la source de vérité éditée par ce widget
+ * est le brouillon persisté relu via `loadDraft()` au montage (revue C1).
  */
 const MailDraftDataSchema = z.object({
   kind: kindSchema,
@@ -55,7 +55,7 @@ export interface MailDraftWidgetProps {
   readonly actions?: WidgetActions;
 }
 
-/** Délai d'autosave après la dernière édition (À/Cc/Cci/Objet/Corps). */
+/** Délai d'autosave après la dernière édition (À/Cc/Cci/Objet/Corps) : 2000 ms. */
 const AUTOSAVE_DEBOUNCE_MS = 2000;
 
 /**
@@ -68,6 +68,12 @@ const AUTOSAVE_DEBOUNCE_MS = 2000;
 const SEND_DRAFT_MESSAGE = 'Envoie le brouillon actuel (send_draft)';
 
 const KEEP_DRAFT_NOTE = 'Sauvegardé — retrouvable dans Communications.';
+const KEEP_FAILED_NOTE = 'Échec de sauvegarde — le brouillon n’a pas été mis à jour.';
+const SEND_BLOCKED_NOTE = 'Envoi bloqué : la sauvegarde du brouillon a échoué — réessayez.';
+const LOAD_FAILED_NOTE =
+  'Impossible de charger le brouillon — ouvrez Communications pour l’éditer.';
+const DRAFT_GONE_NOTE = 'Aucun brouillon en base — il a peut-être déjà été envoyé ou supprimé.';
+const LOADING_LABEL = 'Chargement du brouillon…';
 
 type SaveStatus = 'idle' | 'dirty' | 'saving' | 'saved' | 'error';
 
@@ -109,20 +115,88 @@ export function textToDraftHtml(text: string): string {
     .join('');
 }
 
+/** Texte d'un nœud : récursif, `<br>` → `\n`, autres balises aplaties (inline). */
+function nodeText(node: Node): string {
+  if (node.nodeType === Node.TEXT_NODE) return node.textContent ?? '';
+  if (node.nodeType !== Node.ELEMENT_NODE) return '';
+  const el = node as Element;
+  if (el.tagName === 'BR') return '\n';
+  let out = '';
+  el.childNodes.forEach((child) => {
+    out += nodeText(child);
+  });
+  return out;
+}
+
 /**
- * Brouillon éditable autosauvé dans le fil (Plan 5c Task 6) — rendu pour
- * `create_mail_draft`/`prepare_reply_draft`. À/Cc/Cci via `RecipientField`
- * (chips), objet et corps texte simple ; toute édition programme un autosave
- * debouncé 1800ms→2000ms (`saveDraft`, un seul brouillon par utilisateur).
- * `kind`/`replyToId`/`fromIntegrationId` viennent de la sortie du tool et ne
- * sont jamais édités ici.
+ * Conversion FIDÈLE bodyHtml → texte éditable, CÔTÉ CLIENT via `DOMParser`
+ * (revue C1) : `parseFromString` construit un document inerte — il ne charge
+ * aucune ressource et n'exécute aucun script. Blocs `<p>`/`<div>` → séparés
+ * par une ligne vide, `<br>` → saut de ligne, entités décodées UNE fois par
+ * le DOM. Pas de troncature : c'est l'éditeur du contenu réel du brouillon.
+ * Round-trip stable avec `textToDraftHtml` (pinné en test — pas de
+ * double-échappement).
+ */
+export function draftHtmlToText(html: string): string {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const blocks: string[] = [];
+  let current = '';
+  doc.body.childNodes.forEach((node) => {
+    const isBlock =
+      node.nodeType === Node.ELEMENT_NODE &&
+      ((node as Element).tagName === 'P' || (node as Element).tagName === 'DIV');
+    if (isBlock) {
+      if (current !== '') {
+        blocks.push(current);
+        current = '';
+      }
+      blocks.push(nodeText(node));
+    } else {
+      current += nodeText(node);
+    }
+  });
+  if (current !== '') blocks.push(current);
+  return blocks.join('\n\n');
+}
+
+/** État éditable du formulaire — seedé depuis le `DraftDto` chargé, jamais depuis le JSON du tool. */
+interface FormState {
+  readonly to: readonly string[];
+  readonly cc: readonly string[];
+  readonly bcc: readonly string[];
+  readonly subject: string;
+  readonly bodyText: string;
+  /** True dès que la textarea a été touchée — sinon l'autosave renvoie le bodyHtml canonique inchangé. */
+  readonly bodyDirty: boolean;
+}
+
+type Phase = 'loading' | 'unavailable' | 'ready';
+
+/**
+ * Brouillon éditable autosauvé dans le fil (Plan 5c Task 6, revu C1) —
+ * rendu pour `create_mail_draft`/`prepare_reply_draft`.
  *
- * Envoyer/Garder en brouillon FLUSHENT d'abord l'autosave en attente ou en
- * vol (`flush()`) avant d'agir, pour que ce que l'utilisateur voit soit bien
- * ce qui part : l'envoi réel passe par `sendMessage` → le modèle relit
- * `get_draft` puis appelle `send_draft` avec le jeton de fraîcheur
- * (`expectedUpdatedAt`, mail-tools.ts) — ce widget n'a pas besoin de le
- * connaître.
+ * ÉDITEUR LIVE du brouillon DB : au montage, le widget recharge le brouillon
+ * persisté via `loadDraft()` (Server Action — c'est le brouillon de
+ * l'utilisateur, son client peut voir son bodyHtml ; l'interdit du HTML brut
+ * ne vaut que pour le MODÈLE, cf. mail-tools.ts) et seede TOUS les champs
+ * depuis le `DraftDto` (to/cc/bcc/subject/kind/replyToId/fromIntegrationId/
+ * composeAttachments/bodyHtml). Le JSON du tool ne sert que de déclencheur
+ * et d'aperçu pendant le chargement. Plusieurs widgets draft dans le fil
+ * (ex. messages successifs) sont donc plusieurs VUES du MÊME brouillon —
+ * chacune re-seedée à son montage ; la clé de rendu inclut `data.updatedAt`
+ * (assistant-chat.tsx) pour forcer un remount/re-seed quand la dédup
+ * remplace un widget draft par un plus frais.
+ *
+ * Autosave : debounce 2000 ms après toute édition ; le payload part de
+ * l'état édité + les `composeAttachments` CANONIQUES chargés (jamais
+ * écrasés — revue I2) ; corps non touché → bodyHtml canonique renvoyé tel
+ * quel (pas de reconversion destructrice). Les saves sont SÉRIALISÉS
+ * (revue I4) : chaque save chaîne sur le précédent, jamais deux upserts
+ * concurrents. Envoyer/Garder FLUSHENT d'abord (édition en attente ou save
+ * en vol) et l'échec du flush BLOQUE l'envoi (revue I1) — ce que
+ * l'utilisateur voit doit être persisté avant que le modèle ne le relise
+ * via `get_draft`/`send_draft`.
  */
 export function MailDraftWidget({
   data,
@@ -131,74 +205,58 @@ export function MailDraftWidget({
 }: MailDraftWidgetProps) {
   const parsed = parseWidgetData(tool, MailDraftDataSchema, data);
 
-  const [to, setTo] = useState<readonly string[]>(parsed?.to ?? []);
-  const [cc, setCc] = useState<readonly string[]>(parsed?.cc ?? []);
-  const [bcc, setBcc] = useState<readonly string[]>(parsed?.bcc ?? []);
-  const [subject, setSubject] = useState(parsed?.subject ?? '');
-  const [bodyText, setBodyText] = useState(parsed?.bodyText ?? '');
+  const [phase, setPhase] = useState<Phase>('loading');
+  const [form, setForm] = useState<FormState | null>(null);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
   const [note, setNote] = useState<string | null>(null);
 
+  /** Brouillon canonique chargé au montage — source des champs non édités ici (kind, replyToId, fromIntegrationId, composeAttachments, bodyHtml intact). */
+  const canonicalRef = useRef<DraftDto | null>(null);
+  /** Miroir synchrone de `form` — lu par les saves (pas de closure périmée). */
+  const formRef = useRef<FormState | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // true entre une édition et le moment où `runSave` démarre réellement
-  // l'appel réseau — `flush()` s'appuie dessus pour savoir s'il doit
-  // déclencher un save immédiat plutôt qu'attendre un save déjà en vol.
+  /** True entre une édition et le démarrage du save — `flush()` sait qu'un save immédiat est dû. */
   const pendingRef = useRef(false);
-  const inFlightRef = useRef<Promise<void> | null>(null);
-  // Le premier effet suit le montage (données initiales) — pas une édition
-  // utilisateur, donc pas d'autosave à ce moment-là.
-  const skipFirstRef = useRef(true);
+  /** Chaîne des saves en cours (revue I4) — chaque nouveau save s'y chaîne, `flush()` l'attend en entier. */
+  const inFlightRef = useRef<Promise<boolean> | null>(null);
 
-  function runSave(): Promise<void> {
-    pendingRef.current = false;
-    if (debounceRef.current !== null) {
-      clearTimeout(debounceRef.current);
-      debounceRef.current = null;
-    }
-    setSaveStatus('saving');
-    const promise = (async () => {
-      if (parsed === null) return;
-      const payload = {
-        fromIntegrationId: parsed.fromIntegrationId,
-        kind: parsed.kind,
-        ...(parsed.replyToId !== null ? { replyToId: parsed.replyToId } : {}),
-        toRecipients: [...to],
-        ccRecipients: [...cc],
-        bccRecipients: [...bcc],
-        subject,
-        bodyHtml: textToDraftHtml(bodyText),
-      };
-      try {
-        const res = await saveDraft(payload);
-        setSaveStatus(res.ok ? 'saved' : 'error');
-      } catch {
-        setSaveStatus('error');
-      }
-    })();
-    inFlightRef.current = promise;
-    void promise.finally(() => {
-      inFlightRef.current = null;
-    });
-    return promise;
-  }
-
-  // Autosave debouncé : toute édition (re)programme un unique timer — seule
-  // la dernière frappe dans la fenêtre de 2000ms déclenche réellement l'appel.
+  // Seed au montage : le brouillon DB fait foi. `parsed` capturé au premier
+  // rendu (deps []) — `data` est constant pour une instance de widget.
   useEffect(() => {
-    if (skipFirstRef.current) {
-      skipFirstRef.current = false;
-      return;
-    }
     if (parsed === null) return;
-    pendingRef.current = true;
-    setSaveStatus('dirty');
-    setNote(null);
-    if (debounceRef.current !== null) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      debounceRef.current = null;
-      void runSave();
-    }, AUTOSAVE_DEBOUNCE_MS);
-  }, [to, cc, bcc, subject, bodyText]);
+    let cancelled = false;
+    loadDraft()
+      .then(({ draft }) => {
+        if (cancelled) return;
+        if (draft === null) {
+          setPhase('unavailable');
+          setNote(DRAFT_GONE_NOTE);
+          return;
+        }
+        canonicalRef.current = draft;
+        const seeded: FormState = {
+          to: draft.toRecipients,
+          cc: draft.ccRecipients,
+          bcc: draft.bccRecipients,
+          subject: draft.subject,
+          bodyText: draftHtmlToText(draft.bodyHtml),
+          bodyDirty: false,
+        };
+        formRef.current = seeded;
+        setForm(seeded);
+        setPhase('ready');
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setPhase('unavailable');
+        setNote(LOAD_FAILED_NOTE);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // Montage uniquement (deps vides à dessein) — le re-seed passe par un
+    // remount (clé updatedAt, voir widgetKey dans assistant-chat.tsx).
+  }, []);
 
   // Nettoyage du timer au démontage — évite un setState après unmount.
   useEffect(
@@ -209,46 +267,126 @@ export function MailDraftWidget({
   );
 
   /**
-   * Garantit qu'aucune édition en attente (debounce non déclenché) ni save
-   * en vol ne subsiste avant d'agir (Envoyer/Garder) — ce que l'utilisateur
-   * voit à l'écran doit être ce qui est persisté avant que le modèle ne le
-   * relise via `get_draft`.
+   * Exécute (ou chaîne) un save : lit l'état ÉDITÉ via `formRef` au moment
+   * où le save démarre réellement, jamais une closure périmée. Sérialisé :
+   * chaîné sur `inFlightRef` — jamais deux upserts concurrents (revue I4).
+   * Renvoie `true` si CE save a réussi (revue I1 — flush honnête).
    */
-  async function flush(): Promise<void> {
+  function runSave(): Promise<boolean> {
+    pendingRef.current = false;
     if (debounceRef.current !== null) {
       clearTimeout(debounceRef.current);
       debounceRef.current = null;
     }
-    if (pendingRef.current) {
-      await runSave();
-      return;
-    }
-    if (inFlightRef.current !== null) {
-      await inFlightRef.current;
-    }
+    setSaveStatus('saving');
+    const chained = (inFlightRef.current ?? Promise.resolve(true)).then(
+      async (): Promise<boolean> => {
+        const f = formRef.current;
+        const canonical = canonicalRef.current;
+        if (f === null || canonical === null) return false;
+        try {
+          const res = await saveDraft({
+            fromIntegrationId: canonical.fromIntegrationId,
+            kind: canonical.kind,
+            ...(canonical.replyToId !== null ? { replyToId: canonical.replyToId } : {}),
+            toRecipients: [...f.to],
+            ccRecipients: [...f.cc],
+            bccRecipients: [...f.bcc],
+            subject: f.subject,
+            // Corps non touché → bodyHtml canonique inchangé (pas de
+            // reconversion qui aplatirait un HTML riche) ; touché → HTML
+            // reconstruit par échappement depuis la textarea.
+            bodyHtml: f.bodyDirty ? textToDraftHtml(f.bodyText) : canonical.bodyHtml,
+            // Toujours la valeur CANONIQUE chargée — l'autosave du widget ne
+            // touche jamais aux pièces jointes (revue I2).
+            composeAttachments: [...canonical.composeAttachments],
+          });
+          setSaveStatus(res.ok ? 'saved' : 'error');
+          return res.ok;
+        } catch {
+          setSaveStatus('error');
+          return false;
+        }
+      },
+    );
+    inFlightRef.current = chained;
+    void chained.finally(() => {
+      if (inFlightRef.current === chained) inFlightRef.current = null;
+    });
+    return chained;
+  }
+
+  function scheduleAutosave(): void {
+    pendingRef.current = true;
+    setSaveStatus('dirty');
+    setNote(null);
+    if (debounceRef.current !== null) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      debounceRef.current = null;
+      void runSave();
+    }, AUTOSAVE_DEBOUNCE_MS);
+  }
+
+  function edit(mutator: (prev: FormState) => FormState): void {
+    const prev = formRef.current;
+    if (prev === null) return;
+    const next = mutator(prev);
+    formRef.current = next;
+    setForm(next);
+    scheduleAutosave();
+  }
+
+  /**
+   * Garantit qu'aucune édition en attente (debounce non déclenché) ni save
+   * en vol ne subsiste avant d'agir (Envoyer/Garder), et REMONTE le succès :
+   * `false` si le dernier save a échoué (revue I1).
+   */
+  async function flush(): Promise<boolean> {
+    if (pendingRef.current) return runSave();
+    if (inFlightRef.current !== null) return inFlightRef.current;
+    return true;
   }
 
   async function handleSend(): Promise<void> {
-    await flush();
+    const ok = await flush();
+    if (!ok) {
+      // Échec de persistance → JAMAIS d'envoi : le brouillon en base ne
+      // correspond pas à ce que l'utilisateur voit (revue I1).
+      setNote(SEND_BLOCKED_NOTE);
+      return;
+    }
     actions?.sendMessage(SEND_DRAFT_MESSAGE);
   }
 
   async function handleKeepDraft(): Promise<void> {
-    await flush();
-    setNote(KEEP_DRAFT_NOTE);
+    const ok = await flush();
+    setNote(ok ? KEEP_DRAFT_NOTE : KEEP_FAILED_NOTE);
   }
 
   if (parsed === null) return null;
 
-  const readOnly = actions === undefined;
-  const actionsDisabled = readOnly || actions.busy || saveStatus === 'saving';
-  const statusLabel = saveStatusLabel(saveStatus);
+  // Aperçu (JSON du tool) tant que le brouillon DB n'est pas chargé.
+  const view: FormState = form ?? {
+    to: parsed.to,
+    cc: parsed.cc,
+    bcc: parsed.bcc,
+    subject: parsed.subject,
+    bodyText: parsed.bodyText,
+    bodyDirty: false,
+  };
+  const kind = canonicalRef.current?.kind ?? parsed.kind;
+
+  const editable = phase === 'ready' && actions !== undefined;
+  const fieldsDisabled = !editable;
+  const buttonsDisabled =
+    phase !== 'ready' || actions === undefined || actions.busy || saveStatus === 'saving';
+  const statusLabel = phase === 'loading' ? LOADING_LABEL : saveStatusLabel(saveStatus);
 
   return (
     <div className="w-full rounded-2xl border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] p-3">
       <div className="mb-2 flex items-center justify-between">
         <p className="text-xs font-bold text-[color:var(--color-text-main)]">
-          ✏️ Brouillon — {KIND_LABELS[parsed.kind]}
+          ✏️ Brouillon — {KIND_LABELS[kind]}
         </p>
         {statusLabel !== null && (
           <span
@@ -264,34 +402,49 @@ export function MailDraftWidget({
         )}
       </div>
 
-      <RecipientField label="À" value={to} onChange={setTo} disabled={readOnly} />
-      <RecipientField label="Cc" value={cc} onChange={setCc} disabled={readOnly} />
-      <RecipientField label="Cci" value={bcc} onChange={setBcc} disabled={readOnly} />
+      <RecipientField
+        label="À"
+        value={view.to}
+        onChange={(next) => edit((f) => ({ ...f, to: next }))}
+        disabled={fieldsDisabled}
+      />
+      <RecipientField
+        label="Cc"
+        value={view.cc}
+        onChange={(next) => edit((f) => ({ ...f, cc: next }))}
+        disabled={fieldsDisabled}
+      />
+      <RecipientField
+        label="Cci"
+        value={view.bcc}
+        onChange={(next) => edit((f) => ({ ...f, bcc: next }))}
+        disabled={fieldsDisabled}
+      />
 
       <input
         type="text"
         aria-label="Objet"
-        value={subject}
-        onChange={(e) => setSubject(e.target.value)}
-        disabled={readOnly}
+        value={view.subject}
+        onChange={(e) => edit((f) => ({ ...f, subject: e.target.value }))}
+        disabled={fieldsDisabled}
         placeholder="Objet"
         className="mb-2 w-full rounded border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-[color:var(--color-accent-primary)]"
       />
 
       <textarea
         aria-label="Corps du message"
-        value={bodyText}
-        onChange={(e) => setBodyText(e.target.value)}
-        disabled={readOnly}
+        value={view.bodyText}
+        onChange={(e) => edit((f) => ({ ...f, bodyText: e.target.value, bodyDirty: true }))}
+        disabled={fieldsDisabled}
         rows={6}
         className="mb-2 w-full resize-y rounded border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] px-2 py-1.5 text-sm outline-none focus:ring-1 focus:ring-[color:var(--color-accent-primary)]"
       />
 
-      {!readOnly && (
+      {actions !== undefined && (
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
-            disabled={actionsDisabled}
+            disabled={buttonsDisabled}
             onClick={() => void handleSend()}
             className="rounded-full px-3 py-1 text-xs font-bold text-white disabled:opacity-50"
             style={{ background: 'var(--accent-gradient)' }}
@@ -300,7 +453,7 @@ export function MailDraftWidget({
           </button>
           <button
             type="button"
-            disabled={actionsDisabled}
+            disabled={buttonsDisabled}
             onClick={() => void handleKeepDraft()}
             className="rounded-full border border-[color:var(--color-border-light)] px-3 py-1 text-xs font-semibold text-[color:var(--color-text-muted)] disabled:opacity-50"
           >

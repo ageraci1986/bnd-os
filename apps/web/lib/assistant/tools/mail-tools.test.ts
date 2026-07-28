@@ -772,15 +772,16 @@ describe('buildMailTools', () => {
         expect(draftMocks.loadDraft).not.toHaveBeenCalled();
       });
 
-      it('expectedUpdatedAt ne correspond pas au brouillon persisté → description DÉCLARATIVE de fraîcheur, sans appel sendMail', async () => {
+      it('expectedUpdatedAt ne correspond pas au brouillon persisté → description DÉCLARATIVE de fraîcheur rédigée pour un humain (sans nom de tool), sans appel sendMail', async () => {
         draftMocks.loadDraft.mockResolvedValue({
           ok: true,
           draft: { ...draftBase, kind: 'new_mail', replyToId: null },
         });
         const description = await describe_({ expectedUpdatedAt: '2020-01-01T00:00:00.000Z' });
         expect(description).toBe(
-          "Le brouillon a été modifié depuis sa dernière lecture — l'envoi sera refusé. Relisez-le (get_draft) avant d'envoyer.",
+          "Le brouillon a été modifié depuis sa préparation — demandez à l'assistant de le relire avant d'envoyer.",
         );
+        expect(description).not.toContain('get_draft');
         expect(sendMailMocks.sendMail).not.toHaveBeenCalled();
       });
 

@@ -673,7 +673,9 @@ export function buildMailTools(ctx: AuthContext): ToolSpec[] {
           // Déclaratif, pas impératif : décrit ce qui VA se passer au moment
           // de la confirmation — le handler réévalue la même condition à
           // l'exécution (course possible entre confirmation et clic Autoriser).
-          return "Le brouillon a été modifié depuis sa dernière lecture — l'envoi sera refusé. Relisez-le (get_draft) avant d'envoyer.";
+          // Rédigé pour un HUMAIN (c'est lui qui lit ce dialog) : pas de nom
+          // de tool, une action concrète à sa portée (revue M2).
+          return "Le brouillon a été modifié depuis sa préparation — demandez à l'assistant de le relire avant d'envoyer.";
         }
         return buildSendDescription({
           mode: draft.kind,
