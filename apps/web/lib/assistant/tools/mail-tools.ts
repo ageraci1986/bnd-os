@@ -496,7 +496,8 @@ export function buildMailTools(ctx: AuthContext): ToolSpec[] {
 
     defineTool({
       name: 'mark_email_read',
-      description: 'Marque un mail comme lu.',
+      description:
+        "Marque UN mail comme lu (n'importe quel mail visible du workspace). Pour un lot ou vos boîtes uniquement, voir mark_mail_read.",
       inputSchema: z.object({ emailId: uuid }),
       jsonSchema: { type: 'object', properties: { emailId: UUID_JSON }, required: ['emailId'] },
       handler: async (input) =>
@@ -510,7 +511,7 @@ export function buildMailTools(ctx: AuthContext): ToolSpec[] {
     defineTool({
       name: 'mark_mail_read',
       description:
-        'Marque un lot de mails comme lus (vos boîtes uniquement, ids via search_mails). Réversible.',
+        'Marque un lot de mails comme lus (vos boîtes uniquement, ids via search_mails). Réversible. Pour un seul mail du workspace (y compris d’un autre membre), voir mark_email_read.',
       inputSchema: mailBulkInputSchema,
       jsonSchema: {
         type: 'object',
@@ -523,7 +524,7 @@ export function buildMailTools(ctx: AuthContext): ToolSpec[] {
     defineTool({
       name: 'mark_mail_unread',
       description:
-        "Marque un lot de mails comme non lus (vos boîtes uniquement, ids via search_mails). Réversible — l'état lu/non-lu peut être re-synchronisé depuis le serveur mail.",
+        "Marque un lot de mails comme non lus (vos boîtes uniquement, ids via search_mails). Réversible — l'état lu/non-lu peut être re-synchronisé depuis le serveur mail. Il n’existe pas d’équivalent mono-mail workspace pour non-lu.",
       inputSchema: mailBulkInputSchema,
       jsonSchema: {
         type: 'object',

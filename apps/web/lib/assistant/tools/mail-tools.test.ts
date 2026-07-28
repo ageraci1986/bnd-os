@@ -515,6 +515,37 @@ describe('buildMailTools', () => {
     });
   });
 
+  describe('descriptions mono vs bulk — pins statiques', () => {
+    it('mark_email_read : UN mail, portée workspace, renvoi croisé vers mark_mail_read', () => {
+      const description = getTool('mark_email_read').description;
+      expect(description).toContain('UN mail');
+      expect(description).toContain('workspace');
+      expect(description).toContain('mark_mail_read');
+    });
+
+    it('mark_mail_read : « vos boîtes uniquement » + renvoi croisé vers mark_email_read', () => {
+      const description = getTool('mark_mail_read').description;
+      expect(description).toContain('vos boîtes uniquement');
+      expect(description).toContain('mark_email_read');
+    });
+
+    it('mark_mail_unread : « vos boîtes uniquement » + précise l’absence d’équivalent mono-mail workspace', () => {
+      const description = getTool('mark_mail_unread').description;
+      expect(description).toContain('vos boîtes uniquement');
+      expect(description).toContain('pas d’équivalent mono-mail workspace');
+    });
+
+    it.each(['archive_mail', 'delete_mail'])(
+      '%s : « vos boîtes uniquement » + « LOCALE » + « réapparaître après une synchronisation »',
+      (toolName) => {
+        const description = getTool(toolName).description;
+        expect(description).toContain('vos boîtes uniquement');
+        expect(description).toContain('LOCALE');
+        expect(description).toContain('réapparaître après une synchronisation');
+      },
+    );
+  });
+
   describe('mark_mail_read / mark_mail_unread (non gated)', () => {
     it.each([['mark_mail_read', 'read'] as const, ['mark_mail_unread', 'unread'] as const])(
       '%s → setMailStateCore(ctx, {mailIds, op:%s})',
