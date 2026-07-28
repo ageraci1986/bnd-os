@@ -88,6 +88,11 @@ const ServerEnvSchema = z.object({
   // Assistant (agent conversationnel)
   ANTHROPIC_API_KEY: optionalString(1),
   ASSISTANT_MODEL: optionalString(1),
+  // E2E : bascule le provider sur l'implémentation scriptée (aucun réseau,
+  // aucun coût token) — voir apps/web/lib/assistant/{e2e-provider,provider}.ts.
+  // Garde double : jamais actif si NODE_ENV === 'production', même si la
+  // variable fuit dans cet environnement.
+  ASSISTANT_E2E_MOCK: optionalString(1),
 });
 
 export type ServerEnv = z.infer<typeof ServerEnvSchema>;

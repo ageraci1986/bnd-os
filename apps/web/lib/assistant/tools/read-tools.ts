@@ -10,8 +10,8 @@ import {
   scopedClientWhere,
   scopedProjectWhere,
 } from '@/lib/auth/scope';
-import { startOfTodayUtc } from '@/features/projects/lib/card-filter';
 import { fetchMailBody } from '@/features/communications/actions/fetch-mail-body';
+import { loadTodayOverview } from '@/lib/assistant/overview-core';
 import { safeDb } from './safe-wrappers';
 
 const uuid = z.string().uuid();
@@ -56,40 +56,13 @@ export async function buildReadTools(ctx: AuthContext): Promise<ToolSpec[]> {
         "Résumé du jour : nombre de cartes bloquées, cartes dues aujourd'hui, mails non lus, notifications non lues. Le point de départ de tout briefing.",
       inputSchema: z.object({}),
       jsonSchema: { type: 'object', properties: {} },
+      // Corps extrait dans overview-core.ts (loadTodayOverview) — partagé avec
+      // l'accueil de /assistant (Plan 4 Task 3, chargement serveur, zéro tour
+      // d'agent). Le core recharge son propre scope, comme les autres
+      // `*-core.ts` du repo — d'où l'appel à `ctx` plutôt qu'au `scope`
+      // préchargé en tête de `buildReadTools`.
       handler: async () =>
-        safeDb('get_today_overview', async () => {
-          // Convention repo (card-filter.ts) : les échéances sont stockées à
-          // minuit UTC — « dû aujourd'hui » = [minuit UTC, minuit UTC + 1 j).
-          const start = startOfTodayUtc();
-          const endExclusive = new Date(start);
-          endExclusive.setUTCDate(endExclusive.getUTCDate() + 1);
-          const [blockedCards, dueTodayCards, unreadMails, unreadNotifications] = await Promise.all(
-            [
-              prisma.card.count({
-                where: {
-                  workspaceId,
-                  deletedAt: null,
-                  column: { isBlockedSystem: true },
-                  ...scopedCardWhere(scope),
-                },
-              }),
-              prisma.card.count({
-                where: {
-                  workspaceId,
-                  deletedAt: null,
-                  archivedAt: null,
-                  dueDate: { gte: start, lt: endExclusive },
-                  ...scopedCardWhere(scope),
-                },
-              }),
-              prisma.emailMessage.count({ where: { workspaceId, deletedAt: null, isRead: false } }),
-              prisma.notification.count({
-                where: { workspaceId, userId: ctx.userId, readAt: null },
-              }),
-            ],
-          );
-          return JSON.stringify({ blockedCards, dueTodayCards, unreadMails, unreadNotifications });
-        }),
+        safeDb('get_today_overview', async () => JSON.stringify(await loadTodayOverview(ctx))),
     }),
 
     defineTool({

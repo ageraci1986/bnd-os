@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { requireUser } from '@/lib/auth';
 import { getCsrfTokenForForm } from '@/lib/csrf';
 import { loadMemories } from '@/lib/assistant/memory';
+import { loadTodayOverview, type TodayOverview } from '@/lib/assistant/overview-core';
 import { AssistantChat } from '@/features/assistant/components/assistant-chat';
 import { MemoryPanel } from '@/features/assistant/components/memory-panel';
 
@@ -25,6 +26,25 @@ export default async function AssistantPage({ searchParams }: AssistantPageProps
   ]);
   const firstName = ctx.email.split('@')[0] ?? 'vous';
   const isMemoryTab = tab === 'memoire';
+
+  // Briefing + KPI de l'accueil (Plan 4 Task 3) : chargé côté serveur, zéro
+  // tour d'agent, zéro token. Inutile sur l'onglet Mémoire (AssistantChat
+  // n'y est pas monté). Échec (DB indisponible…) → accueil dégradé, la prop
+  // est omise plutôt que passée `undefined` explicitement
+  // (`exactOptionalPropertyTypes`) et AssistantChat retombe sur le brief
+  // statique existant.
+  let overview: TodayOverview | undefined;
+  if (!isMemoryTab) {
+    try {
+      overview = await loadTodayOverview(ctx);
+    } catch {
+      // Accueil dégradé (brief statique) — loggé sans détail d'erreur ni PII,
+      // convention safe-wrappers/CLAUDE.md §4.7 : une panne DB ne doit pas
+      // être invisible en observabilité.
+      console.error('[assistant] today-overview load failed');
+      overview = undefined;
+    }
+  }
 
   return (
     <div className="flex h-full flex-col">
@@ -53,7 +73,11 @@ export default async function AssistantPage({ searchParams }: AssistantPageProps
         {isMemoryTab ? (
           <MemoryPanel entries={memories} csrfToken={csrfToken} />
         ) : (
-          <AssistantChat csrfToken={csrfToken} firstName={firstName} />
+          <AssistantChat
+            csrfToken={csrfToken}
+            firstName={firstName}
+            {...(overview !== undefined ? { overview } : {})}
+          />
         )}
       </div>
     </div>

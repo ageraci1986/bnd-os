@@ -143,12 +143,25 @@ describe('AssistantChat', () => {
     render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
     await userEvent.type(screen.getByRole('textbox'), 'projets ?');
     await userEvent.click(screen.getByRole('button', { name: /envoyer/i }));
+    // L'orbe passe à `thinking` dès le début du tour — aucun chunk encore reçu.
+    await waitFor(() => {
+      expect(screen.getByTestId('assistant-orb')).toHaveAttribute('data-activity', 'thinking');
+    });
     act(() => push({ type: 'tool_start', name: 'list_projects' }));
     await waitFor(() => {
       expect(screen.getByText('consulte les projets…')).toBeInTheDocument();
     });
+    // Toujours `thinking` pendant l'appel outil — pas encore de texte streamé.
+    expect(screen.getByTestId('assistant-orb')).toHaveAttribute('data-activity', 'thinking');
     act(() => {
       push({ type: 'tool_end', name: 'list_projects', isError: false });
+      push({ type: 'chunk', text: 'Deux ' });
+    });
+    // Le premier chunk fait passer l'orbe à `responding`.
+    await waitFor(() => {
+      expect(screen.getByTestId('assistant-orb')).toHaveAttribute('data-activity', 'responding');
+    });
+    act(() => {
       push({ type: 'done', text: 'Deux projets.' });
       close();
     });
@@ -156,6 +169,8 @@ describe('AssistantChat', () => {
       expect(screen.getByText('Deux projets.')).toBeInTheDocument();
     });
     expect(screen.queryByText('consulte les projets…')).not.toBeInTheDocument();
+    // Le tour est terminé — retour à `idle`.
+    expect(screen.getByTestId('assistant-orb')).toHaveAttribute('data-activity', 'idle');
   });
 
   it('confirm_request → dialog visible ; Autoriser → POST /confirm puis confirm_resolved le ferme', async () => {
@@ -689,5 +704,81 @@ describe('AssistantChat', () => {
     for (const m of body.messages) {
       expect(m).not.toHaveProperty('widgets');
     }
+  });
+
+  describe('accueil — briefing digéré + KPI (Plan 4 Task 3, données serveur)', () => {
+    it('sans prop `overview` : brief statique inchangé', () => {
+      render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
+      expect(
+        screen.getByText('Demandez votre briefing, interrogez vos projets et vos mails.'),
+      ).toBeInTheDocument();
+      expect(screen.queryByTestId('assistant-brief')).not.toBeInTheDocument();
+    });
+
+    it('avec `overview` : remplace le brief statique par la phrase digérée pinnée (pluriel)', () => {
+      render(
+        <AssistantChat
+          csrfToken="tok"
+          firstName="Angelo"
+          overview={{ blockedCards: 1, dueTodayCards: 3, unreadMails: 5, unreadNotifications: 2 }}
+        />,
+      );
+      expect(
+        screen.queryByText('Demandez votre briefing, interrogez vos projets et vos mails.'),
+      ).not.toBeInTheDocument();
+      expect(screen.getByTestId('assistant-brief')).toHaveTextContent(
+        "3 tâches dues aujourd'hui · 1 bloquée · 5 mails non lus",
+      );
+    });
+
+    it('avec `overview` : accords au singulier et partie « bloquée » masquée quand elle vaut 0', () => {
+      render(
+        <AssistantChat
+          csrfToken="tok"
+          firstName="Angelo"
+          overview={{ blockedCards: 0, dueTodayCards: 1, unreadMails: 0, unreadNotifications: 0 }}
+        />,
+      );
+      expect(screen.getByTestId('assistant-brief')).toHaveTextContent(
+        "1 tâche due aujourd'hui · 0 mail non lu",
+      );
+    });
+
+    it('colore la partie « bloquée(s) » avec le token danger — même token que KpiCards', () => {
+      render(
+        <AssistantChat
+          csrfToken="tok"
+          firstName="Angelo"
+          overview={{ blockedCards: 2, dueTodayCards: 0, unreadMails: 0, unreadNotifications: 0 }}
+        />,
+      );
+      expect(screen.getByText('2 bloquées').getAttribute('style')).toContain('--color-danger');
+    });
+
+    it('rend les 4 tuiles KpiCards à l’accueil quand `overview` est fourni', () => {
+      render(
+        <AssistantChat
+          csrfToken="tok"
+          firstName="Angelo"
+          overview={{ blockedCards: 0, dueTodayCards: 2, unreadMails: 5, unreadNotifications: 1 }}
+        />,
+      );
+      expect(screen.getByText('Bloquées')).toBeInTheDocument();
+      expect(screen.getByText("Dues aujourd'hui")).toBeInTheDocument();
+      expect(screen.getByText('Mails non lus')).toBeInTheDocument();
+      expect(screen.getByText('Notifications')).toBeInTheDocument();
+    });
+
+    it('place le brief digéré et les KPI hors de toute région aria-live', () => {
+      render(
+        <AssistantChat
+          csrfToken="tok"
+          firstName="Angelo"
+          overview={{ blockedCards: 0, dueTodayCards: 2, unreadMails: 5, unreadNotifications: 1 }}
+        />,
+      );
+      expect(screen.getByTestId('assistant-brief').closest('[aria-live]')).toBeNull();
+      expect(screen.getByText('Bloquées').closest('[aria-live]')).toBeNull();
+    });
   });
 });

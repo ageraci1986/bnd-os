@@ -2212,6 +2212,127 @@
   }
 }
 
+/* Orbe assistant (Plan 4) — porté de la maquette validée (blob fluide + halo).
+   États par data-attribute sur .nx-orb : data-activity="idle|thinking|responding|listening".
+   prefers-reduced-motion : toutes les animations remplacées par un fondu statique. */
+@keyframes nx-orb-morph {
+  0%,
+  100% {
+    border-radius: 42% 58% 55% 45%/48% 42% 58% 52%;
+    transform: rotate(0deg) scale(1);
+  }
+  25% {
+    border-radius: 58% 42% 47% 53%/40% 55% 45% 60%;
+    transform: rotate(6deg) scale(1.05);
+  }
+  50% {
+    border-radius: 45% 55% 60% 40%/55% 45% 55% 45%;
+    transform: rotate(-4deg) scale(0.97);
+  }
+  75% {
+    border-radius: 55% 45% 42% 58%/45% 60% 40% 55%;
+    transform: rotate(3deg) scale(1.03);
+  }
+}
+@keyframes nx-orb-hue {
+  0%,
+  100% {
+    filter: hue-rotate(0);
+  }
+  50% {
+    filter: hue-rotate(-18deg);
+  }
+}
+@keyframes nx-orb-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes nx-orb-breathe {
+  0%,
+  100% {
+    scale: 0.94;
+    opacity: 0.7;
+  }
+  50% {
+    scale: 1.06;
+    opacity: 1;
+  }
+}
+
+.nx-orb {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.nx-orb-ring {
+  position: absolute;
+  inset: 10px;
+  border-radius: 50%;
+  padding: 2.5px;
+  background: conic-gradient(
+    from 0deg,
+    rgba(139, 43, 226, 0) 8%,
+    #8b2be2 35%,
+    #ff2a6d 60%,
+    rgba(255, 42, 109, 0) 92%
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation:
+    nx-orb-spin 4.5s linear infinite,
+    nx-orb-breathe 2.8s ease-in-out infinite;
+}
+.nx-orb-blob {
+  width: 76px;
+  height: 76px;
+  background: linear-gradient(135deg, #c98fff 0%, #8b2be2 45%, #ff2a6d 100%);
+  animation:
+    nx-orb-morph 6s ease-in-out infinite,
+    nx-orb-hue 9s ease-in-out infinite;
+  box-shadow: 0 14px 40px rgba(139, 43, 226, 0.32);
+  transition: box-shadow 0.4s ease;
+}
+/* thinking : halo accéléré + intensifié (spec §6) */
+.nx-orb[data-activity='thinking'] .nx-orb-ring {
+  animation-duration: 1.6s, 1.2s;
+}
+.nx-orb[data-activity='thinking'] .nx-orb-blob {
+  box-shadow: 0 14px 52px rgba(139, 43, 226, 0.5);
+}
+/* responding : blob pulse plus vif */
+.nx-orb[data-activity='responding'] .nx-orb-blob {
+  animation-duration: 2.4s, 9s;
+}
+/* listening (V1.5, posé pour Storybook) : respiration ample du halo */
+.nx-orb[data-activity='listening'] .nx-orb-ring {
+  animation-duration: 4.5s, 1.4s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nx-orb-ring,
+  .nx-orb-blob {
+    animation: none;
+  }
+  .nx-orb-blob {
+    border-radius: 50%;
+    opacity: 0.9;
+    transition:
+      opacity 0.6s ease,
+      box-shadow 0.6s ease;
+  }
+  .nx-orb[data-activity='thinking'] .nx-orb-blob,
+  .nx-orb[data-activity='responding'] .nx-orb-blob {
+    opacity: 1;
+  }
+}
+
 /* ===== nx-btn variants (used by comments + future components) ===== */
 /* Base reset — composable with the modifier classes below. */
 .nx-btn {

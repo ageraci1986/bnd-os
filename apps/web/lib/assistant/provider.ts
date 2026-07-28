@@ -3,6 +3,7 @@ import 'server-only';
 import Anthropic from '@anthropic-ai/sdk';
 import type { Provider, ProviderTurnResult } from '@nexushub/agent';
 import { getServerEnv } from '@/lib/env';
+import { createE2EProvider } from './e2e-provider';
 
 const DEFAULT_MODEL = 'claude-sonnet-5';
 const MAX_TOKENS = 4096;
@@ -96,8 +97,18 @@ export function safeOnText(onText: (chunk: string) => void): (chunk: string) => 
   };
 }
 
-/** Seule implémentation de `Provider` du repo ; seul fichier qui importe le SDK. */
+/**
+ * Implémentation réelle de `Provider` (SDK Anthropic — seul fichier qui l'importe),
+ * SAUF sous E2E : si `ASSISTANT_E2E_MOCK === '1'` ET `NODE_ENV !== 'production'`,
+ * retourne le provider scripté (`./e2e-provider`) à la place. Garde double
+ * volontaire — le mock ne doit JAMAIS s'activer en production, même si la
+ * variable d'env fuit dans cet environnement.
+ */
 export function createAnthropicProvider(): Provider {
+  const env = getServerEnv();
+  if (env.ASSISTANT_E2E_MOCK === '1' && env.NODE_ENV !== 'production') {
+    return createE2EProvider();
+  }
   return {
     async streamTurn({ system, messages, tools, onText, signal }) {
       try {

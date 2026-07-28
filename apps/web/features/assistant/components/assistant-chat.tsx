@@ -1,9 +1,12 @@
 'use client';
 
 import { Fragment, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import type { TodayOverview } from '@/lib/assistant/overview-core';
 import { parseSseLines, type StreamWidget } from '../lib/sse';
+import { AssistantOrb, deriveOrbActivity } from './assistant-orb';
 import { renderWidget, type WidgetActions } from './widgets';
 import { appendWidget } from './widgets/dedupe-widgets';
+import { KpiCards } from './widgets/kpi-cards';
 import { trimWidgetData } from './widgets/trim-widget-data';
 
 interface DisplayMessage {
@@ -16,6 +19,47 @@ interface DisplayMessage {
 interface AssistantChatProps {
   readonly csrfToken: string;
   readonly firstName: string;
+  /**
+   * Résumé du jour chargé côté serveur (Plan 4 Task 3 — zéro tour d'agent,
+   * zéro token). Absent si non fourni par la page (accueil dégradé, ex. DB
+   * indisponible au chargement) : le brief statique reste affiché.
+   */
+  readonly overview?: TodayOverview;
+}
+
+/**
+ * Phrase digérée de l'accueil, construite depuis `overview` — accords
+ * singulier/pluriel exacts. La partie « bloquée(s) » n'apparaît que si
+ * `blockedCards > 0`, colorée avec le même token danger que `KpiCards`
+ * (widgets/kpi-cards.tsx) pour rester cohérente avec le rendu in-thread du
+ * même tool (`get_today_overview`).
+ */
+// Règle CLDR fr : "one" pour n = 0 ou 1 (« 0 mail », « 1 mail »), "other" au-delà.
+function isSingularFr(count: number): boolean {
+  return count === 0 || count === 1;
+}
+
+function DigestedBrief({ overview }: { readonly overview: TodayOverview }) {
+  const { dueTodayCards, blockedCards, unreadMails } = overview;
+  const taskPart = `${dueTodayCards} ${isSingularFr(dueTodayCards) ? 'tâche due' : 'tâches dues'} aujourd'hui`;
+  const mailPart = `${unreadMails} ${isSingularFr(unreadMails) ? 'mail non lu' : 'mails non lus'}`;
+  const blockedPart =
+    blockedCards > 0
+      ? `${blockedCards} ${isSingularFr(blockedCards) ? 'bloquée' : 'bloquées'}`
+      : null;
+  return (
+    <p data-testid="assistant-brief" className="text-sm text-[color:var(--color-text-muted)]">
+      {taskPart}
+      {blockedPart !== null && (
+        <>
+          {' · '}
+          <span style={{ color: 'var(--color-danger)' }}>{blockedPart}</span>
+        </>
+      )}
+      {' · '}
+      {mailPart}
+    </p>
+  );
 }
 
 const ACTIVITY_LABELS: Record<string, string> = {
@@ -72,7 +116,7 @@ function widgetKey(widget: StreamWidget, index: number): string {
   return `${index}:${widget.tool}:${updatedAt}`;
 }
 
-export function AssistantChat({ csrfToken, firstName }: AssistantChatProps) {
+export function AssistantChat({ csrfToken, firstName, overview }: AssistantChatProps) {
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [input, setInput] = useState('');
   // Ref miroir de `input` (Plan 5c Task 6, mandat B) — `send` la lit au lieu
@@ -319,21 +363,22 @@ export function AssistantChat({ csrfToken, firstName }: AssistantChatProps) {
 
   return (
     <div className="mx-auto flex h-full max-w-2xl flex-col items-center gap-4 px-6 py-8">
-      {/* Placeholder orbe — remplacé par le blob animé au Plan 4 */}
-      <div
-        aria-hidden
-        className="h-20 w-20 rounded-full"
-        style={{
-          background: 'var(--accent-gradient)',
-          boxShadow: '0 14px 40px rgba(139,43,226,.32)',
-        }}
+      <AssistantOrb
+        activity={deriveOrbActivity({ busy, streaming: streamText !== null && streamText !== '' })}
       />
       <h1 className="text-lg font-bold text-[color:var(--color-text-main)]">
         Bonjour {firstName} 👋
       </h1>
-      <p className="text-sm text-[color:var(--color-text-muted)]">
-        Demandez votre briefing, interrogez vos projets et vos mails.
-      </p>
+      {overview !== undefined ? (
+        <>
+          <DigestedBrief overview={overview} />
+          <KpiCards data={overview} />
+        </>
+      ) : (
+        <p className="text-sm text-[color:var(--color-text-muted)]">
+          Demandez votre briefing, interrogez vos projets et vos mails.
+        </p>
+      )}
 
       <div ref={listRef} className="flex w-full flex-1 flex-col gap-2 overflow-y-auto">
         {/* Seul le texte commité est annoncé (région live par bulle) : la réponse
