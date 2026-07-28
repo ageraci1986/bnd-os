@@ -7,6 +7,7 @@ import { buildKanbanTools } from './kanban-tools';
 import { buildClientTools } from './client-tools';
 import { buildMailTools } from './mail-tools';
 import { buildMemoryTools } from './memory-tools';
+import { buildTeamTools } from './team-tools';
 
 /**
  * Construit le registry complet pour un utilisateur.
@@ -25,6 +26,9 @@ export async function buildRegistry(ctx: AuthContext): Promise<ToolRegistry> {
     registry.register(tool);
   }
   for (const tool of buildClientTools(ctx)) {
+    registry.register(tool);
+  }
+  for (const tool of buildTeamTools(ctx)) {
     registry.register(tool);
   }
   for (const tool of buildMailTools(ctx)) {
