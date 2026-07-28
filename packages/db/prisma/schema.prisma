@@ -95,12 +95,16 @@ enum NotificationKind {
   card_blocked
   email_new
   slack_mention
+  agent_briefing
+  agent_card_blocked
+  agent_mail_important
 }
 
 enum NotificationChannel {
   push
   slack
   email
+  in_app
 }
 
 enum ActivityKind {
@@ -242,6 +246,10 @@ model Membership {
   workspaceId String   @map("workspace_id") @db.Uuid
   userId      String   @map("user_id") @db.Uuid
   role        Role     @default(user)
+  /// Kill switch proactivité assistant (briefing, notices cartes bloquées, mails importants)
+  assistantProactivity   Boolean  @default(true) @map("assistant_proactivity")
+  /// Opt-in briefing matinal
+  assistantBriefingOptIn Boolean  @default(false) @map("assistant_briefing_opt_in")
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -905,6 +913,7 @@ model Notification {
 
   @@index([workspaceId])
   @@index([userId, readAt])
+  @@index([userId, kind, readAt])
   @@map("notifications")
 }
 

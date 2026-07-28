@@ -9,11 +9,15 @@
  *
  * Trade-off: a project nobody opens stays "stale" — the metrics on the
  * sidebar / overview do reconcile on load though, so any user landing on
- * the workspace will see fresh state. When we later need *push* effects
- * (emails, Slack pings on auto-block), THAT will warrant a real cron.
+ * the workspace will see fresh state. Since Plan 3b Task 5, the hourly
+ * Inngest cron (`lib/inngest/functions/blocked-cards-scan.ts`) covers the
+ * push side (CLAUDE.md §6.3) — both paths coexist, and BOTH create the
+ * `agent_card_blocked` notices via the shared `notifyNewlyBlocked` helper
+ * (dedup handled by the notice core, so no doubles across paths).
  */
 import 'server-only';
 import { prisma } from '@nexushub/db';
+import { notifyNewlyBlocked } from '@/features/notifications/lib/blocked-card-notices';
 import { shouldRunReconcile } from './reconcile-throttle';
 import {
   computeCardPosition,
@@ -31,10 +35,20 @@ const ARCHIVE_DAYS = 30;
  *
  * Returns a count summary so callers can log/announce the reconcile.
  */
+export interface NewlyBlockedCard {
+  readonly cardId: string;
+  readonly title: string;
+  readonly projectId: string;
+}
+
 export async function reconcileOverdueRouting(
   workspaceId: string,
   options: { readonly projectIds?: readonly string[]; readonly now?: Date } = {},
-): Promise<{ readonly blocked: number; readonly restored: number }> {
+): Promise<{
+  readonly blocked: number;
+  readonly restored: number;
+  readonly newlyBlocked: readonly NewlyBlockedCard[];
+}> {
   const now = options.now ?? new Date();
 
   const baseProjectFilter = {
@@ -59,9 +73,10 @@ export async function reconcileOverdueRouting(
       dueDate: true,
       archivedAt: true,
       projectId: true,
+      title: true,
     },
   });
-  if (cards.length === 0) return { blocked: 0, restored: 0 };
+  if (cards.length === 0) return { blocked: 0, restored: 0, newlyBlocked: [] };
 
   const projectIds = Array.from(new Set(cards.map((c) => c.projectId)));
   const columns = await prisma.column.findMany({
@@ -84,6 +99,7 @@ export async function reconcileOverdueRouting(
 
   let blocked = 0;
   let restored = 0;
+  const newlyBlocked: NewlyBlockedCard[] = [];
 
   for (const card of cards) {
     const projectColumns = colsByProject.get(card.projectId) ?? [];
@@ -116,10 +132,11 @@ export async function reconcileOverdueRouting(
       if (!blockedCol) continue;
       await moveCard(card.id, blockedCol.id, card.columnId);
       blocked++;
+      newlyBlocked.push({ cardId: card.id, title: card.title, projectId: card.projectId });
     }
   }
 
-  return { blocked, restored };
+  return { blocked, restored, newlyBlocked };
 }
 
 /**
@@ -216,6 +233,16 @@ export async function applyAutoArchive(
 
 /**
  * Convenience: run both reconcile passes in one go for a route entry point.
+ *
+ * ALSO the read-path trigger for the `agent_card_blocked` notices (grouped
+ * review Tasks 4-6, fix 1): in an ACTIVE workspace the read path (throttled
+ * 60 s) blocks overdue cards long BEFORE the hourly cron ticks — without
+ * notifying here, the cron's `newlyBlocked` would almost always be empty and
+ * no notice would ever be created. Best-effort by design: a notice failure
+ * must NEVER break a page load, hence the try/catch with a label-only
+ * `console.warn` (no error object — CLAUDE.md §4.7, no PII / query params in
+ * logs). Cross-path dedup is the notice core's job (unread notice per
+ * (userId, kind, ref=cardId)).
  */
 export async function reconcileBeforeRead(
   workspaceId: string,
@@ -232,5 +259,12 @@ export async function reconcileBeforeRead(
     reconcileOverdueRouting(workspaceId, options),
     applyAutoArchive(workspaceId, options),
   ]);
+  if (routing.newlyBlocked.length > 0) {
+    try {
+      await notifyNewlyBlocked(workspaceId, routing.newlyBlocked);
+    } catch {
+      console.warn('[reconcile] notifyNewlyBlocked failed');
+    }
+  }
   return { ...routing, ...archive };
 }

@@ -14,6 +14,8 @@ export interface NavLinkProps {
   readonly count?: number;
   /** Highlight the count with the brand gradient ("new" tone). */
   readonly countTone?: 'neutral' | 'new';
+  /** Animated indicator dot (Plan 3b Task 7 — e.g. unread agent notices on Assistant). */
+  readonly dot?: boolean;
 }
 
 /**
@@ -22,7 +24,7 @@ export interface NavLinkProps {
  *  - preserves the active `?client=<slug>` filter when navigating
  *    (PRD §8.1 — the filter follows the user across sections)
  */
-export function NavLink({ href, icon, label, count, countTone = 'neutral' }: NavLinkProps) {
+export function NavLink({ href, icon, label, count, countTone = 'neutral', dot }: NavLinkProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const active = pathname === href || pathname.startsWith(`${href}/`);
@@ -43,6 +45,7 @@ export function NavLink({ href, icon, label, count, countTone = 'neutral' }: Nav
         active={active}
         countTone={countTone}
         {...(count !== undefined ? { count } : {})}
+        {...(dot === true ? { dot: true } : {})}
       />
     </Link>
   );

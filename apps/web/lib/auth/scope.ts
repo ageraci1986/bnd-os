@@ -10,6 +10,20 @@ interface ScopeRow {
 }
 
 /**
+ * Subset of `AuthContext` actually read by `loadUserScope` — `email` is
+ * never touched. Narrowing the parameter to this `Pick` (instead of the
+ * full `AuthContext`) lets server-side callers that don't have a real HTTP
+ * session (e.g. the Inngest cron functions, which build a scope context
+ * straight from a `Membership` row) call this without fabricating an email.
+ * Every existing caller still passes a full `AuthContext`, which trivially
+ * satisfies this narrower shape — purely additive, zero behavior change.
+ */
+export type ScopeAuthContext = Pick<
+  AuthContext,
+  'userId' | 'workspaceId' | 'role' | 'isSuperAdmin'
+>;
+
+/**
  * Build a UserScope from raw WorkspaceAccess rows. Pure — extracted so
  * tests don't need a Prisma harness.
  */
@@ -28,12 +42,12 @@ export function scopeFromRows(rows: readonly ScopeRow[]): UserScope {
  * Load the effective scope for the current Membership. Admin and
  * super-admin bypass: always full workspace regardless of any stray rows.
  *
- * Memoised per-request via a WeakMap keyed on the AuthContext object so
+ * Memoised per-request via a WeakMap keyed on the context object so
  * repeated calls inside a single page render hit Prisma at most once.
  */
-const cache = new WeakMap<AuthContext, Promise<UserScope>>();
+const cache = new WeakMap<ScopeAuthContext, Promise<UserScope>>();
 
-export async function loadUserScope(ctx: AuthContext): Promise<UserScope> {
+export async function loadUserScope(ctx: ScopeAuthContext): Promise<UserScope> {
   if (ctx.isSuperAdmin || ctx.role === 'admin') return { kind: 'workspace' };
   const cached = cache.get(ctx);
   if (cached) return cached;

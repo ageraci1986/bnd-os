@@ -35,4 +35,19 @@ describe('<NavItem />', () => {
     render(<NavItem icon="◈" label="Dashboard" active />);
     expect(screen.getByText('Dashboard').parentElement?.className).toMatch(/\bactive\b/);
   });
+
+  it('shows the indicator dot when dot=true', () => {
+    render(<NavItem icon="◉" label="Assistant" dot />);
+    expect(screen.getByTestId('nav-item-dot')).toBeInTheDocument();
+  });
+
+  it('hides the indicator dot when dot=false', () => {
+    render(<NavItem icon="◉" label="Assistant" dot={false} />);
+    expect(screen.queryByTestId('nav-item-dot')).not.toBeInTheDocument();
+  });
+
+  it('hides the indicator dot when omitted', () => {
+    render(<NavItem icon="◉" label="Assistant" />);
+    expect(screen.queryByTestId('nav-item-dot')).not.toBeInTheDocument();
+  });
 });
