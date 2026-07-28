@@ -2,6 +2,7 @@ import 'server-only';
 
 import { z } from 'zod';
 import { defineTool, type ToolSpec } from '@nexushub/agent';
+import { prisma } from '@nexushub/db';
 import { BUILTIN_PROJECT_TYPES, BUILTIN_TEMPLATES } from '@nexushub/domain';
 import type { AuthContext } from '@/lib/auth';
 import { createCardCore, deleteCardCore } from '@/features/projects/lib/card-core';
@@ -187,7 +188,21 @@ export function buildKanbanTools(ctx: AuthContext): ToolSpec[] {
             ...(input.categoryTag !== undefined ? { categoryTag: input.categoryTag } : {}),
           });
           if (!result.ok) return failure(result.message);
-          return JSON.stringify({ updated: true });
+          // Lecture-après-écriture (spec V2 §3.1) : l'état renvoyé est RELU
+          // en DB, jamais déduit de l'input — le modèle ne peut plus
+          // affirmer un état qu'aucun tool n'a constaté.
+          const after = await prisma.card.findFirst({
+            where: { id: input.cardId, workspaceId: ctx.workspaceId, deletedAt: null },
+            select: { title: true, description: true, categoryTag: true },
+          });
+          if (after === null) {
+            return 'Mise à jour enregistrée mais vérification impossible (carte introuvable à la relecture).';
+          }
+          return JSON.stringify({
+            updated: true,
+            title: after.title,
+            ...(after.categoryTag !== null ? { categoryTag: after.categoryTag } : {}),
+          });
         }),
     }),
 
@@ -251,7 +266,21 @@ export function buildKanbanTools(ctx: AuthContext): ToolSpec[] {
         safeMutation('move_card', async () => {
           const result = await moveCard(input);
           if (!result.ok) return failure(result.message);
-          return JSON.stringify({ moved: true, position: result.position });
+          // Lecture-après-écriture (spec V2 §3.1) : l'état renvoyé est RELU
+          // en DB, jamais déduit de l'input — le modèle ne peut plus
+          // affirmer un état qu'aucun tool n'a constaté.
+          const after = await prisma.card.findFirst({
+            where: { id: input.cardId, workspaceId: ctx.workspaceId, deletedAt: null },
+            select: { columnId: true, column: { select: { name: true } } },
+          });
+          if (after === null) {
+            return 'Déplacement enregistré mais vérification impossible (carte introuvable à la relecture).';
+          }
+          return JSON.stringify({
+            moved: true,
+            nowInColumn: after.column.name,
+            position: result.position,
+          });
         }),
     }),
 

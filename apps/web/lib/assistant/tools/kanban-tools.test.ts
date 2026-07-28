@@ -29,6 +29,13 @@ const assigneeMocks = vi.hoisted(() => ({
 }));
 vi.mock('@/features/projects/actions/card-assignees', () => assigneeMocks);
 
+// Lecture-après-écriture (spec V2 §3.1) : `move_card`/`update_card` relisent
+// l'état en DB après mutation — voir repo convention dans card-core.test.ts.
+const prismaMocks = vi.hoisted(() => ({
+  card: { findFirst: vi.fn() },
+}));
+vi.mock('@nexushub/db', () => ({ prisma: prismaMocks }));
+
 // `CreateProjectSchema` is NOT mocked: the invalid-dates test relies on its
 // real validation message.
 import { buildKanbanTools } from './kanban-tools';
@@ -270,18 +277,52 @@ describe('buildKanbanTools', () => {
     expect(out).toBe('Échec : Un projet porte déjà ce nom.');
   });
 
-  it('update_card : succès → {updated:true} ; échec → message montrable', async () => {
+  it('update_card : succès → relit la carte et renvoie updated/title/categoryTag depuis la DB ; échec → message montrable', async () => {
     updateCardMocks.updateCard.mockResolvedValueOnce({ ok: true });
+    prismaMocks.card.findFirst.mockResolvedValueOnce({
+      title: 'Titre final',
+      description: null,
+      categoryTag: 'design',
+    });
     const ok = await run('update_card', { cardId: CARD_ID, title: 'Nouveau titre' });
-    expect(JSON.parse(ok)).toEqual({ updated: true });
+    expect(prismaMocks.card.findFirst).toHaveBeenCalledWith({
+      where: { id: CARD_ID, workspaceId: ctx.workspaceId, deletedAt: null },
+      select: { title: true, description: true, categoryTag: true },
+    });
+    expect(JSON.parse(ok)).toEqual({ updated: true, title: 'Titre final', categoryTag: 'design' });
 
     updateCardMocks.updateCard.mockResolvedValueOnce({ ok: false, message: 'Carte introuvable.' });
     const fail = await run('update_card', { cardId: CARD_ID, title: 'X' });
     expect(fail).toBe('Échec : Carte introuvable.');
   });
 
+  it('update_card : categoryTag null en relecture → clé omise du JSON', async () => {
+    updateCardMocks.updateCard.mockResolvedValue({ ok: true });
+    prismaMocks.card.findFirst.mockResolvedValue({
+      title: 'Sans étiquette',
+      description: null,
+      categoryTag: null,
+    });
+    const out = await run('update_card', { cardId: CARD_ID, categoryTag: null });
+    expect(JSON.parse(out)).toEqual({ updated: true, title: 'Sans étiquette' });
+    expect(JSON.parse(out)).not.toHaveProperty('categoryTag');
+  });
+
+  it('update_card : relecture introuvable → message "vérification impossible", pas de updated:true', async () => {
+    updateCardMocks.updateCard.mockResolvedValue({ ok: true });
+    prismaMocks.card.findFirst.mockResolvedValue(null);
+    const out = await run('update_card', { cardId: CARD_ID, title: 'X' });
+    expect(out).toContain('vérification impossible');
+    expect(out).not.toContain('updated');
+  });
+
   it('update_card : categoryTag null est transmis (effacement), les clés absentes ne le sont pas', async () => {
     updateCardMocks.updateCard.mockResolvedValue({ ok: true });
+    prismaMocks.card.findFirst.mockResolvedValue({
+      title: 'Titre',
+      description: null,
+      categoryTag: null,
+    });
     await run('update_card', { cardId: CARD_ID, categoryTag: null });
     // Pin du conditional-spread : null ≠ undefined — la clé doit être présente
     // avec la valeur null, et title/description absents.
@@ -322,14 +363,34 @@ describe('buildKanbanTools', () => {
     expect(out).toContain(message);
   });
 
-  it('move_card : succès → JSON avec position', async () => {
+  it('move_card : succès → relit la carte et renvoie nowInColumn/position depuis la DB', async () => {
     moveCardMocks.moveCard.mockResolvedValue({ ok: true, position: 2048 });
+    prismaMocks.card.findFirst.mockResolvedValue({
+      columnId: COLUMN_ID,
+      column: { name: 'Fait' },
+    });
     const out = await run('move_card', {
       cardId: CARD_ID,
       targetColumnId: COLUMN_ID,
       targetIndex: 1,
     });
-    expect(JSON.parse(out)).toEqual({ moved: true, position: 2048 });
+    expect(prismaMocks.card.findFirst).toHaveBeenCalledWith({
+      where: { id: CARD_ID, workspaceId: ctx.workspaceId, deletedAt: null },
+      select: { columnId: true, column: { select: { name: true } } },
+    });
+    expect(JSON.parse(out)).toEqual({ moved: true, nowInColumn: 'Fait', position: 2048 });
+  });
+
+  it('move_card : relecture introuvable → message "vérification impossible", pas de moved:true', async () => {
+    moveCardMocks.moveCard.mockResolvedValue({ ok: true, position: 2048 });
+    prismaMocks.card.findFirst.mockResolvedValue(null);
+    const out = await run('move_card', {
+      cardId: CARD_ID,
+      targetColumnId: COLUMN_ID,
+      targetIndex: 1,
+    });
+    expect(out).toContain('vérification impossible');
+    expect(out).not.toContain('moved');
   });
 
   it('add_card_assignee transmet le raci tel quel', async () => {
