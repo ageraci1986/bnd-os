@@ -78,7 +78,7 @@ export interface ToolSpec {
    * Ne jamais y mettre plus que ce que l'utilisateur voit déjà (pas de corps
    * de message brut, pas de tokens) ; l'audit ne journalise que le nom du tool.
    */
-  readonly describeForConfirm?: (input: never) => string;
+  readonly describeForConfirm?: (input: never) => string | Promise<string>;
 }
 
 /** Événements émis pendant un tour, consommés par les adaptateurs (SSE, tests). */
