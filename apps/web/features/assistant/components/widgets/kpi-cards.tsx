@@ -43,7 +43,7 @@ export function KpiCards({ data }: KpiCardsProps) {
   const { blockedCards, dueTodayCards, unreadMails, unreadNotifications } = parsed;
 
   return (
-    <div className="flex w-full gap-2">
+    <div className="flex w-full gap-2" data-testid="kpi-cards">
       <KpiTile label="Bloquées" value={blockedCards} danger={blockedCards > 0} />
       <KpiTile label="Dues aujourd'hui" value={dueTodayCards} />
       <KpiTile label="Mails non lus" value={unreadMails} />

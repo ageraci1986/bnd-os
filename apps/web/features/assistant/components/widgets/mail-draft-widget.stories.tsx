@@ -44,7 +44,7 @@ export const ReadOnlyAfterLoadFailure: Story = {
   args: {
     data: {
       kind: 'new_mail',
-      to: ['julie.martin@client-acme.fr'],
+      to: ['julie.martin@client-acme.example'],
       cc: [],
       bcc: [],
       subject: 'Point client — validation maquettes',

@@ -71,7 +71,9 @@ async function createTestCard(
   await titleInput.blur();
   await expect(page.getByText(title, { exact: true })).toBeVisible();
 
-  await page.getByRole('button', { name: 'Fermer' }).click();
+  // Deux boutons « Fermer » dans le modal (croix d'en-tête aria-label + pied) —
+  // .last() cible celui du pied pour éviter la violation strict-mode.
+  await page.getByRole('button', { name: 'Fermer' }).last().click();
   await expect(page).not.toHaveURL(/[?&]card=/);
 
   return { cardId, projectId, title };
@@ -84,11 +86,15 @@ test.describe('Assistant @e2e', () => {
 
     await expect(page.getByRole('heading', { name: /^Bonjour/ })).toBeVisible();
     // 4 tuiles réelles de KpiCards (widgets/kpi-cards.tsx) — la spec §6 en
-    // mentionne 3, l'implémentation en rend 4 (Bloquées incluse).
-    await expect(page.getByText('Bloquées')).toBeVisible();
-    await expect(page.getByText("Dues aujourd'hui")).toBeVisible();
-    await expect(page.getByText('Mails non lus')).toBeVisible();
-    await expect(page.getByText('Notifications')).toBeVisible();
+    // mentionne 3, l'implémentation en rend 4 (Bloquées incluse). Assertions
+    // SCOPÉES sur le conteneur des tuiles : le brief digéré au-dessus reprend
+    // les mêmes mots (« bloquées », « mails non lus »…) et provoquerait des
+    // violations strict-mode selon les données du compte.
+    const kpi = page.getByTestId('kpi-cards').first();
+    await expect(kpi.getByText('Bloquées')).toBeVisible();
+    await expect(kpi.getByText("Dues aujourd'hui")).toBeVisible();
+    await expect(kpi.getByText('Mails non lus')).toBeVisible();
+    await expect(kpi.getByText('Notifications')).toBeVisible();
     await expect(page.getByTestId('assistant-orb')).toHaveAttribute('data-activity', 'idle');
 
     await page.getByLabel('Message').fill('e2e:briefing');
@@ -96,8 +102,8 @@ test.describe('Assistant @e2e', () => {
 
     await expect(page.getByText('Voici votre briefing.')).toBeVisible();
     // Widget KPI in-thread (tool_result get_today_overview) EN PLUS de celui
-    // de l'accueil — même libellé, donc 2 occurrences une fois le tour terminé.
-    await expect(page.getByText('Notifications')).toHaveCount(2);
+    // de l'accueil — deux conteneurs de tuiles une fois le tour terminé.
+    await expect(page.getByTestId('kpi-cards')).toHaveCount(2);
   });
 
   test('(b) Allow — delete_card gated → effet réel en DB', async ({ page }) => {

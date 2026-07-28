@@ -40,7 +40,7 @@ export const ThreeMailsTwoUnread: Story = {
       {
         id: 'mail-1',
         subject: 'Point client — validation maquettes',
-        fromEmail: 'julie.martin@client-acme.fr',
+        fromEmail: 'julie.martin@client-acme.example',
         fromName: 'Julie Martin',
         receivedAt: '2026-07-28T08:12:00.000Z',
         isRead: false,
