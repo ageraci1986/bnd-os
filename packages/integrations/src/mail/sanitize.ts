@@ -39,10 +39,19 @@ const layoutTags = [
 ];
 
 // Legacy presentational attrs still used by every ESP-generated email.
+//
+// `class` and `id` are deliberately EXCLUDED. A hostile mail could set
+// `class="fixed inset-0 z-50 bg-white"` — Tailwind utility classes already
+// present in the app bundle (modals/toaster) — and have that div escape its
+// mail-rendering container to overlay the whole UI (redressing/phishing).
+// The inline-style allowlist below blocks `position` explicitly, but a
+// class-based `position: fixed` bypasses that check entirely, since classes
+// resolve via the app's own stylesheet, not through this sanitizer. All
+// legitimate email styling already arrives as inline `style` (allowed via
+// `allowedStyles` below); no rendering code in apps/web selects mail content
+// by `class`/`id`, so nothing legitimate depends on these attributes.
 const commonAttrs = [
   'style',
-  'class',
-  'id',
   'align',
   'valign',
   'width',
