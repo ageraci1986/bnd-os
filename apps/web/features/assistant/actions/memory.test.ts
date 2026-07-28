@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   rememberFact: vi.fn(),
   updateFact: vi.fn(),
   forgetFact: vi.fn(),
+  revalidatePath: vi.fn(),
 }));
 
 vi.mock('@/lib/auth', () => ({ requireUser: mocks.requireUser }));
@@ -15,6 +16,7 @@ vi.mock('@/lib/assistant/memory', () => ({
   updateFact: mocks.updateFact,
   forgetFact: mocks.forgetFact,
 }));
+vi.mock('next/cache', () => ({ revalidatePath: mocks.revalidatePath }));
 
 import { createMemoryAction, deleteMemoryAction, updateMemoryAction } from './memory';
 
@@ -55,15 +57,17 @@ describe('createMemoryAction', () => {
       fact: 'Préfère les réunions le matin',
     });
     expect(mocks.rememberFact).toHaveBeenCalledWith(CTX, 'Préfère les réunions le matin');
+    expect(mocks.revalidatePath).toHaveBeenCalledWith('/assistant');
   });
 
-  it('maps a core failure to status error', async () => {
+  it('maps a core failure to status error, without revalidating', async () => {
     mocks.rememberFact.mockResolvedValueOnce({
       ok: false,
       message: 'Le fait est vide — rien à retenir.',
     });
     const result = await createMemoryAction({ status: 'idle' }, buildFormData({ fact: '' }));
     expect(result).toEqual({ status: 'error', message: 'Le fait est vide — rien à retenir.' });
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
   });
 
   it('treats a missing fact field as an empty string', async () => {
@@ -95,9 +99,10 @@ describe('updateMemoryAction', () => {
     );
     expect(result).toEqual({ status: 'success', fact: 'Nouveau fait' });
     expect(mocks.updateFact).toHaveBeenCalledWith(CTX, 'mon-fait', 'Nouveau fait');
+    expect(mocks.revalidatePath).toHaveBeenCalledWith('/assistant');
   });
 
-  it('maps a core failure (unknown name) to status error', async () => {
+  it('maps a core failure (unknown name) to status error, without revalidating', async () => {
     mocks.updateFact.mockResolvedValueOnce({
       ok: false,
       message: 'Aucun fait nommé « inconnu ». Faits existants : mon-fait.',
@@ -110,6 +115,7 @@ describe('updateMemoryAction', () => {
       status: 'error',
       message: 'Aucun fait nommé « inconnu ». Faits existants : mon-fait.',
     });
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
   });
 
   it('calls CSRF check, then requireUser, then the core in order', async () => {
@@ -132,9 +138,10 @@ describe('deleteMemoryAction', () => {
     );
     expect(result).toEqual({ status: 'success' });
     expect(mocks.forgetFact).toHaveBeenCalledWith(CTX, 'mon-fait');
+    expect(mocks.revalidatePath).toHaveBeenCalledWith('/assistant');
   });
 
-  it('maps a core failure (unknown name) to status error', async () => {
+  it('maps a core failure (unknown name) to status error, without revalidating', async () => {
     mocks.forgetFact.mockResolvedValueOnce({
       ok: false,
       message: 'Aucun fait nommé « inconnu ». Faits existants : (aucun).',
@@ -144,6 +151,7 @@ describe('deleteMemoryAction', () => {
       status: 'error',
       message: 'Aucun fait nommé « inconnu ». Faits existants : (aucun).',
     });
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
   });
 
   it('calls CSRF check, then requireUser, then the core in order', async () => {

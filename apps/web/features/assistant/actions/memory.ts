@@ -1,5 +1,6 @@
 'use server';
 import 'server-only';
+import { revalidatePath } from 'next/cache';
 import { requireUser } from '@/lib/auth';
 import { assertCsrfFromFormData } from '@/lib/csrf';
 import { forgetFact, rememberFact, updateFact } from '@/lib/assistant/memory';
@@ -11,6 +12,11 @@ import { forgetFact, rememberFact, updateFact } from '@/lib/assistant/memory';
  * du `FormData` → déléguer au cœur partagé `lib/assistant/memory.ts` (le
  * même que les tools `remember_fact`/`update_fact`/`forget_fact`) → mapper
  * `{ok}` vers l'état `{status}` consommé par `useActionState`.
+ *
+ * `revalidatePath('/assistant')` sur chaque succès : contrairement au
+ * Kanban (état optimiste, cf. `create-card.ts`), le panneau Mémoire n'a pas
+ * de store client — la liste vient telle quelle des props RSC, donc un
+ * refetch serveur est le seul moyen de la tenir à jour après une mutation.
  */
 
 export type CreateMemoryState =
@@ -31,6 +37,7 @@ export async function createMemoryAction(
   if (!result.ok) {
     return { status: 'error', message: result.message };
   }
+  revalidatePath('/assistant');
   return { status: 'success', name: result.name, fact: result.fact };
 }
 
@@ -57,6 +64,7 @@ export async function updateMemoryAction(
   if (!result.ok) {
     return { status: 'error', message: result.message };
   }
+  revalidatePath('/assistant');
   return { status: 'success', fact: result.fact };
 }
 
@@ -78,5 +86,6 @@ export async function deleteMemoryAction(
   if (!result.ok) {
     return { status: 'error', message: result.message };
   }
+  revalidatePath('/assistant');
   return { status: 'success' };
 }
