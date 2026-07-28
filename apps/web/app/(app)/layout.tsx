@@ -127,6 +127,7 @@ export default async function AppLayout({ children, searchParams }: AppLayoutPro
             <NavLink href="/overview" icon="◈" label="Tableau de bord" />
             <NavLink href="/projects" icon="◱" label="Projets" count={projectsCount} />
             <NavLink href="/communications" icon="✉" label="Communications" />
+            <NavLink href="/assistant" icon="◉" label="Assistant" />
           </SidebarSectionCollapsible>
 
           <SidebarSectionCollapsible

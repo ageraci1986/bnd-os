@@ -1,12 +1,8 @@
 'use server';
 import 'server-only';
-import { prisma } from '@nexushub/db';
-import { Roles } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
-import { loadUserScope } from '@/lib/auth/scope';
 import { assertCsrfFromFormData } from '@/lib/csrf';
-import { SCOPE_ERROR_MESSAGE, VIEWER_READ_ONLY_MESSAGE } from '../lib/scope-error';
-import { DeleteCardSchema } from '../lib/card-schemas';
+import { deleteCardCore } from '../lib/card-core';
 
 export type DeleteCardState =
   | { readonly status: 'idle' }
@@ -18,36 +14,14 @@ export async function deleteCard(
 ): Promise<DeleteCardState> {
   await assertCsrfFromFormData(formData);
   const ctx = await requireUser();
-  if (ctx.role === Roles.Viewer) {
-    return { status: 'error', message: VIEWER_READ_ONLY_MESSAGE };
-  }
 
-  const parsed = DeleteCardSchema.safeParse({ cardId: formData.get('cardId') });
-  if (!parsed.success) {
-    return { status: 'error', message: 'Identifiant carte invalide.' };
-  }
-
-  const card = await prisma.card.findFirst({
-    where: { id: parsed.data.cardId, workspaceId: ctx.workspaceId, deletedAt: null },
-    select: { id: true, projectId: true, project: { select: { clientId: true } } },
+  const result = await deleteCardCore(ctx, {
+    cardId: formData.get('cardId') as string,
   });
-  if (!card) {
-    return { status: 'error', message: 'Carte introuvable.' };
-  }
 
-  const scope = await loadUserScope(ctx);
-  if (scope.kind === 'restricted') {
-    const allowed =
-      scope.projectIds.includes(card.projectId) || scope.clientIds.includes(card.project.clientId);
-    if (!allowed) {
-      return { status: 'error', message: SCOPE_ERROR_MESSAGE };
-    }
+  if (!result.ok) {
+    return { status: 'error', message: result.message };
   }
-
-  await prisma.card.update({
-    where: { id: card.id },
-    data: { deletedAt: new Date() },
-  });
 
   // Intentionally NO revalidatePath: the board and list remove the row
   // optimistically via the `nx:card-removed` event. A server refetch raced

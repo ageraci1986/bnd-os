@@ -34,6 +34,8 @@ export default {
         'auth',
         'kanban',
         'comm',
+        'agent',
+        'assistant',
         'overview',
         'team',
         'settings',

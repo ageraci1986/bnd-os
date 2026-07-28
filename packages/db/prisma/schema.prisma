@@ -150,6 +150,9 @@ enum AuditAction {
   attachment_scanned_dirty
   attachment_downloaded
   attachment_rejected_upload
+  assistant_turn
+  assistant_gate
+  assistant_tool_run
 }
 
 // =====================================================================
@@ -185,6 +188,7 @@ model User {
   workspaceAccessCreated WorkspaceAccess[]        @relation("WorkspaceAccessCreatedBy")
   emailsSent             EmailMessage[]  @relation("EmailMessageSentByUser")
   mailDrafts             MailDraft[]
+  assistantMemories      AssistantMemory[]
 
   @@index([email])
   @@map("users")
@@ -216,6 +220,7 @@ model Workspace {
   workspaceAccess  WorkspaceAccess[]
   mailDrafts           MailDraft[]
   emailAttachments     EmailAttachment[]
+  assistantMemories    AssistantMemory[]
 
   @@map("workspaces")
 }
@@ -886,6 +891,28 @@ model Notification {
   @@index([workspaceId])
   @@index([userId, readAt])
   @@map("notifications")
+}
+
+/// Mémoire long terme de l'assistant : un fait durable par ligne, strictement
+/// personnel (user + workspace). Édité par l'agent (tools) et par l'utilisateur
+/// (onglet Mémoire).
+model AssistantMemory {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId String   @map("workspace_id") @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  /// Slug stable servant d'identifiant lisible (ex: prefere-reunions-le-matin)
+  name        String   @db.VarChar(80)
+  /// Le fait, en langage naturel (≤ 500 caractères)
+  fact        String   @db.VarChar(500)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Pas d'index (workspaceId, userId) séparé : le préfixe de l'unique le couvre.
+  @@unique([workspaceId, userId, name])
+  @@map("assistant_memory")
 }
 
 model ActivityEvent {
