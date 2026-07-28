@@ -7,6 +7,7 @@ import type { ToolSpec } from '@nexushub/agent';
 // convention (see kanban-tools.test.ts, read-tools.test.ts).
 const prismaMock = vi.hoisted(() => ({
   integration: { findMany: vi.fn() },
+  emailMessage: { count: vi.fn() },
 }));
 vi.mock('@nexushub/db', () => ({ prisma: prismaMock }));
 
@@ -18,6 +19,9 @@ vi.mock('@/features/communications/actions/send-mail', () => sendMailMocks);
 
 const markReadMocks = vi.hoisted(() => ({ markEmailRead: vi.fn() }));
 vi.mock('@/features/communications/actions/mark-email-read', () => markReadMocks);
+
+const mailStateMocks = vi.hoisted(() => ({ setMailStateCore: vi.fn(), MAIL_BULK_MAX: 100 }));
+vi.mock('@/features/communications/lib/mail-state-core', () => mailStateMocks);
 
 import { buildMailTools } from './mail-tools';
 
@@ -32,6 +36,9 @@ const ctx = {
 const INTEGRATION_ID = '4c9d3f0a-2222-4444-8888-aaaaaaaaaaaa';
 const EMAIL_ID = '4c9d3f0a-2222-4444-8888-bbbbbbbbbbbb';
 const REPLY_TO_ID = '4c9d3f0a-2222-4444-8888-cccccccccccc';
+const MAIL_ID_A = '4c9d3f0a-2222-4444-8888-dddddddddddd';
+const MAIL_ID_B = '4c9d3f0a-2222-4444-8888-eeeeeeeeeeee';
+const MAIL_ID_C = '4c9d3f0a-2222-4444-8888-ffffffffffff';
 
 function tools(): ToolSpec[] {
   return buildMailTools(ctx);
@@ -91,18 +98,23 @@ beforeEach(() => {
 });
 
 describe('buildMailTools', () => {
-  it('expose les 5 tools mail, seul send_mail gated, aucun adminOnly', () => {
+  it('expose les 9 tools mail, seuls send_mail/archive_mail/delete_mail gated, aucun adminOnly', () => {
     const list = tools();
     expect(list.map((t) => t.name).sort()).toEqual([
+      'archive_mail',
       'create_mail_draft',
+      'delete_mail',
       'list_my_mailboxes',
       'mark_email_read',
+      'mark_mail_read',
+      'mark_mail_unread',
       'prepare_reply_draft',
       'send_mail',
     ]);
     expect(list.every((t) => !t.adminOnly)).toBe(true);
+    const gatedNames = new Set(['send_mail', 'archive_mail', 'delete_mail']);
     for (const t of list) {
-      expect(t.gated).toBe(t.name === 'send_mail');
+      expect(t.gated).toBe(gatedNames.has(t.name));
     }
   });
 
@@ -502,4 +514,152 @@ describe('buildMailTools', () => {
       expect(out).toBe('Échec : Mail introuvable.');
     });
   });
+
+  describe('mark_mail_read / mark_mail_unread (non gated)', () => {
+    it.each([['mark_mail_read', 'read'] as const, ['mark_mail_unread', 'unread'] as const])(
+      '%s → setMailStateCore(ctx, {mailIds, op:%s})',
+      async (toolName, op) => {
+        mailStateMocks.setMailStateCore.mockResolvedValue({ ok: true, affected: 2, skipped: 1 });
+        const mailIds = [MAIL_ID_A, MAIL_ID_B, MAIL_ID_C];
+        const out = await run(toolName, { mailIds });
+        expect(mailStateMocks.setMailStateCore).toHaveBeenCalledWith(ctx, { mailIds, op });
+        expect(JSON.parse(out)).toEqual({ done: true, affected: 2, skipped: 1 });
+      },
+    );
+
+    it.each(['mark_mail_read', 'mark_mail_unread'])('%s n’est pas gated', (toolName) => {
+      expect(getTool(toolName).gated).not.toBe(true);
+    });
+
+    it.each(['mark_mail_read', 'mark_mail_unread'])(
+      '%s : échec core (reject) → message générique safeMutation, sans fuite',
+      async (toolName) => {
+        mailStateMocks.setMailStateCore.mockRejectedValue(new Error('connect ECONNREFUSED'));
+        const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+        const out = await run(toolName, { mailIds: [MAIL_ID_A] });
+        expect(out).toBe("Erreur interne pendant l'action — réessayez dans un instant.");
+        expect(out).not.toContain('ECONNREFUSED');
+        consoleError.mockRestore();
+      },
+    );
+
+    it.each(['mark_mail_read', 'mark_mail_unread'])(
+      '%s : refus core (ok:false, ex. Viewer) → message relayé via failure()',
+      async (toolName) => {
+        mailStateMocks.setMailStateCore.mockResolvedValue({
+          ok: false,
+          message: 'Lecture seule.',
+        });
+        const out = await run(toolName, { mailIds: [MAIL_ID_A] });
+        expect(out).toBe('Échec : Lecture seule.');
+      },
+    );
+
+    it('mailIds : borné à 100, au moins 1, uuid', () => {
+      const schema = getTool('mark_mail_read').inputSchema as z.ZodTypeAny;
+      expect(schema.safeParse({ mailIds: [] }).success).toBe(false);
+      expect(
+        schema.safeParse({ mailIds: Array.from({ length: 101 }, () => MAIL_ID_A) }).success,
+      ).toBe(false);
+      expect(schema.safeParse({ mailIds: ['not-a-uuid'] }).success).toBe(false);
+      expect(schema.safeParse({ mailIds: [MAIL_ID_A] }).success).toBe(true);
+    });
+  });
+
+  describe.each([['archive_mail', 'archive'] as const, ['delete_mail', 'delete'] as const])(
+    '%s (gated)',
+    (toolName, op) => {
+      it('gated : true', () => {
+        expect(getTool(toolName).gated).toBe(true);
+      });
+
+      it(`handler → setMailStateCore(ctx, {mailIds, op:'${op}'}), JSON {done, affected, skipped}`, async () => {
+        mailStateMocks.setMailStateCore.mockResolvedValue({ ok: true, affected: 3, skipped: 2 });
+        const mailIds = [MAIL_ID_A, MAIL_ID_B, MAIL_ID_C];
+        const out = await run(toolName, { mailIds });
+        expect(mailStateMocks.setMailStateCore).toHaveBeenCalledWith(ctx, { mailIds, op });
+        expect(JSON.parse(out)).toEqual({ done: true, affected: 3, skipped: 2 });
+      });
+
+      it('échec core (reject) → message générique safeMutation, sans fuite', async () => {
+        mailStateMocks.setMailStateCore.mockRejectedValue(new Error('connect ECONNREFUSED'));
+        const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+        const out = await run(toolName, { mailIds: [MAIL_ID_A] });
+        expect(out).toBe("Erreur interne pendant l'action — réessayez dans un instant.");
+        expect(out).not.toContain('ECONNREFUSED');
+        consoleError.mockRestore();
+      });
+
+      it('refus core (ok:false) → message relayé via failure()', async () => {
+        mailStateMocks.setMailStateCore.mockResolvedValue({ ok: false, message: 'Lecture seule.' });
+        const out = await run(toolName, { mailIds: [MAIL_ID_A] });
+        expect(out).toBe('Échec : Lecture seule.');
+      });
+
+      describe('describeForConfirm', () => {
+        async function describe_(input: unknown): Promise<string> {
+          const tool = getTool(toolName);
+          if (tool.describeForConfirm === undefined) throw new Error('describeForConfirm absent');
+          return tool.describeForConfirm(input as never);
+        }
+
+        it('input brut {} → description prudente, SANS requête DB', async () => {
+          const description = await describe_({});
+          expect(description.toLowerCase()).toContain('invalide');
+          expect(prismaMock.emailMessage.count).not.toHaveBeenCalled();
+        });
+
+        it('input brut {mailIds:"x"} (mauvais type) → description prudente, SANS requête DB', async () => {
+          const description = await describe_({ mailIds: 'x' });
+          expect(description.toLowerCase()).toContain('invalide');
+          expect(prismaMock.emailMessage.count).not.toHaveBeenCalled();
+        });
+
+        it('count === N (tous possédés) → requête DB owner-only pinnée, description avec N', async () => {
+          const mailIds = [MAIL_ID_A, MAIL_ID_B, MAIL_ID_C];
+          prismaMock.emailMessage.count.mockResolvedValue(3);
+          const description = await describe_({ mailIds });
+          expect(prismaMock.emailMessage.count).toHaveBeenCalledWith({
+            where: {
+              id: { in: mailIds },
+              workspaceId: ctx.workspaceId,
+              deletedAt: null,
+              integration: { ownerUserId: ctx.userId },
+            },
+          });
+          expect(description).toContain('3');
+          if (op === 'archive') {
+            expect(description).toContain('archivage local');
+          } else {
+            expect(description).toContain('suppression locale');
+          }
+          expect(description).toContain('réapparaître');
+        });
+
+        it('count < N (certains hors périmètre) → description signale le sous-ensemble', async () => {
+          const mailIds = [MAIL_ID_A, MAIL_ID_B, MAIL_ID_C];
+          prismaMock.emailMessage.count.mockResolvedValue(1);
+          const description = await describe_({ mailIds });
+          expect(description).toContain('3');
+          expect(description).toContain('1');
+          expect(description.toLowerCase()).toContain('ignoré');
+          if (op === 'archive') {
+            expect(description).toContain('archivage local');
+          } else {
+            expect(description).toContain('suppression locale');
+          }
+        });
+
+        it('dédoublonne les mailIds avant le count DB (même liste que le core)', async () => {
+          const mailIds = [MAIL_ID_A, MAIL_ID_A, MAIL_ID_B];
+          prismaMock.emailMessage.count.mockResolvedValue(2);
+          await describe_({ mailIds });
+          const call = prismaMock.emailMessage.count.mock.calls[0]?.[0] as {
+            where: { id: { in: string[] } };
+          };
+          expect(call.where.id.in.sort()).toEqual([MAIL_ID_A, MAIL_ID_B].sort());
+        });
+      });
+    },
+  );
 });
