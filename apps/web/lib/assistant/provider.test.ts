@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import Anthropic from '@anthropic-ai/sdk';
 import { ProviderError, safeOnText, toProviderError, toTurnResult } from './provider';
 
@@ -116,5 +116,68 @@ describe('safeOnText', () => {
       guarded('chunk-2');
     }).not.toThrow();
     expect(onText).toHaveBeenCalledTimes(2);
+  });
+});
+
+/**
+ * Sélection du provider par env (Plan 4 Task 4) — garde double : le mock E2E
+ * n'est retourné que si ASSISTANT_E2E_MOCK === '1' ET NODE_ENV !== 'production'.
+ * Chaque test mocke `@/lib/env` et `./e2e-provider` puis réimporte `./provider`
+ * dynamiquement après `vi.resetModules()` pour isoler l'environnement simulé
+ * (le provider réel, lui, ne doit JAMAIS être invoqué réseau ici : on vérifie
+ * seulement QUEL provider a été construit, pas son comportement réseau).
+ */
+describe('createAnthropicProvider — sélection E2E', () => {
+  afterEach(() => {
+    vi.doUnmock('@/lib/env');
+    vi.doUnmock('./e2e-provider');
+    vi.resetModules();
+  });
+
+  it("ASSISTANT_E2E_MOCK='1' + NODE_ENV='test' → provider scripté", async () => {
+    const fakeE2EProvider = { streamTurn: vi.fn() };
+    const createE2EProvider = vi.fn(() => fakeE2EProvider);
+    vi.resetModules();
+    vi.doMock('./e2e-provider', () => ({ createE2EProvider }));
+    vi.doMock('@/lib/env', () => ({
+      getServerEnv: () => ({ NODE_ENV: 'test', ASSISTANT_E2E_MOCK: '1' }),
+    }));
+
+    const { createAnthropicProvider } = await import('./provider');
+    const provider = createAnthropicProvider();
+
+    expect(createE2EProvider).toHaveBeenCalledTimes(1);
+    expect(provider).toBe(fakeE2EProvider);
+  });
+
+  it("NODE_ENV='production' + ASSISTANT_E2E_MOCK='1' → provider réel (garde prod, jamais scripté)", async () => {
+    const createE2EProvider = vi.fn();
+    vi.resetModules();
+    vi.doMock('./e2e-provider', () => ({ createE2EProvider }));
+    vi.doMock('@/lib/env', () => ({
+      getServerEnv: () => ({ NODE_ENV: 'production', ASSISTANT_E2E_MOCK: '1' }),
+    }));
+
+    const { createAnthropicProvider } = await import('./provider');
+    const provider = createAnthropicProvider();
+
+    expect(createE2EProvider).not.toHaveBeenCalled();
+    expect(typeof provider.streamTurn).toBe('function');
+    expect(provider.streamTurn).not.toBe(undefined);
+  });
+
+  it('ASSISTANT_E2E_MOCK absent → provider réel (comportement inchangé, preuve par les tests existants)', async () => {
+    const createE2EProvider = vi.fn();
+    vi.resetModules();
+    vi.doMock('./e2e-provider', () => ({ createE2EProvider }));
+    vi.doMock('@/lib/env', () => ({
+      getServerEnv: () => ({ NODE_ENV: 'test', ASSISTANT_E2E_MOCK: undefined }),
+    }));
+
+    const { createAnthropicProvider } = await import('./provider');
+    const provider = createAnthropicProvider();
+
+    expect(createE2EProvider).not.toHaveBeenCalled();
+    expect(typeof provider.streamTurn).toBe('function');
   });
 });

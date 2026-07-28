@@ -21,6 +21,7 @@ const APP_ROUTES = [
   '/templates/cards',
   '/integrations',
   '/settings',
+  '/assistant',
 ];
 
 for (const route of APP_ROUTES) {
