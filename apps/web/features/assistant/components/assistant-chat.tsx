@@ -1,14 +1,10 @@
 'use client';
 
 import { Fragment, useCallback, useEffect, useId, useRef, useState } from 'react';
-import { parseSseLines } from '../lib/sse';
+import { parseSseLines, type StreamWidget } from '../lib/sse';
 import { renderWidget } from './widgets';
+import { appendWidget } from './widgets/dedupe-widgets';
 import { trimWidgetData } from './widgets/trim-widget-data';
-
-interface StreamWidget {
-  readonly tool: string;
-  readonly data: unknown;
-}
 
 interface DisplayMessage {
   readonly role: 'user' | 'assistant';
@@ -207,10 +203,13 @@ export function AssistantChat({ csrfToken, firstName }: AssistantChatProps) {
           if (event.type === 'tool_result') {
             // Trim à la réception : borne aussi bien l'état de stream que la
             // donnée conservée sur le message commité (ex. board 100 cartes/colonne).
-            widgets = [
-              ...widgets,
-              { tool: event.tool, data: trimWidgetData(event.tool, event.data) },
-            ];
+            // appendWidget garantit aussi qu'un seul board par projet reste
+            // affiché — un board périmé ne doit jamais contredire le texte
+            // de l'agent après une mutation (spec V2 §3.2).
+            widgets = appendWidget(widgets, {
+              tool: event.tool,
+              data: trimWidgetData(event.tool, event.data),
+            });
             setStreamWidgets(widgets);
           }
           if (event.type === 'confirm_request') {

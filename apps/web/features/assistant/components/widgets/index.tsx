@@ -26,6 +26,10 @@ export function renderWidget(tool: string, data: unknown): ReactNode | null {
       return <MailListWidget data={data} />;
     case 'list_projects':
       return <ProjectListWidget data={data} />;
+    case 'find_projects':
+      // Sortie identique à `list_projects` — même widget, nom du tool réel
+      // transmis pour que les logs `parseWidgetData` restent précis.
+      return <ProjectListWidget data={data} tool="find_projects" />;
     case 'remember_fact':
     case 'update_fact':
     case 'forget_fact':

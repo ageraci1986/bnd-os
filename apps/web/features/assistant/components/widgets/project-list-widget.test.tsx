@@ -45,4 +45,23 @@ describe('<ProjectListWidget />', () => {
     render(<ProjectListWidget data={[]} />);
     expect(screen.queryAllByRole('link')).toHaveLength(0);
   });
+
+  it('renders find_projects data through the same widget', () => {
+    render(
+      <ProjectListWidget
+        tool="find_projects"
+        data={[{ id: 'p1', name: 'Refonte site', client: 'Acme', cards: 12 }]}
+      />,
+    );
+    expect(screen.getByText('Refonte site')).toBeInTheDocument();
+  });
+
+  it('logs the real tool name (find_projects) on invalid data', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    render(<ProjectListWidget tool="find_projects" data={{}} />);
+    expect(warn).toHaveBeenCalledWith('[assistant] widget data invalide', {
+      tool: 'find_projects',
+    });
+    warn.mockRestore();
+  });
 });

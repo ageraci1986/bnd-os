@@ -21,6 +21,9 @@ const WIDGET_TOOLS = [
   'get_project_board',
   'search_mails',
   'list_projects',
+  // Sortie IDENTIQUE à `list_projects` (id, name, client, cards) — même widget
+  // ProjectListWidget, seul le nom du tool diffère pour les logs de parse.
+  'find_projects',
   'remember_fact',
   'update_fact',
   'forget_fact',

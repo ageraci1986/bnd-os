@@ -1,5 +1,11 @@
 import { ChatSseEventSchema, type ChatSseEvent } from '@/lib/assistant/chat-schema';
 
+/** Widget accumulé pendant un tour à partir d'un événement SSE `tool_result`. */
+export interface StreamWidget {
+  readonly tool: string;
+  readonly data: unknown;
+}
+
 /** Découpe un buffer SSE en événements complets ; renvoie le fragment incomplet restant. */
 export function parseSseLines(buffer: string): { events: ChatSseEvent[]; rest: string } {
   const events: ChatSseEvent[] = [];

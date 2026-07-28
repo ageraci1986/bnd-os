@@ -67,6 +67,15 @@ describe('renderWidget', () => {
     expect(screen.getByText('Refonte')).toBeInTheDocument();
   });
 
+  it('routes find_projects to ProjectListWidget (même sortie que list_projects)', () => {
+    render(
+      <>
+        {renderWidget('find_projects', [{ id: 'p1', name: 'Refonte', client: 'Acme', cards: 3 }])}
+      </>,
+    );
+    expect(screen.getByText('Refonte')).toBeInTheDocument();
+  });
+
   it('routes remember_fact to MemoryWidget', () => {
     render(
       <>
