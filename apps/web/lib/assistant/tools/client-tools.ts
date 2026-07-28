@@ -37,7 +37,13 @@ const JOB_TITLE_MAX = 120;
 const CONTACT_EMAIL_MAX = 254;
 const PHONE_MAX = 40;
 const NOTES_MAX = 2000;
-/** `DomainsSchema` du feature ne borne que la longueur de la chaîne brute (2048) ; on plafonne ici le nombre d'entrées pour rester raisonnable côté tool. */
+/**
+ * `DomainsSchema` du feature ne borne que la longueur de la chaîne brute
+ * (2048) ; on plafonne ici le nombre de domaines. La borne est appliquée
+ * DEUX fois : sur le tableau d'entrée (Zod/jsonSchema) ET sur le résultat
+ * normalisé de `parseDomainList` (`normalizeDomainsOrFail`) — un seul item
+ * bourré de virgules pourrait sinon produire 1000+ domaines.
+ */
 const DOMAINS_MAX_ITEMS = 30;
 const DOMAIN_ITEM_MAX_CHARS = 253;
 const RACI_JSON = { type: ['string', 'null'], enum: [...RACI_VALUES] } as const;
@@ -53,9 +59,11 @@ function failure(message: string): string {
 /**
  * Valide/normalise des initiales (même règle que `InitialsSchema` du
  * feature) — utilisée quand des initiales sont explicitement fournies par le
- * modèle. Contrairement au fallback silencieux du schéma feature (pensé pour
- * une UI qui contraint déjà la saisie), le tool ÉCHOUE explicitement sur des
- * initiales invalides plutôt que de les stocker telles quelles.
+ * modèle. Contrairement au transform `initials` de `CreateClientSchema`
+ * (features/clients/lib/schemas.ts), qui conserve silencieusement la valeur
+ * brute quand `validateInitials` échoue (fallback pensé pour une UI qui
+ * contraint déjà la saisie), le tool ÉCHOUE explicitement sur des initiales
+ * invalides plutôt que de les stocker telles quelles.
  */
 function normalizeInitialsOrFail(
   raw: string,
@@ -86,6 +94,11 @@ function normalizeDomainsOrFail(
   | { readonly ok: false; readonly message: string } {
   const parsed = parseDomainList(raw.join(' '));
   if (!parsed.ok) return { ok: false, message: 'Domaine invalide (ex : acme.com).' };
+  // Cap sur le résultat NORMALISÉ : parseDomainList splitte sur virgules et
+  // espaces, donc le cap Zod sur le nombre d'items du tableau ne suffit pas.
+  if (parsed.value.length > DOMAINS_MAX_ITEMS) {
+    return { ok: false, message: `Maximum ${DOMAINS_MAX_ITEMS} domaines par client.` };
+  }
   return { ok: true, value: parsed.value };
 }
 
@@ -107,6 +120,16 @@ const domainsJson = {
  * les tests appellent `handler()` directement en contournant `safeParse`.
  */
 const contactEmailSchema = z.string().trim().max(CONTACT_EMAIL_MAX).email('E-mail invalide');
+
+/**
+ * Chaîne vide (ou espaces) → null : parité avec `optionalNullableString` du
+ * feature (features/clients/lib/schemas.ts) pour jobTitle/phone — le modèle
+ * qui passe `""` veut effacer, pas stocker une chaîne vide.
+ */
+function trimmedOrNull(v: string): string | null {
+  const trimmed = v.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
 
 /**
  * Tools mutants Clients + Contacts (Plan 5b Task 3). Wrappent les cores
@@ -291,7 +314,13 @@ export function buildClientTools(ctx: AuthContext): ToolSpec[] {
         if (client === null) return 'Supprimer un client introuvable dans ce workspace ?';
         const n = client._count.projects;
         if (n > 0) {
-          return `Supprimer le client « ${client.name} » ? Attention : ${n} projet(s) actif(s) y sont attachés — la suppression sera refusée.`;
+          // Phrase DÉCLARATIVE, pas une question : le core refusera (ADR #14),
+          // afficher un « Autoriser » voué à l'échec serait trompeur — même
+          // précédent que delete_column sur la colonne système « Bloqué ».
+          // Accord grammatical singulier/pluriel aligné sur le message du core.
+          return n === 1
+            ? `Le client « ${client.name} » a 1 projet actif attaché — la suppression sera refusée tant qu'il est actif.`
+            : `Le client « ${client.name} » a ${n} projets actifs attachés — la suppression sera refusée tant qu'ils sont actifs.`;
         }
         return `Supprimer le client « ${client.name} » (aucun projet actif) ? Ses contacts seront aussi supprimés.`;
       },
@@ -336,9 +365,9 @@ export function buildClientTools(ctx: AuthContext): ToolSpec[] {
           const result = await createContactCore(ctx, {
             clientId: input.clientId,
             name: { firstName: input.firstName, lastName: input.lastName },
-            jobTitle: input.jobTitle ?? null,
+            jobTitle: input.jobTitle !== undefined ? trimmedOrNull(input.jobTitle) : null,
             email: input.email !== undefined ? input.email.toLowerCase() : null,
-            phone: input.phone ?? null,
+            phone: input.phone !== undefined ? trimmedOrNull(input.phone) : null,
             raci: input.raci ?? null,
             notes: null,
           });
@@ -350,7 +379,7 @@ export function buildClientTools(ctx: AuthContext): ToolSpec[] {
     defineTool({
       name: 'update_contact',
       description:
-        "Met à jour le prénom, nom, poste, email, téléphone ou RACI d'un contact. Les champs non fournis restent inchangés ; jobTitle/email/phone/raci: null efface le champ correspondant.",
+        "Met à jour le prénom, nom, poste, email ou téléphone d'un contact (pour le rôle RACI, utiliser set_contact_raci). Les champs non fournis restent inchangés ; jobTitle/email/phone: null efface le champ correspondant.",
       inputSchema: z.object({
         contactId: uuid,
         firstName: z.string().trim().min(1).max(CONTACT_NAME_MAX).optional(),
@@ -358,7 +387,6 @@ export function buildClientTools(ctx: AuthContext): ToolSpec[] {
         jobTitle: z.string().trim().max(JOB_TITLE_MAX).nullable().optional(),
         email: contactEmailSchema.nullable().optional(),
         phone: z.string().trim().max(PHONE_MAX).nullable().optional(),
-        raci: z.enum(RACI_VALUES).nullable().optional(),
       }),
       jsonSchema: {
         type: 'object',
@@ -369,24 +397,28 @@ export function buildClientTools(ctx: AuthContext): ToolSpec[] {
           jobTitle: { type: ['string', 'null'], maxLength: JOB_TITLE_MAX },
           email: { type: ['string', 'null'], format: 'email', maxLength: CONTACT_EMAIL_MAX },
           phone: { type: ['string', 'null'], maxLength: PHONE_MAX },
-          raci: RACI_JSON,
         },
         required: ['contactId'],
       },
       handler: async (input) =>
         safeMutation('update_contact', async () => {
           // Conditional-spread (exactOptionalPropertyTypes) : même rationnel
-          // que update_card/update_project dans kanban-tools.ts.
+          // que update_card/update_project dans kanban-tools.ts. Pas de champ
+          // raci ici : le RACI passe EXCLUSIVEMENT par set_contact_raci
+          // (source unique, caveat « global au contact » porté là-bas).
           const result = await updateContactCore(ctx, {
             contactId: input.contactId,
             ...(input.firstName !== undefined ? { firstName: input.firstName } : {}),
             ...(input.lastName !== undefined ? { lastName: input.lastName } : {}),
-            ...(input.jobTitle !== undefined ? { jobTitle: input.jobTitle } : {}),
+            ...(input.jobTitle !== undefined
+              ? { jobTitle: input.jobTitle === null ? null : trimmedOrNull(input.jobTitle) }
+              : {}),
             ...(input.email !== undefined
               ? { email: input.email === null ? null : input.email.toLowerCase() }
               : {}),
-            ...(input.phone !== undefined ? { phone: input.phone } : {}),
-            ...(input.raci !== undefined ? { raci: input.raci } : {}),
+            ...(input.phone !== undefined
+              ? { phone: input.phone === null ? null : trimmedOrNull(input.phone) }
+              : {}),
           });
           if (!result.ok) return failure(result.message);
           // Post-état RELU par le core lui-même (spec V2 §3.1).

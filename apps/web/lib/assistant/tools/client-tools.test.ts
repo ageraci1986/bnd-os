@@ -170,6 +170,20 @@ describe('buildClientTools', () => {
     expect(clientCoreMocks.createClientCore).not.toHaveBeenCalled();
   });
 
+  it('create_client : cap 30 domaines appliqué APRÈS normalisation — 1 item contenant 31 domaines séparés par virgules → refus sans appeler le core', async () => {
+    // parseDomainList splitte sur virgules/espaces : le cap Zod sur le nombre
+    // d'items du tableau ne suffit pas, un seul item bourré de virgules
+    // pourrait produire 1000+ domaines.
+    const packed = Array.from({ length: 31 }, (_, i) => `d${i}.com`).join(',');
+    const out = await run('create_client', {
+      name: 'Acme',
+      colorToken: 'c-acme',
+      domains: [packed],
+    });
+    expect(out).toBe('Échec : Maximum 30 domaines par client.');
+    expect(clientCoreMocks.createClientCore).not.toHaveBeenCalled();
+  });
+
   it('create_client : échec core (nom dupliqué) → message montrable', async () => {
     clientCoreMocks.createClientCore.mockResolvedValue({
       ok: false,
@@ -320,7 +334,9 @@ describe('buildClientTools', () => {
     expect(out).not.toContain('Acme');
   });
 
-  it('delete_client : describeForConfirm annonce les projets actifs attachés', async () => {
+  it('delete_client : describeForConfirm avec projets actifs → phrase DÉCLARATIVE de refus (pas une question), pluriel exact', async () => {
+    // Même précédent que delete_column/Bloqué : ne pas afficher une question
+    // qui invite un « Autoriser » voué à l'échec — le core refusera (ADR #14).
     const describe = getTool('delete_client').describeForConfirm as (
       input: unknown,
     ) => Promise<string>;
@@ -330,7 +346,22 @@ describe('buildClientTools', () => {
     });
     const out = await describe({ clientId: CLIENT_ID });
     expect(out).toBe(
-      'Supprimer le client « Acme » ? Attention : 2 projet(s) actif(s) y sont attachés — la suppression sera refusée.',
+      "Le client « Acme » a 2 projets actifs attachés — la suppression sera refusée tant qu'ils sont actifs.",
+    );
+    expect(out).not.toContain('?');
+  });
+
+  it('delete_client : describeForConfirm avec 1 projet actif → accord singulier exact', async () => {
+    const describe = getTool('delete_client').describeForConfirm as (
+      input: unknown,
+    ) => Promise<string>;
+    prismaMocks.client.findFirst.mockResolvedValueOnce({
+      name: 'Acme',
+      _count: { projects: 1 },
+    });
+    const out = await describe({ clientId: CLIENT_ID });
+    expect(out).toBe(
+      "Le client « Acme » a 1 projet actif attaché — la suppression sera refusée tant qu'il est actif.",
     );
   });
 
@@ -391,6 +422,26 @@ describe('buildClientTools', () => {
     });
   });
 
+  it('create_contact : jobTitle/phone chaîne vide (ou espaces) → null (parité optionalNullableString de l’UI)', async () => {
+    clientCoreMocks.createContactCore.mockResolvedValue({ ok: true, contactId: 'ct-3' });
+    await run('create_contact', {
+      clientId: CLIENT_ID,
+      firstName: 'Jane',
+      lastName: 'Doe',
+      jobTitle: '  ',
+      phone: '',
+    });
+    expect(clientCoreMocks.createContactCore).toHaveBeenCalledWith(ctx, {
+      clientId: CLIENT_ID,
+      name: { firstName: 'Jane', lastName: 'Doe' },
+      jobTitle: null,
+      email: null,
+      phone: null,
+      raci: null,
+      notes: null,
+    });
+  });
+
   it('create_contact : échec core → message montrable', async () => {
     clientCoreMocks.createContactCore.mockResolvedValue({
       ok: false,
@@ -414,10 +465,10 @@ describe('buildClientTools', () => {
       raci: 'consulted',
       email: 'jane@acme.com',
     });
-    const out = await run('update_contact', { contactId: CONTACT_ID, raci: 'consulted' });
+    const out = await run('update_contact', { contactId: CONTACT_ID, jobTitle: 'CMO' });
     expect(clientCoreMocks.updateContactCore).toHaveBeenCalledWith(ctx, {
       contactId: CONTACT_ID,
-      raci: 'consulted',
+      jobTitle: 'CMO',
     });
     expect(JSON.parse(out)).toEqual({
       updated: true,
@@ -428,7 +479,7 @@ describe('buildClientTools', () => {
     });
   });
 
-  it('update_contact : email:null efface explicitement (transmis), raci:null efface explicitement', async () => {
+  it('update_contact : email:null / jobTitle:null effacent explicitement (transmis)', async () => {
     clientCoreMocks.updateContactCore.mockResolvedValue({
       ok: true,
       firstName: 'Jane',
@@ -436,11 +487,37 @@ describe('buildClientTools', () => {
       raci: null,
       email: null,
     });
-    await run('update_contact', { contactId: CONTACT_ID, email: null, raci: null });
+    await run('update_contact', { contactId: CONTACT_ID, email: null, jobTitle: null });
     expect(clientCoreMocks.updateContactCore).toHaveBeenCalledWith(ctx, {
       contactId: CONTACT_ID,
       email: null,
+      jobTitle: null,
+    });
+  });
+
+  it('update_contact : PAS de champ raci (source unique = set_contact_raci), description renvoie vers set_contact_raci', () => {
+    const tool = getTool('update_contact');
+    const schema = tool.inputSchema as z.ZodTypeAny;
+    if (!(schema instanceof z.ZodObject)) throw new Error('expected ZodObject');
+    expect(Object.keys(schema.shape as Record<string, unknown>)).not.toContain('raci');
+    const json = tool.jsonSchema as { properties?: Record<string, unknown> };
+    expect(Object.keys(json.properties ?? {})).not.toContain('raci');
+    expect(tool.description).toContain('set_contact_raci');
+  });
+
+  it('update_contact : jobTitle/phone chaîne vide (ou espaces) → null transmis (parité optionalNullableString de l’UI)', async () => {
+    clientCoreMocks.updateContactCore.mockResolvedValue({
+      ok: true,
+      firstName: 'Jane',
+      lastName: 'Doe',
       raci: null,
+      email: null,
+    });
+    await run('update_contact', { contactId: CONTACT_ID, jobTitle: '  ', phone: '' });
+    expect(clientCoreMocks.updateContactCore).toHaveBeenCalledWith(ctx, {
+      contactId: CONTACT_ID,
+      jobTitle: null,
+      phone: null,
     });
   });
 
