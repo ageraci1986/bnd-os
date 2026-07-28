@@ -25,7 +25,9 @@ describe('appendWidget', () => {
     expect(result).toEqual([fresh]);
   });
 
-  it('places the replacement board at the end even with other widgets in between', () => {
+  it('replacement stays in place — no reorder when other widgets are in between', () => {
+    // Remplacement EN PLACE : déplacer le board rafraîchi en fin de liste
+    // provoquerait un saut de layout visible pendant le streaming.
     const staleBoard: StreamWidget = { tool: 'get_project_board', data: { id: 'p1' } };
     const other: StreamWidget = { tool: 'search_mails', data: [] };
     const freshBoard: StreamWidget = {
@@ -33,7 +35,7 @@ describe('appendWidget', () => {
       data: { id: 'p1', touched: true },
     };
     const result = appendWidget([staleBoard, other], freshBoard);
-    expect(result).toEqual([other, freshBoard]);
+    expect(result).toEqual([freshBoard, other]);
   });
 
   it('keeps boards for two different projects side by side', () => {
@@ -66,5 +68,14 @@ describe('appendWidget', () => {
     const widgets: StreamWidget[] = [{ tool: 'search_mails', data: [] }];
     const frozen = Object.freeze([...widgets]);
     expect(() => appendWidget(frozen, { tool: 'get_today_overview', data: {} })).not.toThrow();
+  });
+
+  it('does not mutate the input array on in-place board replacement either', () => {
+    const stale: StreamWidget = { tool: 'get_project_board', data: { id: 'p1' } };
+    const frozen = Object.freeze([stale]);
+    const fresh: StreamWidget = { tool: 'get_project_board', data: { id: 'p1', touched: true } };
+    expect(() => appendWidget(frozen, fresh)).not.toThrow();
+    expect(appendWidget(frozen, fresh)).toEqual([fresh]);
+    expect(frozen[0]).toBe(stale);
   });
 });

@@ -596,6 +596,66 @@ describe('AssistantChat', () => {
     expect(screen.getByText('+95 autres')).toBeInTheDocument();
   });
 
+  it('deux tool_result board du même projet dans un stream → un seul board, le plus récent', async () => {
+    const projectId = '22222222-2222-2222-2222-222222222222';
+    const boardEvent = (cardTitle: string) => ({
+      type: 'tool_result',
+      tool: 'get_project_board',
+      data: {
+        id: projectId,
+        name: 'Refonte',
+        columns: [
+          {
+            id: 'col-1',
+            name: 'Backlog',
+            blocked: false,
+            cards: [{ id: `card-${cardTitle}`, title: cardTitle, due: null }],
+          },
+        ],
+      },
+    });
+    const encoder = new TextEncoder();
+    let push!: (e: object) => void;
+    let close!: () => void;
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        push = (e) => controller.enqueue(encoder.encode(`data: ${JSON.stringify(e)}\n\n`));
+        close = () => controller.close();
+      },
+    });
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(stream as unknown as BodyInit, {
+        status: 200,
+        headers: { 'Content-Type': 'text/event-stream' },
+      }),
+    );
+    render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
+    await userEvent.type(screen.getByRole('textbox'), 'déplace la carte puis remontre le board');
+    await userEvent.click(screen.getByRole('button', { name: /envoyer/i }));
+
+    // Premier board (état avant mutation)…
+    act(() => push(boardEvent('Ancienne carte')));
+    await screen.findByText('Ancienne carte');
+
+    // …relu après mutation : le board rafraîchi REMPLACE l'ancien pendant le
+    // streaming — un seul board affiché, et c'est le second.
+    act(() => push(boardEvent('Nouvelle carte')));
+    await screen.findByText('Nouvelle carte');
+    expect(screen.queryByText('Ancienne carte')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: 'Refonte' })).toHaveLength(1);
+
+    act(() => {
+      push({ type: 'done', text: 'Carte déplacée, voici le board à jour.' });
+      close();
+    });
+    await screen.findByText('Carte déplacée, voici le board à jour.');
+
+    // Même invariant sur le message commité : un seul board, le plus récent.
+    expect(screen.getByText('Nouvelle carte')).toBeInTheDocument();
+    expect(screen.queryByText('Ancienne carte')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: 'Refonte' })).toHaveLength(1);
+  });
+
   it('l historique envoyé au serveur reste texte-only : jamais de clé widgets', async () => {
     let call = 0;
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(() => {
