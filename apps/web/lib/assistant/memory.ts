@@ -93,9 +93,16 @@ export async function loadMemories(ctx: AuthContext): Promise<readonly MemoryEnt
   return rows.map((row) => ({ name: row.name, fact: row.fact }));
 }
 
-/** Valide un fait entrant ; renvoie le fait trimé ou un message d'erreur montrable. */
+/**
+ * Valide un fait entrant ; renvoie le fait normalisé ou un message d'erreur
+ * montrable. Normalisation AVANT le contrôle de longueur : toute suite de
+ * blancs (espaces, tabulations, retours à la ligne) est réduite à un espace —
+ * un fait durable tient sur une ligne par design, et un fait multi-lignes
+ * pourrait mimer la structure du system prompt lors de l'injection (vecteur
+ * prompt-injection fermé ici, au seul endroit partagé par tools et actions).
+ */
 function validateFact(fact: string): { ok: true; fact: string } | { ok: false; message: string } {
-  const trimmed = fact.trim();
+  const trimmed = fact.replace(/\s+/g, ' ').trim();
   if (trimmed === '') {
     return { ok: false, message: 'Le fait est vide — rien à retenir.' };
   }
@@ -127,12 +134,14 @@ async function notFoundMessage(ctx: AuthContext, name: string): Promise<string> 
 
 /**
  * Crée un fait. Erreurs montrables : vide, trop long, plafond atteint
- * (consolider), doublon de nom (suffixe -2, -3…).
+ * (consolider), doublon de nom (suffixe -2, -3…). Le `fact` renvoyé est la
+ * version normalisée réellement stockée (mono-ligne) — les consommateurs
+ * (widget mémoire) l'affichent telle quelle.
  */
 export async function rememberFact(
   ctx: AuthContext,
   fact: string,
-): Promise<{ ok: true; name: string } | { ok: false; message: string }> {
+): Promise<{ ok: true; name: string; fact: string } | { ok: false; message: string }> {
   const validated = validateFact(fact);
   if (!validated.ok) return validated;
 
@@ -158,7 +167,7 @@ export async function rememberFact(
       await prisma.assistantMemory.create({
         data: { workspaceId: ctx.workspaceId, userId: ctx.userId, name, fact: validated.fact },
       });
-      return { ok: true, name };
+      return { ok: true, name, fact: validated.fact };
     } catch (err) {
       if (prismaErrorCode(err) !== 'P2002') throw err;
     }
@@ -182,12 +191,15 @@ async function findFreeName(ctx: AuthContext, baseName: string): Promise<string>
   return name;
 }
 
-/** Corrige le fait d'un nom existant. */
+/**
+ * Corrige le fait d'un nom existant. Comme `rememberFact`, renvoie la version
+ * normalisée réellement stockée du fait.
+ */
 export async function updateFact(
   ctx: AuthContext,
   name: string,
   fact: string,
-): Promise<{ ok: true } | { ok: false; message: string }> {
+): Promise<{ ok: true; fact: string } | { ok: false; message: string }> {
   const validated = validateFact(fact);
   if (!validated.ok) return validated;
 
@@ -198,7 +210,7 @@ export async function updateFact(
   if (count === 0) {
     return { ok: false, message: await notFoundMessage(ctx, name) };
   }
-  return { ok: true };
+  return { ok: true, fact: validated.fact };
 }
 
 /** Supprime un fait par son nom. */

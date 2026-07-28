@@ -270,6 +270,22 @@ describe('POST /api/assistant/chat — confirmer', () => {
   });
 });
 
+describe('POST /api/assistant/chat — indisponibilité avant stream', () => {
+  it('loadMemories rejette → 500 JSON, aucun flux SSE ouvert', async () => {
+    mocks.loadMemories.mockRejectedValue(new Error('connect ECONNREFUSED'));
+
+    const res = await POST(makeRequest({ messages: [], message: 'Bonjour' }));
+
+    expect(res.status).toBe(500);
+    expect(res.headers.get('Content-Type')).not.toBe('text/event-stream');
+    const body = (await res.json()) as { ok: boolean; message: string };
+    expect(body.ok).toBe(false);
+    expect(body.message).not.toContain('ECONNREFUSED');
+    // Le tour n'a jamais démarré : aucun appel provider.
+    expect(mocks.streamTurn).not.toHaveBeenCalled();
+  });
+});
+
 describe('POST /api/assistant/chat — tool_result (widgets)', () => {
   it('émis pour un tool whitelisté (search_mails) avec sortie JSON', async () => {
     const payload = { mails: [{ id: 'm1', subject: 'Bonjour' }] };

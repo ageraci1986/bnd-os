@@ -74,11 +74,21 @@ describe('buildMemoryTools', () => {
   });
 
   describe('remember_fact', () => {
-    it('passe ctx + fact au core, succès → {remembered:true, name}', async () => {
-      memoryMocks.rememberFact.mockResolvedValue({ ok: true, name: 'aime-le-cafe' });
+    it('passe ctx + fact au core, succès → {remembered:true, name, fact} (fait stocké, pour le widget)', async () => {
+      // Le core renvoie la version normalisée stockée — c'est ELLE qui sort
+      // du tool (et alimente le chip mémoire), pas l'input du modèle.
+      memoryMocks.rememberFact.mockResolvedValue({
+        ok: true,
+        name: 'aime-le-cafe',
+        fact: 'Aime le café (normalisé)',
+      });
       const out = await run('remember_fact', { fact: 'Aime le café' });
       expect(memoryMocks.rememberFact).toHaveBeenCalledWith(ctx, 'Aime le café');
-      expect(JSON.parse(out)).toEqual({ remembered: true, name: 'aime-le-cafe' });
+      expect(JSON.parse(out)).toEqual({
+        remembered: true,
+        name: 'aime-le-cafe',
+        fact: 'Aime le café (normalisé)',
+      });
     });
 
     it('échec du core → message montrable préfixé "Échec :"', async () => {
@@ -105,15 +115,19 @@ describe('buildMemoryTools', () => {
   });
 
   describe('update_fact', () => {
-    it('passe ctx + name + fact au core, succès → {updated:true}', async () => {
-      memoryMocks.updateFact.mockResolvedValue({ ok: true });
+    it('passe ctx + name + fact au core, succès → {updated:true, name, fact} (fait stocké)', async () => {
+      memoryMocks.updateFact.mockResolvedValue({ ok: true, fact: 'Aime le café serré' });
       const out = await run('update_fact', { name: 'aime-le-cafe', fact: 'Aime le café serré' });
       expect(memoryMocks.updateFact).toHaveBeenCalledWith(
         ctx,
         'aime-le-cafe',
         'Aime le café serré',
       );
-      expect(JSON.parse(out)).toEqual({ updated: true });
+      expect(JSON.parse(out)).toEqual({
+        updated: true,
+        name: 'aime-le-cafe',
+        fact: 'Aime le café serré',
+      });
     });
 
     it('échec (nom introuvable) → message montrable relayé', async () => {
@@ -134,11 +148,11 @@ describe('buildMemoryTools', () => {
   });
 
   describe('forget_fact', () => {
-    it('passe ctx + name au core, succès → {forgotten:true}', async () => {
+    it('passe ctx + name au core, succès → {forgotten:true, name}', async () => {
       memoryMocks.forgetFact.mockResolvedValue({ ok: true });
       const out = await run('forget_fact', { name: 'aime-le-cafe' });
       expect(memoryMocks.forgetFact).toHaveBeenCalledWith(ctx, 'aime-le-cafe');
-      expect(JSON.parse(out)).toEqual({ forgotten: true });
+      expect(JSON.parse(out)).toEqual({ forgotten: true, name: 'aime-le-cafe' });
     });
 
     it('échec (nom introuvable) → message montrable relayé', async () => {

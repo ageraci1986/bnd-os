@@ -37,8 +37,13 @@ function failure(message: string): string {
  * logique métier ici, uniquement la traduction schéma Zod ↔ résultat `{ok}`
  * ↔ message montrable. Aucun tool ⚡ n'est `gated` : la mémoire est interne
  * et réversible (l'onglet Mémoire permet de corriger/supprimer à la main),
- * contrairement à `send_mail` ou `delete_card`. `ctx` est lié à la
- * construction (jamais fourni par le modèle) : voir `tools/index.ts`.
+ * contrairement à `send_mail` ou `delete_card`. En contrepartie, chaque
+ * écriture est rendue VISIBLE de façon déterministe : les trois tools sont
+ * dans la whitelist widgets (`lib/assistant/widget-tools.ts`) et leur sortie
+ * JSON porte `name`/`fact` pour que le chip mémoire s'affiche dans le fil,
+ * quoi que raconte le modèle — un fait planté ne peut pas être silencieux.
+ * `ctx` est lié à la construction (jamais fourni par le modèle) : voir
+ * `tools/index.ts`.
  */
 export function buildMemoryTools(ctx: AuthContext): ToolSpec[] {
   return [
@@ -56,7 +61,8 @@ export function buildMemoryTools(ctx: AuthContext): ToolSpec[] {
         safeMutation('remember_fact', async () => {
           const result = await rememberFact(ctx, input.fact);
           if (!result.ok) return failure(result.message);
-          return JSON.stringify({ remembered: true, name: result.name });
+          // `result.fact` = version normalisée stockée, affichée par le widget.
+          return JSON.stringify({ remembered: true, name: result.name, fact: result.fact });
         }),
     }),
 
@@ -74,7 +80,7 @@ export function buildMemoryTools(ctx: AuthContext): ToolSpec[] {
         safeMutation('update_fact', async () => {
           const result = await updateFact(ctx, input.name, input.fact);
           if (!result.ok) return failure(result.message);
-          return JSON.stringify({ updated: true });
+          return JSON.stringify({ updated: true, name: input.name, fact: result.fact });
         }),
     }),
 
@@ -92,7 +98,7 @@ export function buildMemoryTools(ctx: AuthContext): ToolSpec[] {
         safeMutation('forget_fact', async () => {
           const result = await forgetFact(ctx, input.name);
           if (!result.ok) return failure(result.message);
-          return JSON.stringify({ forgotten: true });
+          return JSON.stringify({ forgotten: true, name: input.name });
         }),
     }),
   ];
