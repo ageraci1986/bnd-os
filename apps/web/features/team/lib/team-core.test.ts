@@ -36,6 +36,7 @@ const invitationMocks = vi.hoisted(() => ({
 vi.mock('@/features/invitations/lib/issue-invitation', () => invitationMocks);
 
 import { changeMemberRoleCore, inviteMemberCore, removeMemberCore } from './team-core';
+import { NotFoundError } from '@nexushub/domain';
 
 const WORKSPACE_ID = 'ws-1';
 const ADMIN_USER_ID = 'admin-user';
@@ -93,6 +94,12 @@ describe('changeMemberRoleCore', () => {
     });
 
     expect(result).toEqual({ ok: true, role: 'admin' });
+    // M1: the lookup MUST go through the composite workspace-scoped unique
+    // key — this is the multi-tenant isolation property of the core.
+    expect(prismaMock.membership.findUnique).toHaveBeenNthCalledWith(1, {
+      where: { workspaceId_userId: { workspaceId: WORKSPACE_ID, userId: TARGET_USER_ID } },
+      select: { id: true, role: true },
+    });
     expect(prismaMock.membership.update).toHaveBeenCalledWith({
       where: { id: MEMBERSHIP_ID },
       data: { role: 'admin' },
@@ -174,6 +181,16 @@ describe('changeMemberRoleCore', () => {
     expect(prismaMock.membership.update).not.toHaveBeenCalled();
     expect(auditMocks.recordAudit).not.toHaveBeenCalled();
   });
+
+  it('throws NotFoundError when the post-write re-read finds no membership', async () => {
+    prismaMock.membership.findUnique
+      .mockResolvedValueOnce({ id: MEMBERSHIP_ID, role: 'user' }) // lookup
+      .mockResolvedValueOnce(null); // re-read: row vanished (concurrent removal)
+    prismaMock.membership.update.mockResolvedValue({ id: MEMBERSHIP_ID });
+    await expect(
+      changeMemberRoleCore(adminCtx, { userId: TARGET_USER_ID, role: 'admin' }),
+    ).rejects.toThrow(NotFoundError);
+  });
 });
 
 // =====================================================================
@@ -188,6 +205,11 @@ describe('removeMemberCore', () => {
     const result = await removeMemberCore(adminCtx, { userId: TARGET_USER_ID });
 
     expect(result).toEqual({ ok: true });
+    // M1: composite workspace-scoped unique key — multi-tenant isolation.
+    expect(prismaMock.membership.findUnique).toHaveBeenCalledWith({
+      where: { workspaceId_userId: { workspaceId: WORKSPACE_ID, userId: TARGET_USER_ID } },
+      select: { id: true, role: true },
+    });
     expect(prismaMock.membership.delete).toHaveBeenCalledWith({ where: { id: MEMBERSHIP_ID } });
     expect(auditMocks.recordAudit).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -318,6 +340,43 @@ describe('inviteMemberCore', () => {
     prismaMock.user.findUnique.mockResolvedValueOnce({ memberships: [{ id: 'm-existing' }] });
     const result = await inviteMemberCore(adminCtx, { email: 'new@example.com', role: 'user' });
     expect(result).toEqual({ ok: false, message: "Cette personne est déjà membre de l'espace." });
+    expect(invitationMocks.issueInvitation).not.toHaveBeenCalled();
+  });
+
+  it('normalizes the email before every use: already-member check catches a case variant', async () => {
+    // I1: the caller (an LLM tool) must not be trusted with the raw email.
+    // `Bob@X.com` and `bob@x.com` are the same mailbox — the already-member
+    // lookup must run against the NORMALIZED form.
+    prismaMock.user.findUnique.mockResolvedValueOnce({ memberships: [{ id: 'm-existing' }] });
+    const result = await inviteMemberCore(adminCtx, { email: '  Bob@X.com ', role: 'user' });
+    expect(result).toEqual({ ok: false, message: "Cette personne est déjà membre de l'espace." });
+    expect(prismaMock.user.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { email: 'bob@x.com' } }),
+    );
+    expect(invitationMocks.issueInvitation).not.toHaveBeenCalled();
+  });
+
+  it('passes the normalized email to issueInvitation and returns it normalized', async () => {
+    const result = await inviteMemberCore(adminCtx, { email: ' New@Example.COM ', role: 'user' });
+    expect(result).toEqual({ ok: true, email: 'new@example.com', role: 'user' });
+    expect(invitationMocks.issueInvitation).toHaveBeenCalledWith(
+      expect.objectContaining({ email: 'new@example.com' }),
+    );
+  });
+
+  it('refuses an invalid email without any DB, rate-limit or issueInvitation call', async () => {
+    const result = await inviteMemberCore(adminCtx, { email: 'not-an-email', role: 'user' });
+    expect(result).toEqual({ ok: false, message: 'Adresse email invalide.' });
+    expect(rateLimitMocks.check).not.toHaveBeenCalled();
+    expect(prismaMock.user.findUnique).not.toHaveBeenCalled();
+    expect(invitationMocks.issueInvitation).not.toHaveBeenCalled();
+  });
+
+  it('refuses an over-long email (>254 chars) as invalid', async () => {
+    const longEmail = `${'a'.repeat(250)}@example.com`;
+    const result = await inviteMemberCore(adminCtx, { email: longEmail, role: 'user' });
+    expect(result).toEqual({ ok: false, message: 'Adresse email invalide.' });
+    expect(prismaMock.user.findUnique).not.toHaveBeenCalled();
     expect(invitationMocks.issueInvitation).not.toHaveBeenCalled();
   });
 });

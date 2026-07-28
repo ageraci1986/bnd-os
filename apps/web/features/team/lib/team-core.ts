@@ -1,10 +1,12 @@
 import 'server-only';
+import { z } from 'zod';
 import { prisma } from '@nexushub/db';
 import { NotFoundError, Roles, type Role } from '@nexushub/domain';
 import type { AuthContext } from '@/lib/auth';
 import { recordAudit } from '@/lib/audit';
 import { getRateLimiter } from '@/lib/rate-limit';
 import { issueInvitation } from '@/features/invitations/lib/issue-invitation';
+import { isLastAdminProtectedError } from './last-admin-error';
 
 /**
  * Team cores (Plan 5b Task 4).
@@ -32,14 +34,14 @@ const ADMIN_ONLY_MESSAGE = 'Action réservée aux administrateurs.';
 const LAST_ADMIN_MESSAGE = "Impossible : ce membre est le dernier Admin de l'espace.";
 const MEMBER_NOT_FOUND_MESSAGE = 'Membre introuvable.';
 
-function isLastAdminProtectedError(err: unknown): boolean {
-  // Detect by message string: Turbopack's RSC module boundary loads Prisma
-  // twice so `instanceof Prisma.PrismaClientKnownRequestError` is
-  // unreliable, and PG raise-exception errors surface as
-  // PrismaClientUnknownRequestError, which would never match anyway. Same
-  // detection as `change-member-role.ts` / `remove-member.ts`.
-  return err instanceof Error && err.message.includes('LAST_ADMIN_PROTECTED');
-}
+/**
+ * Same normalization + validation as `CreateInvitationSchema` in
+ * `create-invitation.ts`. The core validates itself (I1): the caller is an
+ * LLM tool loop, not a Zod-validated form — its email must never be trusted
+ * raw. The NORMALIZED value is the only one used for the already-member
+ * check, `issueInvitation`, and the return value.
+ */
+const InviteEmailSchema = z.string().trim().toLowerCase().email().max(254);
 
 // =====================================================================
 // changeMemberRoleCore
@@ -191,7 +193,7 @@ export async function removeMemberCore(
 // =====================================================================
 
 export interface InviteMemberCoreInput {
-  /** Expected already trimmed + lower-cased, same as `CreateInvitationSchema`. */
+  /** Raw caller-provided email — normalized (trim + lowercase) and validated inside the core. */
   readonly email: string;
   readonly role: Role;
 }
@@ -215,6 +217,14 @@ export async function inviteMemberCore(
     return { ok: false, message: ADMIN_ONLY_MESSAGE };
   }
 
+  // I1: normalize + validate before ANY use. Everything below (already-member
+  // check, issueInvitation, return value) uses only the normalized form.
+  const parsedEmail = InviteEmailSchema.safeParse(input.email);
+  if (!parsedEmail.success) {
+    return { ok: false, message: 'Adresse email invalide.' };
+  }
+  const email = parsedEmail.data;
+
   if (input.role === Roles.Viewer) {
     return {
       ok: false,
@@ -232,7 +242,7 @@ export async function inviteMemberCore(
 
   // Refuse if the email is already a member of the workspace.
   const existingMembership = await prisma.user.findUnique({
-    where: { email: input.email },
+    where: { email },
     select: {
       memberships: {
         where: { workspaceId: ctx.workspaceId },
@@ -247,7 +257,7 @@ export async function inviteMemberCore(
 
   const result = await issueInvitation({
     workspaceId: ctx.workspaceId,
-    email: input.email,
+    email,
     role: input.role,
     scopeClientIds: [],
     scopeProjectIds: [],
@@ -267,5 +277,5 @@ export async function inviteMemberCore(
     data: { role: input.role },
   });
 
-  return { ok: true, email: input.email, role: input.role };
+  return { ok: true, email, role: input.role };
 }
