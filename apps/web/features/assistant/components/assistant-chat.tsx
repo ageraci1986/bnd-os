@@ -1,8 +1,8 @@
 'use client';
 
-import { Fragment, useCallback, useEffect, useId, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { parseSseLines, type StreamWidget } from '../lib/sse';
-import { renderWidget } from './widgets';
+import { renderWidget, type WidgetActions } from './widgets';
 import { appendWidget } from './widgets/dedupe-widgets';
 import { trimWidgetData } from './widgets/trim-widget-data';
 
@@ -127,128 +127,153 @@ export function AssistantChat({ csrfToken, firstName }: AssistantChatProps) {
     [csrfToken],
   );
 
-  const send = useCallback(async () => {
-    const text = input.trim();
-    if (text === '' || busy) return;
-    setBusy(true);
-    setError(null);
-    setInput('');
-    setMessages((prev) => [...prev, { role: 'user', content: text }]);
-    setStreamText('');
-    setStreamWidgets([]);
-
-    const controller = new AbortController();
-    abortRef.current = controller;
-
-    /**
-     * Commit l'échange (question + réponse, même partielle) en bornant
-     * l'historique. Les widgets accumulés pendant le tour sont attachés au
-     * message affiché mais JAMAIS à `historyRef` — le payload renvoyé au
-     * serveur reste texte-only (invariant CLAUDE.md §4.5 : pas de JSON
-     * arbitraire de tool dans le prompt suivant).
-     */
-    const commit = (assistantText: string, widgets: readonly StreamWidget[]): void => {
-      const next: DisplayMessage[] = [
-        ...historyRef.current,
-        { role: 'user', content: text },
-        { role: 'assistant', content: assistantText },
-      ];
-      historyRef.current = next.slice(-HISTORY_MAX);
-      setMessages((prev) =>
-        [
-          ...prev,
-          {
-            role: 'assistant' as const,
-            content: assistantText,
-            ...(widgets.length > 0 ? { widgets } : {}),
-          },
-        ].slice(-DISPLAY_MAX),
-      );
-    };
-
-    let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
-    // Accumulé dans une variable locale (pas seulement en state) pour que les
-    // chemins d'erreur / fermeture sans `done` conservent la réponse partielle.
-    let accumulated = '';
-    let finalText = '';
-    // Idem pour les widgets : variable locale à jour de façon synchrone dans
-    // la boucle de lecture, utilisée par `commit()` sans dépendre du state.
-    let widgets: StreamWidget[] = [];
-    try {
-      const res = await fetch('/api/assistant/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken },
-        body: JSON.stringify({ messages: historyRef.current.slice(-HISTORY_MAX), message: text }),
-        signal: controller.signal,
-      });
-      if (!res.ok || res.body === null) {
-        const payload = (await res.json().catch(() => null)) as { message?: string } | null;
-        setError(payload?.message ?? 'Une erreur est survenue — réessayez.');
-        return;
-      }
-      reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const { events, rest } = parseSseLines(buffer);
-        buffer = rest;
-        for (const event of events) {
-          if (event.type === 'chunk') {
-            accumulated += event.text;
-            setStreamText(accumulated);
-          }
-          if (event.type === 'tool_start') setActivity(ACTIVITY_LABELS[event.name] ?? 'travaille…');
-          if (event.type === 'tool_end') setActivity(null);
-          if (event.type === 'tool_result') {
-            // Trim à la réception : borne aussi bien l'état de stream que la
-            // donnée conservée sur le message commité (ex. board 100 cartes/colonne).
-            // appendWidget garantit aussi qu'un seul board par projet reste
-            // affiché — un board périmé ne doit jamais contredire le texte
-            // de l'agent après une mutation (spec V2 §3.2).
-            widgets = appendWidget(widgets, {
-              tool: event.tool,
-              data: trimWidgetData(event.tool, event.data),
-            });
-            setStreamWidgets(widgets);
-          }
-          if (event.type === 'confirm_request') {
-            setPendingConfirm({ id: event.id, tool: event.tool, description: event.description });
-            setAnswering(null);
-          }
-          if (event.type === 'confirm_resolved') {
-            setPendingConfirm(null);
-            setAnswering(null);
-          }
-          if (event.type === 'done') finalText = event.text;
-          if (event.type === 'error') setError(event.message);
-        }
-      }
-      // Flux terminé sans `done` (erreur mi-parcours, coupure serveur) : on
-      // conserve la réponse partielle plutôt que de jeter les tokens reçus.
-      const answer = finalText !== '' ? finalText : accumulated;
-      if (answer !== '') commit(answer, widgets);
-    } catch (err) {
-      if (reader !== null) void reader.cancel().catch(() => undefined);
-      const isAbort = (err as { name?: string } | null)?.name === 'AbortError';
-      if (!isAbort) {
-        if (accumulated !== '') commit(accumulated, widgets);
-        setError('Connexion interrompue — réessayez.');
-      }
-    } finally {
-      abortRef.current = null;
-      setStreamText(null);
+  /**
+   * `textOverride` (Plan 5c) : canal d'injection utilisé par les widgets
+   * (`WidgetActions.sendMessage`) pour envoyer un message comme si
+   * l'utilisateur l'avait tapé — MÊME chemin que la saisie manuelle en
+   * dessous (mêmes gardes `busy`/texte vide, même historique, même payload).
+   * Un override vide/whitespace est ignoré (repli sur `input`) ; un override
+   * non vide utilisé NE VIDE PAS le champ de saisie (l'utilisateur peut avoir
+   * un brouillon en cours dedans).
+   */
+  const send = useCallback(
+    async (textOverride?: string) => {
+      const useOverride = textOverride !== undefined && textOverride.trim() !== '';
+      const text = (useOverride ? textOverride : input).trim();
+      if (text === '' || busy) return;
+      setBusy(true);
+      setError(null);
+      if (!useOverride) setInput('');
+      setMessages((prev) => [...prev, { role: 'user', content: text }]);
+      setStreamText('');
       setStreamWidgets([]);
-      setActivity(null);
-      // Flux terminé sans confirm_resolved (coupure, erreur) : plus aucun serveur
-      // n'attend la réponse — un dialog restant serait du bruit (clic → 404 muet).
-      setPendingConfirm(null);
-      setAnswering(null);
-      setBusy(false);
-    }
-  }, [busy, csrfToken, input]);
+
+      const controller = new AbortController();
+      abortRef.current = controller;
+
+      /**
+       * Commit l'échange (question + réponse, même partielle) en bornant
+       * l'historique. Les widgets accumulés pendant le tour sont attachés au
+       * message affiché mais JAMAIS à `historyRef` — le payload renvoyé au
+       * serveur reste texte-only (invariant CLAUDE.md §4.5 : pas de JSON
+       * arbitraire de tool dans le prompt suivant).
+       */
+      const commit = (assistantText: string, widgets: readonly StreamWidget[]): void => {
+        const next: DisplayMessage[] = [
+          ...historyRef.current,
+          { role: 'user', content: text },
+          { role: 'assistant', content: assistantText },
+        ];
+        historyRef.current = next.slice(-HISTORY_MAX);
+        setMessages((prev) =>
+          [
+            ...prev,
+            {
+              role: 'assistant' as const,
+              content: assistantText,
+              ...(widgets.length > 0 ? { widgets } : {}),
+            },
+          ].slice(-DISPLAY_MAX),
+        );
+      };
+
+      let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
+      // Accumulé dans une variable locale (pas seulement en state) pour que les
+      // chemins d'erreur / fermeture sans `done` conservent la réponse partielle.
+      let accumulated = '';
+      let finalText = '';
+      // Idem pour les widgets : variable locale à jour de façon synchrone dans
+      // la boucle de lecture, utilisée par `commit()` sans dépendre du state.
+      let widgets: StreamWidget[] = [];
+      try {
+        const res = await fetch('/api/assistant/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken },
+          body: JSON.stringify({ messages: historyRef.current.slice(-HISTORY_MAX), message: text }),
+          signal: controller.signal,
+        });
+        if (!res.ok || res.body === null) {
+          const payload = (await res.json().catch(() => null)) as { message?: string } | null;
+          setError(payload?.message ?? 'Une erreur est survenue — réessayez.');
+          return;
+        }
+        reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const { events, rest } = parseSseLines(buffer);
+          buffer = rest;
+          for (const event of events) {
+            if (event.type === 'chunk') {
+              accumulated += event.text;
+              setStreamText(accumulated);
+            }
+            if (event.type === 'tool_start')
+              setActivity(ACTIVITY_LABELS[event.name] ?? 'travaille…');
+            if (event.type === 'tool_end') setActivity(null);
+            if (event.type === 'tool_result') {
+              // Trim à la réception : borne aussi bien l'état de stream que la
+              // donnée conservée sur le message commité (ex. board 100 cartes/colonne).
+              // appendWidget garantit aussi qu'un seul board par projet reste
+              // affiché — un board périmé ne doit jamais contredire le texte
+              // de l'agent après une mutation (spec V2 §3.2).
+              widgets = appendWidget(widgets, {
+                tool: event.tool,
+                data: trimWidgetData(event.tool, event.data),
+              });
+              setStreamWidgets(widgets);
+            }
+            if (event.type === 'confirm_request') {
+              setPendingConfirm({ id: event.id, tool: event.tool, description: event.description });
+              setAnswering(null);
+            }
+            if (event.type === 'confirm_resolved') {
+              setPendingConfirm(null);
+              setAnswering(null);
+            }
+            if (event.type === 'done') finalText = event.text;
+            if (event.type === 'error') setError(event.message);
+          }
+        }
+        // Flux terminé sans `done` (erreur mi-parcours, coupure serveur) : on
+        // conserve la réponse partielle plutôt que de jeter les tokens reçus.
+        const answer = finalText !== '' ? finalText : accumulated;
+        if (answer !== '') commit(answer, widgets);
+      } catch (err) {
+        if (reader !== null) void reader.cancel().catch(() => undefined);
+        const isAbort = (err as { name?: string } | null)?.name === 'AbortError';
+        if (!isAbort) {
+          if (accumulated !== '') commit(accumulated, widgets);
+          setError('Connexion interrompue — réessayez.');
+        }
+      } finally {
+        abortRef.current = null;
+        setStreamText(null);
+        setStreamWidgets([]);
+        setActivity(null);
+        // Flux terminé sans confirm_resolved (coupure, erreur) : plus aucun serveur
+        // n'attend la réponse — un dialog restant serait du bruit (clic → 404 muet).
+        setPendingConfirm(null);
+        setAnswering(null);
+        setBusy(false);
+      }
+    },
+    [busy, csrfToken, input],
+  );
+
+  /**
+   * Canal d'actions transmis à `renderWidget` (Plan 5c) — identique pour les
+   * messages déjà commités et pour le stream en cours : un widget d'un
+   * message ANCIEN reste actif (« Répondre » sur un mail affiché il y a
+   * plusieurs tours doit marcher), `busy` le neutralise pendant un tour.
+   */
+  const widgetActions: WidgetActions = useMemo(
+    () => ({ sendMessage: (t: string) => void send(t), busy }),
+    [send, busy],
+  );
 
   return (
     <div className="mx-auto flex h-full max-w-2xl flex-col items-center gap-4 px-6 py-8">
@@ -293,7 +318,7 @@ export function AssistantChat({ csrfToken, firstName }: AssistantChatProps) {
               {/* Widgets rendus pleine largeur sous la bulle, pas dedans — plus
                   lisible pour un mini-Kanban ou une liste de mails. */}
               {m.widgets?.map((w, wi) => (
-                <Fragment key={wi}>{renderWidget(w.tool, w.data)}</Fragment>
+                <Fragment key={wi}>{renderWidget(w.tool, w.data, widgetActions)}</Fragment>
               ))}
             </Fragment>
           ))}
@@ -305,7 +330,7 @@ export function AssistantChat({ csrfToken, firstName }: AssistantChatProps) {
             </div>
           )}
           {streamWidgets.map((w, wi) => (
-            <Fragment key={wi}>{renderWidget(w.tool, w.data)}</Fragment>
+            <Fragment key={wi}>{renderWidget(w.tool, w.data, widgetActions)}</Fragment>
           ))}
           {activity !== null && (
             <p className="text-xs font-semibold text-[color:var(--color-text-ghost)]">{activity}</p>

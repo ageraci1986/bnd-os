@@ -7,6 +7,21 @@ import { MemoryWidget } from './memory-widget';
 import { ProjectListWidget } from './project-list-widget';
 
 /**
+ * Canal d'interactivité fourni par `assistant-chat` aux widgets qui en ont
+ * besoin (Plan 5c). `sendMessage` injecte un message utilisateur dans le chat
+ * comme si l'utilisateur l'avait tapé lui-même — même chemin que la saisie
+ * manuelle (voir `send(textOverride)` dans `assistant-chat.tsx`), donc même
+ * historique texte-only, mêmes gardes. `busy` reflète un tour en cours : les
+ * widgets doivent désactiver leurs boutons d'action pendant ce temps.
+ */
+export interface WidgetActions {
+  /** Injecte un message utilisateur dans le chat (comme si l'utilisateur l'avait tapé). */
+  readonly sendMessage: (text: string) => void;
+  /** True pendant un tour en cours — les widgets doivent désactiver leurs boutons. */
+  readonly busy: boolean;
+}
+
+/**
  * Dispatcher : route un événement `tool_result` (nom de tool + data JSON)
  * vers son composant widget. `tool` doit passer `isWidgetTool`
  * (`lib/assistant/widget-tools.ts`) — même whitelist utilisée côté serveur
@@ -14,8 +29,21 @@ import { ProjectListWidget } from './project-list-widget';
  * un data qui échoue son parse Zod local dans le widget rend aussi `null`
  * mais trace un `console.warn` dev (voir `parse-widget-data.ts`) pour
  * diagnostiquer un drift de shape entre un tool serveur et son widget.
+ *
+ * `actions` (Plan 5c) est optionnel et transmis tel quel aux widgets qui le
+ * consomment — pour l'instant AUCUN ne le fait (MailListWidget/MailDraftWidget
+ * le brancheront dans les tâches suivantes du plan 5c). Un appel à 2
+ * arguments reste entièrement valide.
  */
-export function renderWidget(tool: string, data: unknown): ReactNode | null {
+export function renderWidget(
+  tool: string,
+  data: unknown,
+  actions?: WidgetActions,
+): ReactNode | null {
+  // Volontairement non déstructuré ici : `actions` n'est pas encore consommé
+  // par un widget (branché tâche par tâche dans le plan 5c) — ce garde évite
+  // un lint "unused parameter" sans changer le comportement.
+  void actions;
   if (!isWidgetTool(tool)) return null;
   switch (tool) {
     case 'get_today_overview':
