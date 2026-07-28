@@ -52,11 +52,12 @@ beforeEach(() => {
 });
 
 describe('buildReadTools', () => {
-  it('expose les 10 tools de lecture, aucun gated ni adminOnly', async () => {
+  it('expose les 11 tools de lecture, aucun gated ni adminOnly', async () => {
     const tools = await buildReadTools(ctx);
     expect(tools.map((t) => t.name).sort()).toEqual([
       'find_projects',
       'get_card',
+      'get_card_details',
       'get_current_datetime',
       'get_project_board',
       'get_team_members',
@@ -466,6 +467,78 @@ describe('buildReadTools', () => {
     expect(out.checklistTruncated).toBe(true);
     const select = prismaMock.card.findFirst.mock.calls[0]?.[0]?.select;
     expect(select?.checklistItems?.take).toBe(50);
+  });
+
+  it('get_card_details renvoie le JSON complet (échéance, colonne, assignés, checklist ordonnée avec ids)', async () => {
+    prismaMock.card.findFirst.mockResolvedValue({
+      id: 'c1',
+      title: 'Créer le devis',
+      description: 'Devis pour le client',
+      dueDate: new Date('2026-08-01T00:00:00.000Z'),
+      column: { name: 'À faire' },
+      assignees: [{ raci: 'responsible', user: { firstName: 'Ada' } }],
+      checklistItems: [
+        { id: 'i2', title: 'Étape 2', isChecked: false },
+        { id: 'i1', title: 'Étape 1', isChecked: true },
+      ],
+    });
+    const out = JSON.parse(
+      await execute('get_card_details', { cardId: '4c9d3f0a-2222-4444-8888-aaaaaaaaaaaa' }),
+    );
+    expect(out).toEqual({
+      id: 'c1',
+      title: 'Créer le devis',
+      description: 'Devis pour le client',
+      due: '2026-08-01',
+      column: 'À faire',
+      assignees: [{ name: 'Ada', raci: 'responsible' }],
+      checklist: [
+        { id: 'i2', title: 'Étape 2', checked: false },
+        { id: 'i1', title: 'Étape 1', checked: true },
+      ],
+    });
+    // Ordre renvoyé tel quel par Prisma (orderBy position asc) — on vérifie
+    // que le select a bien demandé cet ordre plutôt que de re-trier ici.
+    const select = prismaMock.card.findFirst.mock.calls[0]?.[0]?.select;
+    expect(select?.checklistItems?.orderBy).toEqual({ position: 'asc' });
+  });
+
+  it('get_card_details : échéance nulle → due:null', async () => {
+    prismaMock.card.findFirst.mockResolvedValue({
+      id: 'c1',
+      title: 'Sans échéance',
+      description: null,
+      dueDate: null,
+      column: { name: 'À faire' },
+      assignees: [],
+      checklistItems: [],
+    });
+    const out = JSON.parse(
+      await execute('get_card_details', { cardId: '4c9d3f0a-2222-4444-8888-aaaaaaaaaaaa' }),
+    );
+    expect(out.due).toBeNull();
+  });
+
+  it('get_card_details : carte hors workspace/scope → « Carte introuvable. »', async () => {
+    prismaMock.card.findFirst.mockResolvedValue(null);
+    const out = await execute('get_card_details', {
+      cardId: '4c9d3f0a-2222-4444-8888-aaaaaaaaaaaa',
+    });
+    expect(out).toBe('Carte introuvable.');
+  });
+
+  it('get_card_details : where scope-scopé via AND explicite, jamais de spread à plat à côté de id', async () => {
+    scopeMocks.scopedCardWhere.mockReturnValueOnce({ project: { id: { in: ['scope-p1'] } } });
+    prismaMock.card.findFirst.mockResolvedValue(null);
+    await execute('get_card_details', { cardId: '4c9d3f0a-2222-4444-8888-aaaaaaaaaaaa' });
+    const where = prismaMock.card.findFirst.mock.calls[0]?.[0]?.where;
+    expect(where?.AND).toEqual([
+      { id: '4c9d3f0a-2222-4444-8888-aaaaaaaaaaaa' },
+      { project: { id: { in: ['scope-p1'] } } },
+    ]);
+    expect(where?.workspaceId).toBe('w1');
+    expect(where?.deletedAt).toBeNull();
+    expect(scopeMocks.scopedCardWhere).toHaveBeenCalled();
   });
 
   it('erreur NEXT_REDIRECT (session expirée) → message « session expirée » dédié', async () => {

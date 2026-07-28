@@ -23,6 +23,8 @@ import { moveCard } from '@/features/projects/actions/move-card';
 import { updateCard } from '@/features/projects/actions/update-card';
 import { updateCardDueDate } from '@/features/projects/actions/update-card-due-date';
 import { addCardAssignee, removeCardAssignee } from '@/features/projects/actions/card-assignees';
+import { toggleChecklistItem } from '@/features/projects/actions/checklist';
+import { advanceCard } from '@/features/projects/actions/advance-card';
 import { safeMutation } from './safe-wrappers';
 
 const uuid = z.string().uuid();
@@ -354,6 +356,75 @@ export function buildKanbanTools(ctx: AuthContext): ToolSpec[] {
           const result = await removeCardAssignee(input);
           if (!result.ok) return failure(result.message);
           return JSON.stringify({ removed: true });
+        }),
+    }),
+
+    defineTool({
+      name: 'set_checklist_item',
+      description:
+        "Coche ou décoche un item de checklist d'une carte (ids via get_card_details). Fournir cardId : si le dernier item vient d'être coché, la carte avance automatiquement de colonne (règle métier NexusHub) et le résultat l'indique.",
+      inputSchema: z.object({
+        itemId: uuid,
+        cardId: uuid,
+        isChecked: z.boolean(),
+      }),
+      jsonSchema: {
+        type: 'object',
+        properties: {
+          itemId: UUID_JSON,
+          cardId: UUID_JSON,
+          isChecked: { type: 'boolean' },
+        },
+        required: ['itemId', 'cardId', 'isChecked'],
+      },
+      handler: async (input) =>
+        safeMutation('set_checklist_item', async () => {
+          const result = await toggleChecklistItem({
+            itemId: input.itemId,
+            isChecked: input.isChecked,
+          });
+          if (!result.ok) return failure(result.message);
+          const checked = result.items.filter((i) => i.isChecked).length;
+          const total = result.items.length;
+
+          // L'auto-avancement (règle métier PRD §8.2) ne se déclenche QUE
+          // quand on vient de cocher (jamais au décochage) ET que la
+          // checklist est intégralement cochée. Côté UI le déclenchement
+          // attend 1800ms (fenêtre d'annulation) ; côté agent il est
+          // immédiat — cette fenêtre n'a pas de sens pour un tool.
+          let autoAdvanced = false;
+          let nowInColumn: string | undefined;
+          if (input.isChecked && result.allChecked) {
+            // Best-effort : un échec d'avancement ne doit jamais faire
+            // passer le toggle (déjà committé) pour un échec — l'agent a
+            // simplement l'info que l'auto-avancement n'a pas eu lieu.
+            try {
+              const advance = await advanceCard({ cardId: input.cardId });
+              if (advance.ok && advance.moved) {
+                // Lecture-après-écriture (spec V2 §3.1, même convention que
+                // move_card) : le nom de colonne est RELU en DB, jamais
+                // déduit de l'id renvoyé par advanceCard.
+                const after = await prisma.card.findFirst({
+                  where: { id: input.cardId, workspaceId: ctx.workspaceId, deletedAt: null },
+                  select: { column: { select: { name: true } } },
+                });
+                if (after !== null) {
+                  autoAdvanced = true;
+                  nowInColumn = after.column.name;
+                }
+              }
+            } catch {
+              // autoAdvanced reste false — le toggle, lui, est déjà acquis.
+            }
+          }
+
+          return JSON.stringify({
+            updated: true,
+            checked,
+            total,
+            autoAdvanced,
+            ...(nowInColumn !== undefined ? { nowInColumn } : {}),
+          });
         }),
     }),
 

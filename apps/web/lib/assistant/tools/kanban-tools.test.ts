@@ -41,6 +41,12 @@ const assigneeMocks = vi.hoisted(() => ({
 }));
 vi.mock('@/features/projects/actions/card-assignees', () => assigneeMocks);
 
+const checklistMocks = vi.hoisted(() => ({ toggleChecklistItem: vi.fn() }));
+vi.mock('@/features/projects/actions/checklist', () => checklistMocks);
+
+const advanceCardMocks = vi.hoisted(() => ({ advanceCard: vi.fn() }));
+vi.mock('@/features/projects/actions/advance-card', () => advanceCardMocks);
+
 // Lecture-après-écriture (spec V2 §3.1) : `move_card`/`update_card` relisent
 // l'état en DB après mutation — voir repo convention dans card-core.test.ts.
 // `project.findFirst` / `column.findFirst` / `card.count` : lookups véridiques
@@ -109,7 +115,7 @@ beforeEach(() => {
 });
 
 describe('buildKanbanTools', () => {
-  it('expose les 14 tools mutants, delete_card/delete_project/delete_column gated, aucun adminOnly', () => {
+  it('expose les 15 tools mutants, delete_card/delete_project/delete_column gated, aucun adminOnly', () => {
     const list = tools();
     expect(list.map((t) => t.name).sort()).toEqual([
       'add_card_assignee',
@@ -124,6 +130,7 @@ describe('buildKanbanTools', () => {
       'rename_column',
       'reorder_columns',
       'set_card_due_date',
+      'set_checklist_item',
       'update_card',
       'update_project',
     ]);
@@ -497,6 +504,143 @@ describe('buildKanbanTools', () => {
     });
     const fail = await run('remove_card_assignee', { cardId: CARD_ID, userId: USER_ID });
     expect(fail).toBe('Échec : Carte introuvable.');
+  });
+
+  it('set_checklist_item : coche un item hors dernier restant → décompte exact, pas d’advanceCard', async () => {
+    checklistMocks.toggleChecklistItem.mockResolvedValue({
+      ok: true,
+      allChecked: false,
+      items: [
+        { id: 'i1', title: 'Étape 1', isChecked: true, position: 1, columnSourceId: null },
+        { id: 'i2', title: 'Étape 2', isChecked: false, position: 2, columnSourceId: null },
+      ],
+    });
+    const out = await run('set_checklist_item', {
+      itemId: 'i1',
+      cardId: CARD_ID,
+      isChecked: true,
+    });
+    expect(checklistMocks.toggleChecklistItem).toHaveBeenCalledWith({
+      itemId: 'i1',
+      isChecked: true,
+    });
+    expect(JSON.parse(out)).toEqual({ updated: true, checked: 1, total: 2, autoAdvanced: false });
+    expect(advanceCardMocks.advanceCard).not.toHaveBeenCalled();
+  });
+
+  it('set_checklist_item : coche le dernier item restant → advanceCard({cardId}) puis autoAdvanced + nowInColumn relus en DB', async () => {
+    checklistMocks.toggleChecklistItem.mockResolvedValue({
+      ok: true,
+      allChecked: true,
+      items: [
+        { id: 'i1', title: 'Étape 1', isChecked: true, position: 1, columnSourceId: null },
+        { id: 'i2', title: 'Étape 2', isChecked: true, position: 2, columnSourceId: null },
+      ],
+    });
+    advanceCardMocks.advanceCard.mockResolvedValue({ ok: true, moved: true, newColumnId: 'col2' });
+    prismaMocks.card.findFirst.mockResolvedValue({ column: { name: 'Fait' } });
+
+    const out = await run('set_checklist_item', {
+      itemId: 'i2',
+      cardId: CARD_ID,
+      isChecked: true,
+    });
+
+    expect(advanceCardMocks.advanceCard).toHaveBeenCalledWith({ cardId: CARD_ID });
+    expect(prismaMocks.card.findFirst).toHaveBeenCalledWith({
+      where: { id: CARD_ID, workspaceId: ctx.workspaceId, deletedAt: null },
+      select: { column: { select: { name: true } } },
+    });
+    expect(JSON.parse(out)).toEqual({
+      updated: true,
+      checked: 2,
+      total: 2,
+      autoAdvanced: true,
+      nowInColumn: 'Fait',
+    });
+  });
+
+  it('set_checklist_item : décocher ne déclenche jamais advanceCard, même si allChecked (impossible en pratique mais défensif)', async () => {
+    checklistMocks.toggleChecklistItem.mockResolvedValue({
+      ok: true,
+      allChecked: true,
+      items: [{ id: 'i1', title: 'Étape 1', isChecked: false, position: 1, columnSourceId: null }],
+    });
+    const out = await run('set_checklist_item', {
+      itemId: 'i1',
+      cardId: CARD_ID,
+      isChecked: false,
+    });
+    expect(advanceCardMocks.advanceCard).not.toHaveBeenCalled();
+    expect(JSON.parse(out)).toEqual({ updated: true, checked: 0, total: 1, autoAdvanced: false });
+  });
+
+  it('set_checklist_item : advanceCard refuse/ne déplace pas → autoAdvanced:false sans planter, toggle déjà acquis', async () => {
+    checklistMocks.toggleChecklistItem.mockResolvedValue({
+      ok: true,
+      allChecked: true,
+      items: [{ id: 'i1', title: 'Étape 1', isChecked: true, position: 1, columnSourceId: null }],
+    });
+    advanceCardMocks.advanceCard.mockResolvedValue({
+      ok: true,
+      moved: false,
+      reason: 'already-last-column',
+    });
+    const out = await run('set_checklist_item', {
+      itemId: 'i1',
+      cardId: CARD_ID,
+      isChecked: true,
+    });
+    expect(JSON.parse(out)).toEqual({ updated: true, checked: 1, total: 1, autoAdvanced: false });
+    expect(prismaMocks.card.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('set_checklist_item : advanceCard échoue ({ok:false}) → autoAdvanced:false, pas de fuite du message', async () => {
+    checklistMocks.toggleChecklistItem.mockResolvedValue({
+      ok: true,
+      allChecked: true,
+      items: [{ id: 'i1', title: 'Étape 1', isChecked: true, position: 1, columnSourceId: null }],
+    });
+    advanceCardMocks.advanceCard.mockResolvedValue({
+      ok: false,
+      message: 'Accès restreint à ce projet.',
+    });
+    const out = await run('set_checklist_item', {
+      itemId: 'i1',
+      cardId: CARD_ID,
+      isChecked: true,
+    });
+    expect(JSON.parse(out)).toEqual({ updated: true, checked: 1, total: 1, autoAdvanced: false });
+  });
+
+  it('set_checklist_item : advanceCard ok+moved mais la relecture échoue → autoAdvanced:false sans lever', async () => {
+    checklistMocks.toggleChecklistItem.mockResolvedValue({
+      ok: true,
+      allChecked: true,
+      items: [{ id: 'i1', title: 'Étape 1', isChecked: true, position: 1, columnSourceId: null }],
+    });
+    advanceCardMocks.advanceCard.mockResolvedValue({ ok: true, moved: true, newColumnId: 'col2' });
+    prismaMocks.card.findFirst.mockRejectedValue(new Error('connect ECONNREFUSED'));
+    const out = await run('set_checklist_item', {
+      itemId: 'i1',
+      cardId: CARD_ID,
+      isChecked: true,
+    });
+    expect(JSON.parse(out)).toEqual({ updated: true, checked: 1, total: 1, autoAdvanced: false });
+  });
+
+  it('set_checklist_item : échec du toggle → message montrable, jamais d’advanceCard', async () => {
+    checklistMocks.toggleChecklistItem.mockResolvedValue({
+      ok: false,
+      message: 'Session lecture seule (Viewer).',
+    });
+    const out = await run('set_checklist_item', {
+      itemId: 'i1',
+      cardId: CARD_ID,
+      isChecked: true,
+    });
+    expect(out).toBe('Échec : Session lecture seule (Viewer).');
+    expect(advanceCardMocks.advanceCard).not.toHaveBeenCalled();
   });
 
   it('delete_card est gated:true et wrappe deleteCardCore(ctx, …)', async () => {

@@ -456,5 +456,55 @@ export async function buildReadTools(ctx: AuthContext): Promise<ToolSpec[]> {
           });
         }),
     }),
+
+    defineTool({
+      name: 'get_card_details',
+      description:
+        'Détails d’une carte : description, échéance, colonne, assignés RACI, et items de checklist (avec leur id, pour set_checklist_item).',
+      inputSchema: z.object({ cardId: uuid }),
+      jsonSchema: { type: 'object', properties: { cardId: UUID_JSON }, required: ['cardId'] },
+      handler: async (input) =>
+        safeDb('get_card_details', async () => {
+          const card = await prisma.card.findFirst({
+            where: {
+              workspaceId,
+              deletedAt: null,
+              // AND explicite : même précédent que get_project_board /
+              // find_projects — `scopedCardWhere` s'applique via la
+              // relation `project`, mais on garde le pattern AND pour ne
+              // jamais risquer qu'un spread à plat écrase la clé `id`.
+              AND: [{ id: input.cardId }, scopedCardWhere(scope)],
+            },
+            select: {
+              id: true,
+              title: true,
+              description: true,
+              dueDate: true,
+              column: { select: { name: true } },
+              assignees: {
+                select: { raci: true, user: { select: { firstName: true } } },
+              },
+              checklistItems: {
+                select: { id: true, title: true, isChecked: true },
+                orderBy: { position: 'asc' },
+              },
+            },
+          });
+          if (card === null) return 'Carte introuvable.';
+          return JSON.stringify({
+            id: card.id,
+            title: card.title,
+            description: card.description,
+            due: card.dueDate !== null ? card.dueDate.toISOString().slice(0, 10) : null,
+            column: card.column.name,
+            assignees: card.assignees.map((a) => ({ name: a.user.firstName, raci: a.raci })),
+            checklist: card.checklistItems.map((i) => ({
+              id: i.id,
+              title: i.title,
+              checked: i.isChecked,
+            })),
+          });
+        }),
+    }),
   ];
 }
