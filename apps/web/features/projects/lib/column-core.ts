@@ -1,6 +1,6 @@
 import 'server-only';
 import { prisma } from '@nexushub/db';
-import { NotFoundError, Roles } from '@nexushub/domain';
+import { BLOCKED_COLUMN_POSITION, NotFoundError, Roles } from '@nexushub/domain';
 import type { AuthContext } from '@/lib/auth';
 import { loadUserScope } from '@/lib/auth/scope';
 import { SCOPE_ERROR_MESSAGE, VIEWER_READ_ONLY_MESSAGE } from './scope-error';
@@ -81,21 +81,55 @@ export async function addColumnCore(
     return { ok: false, message: NAME_REQUIRED_MESSAGE };
   }
 
-  // Insert just before the always-last "Bloqué" system column (position
-  // 9999, see packages/domain/src/projects/index.ts BLOCKED_COLUMN_POSITION):
-  // take the current max position among non-system columns and add one step.
+  // Insert just before the always-last "Bloqué" system column
+  // (BLOCKED_COLUMN_POSITION = 9999): take the current max position among
+  // non-system columns and add one step.
   const [top] = await prisma.column.findMany({
     where: { projectId: input.projectId, isBlockedSystem: false },
     orderBy: { position: 'desc' },
     take: 1,
     select: { position: true },
   });
-  const position = (top?.position ?? 0) + POSITION_STEP;
+  const candidate = (top?.position ?? 0) + POSITION_STEP;
 
-  const created = await prisma.column.create({
-    data: { projectId: input.projectId, name, position, isBlockedSystem: false },
+  if (candidate < BLOCKED_COLUMN_POSITION) {
+    const created = await prisma.column.create({
+      data: { projectId: input.projectId, name, position: candidate, isBlockedSystem: false },
+      select: { id: true },
+    });
+    return { ok: true, columnId: created.id, columns: await readColumns(input.projectId) };
+  }
+
+  // Overflow guard (CLAUDE.md §6.3): naively appending would place the new
+  // column at/after Bloqué's fixed position 9999, making it render AFTER the
+  // system column in every position-ordered view. Compact instead: renumber
+  // the existing non-system columns with an even step that keeps every
+  // position — including the new column's — strictly below 9999, then create
+  // the new column, all in one transaction. Bloqué itself is never touched
+  // (the renumbering only reads and updates isBlockedSystem: false rows).
+  const nonSystem = await prisma.column.findMany({
+    where: { projectId: input.projectId, isBlockedSystem: false },
+    orderBy: { position: 'asc' },
     select: { id: true },
   });
+  const count = nonSystem.length;
+  const step = Math.max(1, Math.floor(BLOCKED_COLUMN_POSITION / (count + 2)));
+
+  const results = await prisma.$transaction([
+    ...nonSystem.map((c, index) =>
+      prisma.column.update({ where: { id: c.id }, data: { position: (index + 1) * step } }),
+    ),
+    prisma.column.create({
+      data: {
+        projectId: input.projectId,
+        name,
+        position: (count + 1) * step,
+        isBlockedSystem: false,
+      },
+      select: { id: true },
+    }),
+  ]);
+  const created = results[results.length - 1] as { id: string };
 
   return { ok: true, columnId: created.id, columns: await readColumns(input.projectId) };
 }
@@ -232,7 +266,10 @@ export async function deleteColumnCore(
   // still send them somewhere valid once unblocked. Harmless no-op when no
   // card references this column.
   const previousColumnRerouting = prisma.card.updateMany({
-    where: { previousColumnId: column.id },
+    // workspaceId is redundant here (the column lookup is already
+    // workspace-scoped) but kept per CLAUDE.md §4.4: every Prisma query
+    // includes workspace_id systematically — Card carries it denormalised.
+    where: { workspaceId: ctx.workspaceId, previousColumnId: column.id },
     data: { previousColumnId: target.id },
   });
 

@@ -116,6 +116,89 @@ describe('addColumnCore', () => {
     });
   });
 
+  it('renumbers all non-system columns in one transaction when the candidate position would reach Bloqué (9999)', async () => {
+    // top at 9000 → candidate 10000 ≥ BLOCKED_COLUMN_POSITION → compaction path.
+    prismaMock.column.findMany
+      .mockResolvedValueOnce([{ position: 9000 }]) // max non-system position lookup
+      .mockResolvedValueOnce([{ id: 'c1' }, { id: 'c2' }, { id: 'c3' }]) // non-system columns, ordered
+      .mockResolvedValueOnce([
+        { id: 'c1', name: 'A', position: 1999 },
+        { id: 'c2', name: 'B', position: 3998 },
+        { id: 'c3', name: 'C', position: 5997 },
+        { id: 'new-col', name: 'Nouvelle colonne', position: 7996 },
+        { id: BLOCKED_ID, name: 'Bloqué', position: 9999 },
+      ]); // readColumns post-state
+    prismaMock.column.update.mockImplementation(
+      ({ where, data }: { where: { id: string }; data: { position: number } }) =>
+        Promise.resolve({ id: where.id, ...data }),
+    );
+    prismaMock.column.create.mockResolvedValueOnce({ id: 'new-col' });
+
+    const result = await addColumnCore(adminCtx, {
+      projectId: PROJECT_ID,
+      name: 'Nouvelle colonne',
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected ok result');
+    expect(result.columnId).toBe('new-col');
+
+    // The renumbering only ever reads/updates NON-system columns — Bloqué is
+    // untouched by construction.
+    expect(prismaMock.column.findMany.mock.calls[1]![0]).toMatchObject({
+      where: { projectId: PROJECT_ID, isBlockedSystem: false },
+      orderBy: { position: 'asc' },
+      select: { id: true },
+    });
+
+    // step = max(1, floor(9999 / (3 + 2))) = 1999
+    expect(prismaMock.column.update).toHaveBeenNthCalledWith(1, {
+      where: { id: 'c1' },
+      data: { position: 1999 },
+    });
+    expect(prismaMock.column.update).toHaveBeenNthCalledWith(2, {
+      where: { id: 'c2' },
+      data: { position: 3998 },
+    });
+    expect(prismaMock.column.update).toHaveBeenNthCalledWith(3, {
+      where: { id: 'c3' },
+      data: { position: 5997 },
+    });
+    expect(prismaMock.column.update).toHaveBeenCalledTimes(3);
+    const updatedIds = prismaMock.column.update.mock.calls.map(
+      (call) => (call[0] as { where: { id: string } }).where.id,
+    );
+    expect(updatedIds).toEqual(['c1', 'c2', 'c3']);
+    expect(updatedIds).not.toContain(BLOCKED_ID);
+
+    // New column lands at (count + 1) * step = 7996 — strictly below Bloqué.
+    expect(prismaMock.column.create).toHaveBeenCalledWith({
+      data: {
+        projectId: PROJECT_ID,
+        name: 'Nouvelle colonne',
+        position: 7996,
+        isBlockedSystem: false,
+      },
+      select: { id: true },
+    });
+
+    // Single transaction: 3 renumberings + 1 create.
+    expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
+    expect(prismaMock.$transaction.mock.calls[0]![0]).toHaveLength(4);
+  });
+
+  it('does not open a transaction nor renumber in the nominal (non-overflow) case', async () => {
+    prismaMock.column.findMany
+      .mockResolvedValueOnce([{ position: 3000 }])
+      .mockResolvedValueOnce([]);
+    prismaMock.column.create.mockResolvedValueOnce({ id: 'new-col' });
+
+    await addColumnCore(adminCtx, { projectId: PROJECT_ID, name: 'Nouvelle colonne' });
+
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+    expect(prismaMock.column.update).not.toHaveBeenCalled();
+  });
+
   it('rejects Viewer with VIEWER_READ_ONLY_MESSAGE and performs no lookup', async () => {
     const result = await addColumnCore(viewerCtx, { projectId: PROJECT_ID, name: 'X' });
     expect(result).toEqual({ ok: false, message: VIEWER_READ_ONLY_MESSAGE });
@@ -363,7 +446,7 @@ describe('deleteColumnCore', () => {
     });
     expect(prismaMock.card.update).not.toHaveBeenCalled();
     expect(prismaMock.card.updateMany).toHaveBeenCalledWith({
-      where: { previousColumnId: COLUMN_ID },
+      where: { workspaceId: WORKSPACE_ID, previousColumnId: COLUMN_ID },
       data: { previousColumnId: TARGET_ID },
     });
     expect(prismaMock.column.delete).toHaveBeenCalledWith({ where: { id: COLUMN_ID } });
