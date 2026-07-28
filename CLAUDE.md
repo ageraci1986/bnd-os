@@ -289,7 +289,7 @@ nexushub/
 - **Toujours présente**, jamais éditable, jamais supprimable, jamais déplaçable (contrainte DB + UI désactivée).
 - Une carte y entre **automatiquement** si `due_date < now()` ET pas dans la dernière colonne.
 - Repousser l'échéance → la carte **sort automatiquement** de Bloqué et retourne en `previous_column_id` (mémorisé).
-- Job Inngest cron **toutes les heures** : scan global des échéances dépassées par workspace.
+- Job Inngest cron **toutes les heures** : scan global des échéances dépassées par workspace (réel depuis le Plan 3b — `blocked-cards-scan` ; complété par le reconcile-on-read qui notifie aussi).
 - Métrique Overview "Cartes bloquées" = `COUNT WHERE in_blocked_column AND workspace_id = X`. Affichage rouge si > 0.
 
 ### 6.4 Templates Kanban
@@ -424,6 +424,7 @@ Avant chaque action :
 | 2026-07-28 | Assistant Plan 5b — CRUD clients/contacts/équipe/templates + mails en masse (tools équipe adminOnly+gated, bulk owner-only, audit étendu)        | Angelo L. + Claude |
 | 2026-07-28 | Assistant Plan 5c — widgets mail interactifs (client embarqué), brouillon éditeur live DB + send_draft à jeton de fraîcheur, deep-link mail      | Angelo L. + Claude |
 | 2026-07-28 | Assistant Plan 4 — orbe animée (états + reduced-motion), accueil briefing serveur + KPI, E2E assistant (provider scripté, sign-in), Storybook 10 | Angelo L. + Claude |
+| 2026-07-28 | Assistant Plan 3b — proactivité Inngest 4.13.0 (briefing matinal, scan horaire §6.3 réel, mails importants, pile de notices, Settings)           | Angelo L. + Claude |
 | 2026-07-28 | Template de carte : deep-link éditeur, lien modal, bootstrap défaut « Standard » + backfill                                                      | Angelo L. + Claude |
 
 > **Règle :** chaque modification de ce fichier ajoute une ligne ici.

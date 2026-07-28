@@ -202,4 +202,4 @@ fact (≤ 500 caractères) · created_at · updated_at
 
 - `@anthropic-ai/sdk` (server-only). **Vérifier via Context7 avant installation** (version,
   breaking changes, peer deps) conformément au CLAUDE.md.
-- Pas d'autre dépendance : SSE natif, Zod/Framer Motion/Inngest/Upstash déjà présents.
+- Pas d'autre dépendance : SSE natif, Zod/Upstash déjà présents. (Correctif 2026-07-28 : Inngest n'était PAS présent — installé au Plan 3b, `inngest@4.13.0`.)
