@@ -420,5 +420,6 @@ Avant chaque action :
 | 2026-07-27 | Assistant Plan 2a — tools mutants Kanban + gate Allow/Deny temps réel (ConfirmStore Redis, cores extraits, audit assistant\_\*)    | Angelo L. + Claude |
 | 2026-07-28 | Assistant Plan 2b — tools mail (envoi gated, confirmation exhaustive Cci), widgets structurés dans le chat, store atomique         | Angelo L. + Claude |
 | 2026-07-28 | Assistant Plan 3a — mémoire utilisateur (table RLS personnelle, tools remember/update/forget, chips de visibilité, onglet Mémoire) | Angelo L. + Claude |
+| 2026-07-28 | Assistant Plan 5a — fiabilité (lecture-après-écriture, confirm async véridique), find_projects, CRUD projets/colonnes/checklist    | Angelo L. + Claude |
 
 > **Règle :** chaque modification de ce fichier ajoute une ligne ici.
