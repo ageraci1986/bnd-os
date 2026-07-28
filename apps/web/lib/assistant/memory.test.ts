@@ -63,15 +63,17 @@ describe('slugifyFact', () => {
 
 describe('loadMemories', () => {
   it('charge les faits du scope (workspace+user), plus anciens d’abord, plafonné à MEMORY_MAX_FACTS', async () => {
+    const updatedAt = new Date('2026-07-27T10:00:00Z');
     prismaMock.assistantMemory.findMany.mockResolvedValue([
-      { name: 'aime-le-cafe', fact: 'Aime le café' },
+      { name: 'aime-le-cafe', fact: 'Aime le café', updatedAt },
     ]);
     const out = await loadMemories(ctx);
-    expect(out).toEqual([{ name: 'aime-le-cafe', fact: 'Aime le café' }]);
+    expect(out).toEqual([{ name: 'aime-le-cafe', fact: 'Aime le café', updatedAt }]);
     const call = prismaMock.assistantMemory.findMany.mock.calls[0]?.[0];
     expect(call.where).toEqual({ workspaceId: 'w1', userId: 'u1' });
     expect(call.orderBy).toEqual({ createdAt: 'asc' });
     expect(call.take).toBe(MEMORY_MAX_FACTS);
+    expect(call.select).toEqual({ name: true, fact: true, updatedAt: true });
   });
 });
 

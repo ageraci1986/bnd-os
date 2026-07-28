@@ -40,6 +40,44 @@ describe('<MemoryPanel />', () => {
     expect(screen.getByDisplayValue('Travaille surtout avec le client Acme')).toBeInTheDocument();
   });
 
+  it('shows the update date of an entry when provided', () => {
+    render(
+      <MemoryPanel
+        entries={[
+          {
+            name: 'prefere-reunions-le-matin',
+            fact: 'Préfère les réunions le matin',
+            // Heure LOCALE (pas de Z) : le libellé formaté reste « 27/07/2026 »
+            // quel que soit le fuseau de la machine de test.
+            updatedAt: new Date('2026-07-27T12:00:00'),
+          },
+        ]}
+        csrfToken="tok"
+      />,
+    );
+    expect(screen.getByText(/Mis à jour le 27\/07\/2026/)).toBeInTheDocument();
+  });
+
+  it('resyncs the edit input when a refreshed entries prop carries a normalized fact', () => {
+    const { rerender } = render(<MemoryPanel entries={ENTRIES} csrfToken="tok" />);
+    expect(screen.getByDisplayValue('Préfère les réunions le matin')).toBeInTheDocument();
+
+    // Simule le refetch RSC post-édition (revalidatePath) : le fait revient
+    // normalisé côté serveur — la ligne, keyée sur nom+fait, doit remonter
+    // avec le nouveau defaultValue.
+    rerender(
+      <MemoryPanel
+        entries={[
+          { name: 'prefere-reunions-le-matin', fact: 'Préfère les réunions en fin de matinée' },
+          ENTRIES[1]!,
+        ]}
+        csrfToken="tok"
+      />,
+    );
+    expect(screen.getByDisplayValue('Préfère les réunions en fin de matinée')).toBeInTheDocument();
+    expect(screen.queryByDisplayValue('Préfère les réunions le matin')).not.toBeInTheDocument();
+  });
+
   it('shows the empty state text when there are no entries', () => {
     render(<MemoryPanel entries={[]} csrfToken="tok" />);
     expect(screen.getByText(/n'a encore rien retenu/)).toBeInTheDocument();

@@ -37,6 +37,12 @@ const REMEMBER_MAX_ATTEMPTS = 3;
 export interface MemoryEntry {
   readonly name: string;
   readonly fact: string;
+  /**
+   * Date de dernière mise à jour — optionnelle : seul l'onglet Mémoire
+   * l'affiche ; le system prompt l'ignore (les faits injectés restent
+   * `(nom) fait`, sans métadonnées).
+   */
+  readonly updatedAt?: Date;
 }
 
 /**
@@ -88,9 +94,9 @@ export async function loadMemories(ctx: AuthContext): Promise<readonly MemoryEnt
     where: { workspaceId: ctx.workspaceId, userId: ctx.userId },
     orderBy: { createdAt: 'asc' },
     take: MEMORY_MAX_FACTS,
-    select: { name: true, fact: true },
+    select: { name: true, fact: true, updatedAt: true },
   });
-  return rows.map((row) => ({ name: row.name, fact: row.fact }));
+  return rows.map((row) => ({ name: row.name, fact: row.fact, updatedAt: row.updatedAt }));
 }
 
 /**

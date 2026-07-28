@@ -21,6 +21,8 @@ import {
 export interface MemoryPanelEntry {
   readonly name: string;
   readonly fact: string;
+  /** Date de dernière mise à jour, affichée en ghost sur la ligne. */
+  readonly updatedAt?: Date;
 }
 
 export interface MemoryPanelProps {
@@ -94,7 +96,15 @@ export function MemoryPanel({ entries, csrfToken }: MemoryPanelProps) {
       ) : (
         <ul className="flex flex-col gap-3">
           {entries.map((entry) => (
-            <MemoryEntryRow key={entry.name} entry={entry} csrfToken={csrfToken} />
+            // Clé nom + fait : après une édition réussie, le serveur peut
+            // renvoyer un fait NORMALISÉ (blancs réduits) différent de la
+            // saisie — changer la clé remonte la ligne et resynchronise le
+            // `defaultValue` de l'input sur la valeur réellement stockée.
+            <MemoryEntryRow
+              key={`${entry.name}:${entry.fact}`}
+              entry={entry}
+              csrfToken={csrfToken}
+            />
           ))}
         </ul>
       )}
@@ -105,11 +115,17 @@ export function MemoryPanel({ entries, csrfToken }: MemoryPanelProps) {
 const UPDATE_INITIAL: UpdateMemoryState = { status: 'idle' };
 const DELETE_INITIAL: DeleteMemoryState = { status: 'idle' };
 
+const dateFmt = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'short' });
+
 interface MemoryEntryRowProps {
   readonly entry: MemoryPanelEntry;
   readonly csrfToken: string;
 }
 
+// Course update/delete concurrente (ex. l'agent supprime le fait pendant que
+// l'utilisateur l'édite) : auto-cicatrisante — les cores font
+// `updateMany`/`deleteMany` scopés par nom, un nom disparu est un no-op qui
+// renvoie le message « introuvable » affiché sur la ligne, jamais un crash.
 function MemoryEntryRow({ entry, csrfToken }: MemoryEntryRowProps) {
   const [updateState, updateAction, updatePending] = useActionState(
     updateMemoryAction,
@@ -123,9 +139,19 @@ function MemoryEntryRow({ entry, csrfToken }: MemoryEntryRowProps) {
 
   return (
     <li className="flex flex-col gap-2 rounded-xl border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] p-4">
-      <span className="text-[10px] font-bold uppercase tracking-wide text-[color:var(--color-text-ghost)]">
-        {entry.name}
-      </span>
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-[10px] font-bold uppercase tracking-wide text-[color:var(--color-text-ghost)]">
+          {entry.name}
+        </span>
+        {entry.updatedAt ? (
+          <time
+            dateTime={entry.updatedAt.toISOString()}
+            className="text-[10px] text-[color:var(--color-text-ghost)]"
+          >
+            Mis à jour le {dateFmt.format(entry.updatedAt)}
+          </time>
+        ) : null}
+      </div>
 
       <form action={updateAction} className="flex items-center gap-2">
         <input type="hidden" name={CSRF_FIELD_NAME} value={csrfToken} />
