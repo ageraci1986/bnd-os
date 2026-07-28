@@ -18,6 +18,7 @@ import {
   updateProjectCore,
 } from '@/features/projects/lib/project-core';
 import { CreateProjectSchema } from '@/features/projects/lib/schemas';
+import { loadUserScope, scopedProjectWhere } from '@/lib/auth/scope';
 import { moveCard } from '@/features/projects/actions/move-card';
 import { updateCard } from '@/features/projects/actions/update-card';
 import { updateCardDueDate } from '@/features/projects/actions/update-card-due-date';
@@ -376,7 +377,9 @@ export function buildKanbanTools(ctx: AuthContext): ToolSpec[] {
         "Met à jour le nom, la description ou les dates de début/fin d'un projet. Les champs non fournis restent inchangés ; description: null efface la description, startDate/endDate: null efface la date correspondante.",
       inputSchema: z.object({
         projectId: uuid,
-        name: z.string().trim().min(1).max(160).optional(),
+        // 120 : borne du domain (`validateProjectName`, PROJECT_NAME_MAX) —
+        // pas 160 comme create_project, dont le schéma serveur re-tronque.
+        name: z.string().trim().min(1).max(120).optional(),
         description: z.string().max(2000).nullable().optional(),
         startDate: z
           .string()
@@ -395,7 +398,7 @@ export function buildKanbanTools(ctx: AuthContext): ToolSpec[] {
         type: 'object',
         properties: {
           projectId: UUID_JSON,
-          name: { type: 'string', maxLength: 160 },
+          name: { type: 'string', maxLength: 120 },
           description: { type: ['string', 'null'], maxLength: 2000 },
           startDate: {
             type: ['string', 'null'],
@@ -446,9 +449,26 @@ export function buildKanbanTools(ctx: AuthContext): ToolSpec[] {
       // on ne fait jamais confiance à un nom fourni par le modèle. Le nom et
       // le compte de cartes affichés dans le dialog sont RELUS en DB, scopés
       // au workspace courant via la closure `ctx`.
-      describeForConfirm: async (input: { projectId: string }) => {
+      describeForConfirm: async (input: unknown) => {
+        // Re-parse local OBLIGATOIRE : sans lui, Prisma 6 ignore `id:
+        // undefined` (findFirst → PREMIER projet du workspace !) et accepte
+        // un objet ({"not": null}) comme filtre structuré — le dialog
+        // pourrait nommer un autre objet que celui réellement supprimé.
+        const parsed = z.object({ projectId: uuid }).safeParse(input);
+        if (!parsed.success) return 'Supprimer un projet introuvable dans ce workspace ?';
+        // Même filtrage scope que les tools de lecture (read-tools) : un
+        // restricted ne doit pas apprendre le nom/compte d'un projet hors de
+        // son scope via le dialog. Hors scope → même texte que l'inexistant
+        // (ne pas révéler l'existence). AND explicite : `scopedProjectWhere`
+        // peut renvoyer `{ id: … }`, qui écraserait la clé `id` en spread.
+        const scope = await loadUserScope(ctx);
         const project = await prisma.project.findFirst({
-          where: { id: input.projectId, workspaceId: ctx.workspaceId, deletedAt: null },
+          where: {
+            AND: [
+              { id: parsed.data.projectId, workspaceId: ctx.workspaceId, deletedAt: null },
+              scopedProjectWhere(scope),
+            ],
+          },
           select: { name: true, _count: { select: { cards: { where: { deletedAt: null } } } } },
         });
         if (project === null) return 'Supprimer un projet introuvable dans ce workspace ?';
@@ -545,14 +565,31 @@ export function buildKanbanTools(ctx: AuthContext): ToolSpec[] {
       // texte du dialog (describeForConfirm ci-dessous) distingue déjà les
       // deux cas pour rester honnête sur ce qui va se passer.
       gated: true,
-      describeForConfirm: async (input: { columnId: string }) => {
+      describeForConfirm: async (input: unknown) => {
+        // Re-parse local OBLIGATOIRE (même rationnel que delete_project) :
+        // l'input arrive BRUT, avant la validation Zod du registry.
+        const parsed = z.object({ columnId: uuid }).safeParse(input);
+        if (!parsed.success) return 'Supprimer une colonne introuvable dans ce workspace ?';
+        // Scope restricted appliqué via le join projet (même filtrage que
+        // read-tools) ; hors scope → même texte que l'inexistant.
+        const scope = await loadUserScope(ctx);
         const column = await prisma.column.findFirst({
-          where: { id: input.columnId, project: { workspaceId: ctx.workspaceId, deletedAt: null } },
+          where: {
+            id: parsed.data.columnId,
+            project: {
+              AND: [{ workspaceId: ctx.workspaceId, deletedAt: null }, scopedProjectWhere(scope)],
+            },
+          },
           select: { name: true, isBlockedSystem: true },
         });
         if (column === null) return 'Supprimer une colonne introuvable dans ce workspace ?';
+        // Cohérent avec le refus du core (BLOCKED_LOCKED) : ne pas afficher
+        // un dialog de confirmation pour une action qui sera refusée.
+        if (column.isBlockedSystem) {
+          return 'La colonne « Bloqué » est gérée par le système et ne peut pas être supprimée.';
+        }
         const n = await prisma.card.count({
-          where: { columnId: input.columnId, workspaceId: ctx.workspaceId, deletedAt: null },
+          where: { columnId: parsed.data.columnId, workspaceId: ctx.workspaceId, deletedAt: null },
         });
         if (n === 0) return `Supprimer la colonne vide « ${column.name} » ?`;
         return `Supprimer la colonne « ${column.name} » et déplacer ses ${n} carte${n > 1 ? 's' : ''} vers la première colonne du projet ?`;

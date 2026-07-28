@@ -267,6 +267,9 @@ export async function updateProjectCore(
   // un champ non fourni (`undefined`) garde la valeur actuelle de la ligne,
   // un champ fourni écrase (y compris `null`, qui efface la borne et ne
   // peut donc jamais provoquer d'inversion).
+  // Fail-closed volontaire : la validation tourne aussi pour un update SANS
+  // dates — une ligne historiquement incohérente bloque tout update tant que
+  // l'intervalle n'est pas corrigé (ou une borne effacée).
   const effectiveStartDate =
     input.startDate !== undefined
       ? input.startDate === null

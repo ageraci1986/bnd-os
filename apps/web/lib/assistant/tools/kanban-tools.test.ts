@@ -53,6 +53,15 @@ const prismaMocks = vi.hoisted(() => ({
 }));
 vi.mock('@nexushub/db', () => ({ prisma: prismaMocks }));
 
+// Scope : les describes gated appliquent le MÊME filtrage que les tools de
+// lecture (read-tools) — un restricted ne doit jamais voir le nom/compte
+// d'un objet hors de son scope via le dialog de confirmation.
+const scopeMocks = vi.hoisted(() => ({
+  loadUserScope: vi.fn<() => Promise<unknown>>(async () => ({ kind: 'workspace' as const })),
+  scopedProjectWhere: vi.fn((): Record<string, unknown> => ({})),
+}));
+vi.mock('@/lib/auth/scope', () => scopeMocks);
+
 // `CreateProjectSchema` is NOT mocked: the invalid-dates test relies on its
 // real validation message.
 import { buildKanbanTools } from './kanban-tools';
@@ -95,6 +104,8 @@ function requiredKeys(schema: z.ZodTypeAny): string[] {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  scopeMocks.loadUserScope.mockResolvedValue({ kind: 'workspace' as const });
+  scopeMocks.scopedProjectWhere.mockReturnValue({});
 });
 
 describe('buildKanbanTools', () => {
@@ -593,7 +604,7 @@ describe('buildKanbanTools', () => {
     });
     const found = await describe({ projectId: PROJECT_ID });
     expect(prismaMocks.project.findFirst).toHaveBeenCalledWith({
-      where: { id: PROJECT_ID, workspaceId: ctx.workspaceId, deletedAt: null },
+      where: { AND: [{ id: PROJECT_ID, workspaceId: ctx.workspaceId, deletedAt: null }, {}] },
       select: { name: true, _count: { select: { cards: { where: { deletedAt: null } } } } },
     });
     expect(found).toBe('Supprimer le projet « Campagne été » (3 cartes) — restaurable 30 jours ?');
@@ -608,6 +619,54 @@ describe('buildKanbanTools', () => {
     prismaMocks.project.findFirst.mockResolvedValueOnce(null);
     const missing = await describe({ projectId: PROJECT_ID });
     expect(missing).toBe('Supprimer un projet introuvable dans ce workspace ?');
+  });
+
+  it('delete_project : describeForConfirm re-valide l’input BRUT — {} ou id structuré ({not:null}) → libellé prudent SANS aucun appel prisma', async () => {
+    // Le gate précède la validation Zod du registry : sans re-parse local,
+    // Prisma 6 ignorerait `id: undefined` (findFirst → PREMIER projet du
+    // workspace) et accepterait un objet comme filtre structuré — le dialog
+    // nommerait le mauvais objet.
+    const describe = getTool('delete_project').describeForConfirm as (
+      input: unknown,
+    ) => Promise<string>;
+
+    const empty = await describe({});
+    expect(empty).toBe('Supprimer un projet introuvable dans ce workspace ?');
+    expect(prismaMocks.project.findFirst).not.toHaveBeenCalled();
+
+    const structured = await describe({ projectId: { not: null } });
+    expect(structured).toBe('Supprimer un projet introuvable dans ce workspace ?');
+    expect(prismaMocks.project.findFirst).not.toHaveBeenCalled();
+    expect(scopeMocks.loadUserScope).not.toHaveBeenCalled();
+  });
+
+  it('delete_project : describeForConfirm applique le scope restricted (AND scopedProjectWhere) — hors scope → libellé « introuvable », nom réel jamais présent', async () => {
+    const describe = getTool('delete_project').describeForConfirm as (
+      input: unknown,
+    ) => Promise<string>;
+    scopeMocks.loadUserScope.mockResolvedValueOnce({
+      kind: 'restricted' as const,
+      clientIds: [],
+      projectIds: ['scope-p1'],
+    });
+    scopeMocks.scopedProjectWhere.mockReturnValueOnce({ id: { in: ['scope-p1'] } });
+    // Projet réel hors scope : le filtre scoped le rend invisible → null.
+    prismaMocks.project.findFirst.mockResolvedValueOnce(null);
+
+    const out = await describe({ projectId: PROJECT_ID });
+
+    expect(prismaMocks.project.findFirst).toHaveBeenCalledWith({
+      where: {
+        AND: [
+          { id: PROJECT_ID, workspaceId: ctx.workspaceId, deletedAt: null },
+          { id: { in: ['scope-p1'] } },
+        ],
+      },
+      select: { name: true, _count: { select: { cards: { where: { deletedAt: null } } } } },
+    });
+    // Même texte que l'inexistant : ne pas révéler que le projet existe.
+    expect(out).toBe('Supprimer un projet introuvable dans ce workspace ?');
+    expect(out).not.toContain('Campagne');
   });
 
   it('add_column : transmet ctx + input au core et renvoie {created, columnId, columns}', async () => {
@@ -719,7 +778,10 @@ describe('buildKanbanTools', () => {
     prismaMocks.card.count.mockResolvedValueOnce(0);
     const empty = await describe({ columnId: COLUMN_ID });
     expect(prismaMocks.column.findFirst).toHaveBeenCalledWith({
-      where: { id: COLUMN_ID, project: { workspaceId: ctx.workspaceId, deletedAt: null } },
+      where: {
+        id: COLUMN_ID,
+        project: { AND: [{ workspaceId: ctx.workspaceId, deletedAt: null }, {}] },
+      },
       select: { name: true, isBlockedSystem: true },
     });
     expect(empty).toBe('Supprimer la colonne vide « Brief » ?');
@@ -741,5 +803,76 @@ describe('buildKanbanTools', () => {
     prismaMocks.column.findFirst.mockResolvedValueOnce(null);
     const missing = await describe({ columnId: COLUMN_ID });
     expect(missing).toBe('Supprimer une colonne introuvable dans ce workspace ?');
+  });
+
+  it('delete_column : describeForConfirm re-valide l’input BRUT — {} ou id structuré → libellé prudent SANS aucun appel prisma', async () => {
+    const describe = getTool('delete_column').describeForConfirm as (
+      input: unknown,
+    ) => Promise<string>;
+
+    const empty = await describe({});
+    expect(empty).toBe('Supprimer une colonne introuvable dans ce workspace ?');
+    expect(prismaMocks.column.findFirst).not.toHaveBeenCalled();
+
+    const structured = await describe({ columnId: { not: null } });
+    expect(structured).toBe('Supprimer une colonne introuvable dans ce workspace ?');
+    expect(prismaMocks.column.findFirst).not.toHaveBeenCalled();
+    expect(prismaMocks.card.count).not.toHaveBeenCalled();
+    expect(scopeMocks.loadUserScope).not.toHaveBeenCalled();
+  });
+
+  it('delete_column : describeForConfirm applique le scope restricted via le join projet — hors scope → « introuvable », nom réel jamais présent', async () => {
+    const describe = getTool('delete_column').describeForConfirm as (
+      input: unknown,
+    ) => Promise<string>;
+    scopeMocks.loadUserScope.mockResolvedValueOnce({
+      kind: 'restricted' as const,
+      clientIds: [],
+      projectIds: ['scope-p1'],
+    });
+    scopeMocks.scopedProjectWhere.mockReturnValueOnce({ id: { in: ['scope-p1'] } });
+    prismaMocks.column.findFirst.mockResolvedValueOnce(null);
+
+    const out = await describe({ columnId: COLUMN_ID });
+
+    expect(prismaMocks.column.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: COLUMN_ID,
+        project: {
+          AND: [{ workspaceId: ctx.workspaceId, deletedAt: null }, { id: { in: ['scope-p1'] } }],
+        },
+      },
+      select: { name: true, isBlockedSystem: true },
+    });
+    // Même texte que l'inexistant : ne pas révéler que la colonne existe.
+    expect(out).toBe('Supprimer une colonne introuvable dans ce workspace ?');
+    expect(out).not.toContain('Brief');
+    expect(prismaMocks.card.count).not.toHaveBeenCalled();
+  });
+
+  it('delete_column : describeForConfirm sur la colonne système « Bloqué » → refus explicite, sans compter les cartes', async () => {
+    const describe = getTool('delete_column').describeForConfirm as (
+      input: unknown,
+    ) => Promise<string>;
+    prismaMocks.column.findFirst.mockResolvedValueOnce({ name: 'Bloqué', isBlockedSystem: true });
+
+    const out = await describe({ columnId: COLUMN_ID });
+
+    expect(out).toBe(
+      'La colonne « Bloqué » est gérée par le système et ne peut pas être supprimée.',
+    );
+    expect(prismaMocks.card.count).not.toHaveBeenCalled();
+  });
+
+  it('update_project : le schéma borne name à 120 caractères (aligné sur validateProjectName du domain)', () => {
+    const schema = getTool('update_project').inputSchema as z.ZodTypeAny;
+    expect(schema.safeParse({ projectId: PROJECT_ID, name: 'a'.repeat(120) }).success).toBe(true);
+    expect(schema.safeParse({ projectId: PROJECT_ID, name: 'a'.repeat(121) }).success).toBe(false);
+    const maxLength = (
+      getTool('update_project').jsonSchema as {
+        properties: { name: { maxLength: number } };
+      }
+    ).properties.name.maxLength;
+    expect(maxLength).toBe(120);
   });
 });
