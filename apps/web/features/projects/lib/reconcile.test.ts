@@ -52,6 +52,7 @@ describe('reconcileOverdueRouting', () => {
           dueDate: PAST,
           archivedAt: null,
           projectId: PROJECT,
+          title: 'Card one',
         },
       ])
       // 2nd call: siblings of target column
@@ -69,6 +70,60 @@ describe('reconcileOverdueRouting', () => {
         previousColumnId: DOING,
       }),
     });
+  });
+
+  it('returns the newly-blocked cards (cardId/title/projectId) for this run only', async () => {
+    cardFindMany
+      .mockResolvedValueOnce([
+        {
+          id: 'c1',
+          columnId: DOING,
+          previousColumnId: null,
+          dueDate: PAST,
+          archivedAt: null,
+          projectId: PROJECT,
+          title: 'Overdue card',
+        },
+        {
+          // Already blocked before this run — must NOT appear in newlyBlocked.
+          id: 'c2',
+          columnId: BLOCKED,
+          previousColumnId: DOING,
+          dueDate: PAST,
+          archivedAt: null,
+          projectId: PROJECT,
+          title: 'Already blocked',
+        },
+      ])
+      .mockResolvedValueOnce([{ position: 2000 }]);
+    columnFindMany.mockResolvedValueOnce(COLUMNS);
+
+    const result = await reconcileOverdueRouting('ws-1', { now: NOW });
+
+    expect(result.newlyBlocked).toEqual([
+      { cardId: 'c1', title: 'Overdue card', projectId: PROJECT },
+    ]);
+  });
+
+  it('does not list a restored card in newlyBlocked', async () => {
+    cardFindMany
+      .mockResolvedValueOnce([
+        {
+          id: 'c1',
+          columnId: BLOCKED,
+          previousColumnId: TODO,
+          dueDate: FUTURE,
+          archivedAt: null,
+          projectId: PROJECT,
+          title: 'Restored card',
+        },
+      ])
+      .mockResolvedValueOnce([{ position: 1024 }]);
+    columnFindMany.mockResolvedValueOnce(COLUMNS);
+
+    const result = await reconcileOverdueRouting('ws-1', { now: NOW });
+
+    expect(result.newlyBlocked).toEqual([]);
   });
 
   it('does NOT block cards in the last user column', async () => {
@@ -142,7 +197,7 @@ describe('reconcileOverdueRouting', () => {
 
     const result = await reconcileOverdueRouting('ws-1');
 
-    expect(result).toEqual({ blocked: 0, restored: 0 });
+    expect(result).toEqual({ blocked: 0, restored: 0, newlyBlocked: [] });
     expect(columnFindMany).not.toHaveBeenCalled();
   });
 });

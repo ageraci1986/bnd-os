@@ -31,10 +31,20 @@ const ARCHIVE_DAYS = 30;
  *
  * Returns a count summary so callers can log/announce the reconcile.
  */
+export interface NewlyBlockedCard {
+  readonly cardId: string;
+  readonly title: string;
+  readonly projectId: string;
+}
+
 export async function reconcileOverdueRouting(
   workspaceId: string,
   options: { readonly projectIds?: readonly string[]; readonly now?: Date } = {},
-): Promise<{ readonly blocked: number; readonly restored: number }> {
+): Promise<{
+  readonly blocked: number;
+  readonly restored: number;
+  readonly newlyBlocked: readonly NewlyBlockedCard[];
+}> {
   const now = options.now ?? new Date();
 
   const baseProjectFilter = {
@@ -59,9 +69,10 @@ export async function reconcileOverdueRouting(
       dueDate: true,
       archivedAt: true,
       projectId: true,
+      title: true,
     },
   });
-  if (cards.length === 0) return { blocked: 0, restored: 0 };
+  if (cards.length === 0) return { blocked: 0, restored: 0, newlyBlocked: [] };
 
   const projectIds = Array.from(new Set(cards.map((c) => c.projectId)));
   const columns = await prisma.column.findMany({
@@ -84,6 +95,7 @@ export async function reconcileOverdueRouting(
 
   let blocked = 0;
   let restored = 0;
+  const newlyBlocked: NewlyBlockedCard[] = [];
 
   for (const card of cards) {
     const projectColumns = colsByProject.get(card.projectId) ?? [];
@@ -116,10 +128,11 @@ export async function reconcileOverdueRouting(
       if (!blockedCol) continue;
       await moveCard(card.id, blockedCol.id, card.columnId);
       blocked++;
+      newlyBlocked.push({ cardId: card.id, title: card.title, projectId: card.projectId });
     }
   }
 
-  return { blocked, restored };
+  return { blocked, restored, newlyBlocked };
 }
 
 /**

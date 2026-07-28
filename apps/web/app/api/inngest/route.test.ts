@@ -2,9 +2,11 @@ import { describe, expect, it, vi } from 'vitest';
 
 /**
  * Task 2 (socle Inngest) : `functions` démarrait vide, les 3 crons arrivant
- * aux Tasks 4-6 — `morningBriefing` (Task 4) est le premier ajouté. Le
- * comportement de la fonction elle-même est couvert par
- * `lib/inngest/functions/morning-briefing.test.ts` ; ce fichier couvre le
+ * aux Tasks 4-6 — `morningBriefing` (Task 4) et `blockedCardsScan` (Task 5)
+ * sont ajoutées ; Task 6 (mails importants) étend encore ce registre. Le
+ * comportement de chaque fonction est couvert par ses propres tests
+ * (`lib/inngest/functions/morning-briefing.test.ts`,
+ * `lib/inngest/functions/blocked-cards-scan.test.ts`) ; ce fichier couvre le
  * minimum utile à la route :
  * - la route exporte bien GET/POST/PUT (contrat App Router d'Inngest) ;
  * - `serve()` est appelé avec le client `nexushub` et le registre `functions` ;
@@ -30,9 +32,9 @@ describe('GET/POST/PUT /api/inngest', () => {
     expect(inngestClient.id).toBe('nexushub');
   });
 
-  it('registers the morning-briefing function (Task 4) — Tasks 5-6 extend it further', () => {
-    expect(functions).toHaveLength(1);
-    expect(functions[0]?.id()).toBe('morning-briefing');
+  it('registers morning-briefing (Task 4) and blocked-cards-scan (Task 5) — Task 6 extends it further', () => {
+    expect(functions).toHaveLength(2);
+    expect(functions.map((fn) => fn.id())).toEqual(['morning-briefing', 'blocked-cards-scan']);
   });
 
   it('rejects an unauthenticated PUT (sync) request rather than registering blindly', async () => {
