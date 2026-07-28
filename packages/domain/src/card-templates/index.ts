@@ -282,3 +282,20 @@ export function pruneFieldValuesByItems(
   }
   return out;
 }
+
+// ---------- Workspace default template ---------------------------------------
+
+/** Name of the card template bootstrapped for every new workspace. */
+export const DEFAULT_CARD_TEMPLATE_NAME = 'Standard';
+
+/**
+ * Items of the bootstrapped default template: a description plus an empty
+ * checklist. Kept in domain so the workspace-creation action and the data
+ * migration stay in sync with the modal's rendering expectations.
+ */
+export function defaultCardTemplateItems(): CardTemplateItem[] {
+  return [
+    { id: DESCRIPTION_ITEM_ID, type: 'description' },
+    { id: CHECKLIST_ITEM_ID, type: 'checklist', items: [] },
+  ];
+}
