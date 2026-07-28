@@ -4,6 +4,7 @@ import { ToolRegistry } from '@nexushub/agent';
 import type { AuthContext } from '@/lib/auth';
 import { buildReadTools } from './read-tools';
 import { buildKanbanTools } from './kanban-tools';
+import { buildClientTools } from './client-tools';
 import { buildMailTools } from './mail-tools';
 import { buildMemoryTools } from './memory-tools';
 
@@ -21,6 +22,9 @@ export async function buildRegistry(ctx: AuthContext): Promise<ToolRegistry> {
     registry.register(tool);
   }
   for (const tool of buildKanbanTools(ctx)) {
+    registry.register(tool);
+  }
+  for (const tool of buildClientTools(ctx)) {
     registry.register(tool);
   }
   for (const tool of buildMailTools(ctx)) {
