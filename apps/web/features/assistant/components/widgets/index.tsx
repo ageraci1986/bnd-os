@@ -3,6 +3,7 @@ import { isWidgetTool } from '@/lib/assistant/widget-tools';
 import { KpiCards } from './kpi-cards';
 import { BoardWidget } from './board-widget';
 import { MailListWidget } from './mail-list-widget';
+import { MailDraftWidget } from './mail-draft-widget';
 import { MemoryWidget } from './memory-widget';
 import { ProjectListWidget } from './project-list-widget';
 
@@ -31,9 +32,9 @@ export interface WidgetActions {
  * diagnostiquer un drift de shape entre un tool serveur et son widget.
  *
  * `actions` (Plan 5c) est optionnel et transmis tel quel aux widgets qui le
- * consomment. `MailListWidget` (search_mails) le branche depuis la Task 4 —
- * les autres widgets l'ignorent encore. Un appel à 2 arguments reste
- * entièrement valide.
+ * consomment : `MailListWidget` (search_mails, Task 4) et `MailDraftWidget`
+ * (create_mail_draft/prepare_reply_draft, Task 6). Les autres widgets
+ * l'ignorent encore. Un appel à 2 arguments reste entièrement valide.
  */
 export function renderWidget(
   tool: string,
@@ -63,6 +64,18 @@ export function renderWidget(
       // Visibilité déterministe des écritures mémoire : le chip s'affiche
       // quoi que raconte le modèle (voir memory-widget.tsx).
       return <MemoryWidget tool={tool} data={data} />;
+    case 'create_mail_draft':
+      return <MailDraftWidget data={data} {...(actions !== undefined ? { actions } : {})} />;
+    case 'prepare_reply_draft':
+      // Sortie structurée IDENTIQUE à create_mail_draft — même widget, nom du
+      // tool réel transmis pour que les logs `parseWidgetData` restent précis.
+      return (
+        <MailDraftWidget
+          data={data}
+          tool="prepare_reply_draft"
+          {...(actions !== undefined ? { actions } : {})}
+        />
+      );
     default:
       return null;
   }

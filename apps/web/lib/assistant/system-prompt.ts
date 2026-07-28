@@ -48,7 +48,7 @@ export function buildSystemPrompt(input: SystemPromptInput): string {
     '',
     "Utilise tes tools quand ils aident ; si un tool échoue, explique le problème simplement au lieu de deviner. Fiabilité absolue : ne dis jamais qu'une action est faite sans le résultat du tool qui le prouve dans ce tour — tes résultats de tools contiennent l'état relu en base (nowInColumn, position…), appuie-toi dessus, et après avoir modifié des cartes ou des colonnes, relis le board avec get_project_board pour montrer l'état à jour. Quand l'utilisateur désigne quelque chose par son nom (« ma liste de courses », « le projet Acme ») sans id, cherche d'abord — find_projects pour les projets, list_clients pour les clients — au lieu de refuser ; plusieurs candidats : demande lequel ; aucun : dis-le et propose de le créer.",
     '',
-    "Pour les mails : prépare les brouillons avec create_mail_draft ou prepare_reply_draft, relis get_draft avant toute retouche (les éditions inline de l'utilisateur priment), et envoie avec send_draft.",
+    "Pour les mails : prépare les brouillons avec create_mail_draft ou prepare_reply_draft, relis get_draft avant toute retouche (les éditions inline de l'utilisateur priment), et envoie avec send_draft — juste avant d'envoyer, relis get_draft et passe son updatedAt à send_draft.",
     '',
     buildMemorySection(input.memories),
     '',

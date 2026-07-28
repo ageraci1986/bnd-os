@@ -49,6 +49,14 @@ const DISPLAY_MAX = 80;
 export function AssistantChat({ csrfToken, firstName }: AssistantChatProps) {
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [input, setInput] = useState('');
+  // Ref miroir de `input` (Plan 5c Task 6, mandat B) — `send` la lit au lieu
+  // de dépendre du state `input` : sans ça, `send` (donc `widgetActions`,
+  // memoïsé ci-dessous) changeait d'identité à CHAQUE frappe, ce qui aurait
+  // remis à zéro le debounce d'autosave d'un widget comme `MailDraftWidget`
+  // si ce dernier utilisait `actions` comme dépendance d'effet. `widgetActions`
+  // ne doit changer que sur `busy`/`csrfToken`. Synchronisée dans `onChange`
+  // (ci-dessous), jamais via un effet — pas de round-trip de rendu.
+  const inputValueRef = useRef('');
   const [streamText, setStreamText] = useState<string | null>(null);
   const [streamWidgets, setStreamWidgets] = useState<StreamWidget[]>([]);
   const [activity, setActivity] = useState<string | null>(null);
@@ -139,11 +147,16 @@ export function AssistantChat({ csrfToken, firstName }: AssistantChatProps) {
   const send = useCallback(
     async (textOverride?: string) => {
       const useOverride = textOverride !== undefined && textOverride.trim() !== '';
-      const text = (useOverride ? textOverride : input).trim();
+      // Lu depuis la ref (pas le state `input`) : `send` reste une fonction
+      // stable entre deux frappes — voir le commentaire sur `inputValueRef`.
+      const text = (useOverride ? textOverride : inputValueRef.current).trim();
       if (text === '' || busy) return;
       setBusy(true);
       setError(null);
-      if (!useOverride) setInput('');
+      if (!useOverride) {
+        inputValueRef.current = '';
+        setInput('');
+      }
       setMessages((prev) => [...prev, { role: 'user', content: text }]);
       setStreamText('');
       setStreamWidgets([]);
@@ -261,7 +274,10 @@ export function AssistantChat({ csrfToken, firstName }: AssistantChatProps) {
         setBusy(false);
       }
     },
-    [busy, csrfToken, input],
+    // `input` volontairement absent des deps — `send` lit `inputValueRef.current`
+    // (toujours à jour, synchronisée par l'onChange du champ) pour rester stable
+    // indépendamment de la frappe. Voir le commentaire sur `inputValueRef`.
+    [busy, csrfToken],
   );
 
   /**
@@ -415,7 +431,10 @@ export function AssistantChat({ csrfToken, firstName }: AssistantChatProps) {
           placeholder="Demandez quelque chose, ou dictez une série d'actions…"
           aria-label="Message"
           value={input}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={(e) => {
+            inputValueRef.current = e.target.value;
+            setInput(e.target.value);
+          }}
           disabled={busy}
         />
         <button

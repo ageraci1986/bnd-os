@@ -84,4 +84,11 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('send_draft');
     expect(prompt).toContain('priment');
   });
+
+  it('contient la consigne du jeton de fraîcheur send_draft : relire get_draft et passer son updatedAt avant d’envoyer', () => {
+    const prompt = buildSystemPrompt(base);
+    expect(prompt).toContain(
+      "avant d'envoyer, relis get_draft et passe son updatedAt à send_draft",
+    );
+  });
 });

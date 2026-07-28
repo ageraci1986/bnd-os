@@ -79,3 +79,77 @@ describe('appendWidget', () => {
     expect(frozen[0]).toBe(stale);
   });
 });
+
+/**
+ * Un seul brouillon existe par utilisateur (mail-drafts.ts, upsert
+ * workspaceId/userId) — un seul widget de brouillon a donc de sens dans le
+ * fil, quel que soit le tool exact (`create_mail_draft`/`prepare_reply_draft`)
+ * qui l'a produit (Plan 5c Task 6).
+ */
+describe('appendWidget — brouillons mail', () => {
+  it('replaces an existing create_mail_draft widget with a fresh create_mail_draft', () => {
+    const stale: StreamWidget = {
+      tool: 'create_mail_draft',
+      data: { kind: 'new_mail', subject: 'Ancien objet' },
+    };
+    const fresh: StreamWidget = {
+      tool: 'create_mail_draft',
+      data: { kind: 'new_mail', subject: 'Nouvel objet' },
+    };
+    expect(appendWidget([stale], fresh)).toEqual([fresh]);
+  });
+
+  it('a prepare_reply_draft widget replaces an earlier create_mail_draft widget (one draft per user)', () => {
+    const staleNewMail: StreamWidget = {
+      tool: 'create_mail_draft',
+      data: { kind: 'new_mail', subject: 'Brouillon abandonné' },
+    };
+    const freshReply: StreamWidget = {
+      tool: 'prepare_reply_draft',
+      data: { kind: 'reply', subject: 'Re: Objet' },
+    };
+    expect(appendWidget([staleNewMail], freshReply)).toEqual([freshReply]);
+  });
+
+  it('a create_mail_draft widget replaces an earlier prepare_reply_draft widget', () => {
+    const staleReply: StreamWidget = {
+      tool: 'prepare_reply_draft',
+      data: { kind: 'reply', subject: 'Re: Objet' },
+    };
+    const freshNewMail: StreamWidget = {
+      tool: 'create_mail_draft',
+      data: { kind: 'new_mail', subject: 'Nouveau message' },
+    };
+    expect(appendWidget([staleReply], freshNewMail)).toEqual([freshNewMail]);
+  });
+
+  it('replacement stays in place — no reorder when other widgets are in between', () => {
+    const staleDraft: StreamWidget = { tool: 'create_mail_draft', data: { subject: 'Ancien' } };
+    const other: StreamWidget = { tool: 'search_mails', data: [] };
+    const freshDraft: StreamWidget = { tool: 'create_mail_draft', data: { subject: 'Nouveau' } };
+    expect(appendWidget([staleDraft, other], freshDraft)).toEqual([freshDraft, other]);
+  });
+
+  it('appends the first draft widget as-is when none exists yet', () => {
+    const board: StreamWidget = { tool: 'get_project_board', data: { id: 'p1' } };
+    const draft: StreamWidget = { tool: 'create_mail_draft', data: { subject: 'Brouillon' } };
+    expect(appendWidget([board], draft)).toEqual([board, draft]);
+  });
+
+  it('does not confuse a board widget with a draft widget (independent dedupe groups)', () => {
+    const board: StreamWidget = { tool: 'get_project_board', data: { id: 'p1' } };
+    const draft: StreamWidget = { tool: 'create_mail_draft', data: { subject: 'Brouillon' } };
+    const anotherBoard: StreamWidget = { tool: 'get_project_board', data: { id: 'p2' } };
+    const result = appendWidget(appendWidget([board], draft), anotherBoard);
+    expect(result).toEqual([board, draft, anotherBoard]);
+  });
+
+  it('does not mutate the input array', () => {
+    const stale: StreamWidget = { tool: 'create_mail_draft', data: { subject: 'Ancien' } };
+    const frozen = Object.freeze([stale]);
+    const fresh: StreamWidget = { tool: 'create_mail_draft', data: { subject: 'Nouveau' } };
+    expect(() => appendWidget(frozen, fresh)).not.toThrow();
+    expect(appendWidget(frozen, fresh)).toEqual([fresh]);
+    expect(frozen[0]).toBe(stale);
+  });
+});

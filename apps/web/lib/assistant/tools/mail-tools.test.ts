@@ -189,7 +189,14 @@ describe('buildMailTools', () => {
       bodyHtml: '<p>Bonjour</p>',
     };
 
-    it('passe kind:new_mail + les champs à saveDraft, et renvoie le brouillon structuré (sortie widget)', async () => {
+    it('passe kind:new_mail + les champs à saveDraft, et renvoie le brouillon structuré (sortie widget) avec updatedAt relu post-save', async () => {
+      // 1er appel loadDraft : refuseIfDraftExists (rien à écraser). 2e appel :
+      // currentDraftUpdatedAt() relit le brouillon fraîchement persisté
+      // (Mandat A) — c'est CETTE valeur, pas une horloge locale, qui doit
+      // sortir dans `updatedAt`.
+      draftMocks.loadDraft
+        .mockResolvedValueOnce({ ok: true, draft: null })
+        .mockResolvedValueOnce({ ok: true, draft: { updatedAt: '2026-07-27T11:00:00.000Z' } });
       draftMocks.saveDraft.mockResolvedValue({ ok: true, id: 'd1' });
       const out = await run('create_mail_draft', baseInput);
       expect(draftMocks.saveDraft).toHaveBeenCalledWith(
@@ -211,6 +218,7 @@ describe('buildMailTools', () => {
         bodyText: 'Bonjour',
         replyToId: null,
         fromIntegrationId: INTEGRATION_ID,
+        updatedAt: '2026-07-27T11:00:00.000Z',
       });
     });
 
@@ -242,10 +250,10 @@ describe('buildMailTools', () => {
       expect(JSON.parse(out)).toMatchObject({ draftSaved: true });
     });
 
-    it('aucun brouillon existant → saveDraft appelé sans le flag', async () => {
+    it('aucun brouillon existant → saveDraft appelé sans le flag ; loadDraft appelé deux fois (pré-check + relecture updatedAt)', async () => {
       draftMocks.saveDraft.mockResolvedValue({ ok: true, id: 'd1' });
       await run('create_mail_draft', baseInput);
-      expect(draftMocks.loadDraft).toHaveBeenCalledOnce();
+      expect(draftMocks.loadDraft).toHaveBeenCalledTimes(2);
       expect(draftMocks.saveDraft).toHaveBeenCalledOnce();
     });
 
@@ -274,7 +282,10 @@ describe('buildMailTools', () => {
       bodyHtml: '<p>Réponse</p>',
     };
 
-    it('passe kind:reply + replyToId à saveDraft, et renvoie le brouillon structuré (sortie widget)', async () => {
+    it('passe kind:reply + replyToId à saveDraft, et renvoie le brouillon structuré (sortie widget) avec updatedAt relu post-save', async () => {
+      draftMocks.loadDraft
+        .mockResolvedValueOnce({ ok: true, draft: null })
+        .mockResolvedValueOnce({ ok: true, draft: { updatedAt: '2026-07-27T11:30:00.000Z' } });
       draftMocks.saveDraft.mockResolvedValue({ ok: true, id: 'd2' });
       const out = await run('prepare_reply_draft', baseInput);
       expect(draftMocks.saveDraft).toHaveBeenCalledWith(
@@ -290,6 +301,7 @@ describe('buildMailTools', () => {
         bodyText: 'Réponse',
         replyToId: REPLY_TO_ID,
         fromIntegrationId: INTEGRATION_ID,
+        updatedAt: '2026-07-27T11:30:00.000Z',
       });
     });
 
@@ -627,16 +639,27 @@ describe('buildMailTools', () => {
       composeAttachments: [],
       updatedAt: '2026-07-27T10:00:00.000Z',
     };
+    /** Jeton de fraîcheur correspondant à `draftBase.updatedAt`, inchangé par les overrides `kind`/`replyToId`/etc. des tests ci-dessous. */
+    const FRESH_TOKEN = { expectedUpdatedAt: draftBase.updatedAt };
 
-    it('gated: true, schéma et jsonSchema SANS AUCUN champ (le brouillon persisté fait foi)', () => {
+    it('gated: true ; schéma et jsonSchema exigent expectedUpdatedAt (jeton de fraîcheur — le contenu vient toujours du brouillon persisté)', () => {
       const tool = getTool('send_draft');
       expect(tool.gated).toBe(true);
-      expect(tool.jsonSchema).toEqual({ type: 'object', properties: {} });
+      const json = tool.jsonSchema as { required?: string[]; properties?: Record<string, unknown> };
+      expect(json.required).toEqual(['expectedUpdatedAt']);
+      expect(Object.keys(json.properties ?? {})).toEqual(['expectedUpdatedAt']);
+    });
+
+    it('inputSchema : expectedUpdatedAt requis, doit être une date ISO 8601', () => {
+      const schema = getTool('send_draft').inputSchema as z.ZodTypeAny;
+      expect(schema.safeParse({}).success).toBe(false);
+      expect(schema.safeParse({ expectedUpdatedAt: 'pas-une-date' }).success).toBe(false);
+      expect(schema.safeParse(FRESH_TOKEN).success).toBe(true);
     });
 
     it('aucun brouillon → échec, sendMail PAS appelé', async () => {
       draftMocks.loadDraft.mockResolvedValue({ ok: true, draft: null });
-      const out = await run('send_draft', {});
+      const out = await run('send_draft', FRESH_TOKEN);
       expect(out).toBe('Échec : Aucun brouillon à envoyer.');
       expect(sendMailMocks.sendMail).not.toHaveBeenCalled();
     });
@@ -654,7 +677,7 @@ describe('buildMailTools', () => {
           draft: { ...draftBase, kind, replyToId },
         });
         sendMailMocks.sendMail.mockResolvedValue({ ok: true, emailMessageId: 'm1' });
-        const out = await run('send_draft', {});
+        const out = await run('send_draft', FRESH_TOKEN);
         expect(sendMailMocks.sendMail).toHaveBeenCalledWith({
           fromIntegrationId: INTEGRATION_ID,
           mode: kind,
@@ -676,7 +699,7 @@ describe('buildMailTools', () => {
         draft: { ...draftBase, kind: 'new_mail', replyToId: null },
       });
       sendMailMocks.sendMail.mockResolvedValue({ ok: true, emailMessageId: 'm1' });
-      await run('send_draft', {});
+      await run('send_draft', FRESH_TOKEN);
       // Le mock du module mail-drafts.ts n'expose ici que loadDraft/saveDraft
       // (voir vi.mock en tête de fichier) : si send_draft appelait deleteDraft,
       // ce serait une erreur d'exécution — la réussite de ce test EST la preuve.
@@ -689,7 +712,7 @@ describe('buildMailTools', () => {
         draft: { ...draftBase, kind: 'new_mail', replyToId: null },
       });
       sendMailMocks.sendMail.mockResolvedValue({ ok: false, code: 'RATE_LIMIT' });
-      const out = await run('send_draft', {});
+      const out = await run('send_draft', FRESH_TOKEN);
       expect(out).toContain('quota');
     });
 
@@ -703,17 +726,63 @@ describe('buildMailTools', () => {
         code: 'SEND_FAILED',
         message: 'ETIMEDOUT smtp.internal-host.example:587',
       });
-      const out = await run('send_draft', {});
+      const out = await run('send_draft', FRESH_TOKEN);
       expect(out).not.toContain('internal-host');
       expect(out).toBe("Échec : l'envoi a échoué — réessayez dans un instant.");
     });
 
+    describe('jeton de fraîcheur (Mandat A)', () => {
+      it('handler : expectedUpdatedAt ne correspond plus au brouillon persisté → échec, sendMail PAS appelé', async () => {
+        draftMocks.loadDraft.mockResolvedValue({
+          ok: true,
+          draft: { ...draftBase, kind: 'new_mail', replyToId: null },
+        });
+        const out = await run('send_draft', { expectedUpdatedAt: '2020-01-01T00:00:00.000Z' });
+        expect(out).toBe(
+          'Échec : Le brouillon a changé depuis la confirmation — relisez get_draft et réessayez.',
+        );
+        expect(sendMailMocks.sendMail).not.toHaveBeenCalled();
+      });
+
+      it('handler : expectedUpdatedAt correspond → envoi normal (déjà couvert par les tests kind:* ci-dessus, re-pinné ici pour la lisibilité de la revue)', async () => {
+        draftMocks.loadDraft.mockResolvedValue({
+          ok: true,
+          draft: { ...draftBase, kind: 'new_mail', replyToId: null },
+        });
+        sendMailMocks.sendMail.mockResolvedValue({ ok: true, emailMessageId: 'm1' });
+        const out = await run('send_draft', FRESH_TOKEN);
+        expect(JSON.parse(out)).toEqual({ sent: true, emailMessageId: 'm1' });
+      });
+    });
+
     describe('describeForConfirm', () => {
-      async function describe_(): Promise<string> {
+      async function describe_(input: unknown = FRESH_TOKEN): Promise<string> {
         const tool = getTool('send_draft');
         if (tool.describeForConfirm === undefined) throw new Error('describeForConfirm absent');
-        return tool.describeForConfirm({} as never);
+        return tool.describeForConfirm(input as never);
       }
+
+      it('input brut invalide (expectedUpdatedAt absent/mal formé) → description prudente, SANS lire le brouillon', async () => {
+        const missing = await describe_({});
+        expect(missing.toLowerCase()).toContain('invalide');
+        expect(draftMocks.loadDraft).not.toHaveBeenCalled();
+
+        const malformed = await describe_({ expectedUpdatedAt: 'pas-une-date' });
+        expect(malformed.toLowerCase()).toContain('invalide');
+        expect(draftMocks.loadDraft).not.toHaveBeenCalled();
+      });
+
+      it('expectedUpdatedAt ne correspond pas au brouillon persisté → description DÉCLARATIVE de fraîcheur, sans appel sendMail', async () => {
+        draftMocks.loadDraft.mockResolvedValue({
+          ok: true,
+          draft: { ...draftBase, kind: 'new_mail', replyToId: null },
+        });
+        const description = await describe_({ expectedUpdatedAt: '2020-01-01T00:00:00.000Z' });
+        expect(description).toBe(
+          "Le brouillon a été modifié depuis sa dernière lecture — l'envoi sera refusé. Relisez-le (get_draft) avant d'envoyer.",
+        );
+        expect(sendMailMocks.sendMail).not.toHaveBeenCalled();
+      });
 
       it('aucun brouillon → description DÉCLARATIVE de refus, sans appel sendMail', async () => {
         draftMocks.loadDraft.mockResolvedValue({ ok: true, draft: null });

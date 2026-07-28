@@ -142,6 +142,37 @@ describe('AssistantChat — canal d actions widgets (WidgetActions)', () => {
     expect(screen.getByText('Marque comme lus ces mails : m1,m2')).toBeInTheDocument();
   });
 
+  it('identité de {sendMessage,busy} STABLE pendant la frappe (mandat B) — ne change que sur busy, jamais à chaque caractère tapé', async () => {
+    // Sans la ref (mandat B), `send` (donc `widgetActions`) changeait
+    // d'identité à chaque frappe — un widget dépendant de `actions` dans un
+    // tableau de deps d'effet (ex. autosave debouncé de MailDraftWidget)
+    // verrait cet effet se redéclencher inutilement à chaque caractère tapé.
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      sseResponse([
+        { type: 'tool_result', tool: 'get_today_overview', data: overviewData },
+        { type: 'done', text: 'Un.' },
+      ]),
+    );
+
+    render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
+    await userEvent.type(screen.getByRole('textbox'), 'mon briefing');
+    await userEvent.click(screen.getByRole('button', { name: /envoyer/i }));
+    await screen.findByText('Un.');
+    fetchMock.mockClear();
+
+    const before = renderWidgetMock.mock.calls.at(-1)?.[2];
+    if (before === undefined) throw new Error('actions manquantes');
+    renderWidgetMock.mockClear();
+
+    // Le tour précédent est terminé (busy:false) — taper dans le champ ne
+    // doit PAS produire une nouvelle identité de `actions`.
+    await userEvent.type(screen.getByRole('textbox'), 'brouillon en cours');
+
+    const after = renderWidgetMock.mock.calls.at(-1)?.[2];
+    if (after === undefined) throw new Error('actions manquantes après frappe');
+    expect(after).toBe(before);
+  });
+
   it('sendMessage capturé pendant busy:true est un no-op — même garde que le formulaire, pas de second POST', async () => {
     const encoder = new TextEncoder();
     let push!: (e: object) => void;

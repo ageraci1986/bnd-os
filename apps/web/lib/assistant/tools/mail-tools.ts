@@ -147,6 +147,28 @@ const SEND_JSON_PROPERTIES = {
 
 const SEND_JSON_REQUIRED = [...COMPOSE_JSON_REQUIRED, 'mode'];
 
+/**
+ * Jeton de fraîcheur `send_draft` (Mandat A, revue T5/T6) — ferme le TOCTOU
+ * confirmation→envoi : le modèle DOIT recopier tel quel le `updatedAt` du
+ * dernier `get_draft`/`create_mail_draft`/`prepare_reply_draft` qu'il a lu.
+ * `z.string().datetime()` exige le format ISO 8601 avec suffixe `Z` — même
+ * format que `Date.prototype.toISOString()` (mail-drafts.ts, `loadDraft`).
+ */
+const sendDraftInputSchema = z.object({
+  expectedUpdatedAt: z.string().datetime(),
+});
+
+const SEND_DRAFT_JSON_PROPERTIES = {
+  expectedUpdatedAt: {
+    type: 'string',
+    format: 'date-time',
+    description:
+      "updatedAt du brouillon tel que lu dans le DERNIER get_draft/create_mail_draft/prepare_reply_draft — garantit que ce qui est envoyé est bien ce que l'utilisateur a vu au moment de sa confirmation.",
+  },
+} as const;
+
+const SEND_DRAFT_JSON_REQUIRED = ['expectedUpdatedAt'];
+
 /** Reformule un échec `{ok:false, message}` en message montrable. */
 function failure(message: string): string {
   return `Échec : ${message}`;
@@ -391,6 +413,21 @@ async function refuseIfDraftExists(overwriteExisting: boolean | undefined): Prom
 }
 
 /**
+ * Relit le brouillon fraîchement persisté pour renvoyer son `updatedAt` réel
+ * — même valeur que `get_draft` renverrait immédiatement après (Mandat A,
+ * revue T5/T6) : le modèle copie cette valeur dans `expectedUpdatedAt` lors
+ * d'un futur `send_draft`, jeton de fraîcheur qui détecte une édition inline
+ * du widget/composer survenue entre la confirmation et l'exécution. Filet de
+ * sécurité si le brouillon avait disparu entre la sauvegarde et cette
+ * relecture (ne devrait jamais arriver en pratique) : horodatage courant
+ * plutôt qu'un crash.
+ */
+async function currentDraftUpdatedAt(): Promise<string> {
+  const { draft } = await loadDraft();
+  return draft?.updatedAt ?? new Date().toISOString();
+}
+
+/**
  * Tools mail (Plan 2b Task 7). Wrappent le pipeline mail existant
  * (`saveDraft`, `sendMail`, `markEmailRead`) — aucune logique métier ici,
  * uniquement la traduction schéma Zod ↔ résultat `{ok}` ↔ message montrable.
@@ -462,6 +499,9 @@ export function buildMailTools(ctx: AuthContext): ToolSpec[] {
           // widget-tool) — c'est ce JSON, pas `result.id`, que le widget
           // (Task 6) autosauvera : fromIntegrationId/kind/replyToId lui sont
           // nécessaires pour retrouver le brouillon. JAMAIS bodyHtml brut.
+          // `updatedAt` (Mandat A) : le modèle le copie dans `expectedUpdatedAt`
+          // lors d'un futur send_draft — jeton de fraîcheur, voir
+          // currentDraftUpdatedAt().
           return JSON.stringify({
             draftSaved: true,
             kind: 'new_mail',
@@ -472,6 +512,7 @@ export function buildMailTools(ctx: AuthContext): ToolSpec[] {
             bodyText: boundedBodyText(input.bodyHtml, WIDGET_BODY_TEXT_MAX_CHARS),
             replyToId: null,
             fromIntegrationId: input.fromIntegrationId,
+            updatedAt: await currentDraftUpdatedAt(),
           });
         }),
     }),
@@ -502,7 +543,8 @@ export function buildMailTools(ctx: AuthContext): ToolSpec[] {
           };
           const result = await saveDraft(payload);
           if (!result.ok) return failure(result.message);
-          // Même sortie structurée que create_mail_draft — voir son commentaire.
+          // Même sortie structurée que create_mail_draft — voir son commentaire
+          // (`updatedAt` inclus, même rôle de jeton de fraîcheur).
           return JSON.stringify({
             draftSaved: true,
             kind: 'reply',
@@ -513,6 +555,7 @@ export function buildMailTools(ctx: AuthContext): ToolSpec[] {
             bodyText: boundedBodyText(input.bodyHtml, WIDGET_BODY_TEXT_MAX_CHARS),
             replyToId: input.replyToId,
             fromIntegrationId: input.fromIntegrationId,
+            updatedAt: await currentDraftUpdatedAt(),
           });
         }),
     }),
@@ -595,23 +638,42 @@ export function buildMailTools(ctx: AuthContext): ToolSpec[] {
     defineTool({
       name: 'send_draft',
       description:
-        "Envoie réellement le brouillon persisté en cours (celui affiché dans le widget/composer) — action irréversible, soumise à confirmation. AUCUN champ à fournir : c'est le brouillon en base qui fait foi, jamais ce que tu proposes ici — appelle get_draft d'abord si tu veux vérifier son contenu. Échoue si aucun brouillon n'existe.",
-      // Schéma volontairement VIDE : le modèle ne peut fournir aucun champ.
-      // C'est la garantie du flux (Plan 5c Task 5) — ce qui part est
-      // exactement ce que l'utilisateur voit dans le widget/composer au
-      // moment de la confirmation, jamais une resaisie du modèle qui
-      // pourrait diverger d'une édition inline entre-temps.
-      inputSchema: z.object({}),
-      jsonSchema: { type: 'object', properties: {} },
+        "Envoie réellement le brouillon persisté en cours (celui affiché dans le widget/composer) — action irréversible, soumise à confirmation. Aucun champ de contenu à fournir : c'est le brouillon en base qui fait foi, jamais ce que tu proposes ici. `expectedUpdatedAt` (jeton de fraîcheur) est REQUIS : recopie tel quel le champ `updatedAt` du DERNIER get_draft/create_mail_draft/prepare_reply_draft — si le brouillon a été modifié depuis (édition inline dans le widget/composer), l'envoi est refusé et il faut relire get_draft avant de réessayer. Échoue si aucun brouillon n'existe.",
+      // Le SEUL champ acceptable est le jeton de fraîcheur — jamais un champ
+      // de contenu (to/subject/bodyHtml…). C'est la garantie du flux (Plan 5c
+      // Task 5) : ce qui part est exactement ce que l'utilisateur voit dans
+      // le widget/composer au moment de la confirmation, jamais une resaisie
+      // du modèle qui pourrait diverger d'une édition inline entre-temps.
+      // `expectedUpdatedAt` (Mandat A, revue T5/T6) ferme le TOCTOU restant :
+      // sans lui, un brouillon édité entre la confirmation et l'exécution
+      // partirait quand même — voir describeForConfirm et le handler.
+      inputSchema: sendDraftInputSchema,
+      jsonSchema: {
+        type: 'object',
+        properties: SEND_DRAFT_JSON_PROPERTIES,
+        required: SEND_DRAFT_JSON_REQUIRED,
+      },
       gated: true,
       // Async : relit le brouillon en DB (closure `ctx` → même utilisateur,
       // même session que le handler) pour décrire fidèlement ce qui va
       // partir. Réutilise `buildSendDescription` (voir send_mail ci-dessus)
       // — même énumération, même garantie Cci exhaustif, même budget/repli.
-      describeForConfirm: async (): Promise<string> => {
+      describeForConfirm: async (input: unknown): Promise<string> => {
+        // Le gate précède la validation du registry — input BRUT, re-parse
+        // local (même rationnel que send_mail/archive_mail/delete_mail).
+        const parsed = sendDraftInputSchema.safeParse(input);
+        if (!parsed.success) {
+          return 'Envoyer un brouillon ? paramètres invalides — refusez.';
+        }
         const { draft } = await loadDraft();
         if (draft === null) {
           return "Envoyer un brouillon ? Aucun brouillon en cours — l'envoi sera refusé.";
+        }
+        if (draft.updatedAt !== parsed.data.expectedUpdatedAt) {
+          // Déclaratif, pas impératif : décrit ce qui VA se passer au moment
+          // de la confirmation — le handler réévalue la même condition à
+          // l'exécution (course possible entre confirmation et clic Autoriser).
+          return "Le brouillon a été modifié depuis sa dernière lecture — l'envoi sera refusé. Relisez-le (get_draft) avant d'envoyer.";
         }
         return buildSendDescription({
           mode: draft.kind,
@@ -622,10 +684,18 @@ export function buildMailTools(ctx: AuthContext): ToolSpec[] {
           bodyHtml: draft.bodyHtml,
         });
       },
-      handler: async () =>
+      handler: async (input) =>
         safeMutation('send_draft', async () => {
           const { draft } = await loadDraft();
           if (draft === null) return failure('Aucun brouillon à envoyer.');
+          if (draft.updatedAt !== input.expectedUpdatedAt) {
+            // Le brouillon a changé entre la confirmation (describeForConfirm)
+            // et l'exécution de ce handler — jamais envoyer un contenu que
+            // l'utilisateur n'a pas vu au moment où il a autorisé l'action.
+            return failure(
+              'Le brouillon a changé depuis la confirmation — relisez get_draft et réessayez.',
+            );
+          }
           const result = await sendMail({
             fromIntegrationId: draft.fromIntegrationId,
             // Mapping kind→mode CONSTATÉ dans compose-panel.tsx : `kind`
