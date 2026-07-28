@@ -7,6 +7,7 @@ import { getServerEnv } from '@/lib/env';
 import { getRateLimiter } from '@/lib/rate-limit';
 import { ChatRequestSchema, type ChatSseEvent } from '@/lib/assistant/chat-schema';
 import { getConfirmStore } from '@/lib/assistant/confirm-store';
+import { loadMemories, type MemoryEntry } from '@/lib/assistant/memory';
 import { createAnthropicProvider, ProviderError } from '@/lib/assistant/provider';
 import { buildSystemPrompt } from '@/lib/assistant/system-prompt';
 import { buildRegistry } from '@/lib/assistant/tools';
@@ -55,13 +56,16 @@ export async function POST(req: Request): Promise<Response> {
   // une fois le stream démarré, il est trop tard pour changer le statut HTTP.
   let registry: ToolRegistry;
   let workspaceName: string;
+  let memories: readonly MemoryEntry[];
   try {
-    const [builtRegistry, workspace] = await Promise.all([
+    const [builtRegistry, workspace, loadedMemories] = await Promise.all([
       buildRegistry(ctx),
       prisma.workspace.findUnique({ where: { id: ctx.workspaceId }, select: { name: true } }),
+      loadMemories(ctx),
     ]);
     registry = builtRegistry;
     workspaceName = workspace?.name ?? 'NexusHub';
+    memories = loadedMemories;
   } catch {
     return Response.json(
       { ok: false, message: "L'assistant est indisponible pour le moment." },
@@ -92,6 +96,7 @@ export async function POST(req: Request): Promise<Response> {
       dateStyle: 'full',
       timeStyle: 'short',
     }).format(new Date()),
+    memories,
   });
 
   const { messages, message } = parsed.data;

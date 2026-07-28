@@ -5,6 +5,7 @@ import type { AuthContext } from '@/lib/auth';
 import { buildReadTools } from './read-tools';
 import { buildKanbanTools } from './kanban-tools';
 import { buildMailTools } from './mail-tools';
+import { buildMemoryTools } from './memory-tools';
 
 /**
  * Construit le registry complet pour un utilisateur.
@@ -23,6 +24,9 @@ export async function buildRegistry(ctx: AuthContext): Promise<ToolRegistry> {
     registry.register(tool);
   }
   for (const tool of buildMailTools(ctx)) {
+    registry.register(tool);
+  }
+  for (const tool of buildMemoryTools(ctx)) {
     registry.register(tool);
   }
   return registry;

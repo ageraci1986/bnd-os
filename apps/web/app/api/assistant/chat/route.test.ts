@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => ({
   streamTurn: vi.fn(),
   gatedHandler: vi.fn(),
   readHandler: vi.fn(),
+  loadMemories: vi.fn(),
 }));
 
 vi.mock('server-only', () => ({}));
@@ -43,6 +44,7 @@ vi.mock('@/lib/assistant/confirm-store', () => ({
     awaitAnswer: mocks.awaitAnswer,
   }),
 }));
+vi.mock('@/lib/assistant/memory', () => ({ loadMemories: mocks.loadMemories }));
 
 vi.mock('@/lib/assistant/provider', () => ({
   createAnthropicProvider: () => ({ streamTurn: mocks.streamTurn }),
@@ -147,6 +149,7 @@ beforeEach(() => {
   mocks.workspaceFindUnique.mockResolvedValue({ name: 'Acme' });
   mocks.recordAudit.mockResolvedValue(undefined);
   mocks.createPending.mockResolvedValue('a'.repeat(32));
+  mocks.loadMemories.mockResolvedValue([]);
 });
 
 describe('POST /api/assistant/chat — confirmer', () => {
@@ -264,6 +267,22 @@ describe('POST /api/assistant/chat — confirmer', () => {
     expect(mocks.recordAudit).not.toHaveBeenCalledWith(
       expect.objectContaining({ action: 'assistant_gate' }),
     );
+  });
+});
+
+describe('POST /api/assistant/chat — indisponibilité avant stream', () => {
+  it('loadMemories rejette → 500 JSON, aucun flux SSE ouvert', async () => {
+    mocks.loadMemories.mockRejectedValue(new Error('connect ECONNREFUSED'));
+
+    const res = await POST(makeRequest({ messages: [], message: 'Bonjour' }));
+
+    expect(res.status).toBe(500);
+    expect(res.headers.get('Content-Type')).not.toBe('text/event-stream');
+    const body = (await res.json()) as { ok: boolean; message: string };
+    expect(body.ok).toBe(false);
+    expect(body.message).not.toContain('ECONNREFUSED');
+    // Le tour n'a jamais démarré : aucun appel provider.
+    expect(mocks.streamTurn).not.toHaveBeenCalled();
   });
 });
 

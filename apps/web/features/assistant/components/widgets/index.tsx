@@ -3,6 +3,7 @@ import { isWidgetTool } from '@/lib/assistant/widget-tools';
 import { KpiCards } from './kpi-cards';
 import { BoardWidget } from './board-widget';
 import { MailListWidget } from './mail-list-widget';
+import { MemoryWidget } from './memory-widget';
 import { ProjectListWidget } from './project-list-widget';
 
 /**
@@ -25,6 +26,12 @@ export function renderWidget(tool: string, data: unknown): ReactNode | null {
       return <MailListWidget data={data} />;
     case 'list_projects':
       return <ProjectListWidget data={data} />;
+    case 'remember_fact':
+    case 'update_fact':
+    case 'forget_fact':
+      // Visibilité déterministe des écritures mémoire : le chip s'affiche
+      // quoi que raconte le modèle (voir memory-widget.tsx).
+      return <MemoryWidget tool={tool} data={data} />;
     default:
       return null;
   }

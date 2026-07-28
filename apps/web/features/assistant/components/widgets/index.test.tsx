@@ -67,6 +67,37 @@ describe('renderWidget', () => {
     expect(screen.getByText('Refonte')).toBeInTheDocument();
   });
 
+  it('routes remember_fact to MemoryWidget', () => {
+    render(
+      <>
+        {renderWidget('remember_fact', {
+          remembered: true,
+          name: 'prefere-le-matin',
+          fact: 'Préfère le matin',
+        })}
+      </>,
+    );
+    expect(screen.getByText(/retenu « Préfère le matin »/)).toBeInTheDocument();
+  });
+
+  it('routes update_fact to MemoryWidget', () => {
+    render(
+      <>
+        {renderWidget('update_fact', {
+          updated: true,
+          name: 'aime-le-cafe',
+          fact: 'Aime le café serré',
+        })}
+      </>,
+    );
+    expect(screen.getByText(/mis à jour « Aime le café serré »/)).toBeInTheDocument();
+  });
+
+  it('routes forget_fact to MemoryWidget', () => {
+    render(<>{renderWidget('forget_fact', { forgotten: true, name: 'aime-le-cafe' })}</>);
+    expect(screen.getByText(/oublié \(aime-le-cafe\)/)).toBeInTheDocument();
+  });
+
   it('returns null for an unknown tool name', () => {
     expect(renderWidget('some_other_tool', {})).toBeNull();
   });
