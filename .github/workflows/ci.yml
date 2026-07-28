@@ -101,6 +101,15 @@ jobs:
     name: E2E (smoke)
     needs: build
     runs-on: ubuntu-latest
+    # Le serveur Next exige les 3 clés publiques au démarrage (lib/env.ts,
+    # PublicEnvSchema) — sans elles, chaque page rend une erreur et le job
+    # échouait systématiquement. Valeurs PUBLIQUES du staging (l'anon key est
+    # exposée au navigateur par design), fournies en variables GitHub
+    # (Settings → Variables) pour survivre à une rotation sans commit.
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ vars.E2E_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.E2E_SUPABASE_ANON_KEY }}
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -109,7 +118,10 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm db:generate
       - run: pnpm --filter @nexushub/e2e e2e:install
-      - run: pnpm e2e
+      # CI ne lance QUE le smoke (pages publiques, zéro DB — cf. le nom du
+      # job) : la suite complète exige une base seedée + les secrets serveur
+      # et reste un flux local (`pnpm e2e`).
+      - run: pnpm --filter @nexushub/e2e exec playwright test tests/smoke.spec.ts
 
   security:
     name: Security gates
