@@ -24,6 +24,34 @@ describe('sanitizeMailHtml', () => {
     const out = sanitizeMailHtml('<a href="javascript:alert(1)">x</a>');
     expect(out).not.toContain('javascript:');
   });
+
+  it('strips class and id attributes (anti-overlay: blocks Tailwind utility classes like fixed/inset-0 from escaping the mail container)', () => {
+    const out = sanitizeMailHtml(
+      '<div class="fixed inset-0 z-50 bg-white" id="x"><p class="foo" id="bar">hi</p></div>',
+    );
+    expect(out).not.toContain('class=');
+    expect(out).not.toContain('id=');
+    expect(out).not.toContain('fixed');
+    expect(out).not.toContain('inset-0');
+  });
+
+  it('keeps allowed inline styles even after class/id are stripped', () => {
+    const out = sanitizeMailHtml('<p style="color: red; font-size: 14px;">hi</p>');
+    expect(out).toContain('color:red');
+    expect(out).toContain('font-size:14px');
+  });
+
+  it('preserves layout structure (tables, images) while dropping class/id', () => {
+    const out = sanitizeMailHtml(
+      '<table id="t1" class="layout"><tr><td class="cell"><img src="cid:1" alt="a" class="pic"></td></tr></table>',
+    );
+    expect(out).toContain('<table');
+    expect(out).toContain('<tr');
+    expect(out).toContain('<td');
+    expect(out).toContain('src="cid:1"');
+    expect(out).not.toContain('class=');
+    expect(out).not.toContain('id=');
+  });
 });
 
 describe('stripMailHtmlToText', () => {
