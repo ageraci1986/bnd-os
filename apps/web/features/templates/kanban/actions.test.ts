@@ -34,7 +34,13 @@ vi.mock('@nexushub/db', () => ({
 vi.mock('@/lib/auth', () => ({ requireUser: mocks.requireUser }));
 vi.mock('next/cache', () => ({ revalidatePath: mocks.revalidatePath }));
 
-import { createKanbanTemplate, updateKanbanTemplate, deleteKanbanTemplate } from './actions';
+import {
+  createKanbanTemplate,
+  updateKanbanTemplate,
+  deleteKanbanTemplate,
+  duplicateKanbanTemplate,
+} from './actions';
+import { VIEWER_READ_ONLY_MESSAGE } from '@/features/projects/lib/scope-error';
 
 const KANBAN_ID = '11111111-1111-1111-1111-111111111111';
 const CARD_TPL_ID = '22222222-2222-2222-2222-222222222222';
@@ -60,6 +66,56 @@ beforeEach(() => {
       },
     }),
   );
+});
+
+describe('Viewer refusal (templates are Admin/User-only writes)', () => {
+  beforeEach(() => {
+    mocks.requireUser.mockResolvedValue({
+      userId: 'u-1',
+      workspaceId: 'ws-1',
+      role: 'viewer',
+      isSuperAdmin: false,
+      email: 'viewer@test',
+    });
+  });
+
+  it('createKanbanTemplate: rejects Viewer with VIEWER_READ_ONLY_MESSAGE and performs no write', async () => {
+    const res = await createKanbanTemplate({
+      name: 'Brief',
+      columns: [{ name: 'À faire', stepChecklist: [] }],
+    });
+    expect(res).toEqual({ ok: false, message: VIEWER_READ_ONLY_MESSAGE });
+    expect(mocks.kanbanCreate).not.toHaveBeenCalled();
+    expect(mocks.cardTemplateFindFirst).not.toHaveBeenCalled();
+    expect(mocks.auditCreate).not.toHaveBeenCalled();
+  });
+
+  it('updateKanbanTemplate: rejects Viewer with VIEWER_READ_ONLY_MESSAGE and performs no lookup', async () => {
+    const res = await updateKanbanTemplate({
+      id: KANBAN_ID,
+      name: 'Brief',
+      columns: [{ name: 'À faire', stepChecklist: [] }],
+    });
+    expect(res).toEqual({ ok: false, message: VIEWER_READ_ONLY_MESSAGE });
+    expect(mocks.kanbanFindFirst).not.toHaveBeenCalled();
+    expect(mocks.transaction).not.toHaveBeenCalled();
+    expect(mocks.auditCreate).not.toHaveBeenCalled();
+  });
+
+  it('deleteKanbanTemplate: rejects Viewer with VIEWER_READ_ONLY_MESSAGE and performs no lookup', async () => {
+    const res = await deleteKanbanTemplate({ id: KANBAN_ID });
+    expect(res).toEqual({ ok: false, message: VIEWER_READ_ONLY_MESSAGE });
+    expect(mocks.kanbanFindFirst).not.toHaveBeenCalled();
+    expect(mocks.kanbanDelete).not.toHaveBeenCalled();
+    expect(mocks.auditCreate).not.toHaveBeenCalled();
+  });
+
+  it('duplicateKanbanTemplate: rejects Viewer with VIEWER_READ_ONLY_MESSAGE and performs no lookup', async () => {
+    const res = await duplicateKanbanTemplate({ id: KANBAN_ID });
+    expect(res).toEqual({ ok: false, message: VIEWER_READ_ONLY_MESSAGE });
+    expect(mocks.kanbanFindFirst).not.toHaveBeenCalled();
+    expect(mocks.kanbanCreate).not.toHaveBeenCalled();
+  });
 });
 
 describe('createKanbanTemplate (defaultCardTemplateId)', () => {

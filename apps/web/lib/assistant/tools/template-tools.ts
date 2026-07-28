@@ -143,7 +143,7 @@ export function buildTemplateTools(ctx: AuthContext): ToolSpec[] {
     defineTool({
       name: 'update_template',
       description:
-        'Remplace le nom ET les colonnes d’un template Kanban existant (les deux champs sont requis — utiliser get_kanban_templates ou l’équivalent de lecture pour connaître l’état actuel avant modification). Modifier un template n’impacte pas les projets déjà créés à partir de lui.',
+        'Remplace le nom ET les colonnes d’un template Kanban existant (les deux champs sont requis — fournir le nom ET la liste complète des colonnes, l’existant est remplacé). Modifier un template n’impacte pas les projets déjà créés à partir de lui.',
       inputSchema: UpdateTemplateInputSchema,
       jsonSchema: {
         type: 'object',

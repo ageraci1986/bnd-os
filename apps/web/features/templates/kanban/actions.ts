@@ -5,12 +5,14 @@ import { z } from 'zod';
 import { prisma, type Prisma } from '@nexushub/db';
 import {
   NotFoundError,
+  Roles,
   validateKanbanTemplateColumns,
   validateKanbanTemplateName,
   type KanbanTemplateColumnDef,
 } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
 import { recordAudit } from '@/lib/audit';
+import { VIEWER_READ_ONLY_MESSAGE } from '@/features/projects/lib/scope-error';
 
 function prismaErrorCode(err: unknown): string | null {
   if (err && typeof err === 'object' && 'code' in err) {
@@ -90,6 +92,9 @@ export async function createKanbanTemplate(input: {
   defaultCardTemplateId?: string | null;
 }): Promise<KanbanTemplateMutationResult> {
   const ctx = await requireUser();
+  if (ctx.role === Roles.Viewer) {
+    return { ok: false, message: VIEWER_READ_ONLY_MESSAGE };
+  }
   const parsed = CreateSchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, message: parsed.error.issues[0]?.message ?? 'Données invalides.' };
@@ -142,6 +147,9 @@ export async function updateKanbanTemplate(input: {
   defaultCardTemplateId?: string | null;
 }): Promise<KanbanTemplateMutationResult> {
   const ctx = await requireUser();
+  if (ctx.role === Roles.Viewer) {
+    return { ok: false, message: VIEWER_READ_ONLY_MESSAGE };
+  }
   const parsed = UpdateSchema.safeParse(input);
   if (!parsed.success) {
     return { ok: false, message: parsed.error.issues[0]?.message ?? 'Données invalides.' };
@@ -203,6 +211,9 @@ export async function deleteKanbanTemplate(input: {
   id: string;
 }): Promise<{ ok: true } | { ok: false; message: string }> {
   const ctx = await requireUser();
+  if (ctx.role === Roles.Viewer) {
+    return { ok: false, message: VIEWER_READ_ONLY_MESSAGE };
+  }
   const parsed = DeleteSchema.safeParse(input);
   if (!parsed.success) return { ok: false, message: 'Identifiant invalide.' };
 
@@ -230,6 +241,9 @@ export async function duplicateKanbanTemplate(input: {
   id: string;
 }): Promise<KanbanTemplateMutationResult> {
   const ctx = await requireUser();
+  if (ctx.role === Roles.Viewer) {
+    return { ok: false, message: VIEWER_READ_ONLY_MESSAGE };
+  }
   const parsed = DuplicateSchema.safeParse(input);
   if (!parsed.success) return { ok: false, message: 'Identifiant invalide.' };
 
