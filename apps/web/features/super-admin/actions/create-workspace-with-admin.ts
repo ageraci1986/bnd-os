@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { headers } from 'next/headers';
 import { z } from 'zod';
 import { Prisma, prisma } from '@nexushub/db';
-import { Roles } from '@nexushub/domain';
+import { DEFAULT_CARD_TEMPLATE_NAME, defaultCardTemplateItems, Roles } from '@nexushub/domain';
 import { requireSuperAdmin } from '@/lib/auth';
 import { assertCsrfFromFormData } from '@/lib/csrf';
 import { recordAudit } from '@/lib/audit';
@@ -87,6 +87,20 @@ export async function createWorkspaceWithAdmin(
     }
     throw err;
   }
+
+  // Bootstrap the workspace default card template so every card created in
+  // this workspace resolves to a template with a description (create-card's
+  // `isDefault: true` fallback). Best-effort like the invitation below: a
+  // failure doesn't roll back the workspace — the Admin can create/mark a
+  // default template via /templates/cards.
+  await prisma.cardTemplate.create({
+    data: {
+      workspaceId,
+      name: DEFAULT_CARD_TEMPLATE_NAME,
+      isDefault: true,
+      items: defaultCardTemplateItems(),
+    },
+  });
 
   // Send the Admin invitation. Failures here don't roll back the
   // workspace — the super-admin can retry via inviteAdminToWorkspace.

@@ -3,6 +3,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 const mocks = vi.hoisted(() => ({
   requireSuperAdmin: vi.fn(),
   workspaceCreate: vi.fn(),
+  cardTemplateCreate: vi.fn(),
   assertCsrf: vi.fn(),
   recordAudit: vi.fn(),
   revalidatePath: vi.fn(),
@@ -21,6 +22,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@nexushub/db', () => ({
   prisma: {
     workspace: { create: mocks.workspaceCreate },
+    cardTemplate: { create: mocks.cardTemplateCreate },
   },
   Prisma: { PrismaClientKnownRequestError: mocks.PrismaP2002 },
 }));
@@ -54,6 +56,7 @@ beforeEach(() => {
     email: 'sa@platform',
   });
   mocks.workspaceCreate.mockResolvedValue({ id: WS_ID });
+  mocks.cardTemplateCreate.mockResolvedValue({ id: 'tpl-1' });
   mocks.issueInvitation.mockResolvedValue({
     invitationId: 'inv-1',
     expiresAt: new Date(),
@@ -74,6 +77,15 @@ describe('createWorkspaceWithAdmin', () => {
       expect(result.adminEmail).toBe('admin@acme.io');
     }
     expect(mocks.workspaceCreate).toHaveBeenCalledOnce();
+    expect(mocks.cardTemplateCreate).toHaveBeenCalledOnce();
+    const tplArgs = mocks.cardTemplateCreate.mock.calls[0]![0];
+    expect(tplArgs.data.workspaceId).toBe(WS_ID);
+    expect(tplArgs.data.name).toBe('Standard');
+    expect(tplArgs.data.isDefault).toBe(true);
+    expect(tplArgs.data.items).toEqual([
+      { id: 'description', type: 'description' },
+      { id: 'checklist', type: 'checklist', items: [] },
+    ]);
     expect(mocks.issueInvitation).toHaveBeenCalledOnce();
     const inviteArgs = mocks.issueInvitation.mock.calls[0]![0];
     expect(inviteArgs.workspaceId).toBe(WS_ID);
@@ -104,6 +116,7 @@ describe('createWorkspaceWithAdmin', () => {
       status: 'error',
       message: 'Ce slug est déjà utilisé par un autre workspace.',
     });
+    expect(mocks.cardTemplateCreate).not.toHaveBeenCalled();
     expect(mocks.issueInvitation).not.toHaveBeenCalled();
     expect(mocks.recordAudit).not.toHaveBeenCalled();
   });
