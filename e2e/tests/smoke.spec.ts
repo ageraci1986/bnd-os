@@ -1,9 +1,14 @@
 import { expect, test } from '@playwright/test';
 
-test('home page loads with brand visible', async ({ page }) => {
+// `/` n'a pas de page d'accueil marketing : redirection immédiate vers /login
+// (visiteur non connecté) — cf. apps/web/app/page.tsx. Le smoke vérifie donc
+// la page de connexion (marque + formulaire), sans toucher à la DB.
+test('home redirects to login with brand visible', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: /NexusHub/i })).toBeVisible();
-  await expect(page.getByRole('link', { name: /Se connecter/i })).toBeVisible();
+  await expect(page).toHaveURL(/\/login$/);
+  await expect(page.getByText('NexusHub', { exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Bon retour parmi nous' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Se connecter' })).toBeVisible();
 });
 
 test('security headers are present', async ({ request }) => {
