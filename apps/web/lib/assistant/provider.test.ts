@@ -71,6 +71,17 @@ describe('toProviderError', () => {
     expect(toProviderError(err).message).toContain('joindre');
   });
 
+  it('erreur API sans statut (en-bande du stream, ex. overloaded) → message réessayer, jamais « undefined »', () => {
+    // HTTP 200 mais erreur DANS le flux de streaming : le SDK lève une
+    // APIError sans code — le cas « (undefined) » constaté en prod.
+    const err = Object.create(Anthropic.APIError.prototype) as InstanceType<
+      typeof Anthropic.APIError
+    >;
+    const message = toProviderError(err).message;
+    expect(message).toContain('sollicité');
+    expect(message).not.toContain('undefined');
+  });
+
   it('erreur API générique → message avec le statut HTTP', () => {
     // Object.create saute le constructeur — status posé manuellement.
     const err = Object.assign(Object.create(Anthropic.BadRequestError.prototype) as object, {
