@@ -21,7 +21,15 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: {
+        ...devices['Desktop Chrome'],
+        launchOptions: {
+          // Voix (V1.5) : micro factice — getUserMedia accordé sans dialog,
+          // MediaRecorder produit un vrai webm silencieux. Sans effet sur les
+          // autres specs.
+          args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'],
+        },
+      },
     },
   ],
   webServer: {
