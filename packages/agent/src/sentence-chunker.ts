@@ -4,10 +4,16 @@
  * complètes — la première phrase part dès qu'elle est finie, sans attendre la
  * fin de la réponse.
  *
+ * Contrat de durée de vie : une instance = UN tour vocal ; ne pas réutiliser
+ * entre tours (l'état buffer/settled est conservé d'un push à l'autre).
+ *
  * Invariants :
  *  - une « phrase » se termine par . ! ? … ou un saut de ligne, suivis
  *    d'éventuels marqueurs markdown de fermeture collés dessus (**, *, `),
  *    puis d'un blanc ;
+ *  - un « . » précédé d'une abréviation connue (M., p., etc.) n'est PAS une
+ *    frontière de phrase — on continue à chercher la suivante. Ne s'applique
+ *    jamais à ! ? … ni au saut de ligne ;
  *  - le tout premier fragment émis, s'il fait moins de MIN_CHARS, est retenu
  *    et fusionné avec la phrase suivante — ça évite un aller-retour réseau
  *    TTS dédié pour un « Ok. » isolé en ouverture de réponse. Une fois la
@@ -16,7 +22,7 @@
  *    fin connue casserait le flux ;
  *  - au-delà de MAX_CHARS sans délimiteur, on coupe au dernier espace (évite
  *    de dépasser la limite de la route /speak sur une énumération sans
- *    point) ;
+ *    point) ; une coupe qui ne produit que du blanc n'émet rien ;
  *  - le markdown de mise en forme (gras, italique, code, puces) est retiré —
  *    il n'a aucun sens à l'oral.
  */
@@ -27,8 +33,38 @@ const MAX_CHARS = 300;
 /**
  * Délimiteur de phrase : ponctuation finale, marqueurs markdown de fermeture
  * éventuellement collés dessus (**gras**, *italique*, `code`), puis un blanc.
+ *
+ * Volontairement NON global : `exec` doit repartir du début de la fenêtre à
+ * chaque itération, le buffer étant muté après chaque découpe — un flag /g
+ * conserverait un `lastIndex` obsolète et serait ici le bug. Le saut des
+ * frontières non retenues (abréviations) passe par la fenêtre de scan
+ * explicite `searchFrom` dans `push()`, pas par l'état du regex.
  */
 const BOUNDARY = /([.!?…\n])([*_`]*)(\s+)/;
+
+/**
+ * Abréviations dont le « . » ne termine pas une phrase. Sensibles à la casse,
+ * comparées au mot situé entre le dernier blanc (ou le début du buffer) et le
+ * délimiteur. Ne concerne que « . » — jamais ! ? … ni le saut de ligne.
+ */
+const NON_BREAKING_ABBREVIATIONS = new Set([
+  'M',
+  'Mme',
+  'Mlle',
+  'Dr',
+  'St',
+  'Ste',
+  'cf',
+  'ex',
+  'etc',
+  'n°',
+  'p',
+  'art',
+  'Mr',
+  'Mrs',
+  'Ms',
+  'vs',
+]);
 
 /** Retire la mise en forme markdown inutile à l'oral (gras/italique/code/puces). */
 function stripMarkdown(text: string): string {
@@ -50,9 +86,12 @@ export class SentenceChunker {
   push(delta: string): string[] {
     this.buffer += delta;
     const out: string[] = [];
+    // Fenêtre de scan : avance au-delà des frontières ignorées (abréviations)
+    // sans muter le buffer ; remise à 0 après chaque découpe effective.
+    let searchFrom = 0;
 
     for (;;) {
-      const match = BOUNDARY.exec(this.buffer);
+      const match = BOUNDARY.exec(this.buffer.slice(searchFrom));
       if (match === null) break;
 
       // Les 3 groupes de BOUNDARY participent toujours à un match réussi (aucun
@@ -64,9 +103,25 @@ export class SentenceChunker {
       const delim = match[1] as string;
       const closers = match[2] as string;
       const whitespace = match[3] as string;
-      const rawEnd = match.index + delim.length + closers.length;
+      const delimIndex = searchFrom + match.index;
+
+      if (delim === '.') {
+        // Mot précédant le point. `split(/\s/)` renvoie toujours au moins un
+        // élément ([''] sur une chaîne vide) : `pop()` ne peut pas rendre
+        // undefined, l'assertion évite un garde mort (même logique que pour
+        // les groupes ci-dessus).
+        const token = this.buffer.slice(0, delimIndex).split(/\s/).pop() as string;
+        if (NON_BREAKING_ABBREVIATIONS.has(token)) {
+          // Abréviation : pas une fin de phrase — on scanne après ce point.
+          searchFrom = delimIndex + delim.length + closers.length + whitespace.length;
+          continue;
+        }
+      }
+
+      const rawEnd = delimIndex + delim.length + closers.length;
       const raw = this.buffer.slice(0, rawEnd);
       this.buffer = this.buffer.slice(rawEnd + whitespace.length);
+      searchFrom = 0;
       const sentence = stripMarkdown(raw).trim();
 
       if (this.held !== '') {
@@ -85,9 +140,12 @@ export class SentenceChunker {
     while (this.buffer.length > MAX_CHARS) {
       const cut = this.buffer.lastIndexOf(' ', MAX_CHARS);
       const at = cut > 0 ? cut : MAX_CHARS;
-      out.push(stripMarkdown(this.buffer.slice(0, at)).trim());
+      const sentence = stripMarkdown(this.buffer.slice(0, at)).trim();
       this.buffer = this.buffer.slice(at + (cut > 0 ? 1 : 0));
-      this.settled = true;
+      if (sentence !== '') {
+        out.push(sentence);
+        this.settled = true;
+      }
     }
 
     return out;

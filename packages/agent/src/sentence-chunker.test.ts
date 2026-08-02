@@ -50,9 +50,11 @@ describe('SentenceChunker', () => {
     expect(c.push('**Fait.** Voici la - liste. ')).toEqual(['Fait.', 'Voici la liste.']);
   });
 
-  // Tests ajoutés au-delà de la spec pour atteindre 100% de couverture de
-  // branches (voir rapport de la tâche) : ils exercent des chemins réels de
-  // l'implémentation qui ne sont touchés par aucun des 7 tests ci-dessus.
+  // Tests complémentaires : chacun exerce un chemin réel de l'implémentation
+  // qu'aucun des 7 scénarios de la spec ne touche — coupe forcée sans espace,
+  // fragment court retenu jusqu'à flush(), push de blanc pur, abréviations
+  // non terminales. Ce sont de vrais cas de flux SSE, et ils garantissent la
+  // couverture 100% (branches) exigée par le package.
 
   it('découpe un mot unique interminable sans espace (fallback MAX_CHARS)', () => {
     const c = new SentenceChunker();
@@ -67,5 +69,32 @@ describe('SentenceChunker', () => {
     expect(c.push('Ok. ')).toEqual([]);
     expect(c.flush()).toBe('Ok.');
     expect(c.flush()).toBe('');
+  });
+
+  it("n'émet rien sur un push de blanc pur, même au-delà de MAX_CHARS", () => {
+    const c = new SentenceChunker();
+    expect(c.push(' '.repeat(400))).toEqual([]);
+  });
+
+  it('ne coupe pas après une abréviation de civilité (M.)', () => {
+    const c = new SentenceChunker();
+    expect(c.push('M. Dupont a validé. ')).toEqual(['M. Dupont a validé.']);
+  });
+
+  it('ne coupe pas après une abréviation de référence (p.)', () => {
+    const c = new SentenceChunker();
+    expect(c.push('Voir p. 12 du contrat. ')).toEqual(['Voir p. 12 du contrat.']);
+  });
+
+  it('ne coupe pas sur « etc. » en milieu de phrase', () => {
+    const c = new SentenceChunker();
+    expect(c.push('Les cartes, colonnes, etc. sont synchronisées. ')).toEqual([
+      'Les cartes, colonnes, etc. sont synchronisées.',
+    ]);
+  });
+
+  it('coupe normalement après un mot ordinaire suivi d’un point (contrôle)', () => {
+    const c = new SentenceChunker();
+    expect(c.push('Le contrat. Il est signé. ')).toEqual(['Le contrat.', 'Il est signé.']);
   });
 });
