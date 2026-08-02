@@ -123,6 +123,9 @@ export class SentenceChunker {
       this.buffer = this.buffer.slice(rawEnd + whitespace.length);
       searchFrom = 0;
       const sentence = stripMarkdown(raw).trim();
+      // Frontière sans contenu (ex. sauts de ligne consécutifs) : rien à
+      // vocaliser — le buffer est déjà consommé, `held`/`settled` inchangés.
+      if (sentence === '') continue;
 
       if (this.held !== '') {
         out.push(`${this.held} ${sentence}`);

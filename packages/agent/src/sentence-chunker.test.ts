@@ -97,4 +97,11 @@ describe('SentenceChunker', () => {
     const c = new SentenceChunker();
     expect(c.push('Le contrat. Il est signé. ')).toEqual(['Le contrat.', 'Il est signé.']);
   });
+
+  it("n'émet pas de phrase vide sur des sauts de ligne consécutifs en tête de delta", () => {
+    const c = new SentenceChunker();
+    expect(c.push('Bonjour tout le monde. ')).toEqual(['Bonjour tout le monde.']);
+    expect(c.push('Fini voila. ')).toEqual(['Fini voila.']);
+    expect(c.push('\n\nEnsuite on continue. ')).toEqual(['Ensuite on continue.']);
+  });
 });
