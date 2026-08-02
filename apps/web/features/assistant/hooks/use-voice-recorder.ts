@@ -32,6 +32,14 @@ export function useVoiceRecorder(options?: UseVoiceRecorderOptions) {
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cancelledRef = useRef(false);
+  /**
+   * Jeton de génération : `stop()`/`cancel()`/un nouveau `start()` l'incrémentent.
+   * Un `start()` suspendu sur `getUserMedia` (le dialogue de permission peut
+   * bloquer des secondes) revérifie qu'il est toujours le plus récent avant de
+   * créer un recorder — sinon on enregistrerait alors que la touche est déjà
+   * relâchée (enregistrement orphelin, fuite micro).
+   */
+  const generationRef = useRef(0);
   const onAutoStopRef = useRef<((blob: Blob) => void) | undefined>(options?.onAutoStop);
   onAutoStopRef.current = options?.onAutoStop;
 
@@ -39,6 +47,7 @@ export function useVoiceRecorder(options?: UseVoiceRecorderOptions) {
     () => () => {
       if (timerRef.current !== null) clearTimeout(timerRef.current);
       streamRef.current?.getTracks().forEach((t) => t.stop());
+      recorderRef.current = null;
     },
     [],
   );
@@ -54,12 +63,16 @@ export function useVoiceRecorder(options?: UseVoiceRecorderOptions) {
       setState('unsupported');
       return;
     }
+    const generation = ++generationRef.current;
     try {
       streamRef.current ??= await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch {
-      setState('denied');
+      if (generation === generationRef.current) setState('denied');
       return;
     }
+    // stop()/cancel()/un start() plus récent est passé pendant l'attente de la
+    // permission → cette capture est obsolète, ne pas démarrer de recorder.
+    if (generation !== generationRef.current) return;
     cancelledRef.current = false;
     chunksRef.current = [];
     const mimeType = pickMimeType();
@@ -75,22 +88,30 @@ export function useVoiceRecorder(options?: UseVoiceRecorderOptions) {
     setState('recording');
     timerRef.current = setTimeout(() => {
       // Borne 60 s (spec §2) : arrêt forcé, blob livré via onAutoStop.
-      if (recorderRef.current?.state !== 'recording') return;
-      recorderRef.current.onstop = () => {
+      if (recorderRef.current !== recorder || recorder.state !== 'recording') return;
+      recorder.onstop = () => {
+        // L'event stop arrive en tâche différée : un nouveau recorder a pu
+        // remplacer celui-ci entre-temps — ne pas écraser son état.
+        if (recorderRef.current !== recorder) return;
         setState('idle');
         onAutoStopRef.current?.(buildBlob());
       };
-      recorderRef.current.stop();
+      recorder.stop();
     }, MAX_RECORDING_MS);
   }, [buildBlob]);
 
   /** Arrête et résout avec l'audio capturé (null si annulé/vide). */
   const stop = useCallback((): Promise<Blob | null> => {
+    generationRef.current++; // invalide tout start() encore suspendu sur getUserMedia
     const recorder = recorderRef.current;
     if (timerRef.current !== null) clearTimeout(timerRef.current);
     if (recorder === null || recorder.state !== 'recording') return Promise.resolve(null);
     return new Promise((resolve) => {
       recorder.onstop = () => {
+        if (recorderRef.current !== recorder) {
+          resolve(null); // recorder remplacé entre-temps — ne pas stomper l'état
+          return;
+        }
         setState('idle');
         resolve(cancelledRef.current ? null : buildBlob());
       };
@@ -99,11 +120,15 @@ export function useVoiceRecorder(options?: UseVoiceRecorderOptions) {
   }, [buildBlob]);
 
   const cancel = useCallback((): void => {
+    generationRef.current++; // invalide tout start() encore suspendu sur getUserMedia
     cancelledRef.current = true;
     if (timerRef.current !== null) clearTimeout(timerRef.current);
     const recorder = recorderRef.current;
     if (recorder !== null && recorder.state === 'recording') {
-      recorder.onstop = () => setState('idle');
+      recorder.onstop = () => {
+        if (recorderRef.current !== recorder) return;
+        setState('idle');
+      };
       recorder.stop();
     } else {
       setState('idle');

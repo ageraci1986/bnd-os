@@ -21,13 +21,33 @@ class FakeMediaRecorder {
   }
   stop() {
     this.state = 'inactive';
-    this.ondataavailable?.({ data: new Blob(['aud'], { type: this.mimeType }) });
-    this.onstop?.();
+    // Fidèle aux vrais navigateurs : dataavailable/stop arrivent en tâche
+    // DIFFÉRÉE, jamais synchrone — c'est ce qui rend les races détectables.
+    queueMicrotask(() => {
+      this.ondataavailable?.({ data: new Blob(['aud'], { type: this.mimeType }) });
+      this.onstop?.();
+    });
   }
 }
 
 const fakeTrack = { stop: vi.fn() };
 const fakeStream = { getTracks: () => [fakeTrack] } as unknown as MediaStream;
+
+/** Promesse getUserMedia résoluble à la main — simule le dialogue de permission. */
+function deferredPermission() {
+  let resolve!: (s: MediaStream) => void;
+  const promise = new Promise<MediaStream>((res) => {
+    resolve = res;
+  });
+  return { promise, resolve };
+}
+
+/** Vide la file de microtâches (onstop différés) dans act(). */
+const flushMicrotasks = () =>
+  act(async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+  });
 
 describe('useVoiceRecorder', () => {
   beforeEach(() => {
@@ -66,7 +86,14 @@ describe('useVoiceRecorder', () => {
     const { result } = renderHook(() => useVoiceRecorder());
     await act(() => result.current.start());
     act(() => result.current.cancel());
+    await flushMicrotasks(); // l'event stop du recorder est différé
     expect(result.current.state).toBe('idle');
+    // Après annulation, stop() n'a plus rien à livrer.
+    let blob: Blob | null = new Blob(['sentinel']);
+    await act(async () => {
+      blob = await result.current.stop();
+    });
+    expect(blob).toBeNull();
   });
 
   it('borne à 60 s : auto-stop et blob disponible via onAutoStop', async () => {
@@ -74,9 +101,9 @@ describe('useVoiceRecorder', () => {
     const { result } = renderHook(() => useVoiceRecorder({ onAutoStop }));
     await act(() => result.current.start());
     // NOTE: testing-library's `waitFor` polls with real timers, which deadlocks
-    // under `vi.useFakeTimers()` (its polling setInterval never fires). Since the
-    // fake MediaRecorder resolves `onstop` synchronously, `advanceTimersByTimeAsync`
-    // (which flushes microtasks) is enough — no polling wait needed.
+    // under `vi.useFakeTimers()` (its polling setInterval never fires). The fake
+    // MediaRecorder delivers `onstop` via microtask, and `advanceTimersByTimeAsync`
+    // flushes microtasks between ticks — no polling wait needed.
     await act(async () => {
       await vi.advanceTimersByTimeAsync(60_000);
     });
@@ -98,5 +125,73 @@ describe('useVoiceRecorder', () => {
     const { result } = renderHook(() => useVoiceRecorder());
     await act(() => result.current.start());
     expect(result.current.state).toBe('unsupported');
+  });
+
+  describe('races pendant l’attente de permission (getUserMedia suspendu)', () => {
+    it('keyup avant la permission : stop() pendant l’attente → aucun recorder orphelin', async () => {
+      const perm = deferredPermission();
+      (navigator.mediaDevices.getUserMedia as ReturnType<typeof vi.fn>).mockReturnValue(
+        perm.promise,
+      );
+      const { result } = renderHook(() => useVoiceRecorder());
+      const startP = result.current.start(); // suspend sur getUserMedia
+      let blob: Blob | null = new Blob(['sentinel']);
+      await act(async () => {
+        blob = await result.current.stop(); // keyup pendant le dialogue
+      });
+      expect(blob).toBeNull();
+      perm.resolve(fakeStream); // l'utilisateur accorde ENSUITE la permission
+      await act(async () => {
+        await startP;
+      });
+      // Sans le jeton de génération, start() reprendrait ici et enregistrerait
+      // alors que personne ne tient la touche.
+      expect(FakeMediaRecorder.instances).toHaveLength(0);
+      expect(result.current.state).toBe('idle');
+    });
+
+    it('cancel() pendant l’attente de permission → capture abandonnée', async () => {
+      const perm = deferredPermission();
+      (navigator.mediaDevices.getUserMedia as ReturnType<typeof vi.fn>).mockReturnValue(
+        perm.promise,
+      );
+      const { result } = renderHook(() => useVoiceRecorder());
+      const startP = result.current.start();
+      act(() => result.current.cancel());
+      perm.resolve(fakeStream);
+      await act(async () => {
+        await startP;
+      });
+      expect(FakeMediaRecorder.instances).toHaveLength(0);
+      expect(result.current.state).toBe('idle');
+    });
+
+    it('double start() pendant l’attente → un seul recorder créé', async () => {
+      const perm = deferredPermission();
+      (navigator.mediaDevices.getUserMedia as ReturnType<typeof vi.fn>).mockReturnValue(
+        perm.promise,
+      );
+      const { result } = renderHook(() => useVoiceRecorder());
+      const p1 = result.current.start();
+      const p2 = result.current.start();
+      perm.resolve(fakeStream);
+      await act(async () => {
+        await Promise.all([p1, p2]);
+      });
+      expect(FakeMediaRecorder.instances).toHaveLength(1);
+      expect(result.current.state).toBe('recording');
+    });
+
+    it('cancel() puis start() immédiat : le onstop différé du vieux recorder ne stompe pas le nouvel état', async () => {
+      const { result } = renderHook(() => useVoiceRecorder());
+      await act(() => result.current.start());
+      await act(async () => {
+        result.current.cancel();
+        await result.current.start(); // re-PTT avant que l'event stop différé n'arrive
+      });
+      await flushMicrotasks(); // le onstop du recorder annulé arrive maintenant
+      expect(FakeMediaRecorder.instances).toHaveLength(2);
+      expect(result.current.state).toBe('recording'); // pas stompé en 'idle'
+    });
   });
 });
