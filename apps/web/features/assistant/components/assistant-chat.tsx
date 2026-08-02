@@ -235,6 +235,13 @@ export function AssistantChat({ csrfToken, firstName, overview, notices }: Assis
       // Lu depuis la ref (pas le state `input`) : `send` reste une fonction
       // stable entre deux frappes — voir le commentaire sur `inputValueRef`.
       const text = (useOverride ? textOverride : inputValueRef.current).trim();
+      // Tour vocal ? Armé par onTranscript uniquement (nextTurnIsVoiceRef) —
+      // sortie symétrique : les envois clavier/widget restent silencieux.
+      // Consommé AVANT le garde busy/vide : un envoi vocal refusé (tour déjà
+      // en cours, transcript devenu vide) ne doit jamais laisser le flag armé
+      // pour un tour clavier ultérieur.
+      const isVoiceTurn = nextTurnIsVoiceRef.current;
+      nextTurnIsVoiceRef.current = false;
       if (text === '' || busy) return;
       setBusy(true);
       setError(null);
@@ -245,11 +252,8 @@ export function AssistantChat({ csrfToken, firstName, overview, notices }: Assis
       setMessages((prev) => [...prev, { role: 'user', content: text }]);
       setStreamText('');
       setStreamWidgets([]);
-      // Tour vocal ? Armé par onTranscript uniquement (nextTurnIsVoiceRef) —
-      // sortie symétrique : les envois clavier/widget restent silencieux.
-      voiceTurnRef.current = nextTurnIsVoiceRef.current;
-      nextTurnIsVoiceRef.current = false;
-      chunkerRef.current = voiceTurnRef.current ? new SentenceChunker() : null;
+      voiceTurnRef.current = isVoiceTurn;
+      chunkerRef.current = isVoiceTurn ? new SentenceChunker() : null;
 
       const controller = new AbortController();
       abortRef.current = controller;
@@ -408,7 +412,16 @@ export function AssistantChat({ csrfToken, firstName, overview, notices }: Assis
       void answerConfirm(pending.id, intent === 'allow');
       return true;
     },
-    onInterrupt: () => abortRef.current?.abort(),
+    // Interruption : tuer le chunker AVANT l'abort — sinon le `finally` de
+    // send() flusherait le reliquat vers la file TTS fraîchement vidée (le
+    // runId bumpé par queue.stop() ne protège pas d'un enqueue POSTÉRIEUR) et
+    // la voix reprendrait par-dessus l'écoute. Ce tour ne vocalise plus rien.
+    // `voiceTurnRef` reste vrai : une interruption OUVRE un nouvel échange
+    // vocal (contrairement au bouton Stop, demande de silence explicite).
+    onInterrupt: () => {
+      chunkerRef.current = null;
+      abortRef.current?.abort();
+    },
   });
   speakRef.current = voice.speak;
   // Miroir du pendingConfirm pour le hook voix (état → ref, même valeur).
@@ -429,13 +442,26 @@ export function AssistantChat({ csrfToken, firstName, overview, notices }: Assis
       if (e.key === 'Escape' && voice.mode === 'recording') voice.cancel();
     };
     const up = (e: KeyboardEvent) => {
-      if (e.key === 'Alt' && voice.mode === 'recording') void voice.pressEnd();
+      // INCONDITIONNEL (pas de garde `mode === 'recording'`) : le state peut
+      // être en retard d'un render, et surtout la relâche peut arriver PENDANT
+      // l'attente getUserMedia (dialogue de permission) — pressEnd no-ope sans
+      // risque et recorder.stop() bump le jeton de génération, ce qui tue tout
+      // start() encore suspendu (sinon : capture ambiante de 60 s auto-envoyée).
+      if (e.key === 'Alt') void voice.pressEnd();
+    };
+    const blur = () => {
+      // Alt+Tab / changement de fenêtre pendant l'écoute : le keyup n'arrivera
+      // jamais — annuler (PAS pressEnd : l'utilisateur n'a pas voulu envoyer),
+      // sinon capture d'ambiance de 60 s auto-transmise (vie privée).
+      if (voice.mode === 'recording') voice.cancel();
     };
     window.addEventListener('keydown', down);
     window.addEventListener('keyup', up);
+    window.addEventListener('blur', blur);
     return () => {
       window.removeEventListener('keydown', down);
       window.removeEventListener('keyup', up);
+      window.removeEventListener('blur', blur);
     };
   }, [voice]);
 
@@ -591,7 +617,18 @@ export function AssistantChat({ csrfToken, firstName, overview, notices }: Assis
         <div ref={bottomRef} aria-hidden />
       </div>
 
-      <VoiceCapsule mode={voice.mode} onStop={voice.speakStop} />
+      <VoiceCapsule
+        mode={voice.mode}
+        onStop={() => {
+          // Stop explicite = demande de silence pour TOUT le reste du tour :
+          // tuer le chunker (sinon la prochaine phrase SSE ré-enqueue et la
+          // voix reprend) ET désarmer voiceTurnRef (décision produit : un
+          // confirm_request ultérieur du même tour ne doit pas être lu).
+          chunkerRef.current = null;
+          voiceTurnRef.current = false;
+          voice.speakStop();
+        }}
+      />
       {voice.notice !== null && (
         <p className="text-xs text-[color:var(--color-text-ghost)]" role="status">
           {voice.notice}
