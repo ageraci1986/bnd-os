@@ -81,6 +81,9 @@ export function useVoiceRecorder(options?: UseVoiceRecorderOptions) {
       mimeType !== '' ? { mimeType } : undefined,
     );
     recorder.ondataavailable = (e) => {
+      // Même garde d'identité que les onstop : le dataavailable DIFFÉRÉ d'un
+      // recorder annulé ne doit pas injecter son chunk dans la prise suivante.
+      if (recorderRef.current !== recorder) return;
       if (e.data.size > 0 || chunksRef.current.length === 0) chunksRef.current.push(e.data);
     };
     recorderRef.current = recorder;

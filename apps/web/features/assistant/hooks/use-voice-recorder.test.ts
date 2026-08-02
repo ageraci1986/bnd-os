@@ -12,9 +12,15 @@ class FakeMediaRecorder {
   onstop: (() => void) | null = null;
   state = 'inactive';
   readonly mimeType: string;
+  /**
+   * Chunk distinctif par instance, de TAILLE unique ("take-1" = 6 o, "take-2take-2"
+   * = 12 o…) : le Blob de jsdom n'a pas .text(), on trace les fuites via .size.
+   */
+  readonly takeChunk: string;
   constructor(_stream: MediaStream, opts?: { mimeType?: string }) {
     this.mimeType = opts?.mimeType ?? 'audio/webm';
-    FakeMediaRecorder.instances.push(this);
+    const take = FakeMediaRecorder.instances.push(this);
+    this.takeChunk = `take-${take}`.repeat(take);
   }
   start() {
     this.state = 'recording';
@@ -24,7 +30,7 @@ class FakeMediaRecorder {
     // Fidèle aux vrais navigateurs : dataavailable/stop arrivent en tâche
     // DIFFÉRÉE, jamais synchrone — c'est ce qui rend les races détectables.
     queueMicrotask(() => {
-      this.ondataavailable?.({ data: new Blob(['aud'], { type: this.mimeType }) });
+      this.ondataavailable?.({ data: new Blob([this.takeChunk], { type: this.mimeType }) });
       this.onstop?.();
     });
   }
@@ -182,16 +188,25 @@ describe('useVoiceRecorder', () => {
       expect(result.current.state).toBe('recording');
     });
 
-    it('cancel() puis start() immédiat : le onstop différé du vieux recorder ne stompe pas le nouvel état', async () => {
+    it('cancel() puis start() immédiat : ni le onstop ni le dataavailable différés du vieux recorder ne polluent la nouvelle prise', async () => {
       const { result } = renderHook(() => useVoiceRecorder());
       await act(() => result.current.start());
       await act(async () => {
         result.current.cancel();
-        await result.current.start(); // re-PTT avant que l'event stop différé n'arrive
+        await result.current.start(); // re-PTT avant que les events différés n'arrivent
       });
-      await flushMicrotasks(); // le onstop du recorder annulé arrive maintenant
+      await flushMicrotasks(); // le onstop + dataavailable du recorder annulé arrivent maintenant
       expect(FakeMediaRecorder.instances).toHaveLength(2);
       expect(result.current.state).toBe('recording'); // pas stompé en 'idle'
+      // La 2e prise ne doit contenir QUE son propre chunk. Tailles uniques :
+      // take 1 = 6 o, take 2 = 12 o → 12 = chunk de la prise 2 seule ;
+      // 18 = fuite du chunk annulé en tête ; 6 = mauvaise prise conservée.
+      let blob: Blob | null = null;
+      await act(async () => {
+        blob = await result.current.stop();
+      });
+      expect(blob).not.toBeNull();
+      expect((blob as unknown as Blob).size).toBe(FakeMediaRecorder.instances[1]!.takeChunk.length);
     });
   });
 });
