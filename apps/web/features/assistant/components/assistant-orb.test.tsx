@@ -16,7 +16,7 @@ describe('deriveOrbActivity', () => {
     expect(deriveOrbActivity({ busy: true, streaming: true })).toBe('responding');
   });
 
-  it('ne dérive jamais listening (réservé V1.5)', () => {
+  it('sans flag listening, ne dérive jamais listening', () => {
     const cases = [
       { busy: false, streaming: false },
       { busy: false, streaming: true },

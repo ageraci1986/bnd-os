@@ -6,9 +6,10 @@ import { describe, expect, it, vi } from 'vitest';
 import { VoiceCapsule } from './voice-capsule';
 
 describe('VoiceCapsule', () => {
-  it('rend null en idle', () => {
+  it('idle : wrapper aria-live monté mais vide (pas de capsule interne)', () => {
     const { container } = render(<VoiceCapsule mode="idle" onStop={() => undefined} />);
-    expect(container.firstChild).toBeNull();
+    expect(container.querySelector('[data-testid="voice-capsule"]')).toBeNull();
+    expect(container.querySelector('[aria-live="polite"]')).not.toBeNull();
   });
 
   it('écoute : texte + aria-live polite', () => {
