@@ -1,10 +1,12 @@
 export type OrbActivity = 'idle' | 'thinking' | 'responding' | 'listening';
 
-/** Dérive l'état de l'orbe depuis les états du chat (spec §3.1/§6). `listening` = V1.5. */
+/** Dérive l'état de l'orbe depuis les états du chat (spec §3.1/§6). `listening` prime (V1.5 voix). */
 export function deriveOrbActivity(input: {
   busy: boolean;
   streaming: boolean; // streamText non vide
+  listening?: boolean; // PTT en cours (voix V1.5)
 }): OrbActivity {
+  if (input.listening === true) return 'listening';
   if (!input.busy) return 'idle';
   return input.streaming ? 'responding' : 'thinking';
 }

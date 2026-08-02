@@ -27,6 +27,11 @@ describe('deriveOrbActivity', () => {
       expect(deriveOrbActivity(c)).not.toBe('listening');
     }
   });
+
+  it('listening prime sur tous les autres états', () => {
+    expect(deriveOrbActivity({ busy: true, streaming: true, listening: true })).toBe('listening');
+    expect(deriveOrbActivity({ busy: false, streaming: false, listening: true })).toBe('listening');
+  });
 });
 
 describe('<AssistantOrb />', () => {
