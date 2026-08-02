@@ -44,7 +44,8 @@ function silentWav(): Uint8Array {
 
 export async function synthesizeSpeech(text: string): Promise<SpeechResult> {
   const env = getServerEnv();
-  // Garde double identique au provider Deepgram (jamais actif en production).
+  // Garde double identique au provider Anthropic (provider.ts) et au seam STT
+  // (stt.ts) — jamais actif en production.
   if (env.ASSISTANT_E2E_MOCK === '1' && env.NODE_ENV !== 'production') {
     return { body: new Response(silentWav().buffer as ArrayBuffer).body, contentType: 'audio/wav' };
   }

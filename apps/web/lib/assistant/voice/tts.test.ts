@@ -62,6 +62,26 @@ describe('synthesizeSpeech', () => {
     // Header RIFF/WAVE valide → decodeAudioData côté client ne jettera pas.
     expect(String.fromCharCode(...bytes.slice(0, 4))).toBe('RIFF');
     expect(String.fromCharCode(...bytes.slice(8, 12))).toBe('WAVE');
+    // Maths du header verrouillées : 44 octets d'en-tête + 2400 octets de data
+    // (1200 échantillons × 2 octets). Une régression ne se verrait sinon qu'en
+    // E2E via un decodeAudioData qui jette.
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    expect(bytes.length).toBe(2444);
+    expect(view.getUint32(4, true)).toBe(2436); // RIFF chunk size = 36 + dataLen
+    expect(view.getUint32(40, true)).toBe(2400); // data chunk size = dataLen
+  });
+
+  it("encode le voice id dans l'URL (défense injection de chemin)", async () => {
+    mockEnv.env.ELEVENLABS_VOICE_ID = 'voice/../123';
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+      new Response(new Uint8Array([1]), { status: 200, headers: { 'Content-Type': 'audio/mpeg' } }),
+    );
+    await synthesizeSpeech('x');
+    const [url] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0]!;
+    expect(String(url)).toContain(
+      `/v1/text-to-speech/${encodeURIComponent('voice/../123')}/stream`,
+    );
+    expect(String(url)).not.toContain('/voice/../123/');
   });
 
   it('garde double : mock OFF en production même si ASSISTANT_E2E_MOCK=1', async () => {
