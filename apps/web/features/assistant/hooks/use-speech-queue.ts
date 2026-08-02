@@ -28,6 +28,8 @@ export function useSpeechQueue(csrfToken: string) {
   const sourceRef = useRef<AudioBufferSourceNode | null>(null);
   const ctxRef = useRef<AudioContext | null>(null);
   const csrfRef = useRef(csrfToken);
+  // « Latest ref » volontaire : réécrit à chaque render pour que drain() lise
+  // toujours le token courant sans invalider ses callbacks mémoïsés.
   csrfRef.current = csrfToken;
 
   const stop = useCallback((): void => {
@@ -81,7 +83,11 @@ export function useSpeechQueue(csrfToken: string) {
           sourceRef.current = source;
           source.start();
         });
-        sourceRef.current = null;
+        // Guard runId : si stop() + un nouveau tour sont passés pendant que
+        // l'onended de CE run était en vol, sourceRef pointe déjà sur la
+        // source du run suivant — ne pas l'écraser (sinon un stop() ultérieur
+        // ne pourrait plus couper cette nouvelle source).
+        if (runIdRef.current === runId) sourceRef.current = null;
       } catch (err) {
         if ((err as { name?: string } | null)?.name === 'AbortError') return;
         // réseau/décodage : phrase sautée, on continue
