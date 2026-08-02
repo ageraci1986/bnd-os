@@ -73,6 +73,14 @@ export function toProviderError(error: unknown): ProviderError {
     return new ProviderError('Impossible de joindre le modèle — vérifiez la connexion réseau.');
   }
   if (error instanceof Anthropic.APIError) {
+    // Statut absent = erreur EN-BANDE du stream (le HTTP était 200, l'erreur
+    // arrive DANS le flux — typiquement `overloaded_error` quand Anthropic
+    // sature pendant la génération). Transitoire : même message que le rate
+    // limit, au lieu d'un « (undefined) » ni honnête ni actionnable
+    // (constaté en prod le 2026-07-29).
+    if (error.status === undefined) {
+      return new ProviderError('Le modèle est très sollicité — réessayez dans un instant.');
+    }
     return new ProviderError(
       `Le service du modèle a renvoyé une erreur (${String(error.status)}). Réessayez sous peu.`,
     );

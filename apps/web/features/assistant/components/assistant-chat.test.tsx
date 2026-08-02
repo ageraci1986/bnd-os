@@ -587,7 +587,10 @@ describe('AssistantChat', () => {
     expect(screen.queryByText('réponse 1')).not.toBeInTheDocument();
     expect(screen.getByText('q2')).toBeInTheDocument();
     expect(screen.getByText('réponse 41')).toBeInTheDocument();
-  });
+    // 41 tours SSE complets : bien au-delà du budget par défaut de 5 s quand
+    // la machine est chargée (flake constaté sur le hook pre-push) — timeout
+    // dédié plutôt qu'une hausse globale.
+  }, 30_000);
 
   it('trime la donnée board stockée : 5 cartes rendues, total préservé via le compteur', async () => {
     const cards = Array.from({ length: 100 }, (_, i) => ({
