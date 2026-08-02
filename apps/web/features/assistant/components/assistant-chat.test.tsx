@@ -1,8 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 // jsdom's global `Blob` doesn't implement `.stream()` — use Node's, which does.
 import { Blob as NodeBlob } from 'node:buffer';
+import { installFakeAudioContext, installFakeMediaRecorder } from '../hooks/fake-media-recorder';
 // Vitest hoists vi.mock above all imports — la closure doit passer par
 // vi.hoisted() (même convention que ailleurs dans ce fichier de tests).
 const { markNotificationReadSpy } = vi.hoisted(() => ({
@@ -838,6 +839,193 @@ describe('AssistantChat', () => {
     it('la pile de notices reste hors de toute région aria-live', () => {
       render(<AssistantChat csrfToken="tok" firstName="Angelo" notices={[notice]} />);
       expect(screen.getByText(notice.message).closest('[aria-live]')).toBeNull();
+    });
+  });
+
+  describe('mode voix', () => {
+    beforeEach(() => {
+      installFakeMediaRecorder();
+      installFakeAudioContext();
+    });
+    afterEach(() => vi.unstubAllGlobals());
+
+    /**
+     * Route le fetch mocké par URL : /api/assistant/voice/transcribe renvoie
+     * le transcript configurable, /api/assistant/voice/speak un petit buffer
+     * audio, /api/assistant/confirm un OK par défaut, /api/assistant/chat le
+     * flux SSE fourni par le test (voir sseResponse/openSseResponse en tête
+     * de fichier).
+     */
+    function routeFetch(handlers: {
+      chat?: () => Response;
+      transcript?: string;
+      confirm?: () => Response;
+    }) {
+      return vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+        const u = String(url);
+        if (u.endsWith('/api/assistant/voice/transcribe')) {
+          return Response.json({ ok: true, transcript: handlers.transcript ?? '' });
+        }
+        if (u.endsWith('/api/assistant/voice/speak')) {
+          return new Response(new Uint8Array([1, 2]), { status: 200 });
+        }
+        if (u.endsWith('/api/assistant/confirm')) {
+          return handlers.confirm ? handlers.confirm() : Response.json({ ok: true });
+        }
+        if (u.endsWith('/api/assistant/chat') && handlers.chat) return handlers.chat();
+        throw new Error(`URL non routée dans ce test : ${u}`);
+      });
+    }
+
+    /** Maintien ⌥ Option → relâche, en dehors de tout champ de saisie. */
+    async function pressAltAndRelease(): Promise<void> {
+      fireEvent.keyDown(window, { key: 'Alt' });
+      await waitFor(() => {
+        expect(screen.getByTestId('voice-capsule')).toHaveAttribute('data-mode', 'recording');
+      });
+      fireEvent.keyUp(window, { key: 'Alt' });
+    }
+
+    it('PTT clavier bout en bout : ⌥ Option maintenu → transcript → bulle user + POST /chat', async () => {
+      const fetchMock = routeFetch({
+        transcript: 'quelles cartes sont bloquées ?',
+        chat: () => sseResponse([{ type: 'done', text: 'Aucune carte bloquée.' }]),
+      });
+      render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
+
+      await pressAltAndRelease();
+
+      await waitFor(() => {
+        expect(screen.getByText('quelles cartes sont bloquées ?')).toBeInTheDocument();
+      });
+      expect(fetchMock.mock.calls.some(([u]) => String(u).endsWith('/api/assistant/chat'))).toBe(
+        true,
+      );
+    });
+
+    it('symétrie : un tour vocal vocalise la réponse, le même tour au clavier reste silencieux', async () => {
+      const fetchMock = routeFetch({
+        transcript: 'fais le',
+        chat: () =>
+          sseResponse([
+            { type: 'chunk', text: "C'est fait. " },
+            { type: 'chunk', text: 'Voilà.' },
+            { type: 'done', text: "C'est fait. Voilà." },
+          ]),
+      });
+      render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
+
+      // Tour VOCAL : au moins une phrase part vers /speak.
+      await pressAltAndRelease();
+      await waitFor(() => {
+        expect(screen.getByText("C'est fait. Voilà.")).toBeInTheDocument();
+      });
+      const speakCallsVoiceTurn = fetchMock.mock.calls.filter(([u]) =>
+        String(u).endsWith('/api/assistant/voice/speak'),
+      ).length;
+      expect(speakCallsVoiceTurn).toBeGreaterThan(0);
+
+      // Tour CLAVIER identique : aucune vocalisation.
+      fetchMock.mockClear();
+      await userEvent.type(screen.getByRole('textbox'), 'fais le');
+      await userEvent.click(screen.getByRole('button', { name: /envoyer/i }));
+      await waitFor(() => {
+        expect(screen.getAllByText("C'est fait. Voilà.")).toHaveLength(2);
+      });
+      const speakCallsKeyboardTurn = fetchMock.mock.calls.filter(([u]) =>
+        String(u).endsWith('/api/assistant/voice/speak'),
+      ).length;
+      expect(speakCallsKeyboardTurn).toBe(0);
+    });
+
+    it('confirmation vocale : transcript « oui » pendant un confirm_request → POST /confirm allowed:true', async () => {
+      const confirmId = '7'.repeat(32);
+      const fetchMock = routeFetch({
+        transcript: 'oui',
+        chat: () =>
+          openSseResponse([
+            {
+              type: 'confirm_request',
+              id: confirmId,
+              tool: 'send_mail',
+              description: 'Envoyer un mail à a@b.test',
+            },
+          ]),
+      });
+      render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
+
+      // Tour vocal initial : déclenche le confirm_request côté serveur (mocké).
+      await pressAltAndRelease();
+      await screen.findByRole('alertdialog');
+
+      // Nouveau PTT pendant la confirmation en attente : le transcript "oui"
+      // est consommé comme réponse Autoriser — pas de nouveau message.
+      await pressAltAndRelease();
+
+      await waitFor(() => {
+        const confirmCall = fetchMock.mock.calls.find(([u]) =>
+          String(u).endsWith('/api/assistant/confirm'),
+        );
+        expect(confirmCall).toBeDefined();
+        const [, init] = confirmCall ?? [];
+        expect(JSON.parse(String(init?.body))).toEqual({ id: confirmId, allowed: true });
+      });
+    });
+
+    it('confirmation vocale : transcript ambigu → pas de POST /confirm, redemande à voix haute via /speak', async () => {
+      const confirmId = '8'.repeat(32);
+      const fetchMock = routeFetch({
+        transcript: 'euh peut-être',
+        chat: () =>
+          openSseResponse([
+            {
+              type: 'confirm_request',
+              id: confirmId,
+              tool: 'send_mail',
+              description: 'Envoyer un mail à a@b.test',
+            },
+          ]),
+      });
+      render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
+
+      await pressAltAndRelease();
+      await screen.findByRole('alertdialog');
+
+      fetchMock.mockClear();
+      await pressAltAndRelease();
+
+      await waitFor(() => {
+        const speakCall = fetchMock.mock.calls.find(([u]) =>
+          String(u).endsWith('/api/assistant/voice/speak'),
+        );
+        expect(speakCall).toBeDefined();
+        const [, init] = speakCall ?? [];
+        expect(JSON.parse(String(init?.body)) as { text: string }).toMatchObject({
+          text: expect.stringContaining('Dis clairement') as unknown as string,
+        });
+      });
+      expect(fetchMock.mock.calls.some(([u]) => String(u).endsWith('/api/assistant/confirm'))).toBe(
+        false,
+      );
+    });
+
+    it('Échap pendant l’écoute → annule sans transcription (aucun POST /transcribe)', async () => {
+      const fetchMock = routeFetch({});
+      render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
+
+      fireEvent.keyDown(window, { key: 'Alt' });
+      await waitFor(() => {
+        expect(screen.getByTestId('voice-capsule')).toHaveAttribute('data-mode', 'recording');
+      });
+
+      fireEvent.keyDown(window, { key: 'Escape' });
+      await waitFor(() => {
+        expect(screen.queryByTestId('voice-capsule')).not.toBeInTheDocument();
+      });
+
+      expect(
+        fetchMock.mock.calls.some(([u]) => String(u).endsWith('/api/assistant/voice/transcribe')),
+      ).toBe(false);
     });
   });
 });
