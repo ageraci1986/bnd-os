@@ -36,14 +36,16 @@ describe('POST /api/assistant/voice/transcribe', () => {
     mocks.transcribeAudio.mockResolvedValue('bonjour');
   });
 
-  it('401 sans session', async () => {
+  it('401 sans session — sans consommer le budget rate-limit', async () => {
     mocks.getAuthContext.mockResolvedValue(null);
     expect((await POST(makeReq(new Uint8Array(4)))).status).toBe(401);
+    expect(mocks.check).not.toHaveBeenCalled();
   });
 
-  it('403 sans CSRF valide', async () => {
+  it('403 sans CSRF valide — sans consommer le budget rate-limit', async () => {
     mocks.assertCsrfHeader.mockRejectedValue(new Error('csrf'));
     expect((await POST(makeReq(new Uint8Array(4)))).status).toBe(403);
+    expect(mocks.check).not.toHaveBeenCalled();
   });
 
   it('429 quand le rate limit est atteint', async () => {
@@ -57,6 +59,10 @@ describe('POST /api/assistant/voice/transcribe', () => {
 
   it('413 au-delà de 2 Mo', async () => {
     expect((await POST(makeReq(new Uint8Array(2_000_001)))).status).toBe(413);
+  });
+
+  it('200 à exactement 2 Mo (borne stricte : > et non >=)', async () => {
+    expect((await POST(makeReq(new Uint8Array(2_000_000)))).status).toBe(200);
   });
 
   it('400 sur un audio vide', async () => {

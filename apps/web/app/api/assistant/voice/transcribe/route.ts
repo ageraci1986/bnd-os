@@ -36,6 +36,13 @@ export async function POST(req: Request): Promise<Response> {
       { status: 415 },
     );
   }
+  // Pré-check Content-Length AVANT de lire le corps : défense en profondeur
+  // si l'on quitte un jour le cap plateforme Vercel (~4,5 Mo). L'en-tête peut
+  // être absent ou forgé — le check post-lecture ci-dessous reste la vérité.
+  const declared = Number(req.headers.get('content-length'));
+  if (Number.isFinite(declared) && declared > MAX_AUDIO_BYTES) {
+    return Response.json({ ok: false, message: 'Enregistrement trop long.' }, { status: 413 });
+  }
   const audio = await req.arrayBuffer();
   if (audio.byteLength === 0) {
     return Response.json({ ok: false, message: 'Audio vide.' }, { status: 400 });
