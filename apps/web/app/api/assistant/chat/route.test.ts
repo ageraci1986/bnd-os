@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type * as AgentModule from '@nexushub/agent';
 import { parseSseLines } from '@/features/assistant/lib/sse';
 import type { ChatSseEvent } from '@/lib/assistant/chat-schema';
 
@@ -23,9 +24,26 @@ const mocks = vi.hoisted(() => ({
   readHandler: vi.fn(),
   adminHandler: vi.fn(),
   loadMemories: vi.fn(),
+  runTurnSpy: vi.fn(),
 }));
 
 vi.mock('server-only', () => ({}));
+
+// Wrappe le VRAI `runTurn` (@nexushub/agent) derrière un espion qui capture les
+// deps reçues (notamment `deadlineAt`), sans changer son comportement — le
+// registre `ToolRegistry`/`defineTool` importés dynamiquement par le mock
+// `@/lib/assistant/tools` ci-dessous passe par ce même mock, donc on doit
+// réexporter le reste du module tel quel.
+vi.mock('@nexushub/agent', async (importOriginal) => {
+  const actual = await importOriginal<typeof AgentModule>();
+  return {
+    ...actual,
+    runTurn: (...args: Parameters<typeof actual.runTurn>): ReturnType<typeof actual.runTurn> => {
+      mocks.runTurnSpy(...args);
+      return actual.runTurn(...args);
+    },
+  };
+});
 
 vi.mock('@/lib/auth', () => ({ getAuthContext: mocks.getAuthContext }));
 vi.mock('@/lib/csrf', () => ({ assertCsrfHeader: mocks.assertCsrfHeader }));
@@ -284,6 +302,25 @@ describe('POST /api/assistant/chat — confirmer', () => {
     expect(mocks.recordAudit).not.toHaveBeenCalledWith(
       expect.objectContaining({ action: 'assistant_gate' }),
     );
+  });
+});
+
+describe('POST /api/assistant/chat — budget temps du tour', () => {
+  it('passe deadlineAt ≈ maintenant + TURN_TIME_BUDGET_MS (540s) à runTurn', async () => {
+    mocks.streamTurn.mockResolvedValueOnce(endTurnRound());
+
+    const before = Date.now();
+    const res = await POST(makeRequest({ messages: [], message: 'Bonjour' }));
+    const after = Date.now();
+    expect(res.status).toBe(200);
+    await readEvents(res);
+
+    expect(mocks.runTurnSpy).toHaveBeenCalledTimes(1);
+    const call = mocks.runTurnSpy.mock.calls[0] as [unknown, unknown, { deadlineAt?: number }];
+    const deadlineAt = call[2].deadlineAt;
+    expect(deadlineAt).toBeDefined();
+    expect(deadlineAt).toBeGreaterThanOrEqual(before + 540_000);
+    expect(deadlineAt).toBeLessThanOrEqual(after + 540_000);
   });
 });
 

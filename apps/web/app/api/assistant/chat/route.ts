@@ -15,8 +15,20 @@ import { isWidgetTool } from '@/lib/assistant/widget-tools';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-// Budget ~2 fenêtres de confirmation (120 s) + rounds modèle ; Vercel Fluid.
-export const maxDuration = 300;
+// Vercel Fluid compute (Pro) : la doc Vercel confirme sans ambiguïté un
+// plafond de 800 s pour Pro/Enterprise sans opt-in beta (au-delà, jusqu'à
+// 1800 s, nécessite un beta spécifique — on n'y touche pas). 600 s laisse une
+// marge confortable sous ce plafond documenté.
+export const maxDuration = 600;
+
+// 60 s de marge sous maxDuration pour finir le round provider en cours (déjà
+// lancé, non interruptible en plein vol) + exécuter les tools du dernier
+// round + flush du stream SSE avant que Vercel ne tue la fonction serverless.
+// Incident déclencheur : un tour géant (4 pages de recherche + marquage en
+// masse de 83 mails) a dépassé maxDuration=300 avant ce budget — le stream
+// s'est coupé net, sans événement `done`. Avec ce budget, `runTurn` s'arrête
+// proprement à la frontière d'un round et répond un texte explicite.
+const TURN_TIME_BUDGET_MS = 540_000;
 
 const WIDGET_DATA_MAX_CHARS = 8_000;
 
@@ -164,6 +176,10 @@ export async function POST(req: Request): Promise<Response> {
           // Propagation de la déconnexion client : stoppe la boucle de rounds
           // et annule la requête provider en cours (pas de tokens brûlés à vide).
           signal: req.signal,
+          // Arrêt gracieux avant le hard kill serverless (voir TURN_TIME_BUDGET_MS
+          // ci-dessus) — runTurn répond un texte explicite plutôt que de couper
+          // le stream net à la frontière de maxDuration.
+          deadlineAt: Date.now() + TURN_TIME_BUDGET_MS,
           onText: (chunk) => {
             send({ type: 'chunk', text: chunk });
           },
