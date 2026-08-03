@@ -70,6 +70,8 @@ export class FakeAudioContext {
   static sources: FakeSource[] = [];
   static autoEnd = true;
   state = 'running';
+  /** Appelé par le cleanup de démontage du speech-queue (anti-fuite de contextes). */
+  close = vi.fn(() => Promise.resolve());
   constructor() {
     FakeAudioContext.created += 1;
   }

@@ -19,9 +19,13 @@ class FakeAudioContext {
   static sources: FakeSource[] = [];
   /** false → onended ne se déclenche jamais tout seul (timing contrôlé par le test). */
   static autoEnd = true;
+  /** Toutes les instances créées, dans l'ordre — pour asserter close() sur la bonne. */
+  static instances: FakeAudioContext[] = [];
   state = 'running';
+  close = vi.fn(() => Promise.resolve());
   constructor() {
     FakeAudioContext.created += 1;
+    FakeAudioContext.instances.push(this);
   }
   decodeAudioData(buf: ArrayBuffer): Promise<AudioBuffer> {
     if (buf.byteLength === 0) return Promise.reject(new Error('decode'));
@@ -52,6 +56,7 @@ describe('useSpeechQueue', () => {
   beforeEach(() => {
     FakeAudioContext.created = 0;
     FakeAudioContext.sources = [];
+    FakeAudioContext.instances = [];
     FakeAudioContext.autoEnd = true;
     vi.stubGlobal('AudioContext', FakeAudioContext);
     // Une Response FRAÎCHE par appel : un body de Response ne se consomme
@@ -217,5 +222,22 @@ describe('useSpeechQueue', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(FakeAudioContext.sources).toHaveLength(1);
     expect(FakeAudioContext.sources[0]!.start).toHaveBeenCalledTimes(1);
+  });
+
+  it('ferme le AudioContext au démontage — pas lors d’un simple stop()', async () => {
+    const { result, unmount } = renderHook(() => useSpeechQueue('t'));
+    act(() => result.current.enqueue('Phrase.'));
+    await waitFor(() => expect(result.current.speaking).toBe(false));
+    expect(FakeAudioContext.instances).toHaveLength(1);
+    const ctx = FakeAudioContext.instances[0]!;
+
+    // stop() seul (interruption, bouton Stop) : le contexte reste utilisable.
+    act(() => result.current.stop());
+    expect(ctx.close).not.toHaveBeenCalled();
+
+    // Démontage : un contexte non fermé n'est pas GC-éligible et les
+    // navigateurs plafonnent le nombre de contextes simultanés.
+    unmount();
+    expect(ctx.close).toHaveBeenCalledTimes(1);
   });
 });

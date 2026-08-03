@@ -483,6 +483,8 @@ export function AssistantChat({ csrfToken, firstName, overview, notices }: Assis
           busy,
           streaming: streamText !== null && streamText !== '',
           listening: voice.mode === 'recording',
+          // SSE fini mais la file TTS parle encore : l'orbe reste `responding`.
+          speaking: voice.mode === 'speaking',
         })}
       />
       <h1 className="text-lg font-bold text-[color:var(--color-text-main)]">

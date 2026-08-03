@@ -47,7 +47,19 @@ export function useSpeechQueue(csrfToken: string) {
     setSpeaking(false);
   }, []);
 
-  useEffect(() => stop, [stop]);
+  // Démontage : stop() PUIS close() du AudioContext — un contexte non fermé
+  // n'est pas GC-éligible et les navigateurs plafonnent le nombre de contextes
+  // simultanés ; sans close(), ils s'accumulent au fil des navigations client.
+  // stop() lui-même ne ferme jamais le contexte : il est aussi appelé pour les
+  // interruptions/Stop, où le contexte doit rester utilisable pour la suite.
+  useEffect(
+    () => () => {
+      stop();
+      void ctxRef.current?.close().catch(() => undefined);
+      ctxRef.current = null;
+    },
+    [stop],
+  );
 
   const drain = useCallback(async (runId: number): Promise<void> => {
     if (playingRef.current) return;
