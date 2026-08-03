@@ -49,11 +49,22 @@ const markSchema = z
  * Résout en un seul aller-retour les cartes référencées par `data.cardId`
  * dans un lot de résumés (jamais de N+1) — suivi de la revue de sécurité
  * « total visibility » : une notification affiche un titre humain et un
- * `cardId` actionnable (chaînable avec `get_card`) SEULEMENT si la carte est
- * résolue dans LE workspace courant. Une carte inconnue/soft-deleted/d'un
- * autre workspace ne doit jamais laisser fuiter un id inaccessible — on la
- * retire alors du résumé plutôt que d'exposer un cardId que `get_card`
- * refuserait de toute façon.
+ * `cardId` actionnable (chaînable avec `get_card`) SEULEMENT si `get_card`
+ * pourrait effectivement l'ouvrir. Détail des branches :
+ *
+ * - carte vivante, projet vivant → titre « <titre> — <projet> » + cardId ;
+ * - carte vivante, projet en corbeille (soft delete, ADR 0001 #15) → titre
+ *   suffixé « (projet en corbeille) » + cardId QUAND MÊME exposé :
+ *   `get_card`/`get_card_details` ne filtrent PAS `project.deletedAt` (voir
+ *   read-tools.ts + scopedCardWhere), la carte reste donc lisible ;
+ * - carte soft-deleted → NOMMÉE « <titre> — <projet> (carte supprimée) »
+ *   pour que la notification reste explicable, mais SANS cardId : `get_card`
+ *   filtre `deletedAt: null`, l'id serait inactionnable ;
+ * - id inconnu / autre workspace → rien d'exposé, titre reste null (jamais
+ *   d'id que l'utilisateur ne peut pas ouvrir).
+ *
+ * La requête ne filtre donc PAS `deletedAt` (il faut résoudre les cartes
+ * supprimées pour les nommer) mais reste STRICTEMENT scopée `workspaceId`.
  */
 async function enrichWithCardContext(
   summaries: readonly NotificationSummary[],
@@ -65,8 +76,13 @@ async function enrichWithCardContext(
   if (cardIds.length === 0) return summaries.slice();
 
   const cards = await prisma.card.findMany({
-    where: { id: { in: cardIds }, workspaceId, deletedAt: null },
-    select: { id: true, title: true, project: { select: { name: true } } },
+    where: { id: { in: cardIds }, workspaceId },
+    select: {
+      id: true,
+      title: true,
+      deletedAt: true,
+      project: { select: { name: true, deletedAt: true } },
+    },
   });
   const cardById = new Map(cards.map((c) => [c.id, c]));
 
@@ -74,14 +90,23 @@ async function enrichWithCardContext(
     if (summary.cardId === undefined) return summary;
     const card = cardById.get(summary.cardId);
     if (card === undefined) {
-      // Non résolue dans ce workspace (autre workspace, supprimée…) : on ne
+      // Non résolue dans ce workspace (id inconnu, autre workspace) : on ne
       // renvoie JAMAIS un cardId que l'utilisateur ne peut pas ouvrir.
       const { cardId: _drop, ...rest } = summary;
       return rest;
     }
-    if (summary.title !== null) return summary; // titre déjà rempli (agent_*), on ne l'écrase pas
-    const composedTitle = `${card.title} — ${card.project.name}`.slice(0, TITLE_MAX_CHARS);
-    return { ...summary, title: composedTitle };
+    const cardDeleted = card.deletedAt !== null;
+    // Carte supprimée : nommée ci-dessous, mais id inactionnable → retiré.
+    const { cardId: _actionable, ...withoutCardId } = summary;
+    const enriched: NotificationSummary = cardDeleted ? withoutCardId : summary;
+    if (summary.title !== null) return enriched; // titre déjà rempli (agent_*), on ne l'écrase pas
+    const suffix = cardDeleted
+      ? ' (carte supprimée)'
+      : card.project.deletedAt !== null
+        ? ' (projet en corbeille)'
+        : '';
+    const composedTitle = `${card.title} — ${card.project.name}${suffix}`.slice(0, TITLE_MAX_CHARS);
+    return { ...enriched, title: composedTitle };
   });
 }
 

@@ -101,7 +101,12 @@ describe('list_notifications — résolution du contexte carte', () => {
       },
     ]);
     prismaMock.card.findMany.mockResolvedValue([
-      { id: CARD_ID, title: 'Landing page V2', project: { name: 'Site Acme' } },
+      {
+        id: CARD_ID,
+        title: 'Landing page V2',
+        deletedAt: null,
+        project: { name: 'Site Acme', deletedAt: null },
+      },
     ]);
 
     const out = JSON.parse(await tool('list_notifications').handler({} as never)) as {
@@ -112,7 +117,10 @@ describe('list_notifications — résolution du contexte carte', () => {
     expect(out.notifications[0]?.title).toBe('Landing page V2 — Site Acme');
     expect(prismaMock.card.findMany).toHaveBeenCalledTimes(1);
     const args = prismaMock.card.findMany.mock.calls[0]?.[0];
-    expect(args?.where).toMatchObject({ workspaceId: 'w1', deletedAt: null });
+    expect(args?.where).toMatchObject({ workspaceId: 'w1' });
+    // Pas de filtre deletedAt : les cartes soft-deleted doivent être résolues
+    // pour pouvoir être NOMMÉES dans le résumé (sans exposer leur id).
+    expect(args?.where?.deletedAt).toBeUndefined();
     expect(args?.where?.id?.in).toEqual([CARD_ID]);
   });
 
@@ -142,8 +150,18 @@ describe('list_notifications — résolution du contexte carte', () => {
       },
     ]);
     prismaMock.card.findMany.mockResolvedValue([
-      { id: CARD_ID, title: 'Landing page V2', project: { name: 'Site Acme' } },
-      { id: CARD_ID_2, title: 'Refonte logo', project: { name: 'Site Acme' } },
+      {
+        id: CARD_ID,
+        title: 'Landing page V2',
+        deletedAt: null,
+        project: { name: 'Site Acme', deletedAt: null },
+      },
+      {
+        id: CARD_ID_2,
+        title: 'Refonte logo',
+        deletedAt: null,
+        project: { name: 'Site Acme', deletedAt: null },
+      },
     ]);
 
     const out = JSON.parse(await tool('list_notifications').handler({} as never)) as {
@@ -158,7 +176,7 @@ describe('list_notifications — résolution du contexte carte', () => {
     expect(out.notifications[2]?.title).toBe('Landing page V2 — Site Acme');
   });
 
-  it("cardId d'un autre workspace (ou carte supprimée) ne résout à rien → cardId absent de la sortie, titre reste null (jamais d'id inaccessible exposé)", async () => {
+  it("cardId inconnu ou d'un autre workspace ne résout à rien → cardId absent de la sortie, titre reste null (jamais d'id inaccessible exposé)", async () => {
     prismaMock.notification.findMany.mockResolvedValue([
       {
         id: 'n1',
@@ -168,7 +186,7 @@ describe('list_notifications — résolution du contexte carte', () => {
         createdAt: new Date(),
       },
     ]);
-    prismaMock.card.findMany.mockResolvedValue([]); // scope workspaceId+deletedAt ne matche rien
+    prismaMock.card.findMany.mockResolvedValue([]); // scope workspaceId ne matche rien
 
     const out = JSON.parse(await tool('list_notifications').handler({} as never)) as {
       notifications: { cardId?: string; title: string | null }[];
@@ -176,6 +194,60 @@ describe('list_notifications — résolution du contexte carte', () => {
 
     expect(out.notifications[0]?.cardId).toBeUndefined();
     expect(out.notifications[0]?.title).toBeNull();
+  });
+
+  it('carte soft-deleted → NOMMÉE « <titre> — <projet> (carte supprimée) », mais AUCUN cardId exposé (id inactionnable par get_card)', async () => {
+    prismaMock.notification.findMany.mockResolvedValue([
+      {
+        id: 'n1',
+        kind: 'card_commented',
+        data: { cardId: CARD_ID },
+        readAt: null,
+        createdAt: new Date(),
+      },
+    ]);
+    prismaMock.card.findMany.mockResolvedValue([
+      {
+        id: CARD_ID,
+        title: 'Landing page V2',
+        deletedAt: new Date('2026-08-01T10:00:00Z'),
+        project: { name: 'Site Acme', deletedAt: null },
+      },
+    ]);
+
+    const out = JSON.parse(await tool('list_notifications').handler({} as never)) as {
+      notifications: { cardId?: string; title: string | null }[];
+    };
+
+    expect(out.notifications[0]?.title).toBe('Landing page V2 — Site Acme (carte supprimée)');
+    expect(out.notifications[0]?.cardId).toBeUndefined();
+  });
+
+  it('carte vivante dans un projet en corbeille → « … (projet en corbeille) » + cardId EXPOSÉ (get_card ne filtre pas project.deletedAt, la carte reste lisible)', async () => {
+    prismaMock.notification.findMany.mockResolvedValue([
+      {
+        id: 'n1',
+        kind: 'card_commented',
+        data: { cardId: CARD_ID },
+        readAt: null,
+        createdAt: new Date(),
+      },
+    ]);
+    prismaMock.card.findMany.mockResolvedValue([
+      {
+        id: CARD_ID,
+        title: 'Landing page V2',
+        deletedAt: null,
+        project: { name: 'Site Acme', deletedAt: new Date('2026-08-01T10:00:00Z') },
+      },
+    ]);
+
+    const out = JSON.parse(await tool('list_notifications').handler({} as never)) as {
+      notifications: { cardId?: string; title: string | null }[];
+    };
+
+    expect(out.notifications[0]?.title).toBe('Landing page V2 — Site Acme (projet en corbeille)');
+    expect(out.notifications[0]?.cardId).toBe(CARD_ID);
   });
 
   it('titre déjà présent (kinds agent_*) : cardId éventuel garde son titre existant, non écrasé', async () => {
@@ -212,7 +284,37 @@ describe('list_notifications — résolution du contexte carte', () => {
       },
     ]);
     prismaMock.card.findMany.mockResolvedValue([
-      { id: CARD_ID, title: longTitle, project: { name: 'Site Acme' } },
+      {
+        id: CARD_ID,
+        title: longTitle,
+        deletedAt: null,
+        project: { name: 'Site Acme', deletedAt: null },
+      },
+    ]);
+
+    const out = JSON.parse(await tool('list_notifications').handler({} as never)) as {
+      notifications: { title: string | null }[];
+    };
+    expect(out.notifications[0]?.title?.length).toBe(200);
+  });
+
+  it('le titre composé avec suffixe « (carte supprimée) » reste borné à 200 caractères', async () => {
+    prismaMock.notification.findMany.mockResolvedValue([
+      {
+        id: 'n1',
+        kind: 'card_commented',
+        data: { cardId: CARD_ID },
+        readAt: null,
+        createdAt: new Date(),
+      },
+    ]);
+    prismaMock.card.findMany.mockResolvedValue([
+      {
+        id: CARD_ID,
+        title: 'y'.repeat(250),
+        deletedAt: new Date(),
+        project: { name: 'Site Acme', deletedAt: null },
+      },
     ]);
 
     const out = JSON.parse(await tool('list_notifications').handler({} as never)) as {
