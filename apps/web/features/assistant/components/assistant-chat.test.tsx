@@ -140,6 +140,90 @@ describe('AssistantChat', () => {
       expect(screen.getByRole('textbox')).not.toBeDisabled();
     });
     expect(screen.getByText('Réponse partielle')).toBeInTheDocument();
+    // Ni `done` ni `error` reçu : le flux a été coupé (infra) — l'utilisateur
+    // doit le savoir plutôt que de croire que la réponse s'est arrêtée là
+    // volontairement.
+    expect(
+      screen.getByText(
+        'La réponse a été interrompue (délai dépassé ou coupure serveur) — réessayez ou découpez la demande.',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  describe('fin de flux sans événement terminal (mort silencieuse du stream)', () => {
+    it('tool_result seul, flux fermé sans done/error → le widget est commité et l’erreur d’interruption affichée', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        sseResponse([
+          {
+            type: 'tool_result',
+            tool: 'get_today_overview',
+            data: { blockedCards: 2, dueTodayCards: 1, unreadMails: 3, unreadNotifications: 0 },
+          },
+        ]),
+      );
+      render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
+      await userEvent.type(screen.getByRole('textbox'), 'mon briefing');
+      await userEvent.click(screen.getByRole('button', { name: /envoyer/i }));
+
+      await waitFor(() => {
+        expect(screen.getByRole('textbox')).not.toBeDisabled();
+      });
+      // Le widget reçu pendant le tour n'a pas disparu : il est commité au fil,
+      // avec un texte de repli signalant l'interruption.
+      expect(screen.getByText('Bloquées')).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          '(Réponse interrompue avant le texte final — les éléments ci-dessous ont été conservés.)',
+        ),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          'La réponse a été interrompue (délai dépassé ou coupure serveur) — réessayez ou découpez la demande.',
+        ),
+      ).toBeInTheDocument();
+    });
+
+    it('flux normal avec `done` → pas de message d’interruption', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        sseResponse([
+          { type: 'chunk', text: 'Trois ' },
+          { type: 'chunk', text: 'tâches.' },
+          { type: 'done', text: 'Trois tâches.' },
+        ]),
+      );
+      render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
+      await userEvent.type(screen.getByRole('textbox'), 'Mes tâches ?');
+      await userEvent.click(screen.getByRole('button', { name: /envoyer/i }));
+      await waitFor(() => {
+        expect(screen.getByText('Trois tâches.')).toBeInTheDocument();
+      });
+      expect(
+        screen.queryByText(
+          'La réponse a été interrompue (délai dépassé ou coupure serveur) — réessayez ou découpez la demande.',
+        ),
+      ).not.toBeInTheDocument();
+    });
+
+    it('événement `error` du serveur → seul son message est affiché, jamais le message d’interruption générique', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        sseResponse([
+          { type: 'error', message: 'Le modèle est très sollicité — réessayez dans un instant.' },
+        ]),
+      );
+      render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
+      await userEvent.type(screen.getByRole('textbox'), 'x');
+      await userEvent.click(screen.getByRole('button', { name: /envoyer/i }));
+      await waitFor(() => {
+        expect(screen.getByText(/sollicité/)).toBeInTheDocument();
+      });
+      // Un seul message d'erreur affiché — pas de doublon générique.
+      expect(screen.getAllByRole('alert')).toHaveLength(1);
+      expect(
+        screen.queryByText(
+          'La réponse a été interrompue (délai dépassé ou coupure serveur) — réessayez ou découpez la demande.',
+        ),
+      ).not.toBeInTheDocument();
+    });
   });
 
   it('affiche le libellé d activité pendant un appel outil puis le retire', async () => {
