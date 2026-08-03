@@ -78,7 +78,14 @@ export function useVoiceMode(props: UseVoiceModeProps) {
       queue.stop();
       propsRef.current.onInterrupt();
     }
-    await recorder.start();
+    const result = await recorder.start();
+    // Panne transitoire (micro occupé par une autre appli, périphérique
+    // débranché…) — pas un refus de permission (mode capsule 'denied' s'en
+    // charge déjà). Notice one-shot : réémise à chaque échec, effacée dès le
+    // prochain pressStart (réussi ou non — voir setNotice(null) en tête).
+    if (result === 'unavailable') {
+      setNotice('Micro indisponible — vérifie qu’aucune autre app ne l’utilise et réessaie.');
+    }
   }, [queue, recorder]);
 
   const pressEnd = useCallback(async (): Promise<void> => {

@@ -926,8 +926,16 @@ describe('AssistantChat', () => {
 
       // Tour VOCAL : au moins une phrase part vers /speak.
       await pressAltAndRelease();
+      // Attend le texte final ET le champ réactivé (busy=false) — pas juste le
+      // texte : celui-ci peut matcher la bulle de STREAM en cours (identique
+      // une fois les deux chunks accumulés) UN TICK avant que la boucle de
+      // lecture SSE ne détecte la fin de flux et ne relâche `busy` dans le
+      // `finally` de send(). Sans ce garde, taper dans le champ juste après
+      // peut tomber sur un instant où il est encore `disabled` → no-op
+      // silencieux de userEvent.type (repro : `pnpm test -t symétrie` en boucle).
       await waitFor(() => {
         expect(screen.getByText("C'est fait. Voilà.")).toBeInTheDocument();
+        expect(screen.getByRole('textbox')).not.toBeDisabled();
       });
       const speakCallsVoiceTurn = fetchMock.mock.calls.filter(([u]) =>
         String(u).endsWith('/api/assistant/voice/speak'),
@@ -1160,6 +1168,115 @@ describe('AssistantChat', () => {
       expect(
         fetchMock.mock.calls.some(([u]) => String(u).endsWith('/api/assistant/voice/transcribe')),
       ).toBe(false);
+    });
+
+    it('Option maintenu ≥250 ms avec le champ de saisie focus → arme le PTT et retire le focus du champ', async () => {
+      routeFetch({});
+      render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
+      const input = screen.getByRole('textbox');
+      act(() => input.focus());
+      expect(input).toHaveFocus();
+
+      fireEvent.keyDown(window, { key: 'Alt' });
+      // Avant le délai : rien ne s'arme encore (le champ garde le focus).
+      expect(screen.queryByTestId('voice-capsule')).not.toBeInTheDocument();
+      expect(input).toHaveFocus();
+
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 260));
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('voice-capsule')).toHaveAttribute('data-mode', 'recording');
+      });
+      expect(input).not.toHaveFocus();
+
+      fireEvent.keyUp(window, { key: 'Alt' });
+    });
+
+    it('Option puis autre touche avant le délai (composition d’accent, ex. Option+e) → aucun PTT armé', async () => {
+      const fetchMock = routeFetch({});
+      render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
+      const input = screen.getByRole('textbox');
+      act(() => input.focus());
+
+      fireEvent.keyDown(window, { key: 'Alt' });
+      fireEvent.keyDown(window, { key: 'e' }); // composition — annule le timer PTT
+      fireEvent.keyUp(window, { key: 'Alt' });
+
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 260));
+      });
+
+      expect(screen.queryByTestId('voice-capsule')).not.toBeInTheDocument();
+      expect(input).toHaveFocus();
+      expect(
+        fetchMock.mock.calls.some(([u]) => String(u).endsWith('/api/assistant/voice/transcribe')),
+      ).toBe(false);
+    });
+
+    it('tap rapide d’Option (<250 ms) avec le champ de saisie focus → aucun PTT armé', async () => {
+      routeFetch({});
+      render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
+      const input = screen.getByRole('textbox');
+      act(() => input.focus());
+
+      fireEvent.keyDown(window, { key: 'Alt' });
+      fireEvent.keyUp(window, { key: 'Alt' }); // relâché avant le délai
+
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 260));
+      });
+
+      expect(screen.queryByTestId('voice-capsule')).not.toBeInTheDocument();
+      expect(input).toHaveFocus();
+    });
+
+    it('blur de la fenêtre pendant le délai de maintien (250 ms) → timer annulé, aucun enregistrement non surveillé', async () => {
+      const fetchMock = routeFetch({});
+      render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
+      const input = screen.getByRole('textbox');
+      act(() => input.focus());
+
+      fireEvent.keyDown(window, { key: 'Alt' });
+      // Fenêtre quittée (Cmd+Tab…) AVANT l'échéance : le keyup Alt n'arrivera
+      // jamais — si le timer survivait, il armerait une capture de 60 s sans
+      // personne devant l'écran (vie privée).
+      fireEvent(window, new Event('blur'));
+
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 300));
+      });
+
+      expect(screen.queryByTestId('voice-capsule')).not.toBeInTheDocument();
+      expect(
+        fetchMock.mock.calls.some(([u]) => String(u).endsWith('/api/assistant/voice/transcribe')),
+      ).toBe(false);
+    });
+
+    it('auto-repeat d’Alt maintenu (Windows/Linux) pendant le délai → n’annule pas le timer, le PTT s’arme à 250 ms', async () => {
+      routeFetch({});
+      render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
+      const input = screen.getByRole('textbox');
+      act(() => input.focus());
+
+      fireEvent.keyDown(window, { key: 'Alt' });
+      // Sous Windows/Linux, Alt tenu émet des keydown repeat:true — ils ne
+      // doivent PAS passer pour une « autre touche » (composition) qui annule.
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 100));
+      });
+      fireEvent.keyDown(window, { key: 'Alt', repeat: true });
+
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 200));
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('voice-capsule')).toHaveAttribute('data-mode', 'recording');
+      });
+
+      fireEvent.keyUp(window, { key: 'Alt' });
     });
 
     it('blur de la fenêtre pendant l’écoute → annulation, aucun /transcribe (vie privée)', async () => {

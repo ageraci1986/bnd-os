@@ -12,12 +12,16 @@ class FakeMediaRecorder {
   onstop: (() => void) | null = null;
   state = 'inactive';
   readonly mimeType: string;
+  /** Stream reçu au constructeur — capturé pour vérifier (Fix 2) que le
+   * recorder utilise bien le NOUVEAU stream après réacquisition. */
+  readonly stream: MediaStream;
   /**
    * Chunk distinctif par instance, de TAILLE unique ("take-1" = 6 o, "take-2take-2"
    * = 12 o…) : le Blob de jsdom n'a pas .text(), on trace les fuites via .size.
    */
   readonly takeChunk: string;
-  constructor(_stream: MediaStream, opts?: { mimeType?: string }) {
+  constructor(stream: MediaStream, opts?: { mimeType?: string }) {
+    this.stream = stream;
     this.mimeType = opts?.mimeType ?? 'audio/webm';
     const take = FakeMediaRecorder.instances.push(this);
     this.takeChunk = `take-${take}`.repeat(take);
@@ -36,8 +40,11 @@ class FakeMediaRecorder {
   }
 }
 
-const fakeTrack = { stop: vi.fn() };
-const fakeStream = { getTracks: () => [fakeTrack] } as unknown as MediaStream;
+const fakeTrack = { stop: vi.fn(), readyState: 'live' as const };
+const fakeStream = {
+  active: true,
+  getTracks: () => [fakeTrack],
+} as unknown as MediaStream;
 
 /** Promesse getUserMedia résoluble à la main — simule le dialogue de permission. */
 function deferredPermission() {
@@ -117,13 +124,73 @@ describe('useVoiceRecorder', () => {
     expect((onAutoStop.mock.calls[0]![0] as Blob).type).toContain('audio/webm');
   });
 
-  it('permission refusée → state denied, pas de crash', async () => {
+  it('permission refusée (NotAllowedError) → state denied, pas de crash', async () => {
     (navigator.mediaDevices.getUserMedia as ReturnType<typeof vi.fn>).mockRejectedValue(
       new DOMException('denied', 'NotAllowedError'),
     );
     const { result } = renderHook(() => useVoiceRecorder());
     await act(() => result.current.start());
     expect(result.current.state).toBe('denied');
+  });
+
+  it('permission refusée (SecurityError) → state denied', async () => {
+    (navigator.mediaDevices.getUserMedia as ReturnType<typeof vi.fn>).mockRejectedValue(
+      new DOMException('bloqué', 'SecurityError'),
+    );
+    const { result } = renderHook(() => useVoiceRecorder());
+    await act(() => result.current.start());
+    expect(result.current.state).toBe('denied');
+  });
+
+  it('erreur transitoire (NotReadableError, micro déjà utilisé par une autre appli) → state unavailable, PAS denied', async () => {
+    (navigator.mediaDevices.getUserMedia as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      new DOMException('device in use', 'NotReadableError'),
+    );
+    const { result } = renderHook(() => useVoiceRecorder());
+    const returned = await act(() => result.current.start());
+    expect(result.current.state).toBe('unavailable');
+    expect(returned).toBe('unavailable');
+
+    // Retryable : un nouvel essai avec un micro qui répond doit réussir.
+    (navigator.mediaDevices.getUserMedia as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+      fakeStream,
+    );
+    await act(() => result.current.start());
+    expect(result.current.state).toBe('recording');
+  });
+
+  it('erreur inconnue au getUserMedia → state unavailable (jamais denied pour une panne transitoire)', async () => {
+    (navigator.mediaDevices.getUserMedia as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      new Error('boom'),
+    );
+    const { result } = renderHook(() => useVoiceRecorder());
+    await act(() => result.current.start());
+    expect(result.current.state).toBe('unavailable');
+  });
+
+  it('stream micro caché mort (veille prolongée / changement de périphérique) → réacquisition, pas de silence enregistré', async () => {
+    const deadTrack = { stop: vi.fn(), readyState: 'ended' as const };
+    const deadStream = { active: false, getTracks: () => [deadTrack] } as unknown as MediaStream;
+    const freshTrack = { stop: vi.fn(), readyState: 'live' as const };
+    const freshStream = { active: true, getTracks: () => [freshTrack] } as unknown as MediaStream;
+    const getUserMedia = navigator.mediaDevices.getUserMedia as ReturnType<typeof vi.fn>;
+    getUserMedia.mockResolvedValueOnce(deadStream);
+
+    const { result } = renderHook(() => useVoiceRecorder());
+    await act(() => result.current.start()); // met deadStream en cache
+    await act(async () => {
+      await result.current.stop();
+    });
+    expect(result.current.state).toBe('idle');
+
+    getUserMedia.mockResolvedValueOnce(freshStream);
+    await act(() => result.current.start()); // le cache est mort → doit redemander
+
+    expect(getUserMedia).toHaveBeenCalledTimes(2);
+    expect(deadTrack.stop).toHaveBeenCalled();
+    expect(result.current.state).toBe('recording');
+    // Le recorder actif doit porter le NOUVEAU stream, pas l'ancien.
+    expect(FakeMediaRecorder.instances.at(-1)!.stream).toBe(freshStream);
   });
 
   it('navigateur sans MediaRecorder → state unsupported', async () => {
