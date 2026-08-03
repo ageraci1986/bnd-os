@@ -9,7 +9,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
  * suivants) et coupé au démontage.
  */
 
-export type RecorderState = 'idle' | 'recording' | 'denied' | 'unsupported';
+export type RecorderState = 'idle' | 'recording' | 'denied' | 'unsupported' | 'unavailable';
 
 const MAX_RECORDING_MS = 60_000;
 
@@ -18,6 +18,19 @@ function pickMimeType(): string {
   if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) return 'audio/webm;codecs=opus';
   if (MediaRecorder.isTypeSupported('audio/mp4')) return 'audio/mp4';
   return '';
+}
+
+/**
+ * Un stream micro caché (réutilisé entre deux PTT — voir `streamRef` ci-
+ * dessous) peut mourir en silence : veille prolongée de l'OS, permission
+ * retirée pendant que l'onglet était en arrière-plan, changement de
+ * périphérique par défaut… Le réutiliser produirait un enregistrement muet
+ * sans qu'aucune erreur ne remonte. `active` passe à `false` et/ou les tracks
+ * finissent en `readyState: 'ended'` : on considère le stream sain seulement
+ * si aucun des deux ne s'est produit.
+ */
+function isStreamHealthy(stream: MediaStream): boolean {
+  return stream.active && stream.getTracks().every((t) => t.readyState !== 'ended');
 }
 
 export interface UseVoiceRecorderOptions {
@@ -57,22 +70,36 @@ export function useVoiceRecorder(options?: UseVoiceRecorderOptions) {
     return new Blob(chunksRef.current, { type });
   }, []);
 
-  const start = useCallback(async (): Promise<void> => {
-    if (recorderRef.current?.state === 'recording') return;
+  const start = useCallback(async (): Promise<RecorderState> => {
+    if (recorderRef.current?.state === 'recording') return 'recording';
     if (typeof MediaRecorder === 'undefined') {
       setState('unsupported');
-      return;
+      return 'unsupported';
     }
     const generation = ++generationRef.current;
+    // Stream caché mort (voir isStreamHealthy) : le jeter avant de le
+    // réutiliser, sinon `??=` ci-dessous le reprendrait tel quel.
+    if (streamRef.current !== null && !isStreamHealthy(streamRef.current)) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
     try {
       streamRef.current ??= await navigator.mediaDevices.getUserMedia({ audio: true });
-    } catch {
-      if (generation === generationRef.current) setState('denied');
-      return;
+    } catch (err) {
+      // Seules NotAllowedError/SecurityError sont un refus DÉFINITIF de
+      // permission. Tout le reste (NotReadableError = micro déjà utilisé par
+      // une autre appli, AbortError, NotFoundError = périphérique débranché,
+      // erreur inconnue…) est transitoire : l'appelant doit pouvoir réessayer
+      // sans que l'UI ne bascule dans l'état "bloqué par l'utilisateur".
+      const name = (err as { name?: string } | null)?.name;
+      const denied = name === 'NotAllowedError' || name === 'SecurityError';
+      const result: RecorderState = denied ? 'denied' : 'unavailable';
+      if (generation === generationRef.current) setState(result);
+      return result;
     }
     // stop()/cancel()/un start() plus récent est passé pendant l'attente de la
     // permission → cette capture est obsolète, ne pas démarrer de recorder.
-    if (generation !== generationRef.current) return;
+    if (generation !== generationRef.current) return 'idle';
     cancelledRef.current = false;
     chunksRef.current = [];
     const mimeType = pickMimeType();
@@ -101,6 +128,7 @@ export function useVoiceRecorder(options?: UseVoiceRecorderOptions) {
       };
       recorder.stop();
     }, MAX_RECORDING_MS);
+    return 'recording';
   }, [buildBlob]);
 
   /** Arrête et résout avec l'audio capturé (null si annulé/vide). */

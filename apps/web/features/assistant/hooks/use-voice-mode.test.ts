@@ -94,6 +94,31 @@ describe('useVoiceMode', () => {
     expect(props.onTranscript).not.toHaveBeenCalled();
   });
 
+  it('pressStart → recorder.start() résout "unavailable" → notice micro indisponible', async () => {
+    mocks.recorder.start.mockResolvedValueOnce('unavailable');
+    const { result } = setup();
+    await act(() => result.current.pressStart());
+    expect(result.current.notice).toMatch(/micro indisponible/i);
+  });
+
+  it('notice "micro indisponible" effacée dès le pressStart suivant réussi', async () => {
+    mocks.recorder.start.mockResolvedValueOnce('unavailable');
+    const { result } = setup();
+    await act(() => result.current.pressStart());
+    expect(result.current.notice).toMatch(/micro indisponible/i);
+
+    mocks.recorder.start.mockResolvedValueOnce('recording');
+    await act(() => result.current.pressStart());
+    expect(result.current.notice).toBeNull();
+  });
+
+  it('pressStart → recorder.start() résout "denied" → aucune notice ajoutée (la capsule "denied" suffit)', async () => {
+    mocks.recorder.start.mockResolvedValueOnce('denied');
+    const { result } = setup();
+    await act(() => result.current.pressStart());
+    expect(result.current.notice).toBeNull();
+  });
+
   it('erreur route transcribe → notice avec le message serveur', async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
       new Response(

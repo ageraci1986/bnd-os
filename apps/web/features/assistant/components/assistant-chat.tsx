@@ -428,26 +428,63 @@ export function AssistantChat({ csrfToken, firstName, overview, notices }: Assis
   pendingConfirmRef.current = pendingConfirm === null ? null : { id: pendingConfirm.id };
 
   // PTT ⌥ Option (décision produit) : maintien = écoute, relâche = envoi.
-  // Ignoré quand la saisie a le focus (Option+lettre y produit des caractères).
+  //
+  // Le champ de saisie est autofocusé après certains flux (ex. fermeture du
+  // dialog de confirmation — voir l'effet de gestion du focus plus haut), et
+  // rien n'empêche l'utilisateur de cliquer dedans à tout moment : Option y
+  // sert normalement à composer des caractères accentués (Option+e = é,
+  // Option+u = ü…), donc armer le PTT au premier keydown y ferait perdre
+  // cette composition native ET partirait en écoute à chaque accent tapé.
+  //
+  // Quand le champ a le focus, on ne tranche donc pas au keydown : on arme un
+  // délai `PTT_FOCUSED_HOLD_MS` et on observe ce qui arrive en premier — une
+  // autre touche (composition, on annule), un keyup rapide (simple tap,
+  // rien ne se passe), ou rien du tout avant l'échéance (maintien volontaire
+  // → on retire le focus du champ puis on démarre l'écoute comme d'habitude).
   useEffect(() => {
+    const PTT_FOCUSED_HOLD_MS = 250;
     const isTyping = () => {
       const el = document.activeElement;
       return el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement;
     };
+    let focusedHoldTimer: ReturnType<typeof setTimeout> | null = null;
+    const clearFocusedHoldTimer = () => {
+      if (focusedHoldTimer !== null) {
+        clearTimeout(focusedHoldTimer);
+        focusedHoldTimer = null;
+      }
+    };
     const down = (e: KeyboardEvent) => {
-      if (e.key === 'Alt' && !e.repeat && !isTyping()) {
+      if (e.key === 'Alt' && !e.repeat) {
+        if (isTyping()) {
+          // Pas de preventDefault ici : la composition native (Option+lettre)
+          // doit rester intacte tant qu'on n'a pas tranché pour le PTT.
+          clearFocusedHoldTimer();
+          focusedHoldTimer = setTimeout(() => {
+            focusedHoldTimer = null;
+            inputRef.current?.blur();
+            void voice.pressStart();
+          }, PTT_FOCUSED_HOLD_MS);
+          return;
+        }
         e.preventDefault();
         void voice.pressStart();
+        return;
       }
+      // N'importe quelle autre touche pendant le délai = composition d'accent
+      // (Option+e…), pas un maintien PTT — on annule silencieusement.
+      if (focusedHoldTimer !== null) clearFocusedHoldTimer();
       if (e.key === 'Escape' && voice.mode === 'recording') voice.cancel();
     };
     const up = (e: KeyboardEvent) => {
+      if (e.key !== 'Alt') return;
+      clearFocusedHoldTimer(); // tap rapide en focus : rien ne s'était armé
       // INCONDITIONNEL (pas de garde `mode === 'recording'`) : le state peut
       // être en retard d'un render, et surtout la relâche peut arriver PENDANT
       // l'attente getUserMedia (dialogue de permission) — pressEnd no-ope sans
       // risque et recorder.stop() bump le jeton de génération, ce qui tue tout
       // start() encore suspendu (sinon : capture ambiante de 60 s auto-envoyée).
-      if (e.key === 'Alt') void voice.pressEnd();
+      void voice.pressEnd();
     };
     const blur = () => {
       // Alt+Tab / changement de fenêtre pendant l'écoute : le keyup n'arrivera
@@ -459,6 +496,7 @@ export function AssistantChat({ csrfToken, firstName, overview, notices }: Assis
     window.addEventListener('keyup', up);
     window.addEventListener('blur', blur);
     return () => {
+      clearFocusedHoldTimer();
       window.removeEventListener('keydown', down);
       window.removeEventListener('keyup', up);
       window.removeEventListener('blur', blur);
