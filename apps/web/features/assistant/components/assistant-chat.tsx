@@ -292,6 +292,11 @@ export function AssistantChat({ csrfToken, firstName, overview, notices }: Assis
       // Idem pour les widgets : variable locale à jour de façon synchrone dans
       // la boucle de lecture, utilisée par `commit()` sans dépendre du state.
       let widgets: StreamWidget[] = [];
+      // Un tour normal émet TOUJOURS un événement terminal (`done` ou
+      // `error` — voir route.ts) SAUF quand la fonction serverless est tuée
+      // (maxDuration Vercel, OOM, redeploy) : le flux se ferme net, sans le
+      // dire. Sans ce drapeau, l'UI redevenait idle en silence.
+      let sawTerminal = false;
       try {
         const res = await fetch('/api/assistant/chat', {
           method: 'POST',
@@ -349,14 +354,41 @@ export function AssistantChat({ csrfToken, firstName, overview, notices }: Assis
               setPendingConfirm(null);
               setAnswering(null);
             }
-            if (event.type === 'done') finalText = event.text;
-            if (event.type === 'error') setError(event.message);
+            if (event.type === 'done') {
+              finalText = event.text;
+              sawTerminal = true;
+            }
+            if (event.type === 'error') {
+              setError(event.message);
+              sawTerminal = true;
+            }
           }
         }
         // Flux terminé sans `done` (erreur mi-parcours, coupure serveur) : on
         // conserve la réponse partielle plutôt que de jeter les tokens reçus.
         const answer = finalText !== '' ? finalText : accumulated;
-        if (answer !== '') commit(answer, widgets);
+        if (answer !== '') {
+          commit(answer, widgets);
+        } else if (widgets.length > 0) {
+          // Coupure AVANT le premier chunk de texte (ex. mi-boucle d'outils) :
+          // sans ce repli, les widgets déjà reçus (tool_result) seraient
+          // purgés en silence par le `finally` ci-dessous (setStreamWidgets([])) —
+          // on les commite quand même, avec un texte de repli, plutôt que de
+          // les faire disparaître.
+          commit(
+            '(Réponse interrompue avant le texte final — les éléments ci-dessous ont été conservés.)',
+            widgets,
+          );
+        }
+        // Ni `done` ni `error` reçu : le flux s'est arrêté sans le dire (tué
+        // par l'infra — maxDuration Vercel 300s, OOM, redeploy). Doit rester
+        // silencieux sur un abort utilisateur (catch ci-dessous, AbortError)
+        // et ne jamais doubler un message déjà posé par un événement `error`.
+        if (!sawTerminal) {
+          setError(
+            'La réponse a été interrompue (délai dépassé ou coupure serveur) — réessayez ou découpez la demande.',
+          );
+        }
       } catch (err) {
         if (reader !== null) void reader.cancel().catch(() => undefined);
         const isAbort = (err as { name?: string } | null)?.name === 'AbortError';
