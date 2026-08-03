@@ -150,6 +150,57 @@ describe('AssistantChat', () => {
     ).toBeInTheDocument();
   });
 
+  it('onglet périmé : 403 "CSRF invalide" → refresh transparent via /api/assistant/csrf → retry avec le nouveau token → le tour se termine normalement', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation((url, init) => {
+      const href = String(url);
+      if (href.endsWith('/api/assistant/csrf')) {
+        return Promise.resolve(Response.json({ ok: true, token: 'fresh-token' }));
+      }
+      if (href.endsWith('/api/assistant/chat')) {
+        const headers = init?.headers as Record<string, string> | undefined;
+        if (headers?.['x-csrf-token'] === 'tok') {
+          // Cookie périmé (onglet resté ouvert) : le premier appel échoue.
+          return Promise.resolve(
+            Response.json({ ok: false, message: 'CSRF invalide.' }, { status: 403 }),
+          );
+        }
+        // Retry avec le token fraîchement réémis : le tour aboutit normalement.
+        return Promise.resolve(
+          sseResponse([
+            { type: 'chunk', text: 'Ça marche.' },
+            { type: 'done', text: 'Ça marche.' },
+          ]),
+        );
+      }
+      throw new Error(`URL inattendue : ${href}`);
+    });
+
+    render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
+    await userEvent.type(screen.getByRole('textbox'), 'Mes tâches ?');
+    await userEvent.click(screen.getByRole('button', { name: /envoyer/i }));
+
+    // Le tour aboutit comme si de rien n'était — aucune erreur affichée à
+    // l'utilisateur, le recovery est totalement transparent.
+    await waitFor(() => {
+      expect(screen.getByText('Ça marche.')).toBeInTheDocument();
+    });
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+
+    // Séquence exacte : POST /chat (403) → GET /csrf → POST /chat (200).
+    const chatCalls = fetchMock.mock.calls.filter(([u]) =>
+      String(u).endsWith('/api/assistant/chat'),
+    );
+    expect(chatCalls).toHaveLength(2);
+    expect((chatCalls[0]?.[1]?.headers as Record<string, string>)['x-csrf-token']).toBe('tok');
+    expect((chatCalls[1]?.[1]?.headers as Record<string, string>)['x-csrf-token']).toBe(
+      'fresh-token',
+    );
+    const csrfCalls = fetchMock.mock.calls.filter(([u]) =>
+      String(u).endsWith('/api/assistant/csrf'),
+    );
+    expect(csrfCalls).toHaveLength(1);
+  });
+
   describe('fin de flux sans événement terminal (mort silencieuse du stream)', () => {
     it('tool_result seul, flux fermé sans done/error → le widget est commité et l’erreur d’interruption affichée', async () => {
       vi.spyOn(globalThis, 'fetch').mockResolvedValue(
