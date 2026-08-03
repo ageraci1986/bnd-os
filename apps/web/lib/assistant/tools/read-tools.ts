@@ -67,30 +67,37 @@ export async function buildReadTools(ctx: AuthContext): Promise<ToolSpec[]> {
 
     defineTool({
       name: 'list_projects',
-      description: 'Liste des projets actifs du workspace (id, nom, client, nombre de cartes).',
+      description:
+        "Liste des projets actifs du workspace (id, nom, client, nombre de cartes). Renvoie total (le vrai compte en base) et truncated (true si le workspace en compte plus que les 50 renvoyés) — au-delà, utiliser find_projects pour cibler un projet par nom plutôt que de conclure à tort qu'il n'existe pas.",
       inputSchema: z.object({}),
       jsonSchema: { type: 'object', properties: {} },
       handler: async () =>
         safeDb('list_projects', async () => {
-          const projects = await prisma.project.findMany({
-            where: { workspaceId, deletedAt: null, ...scopedProjectWhere(scope) },
-            select: {
-              id: true,
-              name: true,
-              client: { select: { name: true } },
-              _count: { select: { cards: true } },
-            },
-            orderBy: { name: 'asc' },
-            take: 50,
-          });
-          return JSON.stringify(
-            projects.map((p) => ({
+          const where = { workspaceId, deletedAt: null, ...scopedProjectWhere(scope) };
+          const [total, projects] = await Promise.all([
+            prisma.project.count({ where }),
+            prisma.project.findMany({
+              where,
+              select: {
+                id: true,
+                name: true,
+                client: { select: { name: true } },
+                _count: { select: { cards: true } },
+              },
+              orderBy: { name: 'asc' },
+              take: 50,
+            }),
+          ]);
+          return JSON.stringify({
+            total,
+            truncated: projects.length === 50 && total > 50,
+            projects: projects.map((p) => ({
               id: p.id,
               name: p.name,
               client: p.client.name,
               cards: p._count.cards,
             })),
-          );
+          });
         }),
     }),
 
@@ -119,7 +126,7 @@ export async function buildReadTools(ctx: AuthContext): Promise<ToolSpec[]> {
               AND lower(unaccent(name)) LIKE '%' || lower(unaccent(${input.query})) || '%'
             ORDER BY name ASC
             LIMIT 25`;
-          if (candidates.length === 0) return JSON.stringify([]);
+          if (candidates.length === 0) return JSON.stringify({ projects: [] });
           const projects = await prisma.project.findMany({
             where: {
               workspaceId,
@@ -138,14 +145,19 @@ export async function buildReadTools(ctx: AuthContext): Promise<ToolSpec[]> {
             orderBy: { name: 'asc' },
             take: 10,
           });
-          return JSON.stringify(
-            projects.map((p) => ({
+          return JSON.stringify({
+            projects: projects.map((p) => ({
               id: p.id,
               name: p.name,
               client: p.client.name,
               cards: p._count.cards,
             })),
-          );
+            // Le plafond LIMIT 25 côté SQL brut rend un compte exact coûteux
+            // (second aller-retour) pour un gain marginal ici — signal cheap :
+            // 10 candidats retenus sur les 25 pré-sélectionnés signifie qu'il
+            // en existe potentiellement d'autres, jamais l'inverse.
+            ...(projects.length === 10 ? { truncated: true } : {}),
+          });
         }),
     }),
 
@@ -181,6 +193,16 @@ export async function buildReadTools(ctx: AuthContext): Promise<ToolSpec[]> {
                     select: { id: true, title: true, dueDate: true },
                     take: BOARD_CARDS_PER_COLUMN,
                   },
+                  // Compte réel de cartes visibles par colonne (Prisma 6 :
+                  // `_count` relationnel supporte un `where` filtré — vérifié
+                  // sur ColumnCountOutputTypeCountCardsArgs) — MÊME filtre que
+                  // `cards` ci-dessus, sinon `totalCards` compterait des
+                  // cartes supprimées/archivées jamais visibles dans `cards`.
+                  _count: {
+                    select: {
+                      cards: { where: { deletedAt: null, archivedAt: null } },
+                    },
+                  },
                 },
               },
             },
@@ -189,13 +211,23 @@ export async function buildReadTools(ctx: AuthContext): Promise<ToolSpec[]> {
           return JSON.stringify({
             id: project.id,
             name: project.name,
-            columns: project.columns.map((c) => ({
-              id: c.id,
-              name: c.name,
-              blocked: c.isBlockedSystem,
-              cards: c.cards.map((card) => ({ id: card.id, title: card.title, due: card.dueDate })),
-              ...(c.cards.length === BOARD_CARDS_PER_COLUMN ? { truncated: true } : {}),
-            })),
+            columns: project.columns.map((c) => {
+              const totalCards = c._count.cards;
+              return {
+                id: c.id,
+                name: c.name,
+                blocked: c.isBlockedSystem,
+                cards: c.cards.map((card) => ({
+                  id: card.id,
+                  title: card.title,
+                  due: card.dueDate,
+                })),
+                totalCards,
+                ...(c.cards.length === BOARD_CARDS_PER_COLUMN && totalCards > BOARD_CARDS_PER_COLUMN
+                  ? { truncated: true }
+                  : {}),
+              };
+            }),
           });
         }),
     }),
@@ -374,7 +406,8 @@ export async function buildReadTools(ctx: AuthContext): Promise<ToolSpec[]> {
 
     defineTool({
       name: 'get_team_members',
-      description: 'Membres du workspace (id, email, rôle) — nécessaire pour assigner une carte.',
+      description:
+        'Membres du workspace (id, email, rôle) — nécessaire pour assigner une carte. Renvoie total (le vrai compte) et truncated si le workspace en compte plus que les 50 renvoyés.',
       inputSchema: z.object({}),
       jsonSchema: { type: 'object', properties: {} },
       handler: async () =>
@@ -383,16 +416,21 @@ export async function buildReadTools(ctx: AuthContext): Promise<ToolSpec[]> {
           // précédent que les pickers assignés/RACI des pages projets, qui les
           // exposent déjà à tout Membre via requireUser
           // (cf. app/(app)/projects/[id]/page.tsx).
-          const members = await prisma.membership.findMany({
-            where: { workspaceId },
-            select: {
-              role: true,
-              user: { select: { id: true, email: true, firstName: true, lastName: true } },
-            },
-            orderBy: { user: { email: 'asc' } },
-            take: TEAM_MEMBERS_MAX,
-          });
+          const where = { workspaceId };
+          const [total, members] = await Promise.all([
+            prisma.membership.count({ where }),
+            prisma.membership.findMany({
+              where,
+              select: {
+                role: true,
+                user: { select: { id: true, email: true, firstName: true, lastName: true } },
+              },
+              orderBy: { user: { email: 'asc' } },
+              take: TEAM_MEMBERS_MAX,
+            }),
+          ]);
           return JSON.stringify({
+            total,
             members: members.map((m) => ({
               userId: m.user.id,
               email: m.user.email,
@@ -428,6 +466,10 @@ export async function buildReadTools(ctx: AuthContext): Promise<ToolSpec[]> {
                 orderBy: { position: 'asc' },
                 take: CARD_CHECKLIST_MAX,
               },
+              // Compte réel d'items de checklist (non borné par `take`
+              // ci-dessus) — permet à totalItems de rester exact même quand
+              // la liste renvoyée est tronquée à CARD_CHECKLIST_MAX.
+              _count: { select: { checklistItems: true } },
             },
           });
           if (card === null) return 'Erreur : carte introuvable ou hors de votre périmètre.';
@@ -435,9 +477,14 @@ export async function buildReadTools(ctx: AuthContext): Promise<ToolSpec[]> {
             card.description !== null && card.description.length > CARD_DESCRIPTION_MAX_CHARS
               ? `${card.description.slice(0, CARD_DESCRIPTION_MAX_CHARS)} […tronqué]`
               : card.description;
+          // Le `_count` brut de Prisma n'est jamais renvoyé tel quel (il
+          // fuiterait un objet `{ checklistItems: N }` sans rapport avec la
+          // shape publique) — extrait puis exposé sous `totalItems`.
+          const { _count, ...cardWithoutCount } = card;
           return JSON.stringify({
-            ...card,
+            ...cardWithoutCount,
             description,
+            totalItems: _count.checklistItems,
             ...(card.checklistItems.length === CARD_CHECKLIST_MAX
               ? { checklistTruncated: true }
               : {}),
