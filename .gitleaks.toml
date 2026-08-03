@@ -44,3 +44,8 @@ paths = [
   '''package-lock\.json''',
   '''mockups/.*''',
 ]
+# Valeurs factices des tests voix (stt.test.ts / tts.test.ts) — motif exact,
+# volontairement étroit : on n'allowliste PAS les fichiers de test eux-mêmes.
+regexes = [
+  '''(dg|el)-test-key-0123456789''',
+]
