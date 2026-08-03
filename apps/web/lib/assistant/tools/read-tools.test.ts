@@ -261,6 +261,7 @@ describe('buildReadTools', () => {
   });
 
   it('search_mails filtre par texte sur sujet/expéditeur', async () => {
+    prismaMock.emailMessage.count.mockResolvedValue(1);
     prismaMock.emailMessage.findMany.mockResolvedValue([
       {
         id: 'm1',
@@ -274,13 +275,30 @@ describe('buildReadTools', () => {
       },
     ]);
     const out = JSON.parse(await execute('search_mails', { query: 'devis' }));
-    expect(out[0].subject).toBe('Devis');
+    expect(out.mails[0].subject).toBe('Devis');
+    expect(out.total).toBe(1);
+    expect(out.offset).toBe(0);
     const where = prismaMock.emailMessage.findMany.mock.calls[0]?.[0]?.where;
     expect(where.workspaceId).toBe('w1');
     expect(where.deletedAt).toBeNull();
   });
 
+  it('search_mails : renvoie { total, offset, mails } et transmet skip', async () => {
+    prismaMock.emailMessage.count.mockResolvedValue(88);
+    prismaMock.emailMessage.findMany.mockResolvedValue([]);
+    const out = JSON.parse(await execute('search_mails', { offset: 25, limit: 25 }));
+    expect(out.total).toBe(88);
+    expect(out.offset).toBe(25);
+    expect(Array.isArray(out.mails)).toBe(true);
+    expect(prismaMock.emailMessage.findMany.mock.calls[0]?.[0]?.skip).toBe(25);
+    // le count porte le MÊME where que le findMany
+    expect(prismaMock.emailMessage.count.mock.calls[0]?.[0]?.where).toEqual(
+      prismaMock.emailMessage.findMany.mock.calls[0]?.[0]?.where,
+    );
+  });
+
   it('search_mails exclut les mails archivés (archivedAt: null)', async () => {
+    prismaMock.emailMessage.count.mockResolvedValue(0);
     prismaMock.emailMessage.findMany.mockResolvedValue([]);
     await execute('search_mails', { query: 'devis' });
     const where = prismaMock.emailMessage.findMany.mock.calls[0]?.[0]?.where;
@@ -288,6 +306,7 @@ describe('buildReadTools', () => {
   });
 
   it('search_mails select `integrationId` (nécessaire au deep-link du widget mail)', async () => {
+    prismaMock.emailMessage.count.mockResolvedValue(0);
     prismaMock.emailMessage.findMany.mockResolvedValue([]);
     await execute('search_mails', { query: 'devis' });
     const select = prismaMock.emailMessage.findMany.mock.calls[0]?.[0]?.select;
@@ -304,6 +323,7 @@ describe('buildReadTools', () => {
   });
 
   it('search_mails renvoie `integrationId` dans le JSON de sortie de chaque mail', async () => {
+    prismaMock.emailMessage.count.mockResolvedValue(1);
     prismaMock.emailMessage.findMany.mockResolvedValue([
       {
         id: 'm1',
@@ -317,7 +337,7 @@ describe('buildReadTools', () => {
       },
     ]);
     const out = JSON.parse(await execute('search_mails', { query: 'devis' }));
-    expect(out).toEqual([
+    expect(out.mails).toEqual([
       {
         id: 'm1',
         subject: 'Devis',

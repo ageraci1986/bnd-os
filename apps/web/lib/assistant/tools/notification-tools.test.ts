@@ -105,6 +105,15 @@ describe('mark_notifications_read', () => {
     expect(prismaMock.notification.updateMany).not.toHaveBeenCalled();
   });
 
+  it('ids ET all fournis ensemble → erreur de validation, aucun updateMany', async () => {
+    const raw = await tool('mark_notifications_read').handler({
+      ids: ['11111111-1111-4111-8111-111111111111'],
+      all: true,
+    } as never);
+    expect(raw).toMatch(/invalide/i);
+    expect(prismaMock.notification.updateMany).not.toHaveBeenCalled();
+  });
+
   it('les deux tools ne sont pas gated', () => {
     expect(tool('list_notifications').gated).not.toBe(true);
     expect(tool('mark_notifications_read').gated).not.toBe(true);
