@@ -45,9 +45,9 @@ Trois nouveaux outils symétriques des outils à ids : `mark_mails_read_by_filte
 
 ```
 {
-  fromContains?: string (3..120)     // match insensible casse/accents sur fromEmail OU fromName
+  fromContains?: string (3..120)     // match insensible casse sur fromEmail OU fromName
   subjectContains?: string (3..120)
-  folder?: enum (mêmes valeurs que search_mails)
+  folder?: enum ['inbox', 'sent']
   isRead?: boolean
   receivedBefore?: date ISO
   receivedAfter?: date ISO
@@ -55,6 +55,8 @@ Trois nouveaux outils symétriques des outils à ids : `mark_mails_read_by_filte
 ```
 
 - **Au moins un critère requis** (`.refine`) — un filtre vide est rejeté : jamais de « tout » implicite.
+- `fromContains`/`subjectContains` : insensibles à la **casse** (Prisma `mode: 'insensitive'`). L'insensibilité aux **accents** est **reportée** (nécessiterait une requête SQL brute avec `unaccent`, comme `find_projects` — hors scope de cette itération, noté comme amélioration future). **Déviation validée en revue** (2026-08-03) : la spec initiale évoquait « insensible casse/accents » ; en pratique seul `mode: 'insensitive'` est implémenté.
+- `folder` : enum strict `['inbox', 'sent']` — ce sont les seules valeurs réellement écrites en base sur `EmailMessage` ; `'draft'` n'existe pas comme valeur de `folder` (les brouillons sont modélisés autrement). **Déviation validée en revue** (2026-08-03) : la spec mentionnait « mêmes valeurs que `search_mails` » sans lister l'enum ; il est fixé ici pour éviter toute valeur fantôme.
 - Owner-only : même `where` de propriété que `setMailStateCore` (boîtes de l'utilisateur uniquement) + `workspaceId` + `deletedAt: null` (+ exclusions cohérentes avec l'outil à ids équivalent : ex. archive ignore les déjà-archivés dans le compte annoncé).
 
 ### Confirmation (gate)
@@ -65,7 +67,7 @@ Trois nouveaux outils symétriques des outils à ids : `mark_mails_read_by_filte
 ### Exécution
 
 - Un seul `updateMany`, **sans plafond**. Retour : compte réellement modifié + reformulation du filtre appliqué.
-- Audit `assistant_mail_bulk_filter` (tool, filtre normalisé, compte — jamais de contenu de mail).
+- Audit : pas de nouvelle valeur d'enum `AuditAction`. On réutilise les enums existants (`mail_marked_read`/`mail_archived`/`mail_deleted`) avec `subjectType: 'mail_bulk_filter'` (au lieu de l'id du mail) — l'origine « bulk par filtre assistant » est ainsi portée par le `subjectType`, pas par une action dédiée. **Déviation validée en revue** (2026-08-03) : évite une migration d'enum pour un tri qui n'a pas besoin d'une action à part (l'action métier reste identique, seul le mode de sélection change).
 
 ## 3. Pagination des lectures
 

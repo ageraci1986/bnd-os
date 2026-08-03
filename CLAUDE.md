@@ -428,5 +428,6 @@ Avant chaque action :
 | 2026-07-28 | Template de carte : deep-link éditeur, lien modal, bootstrap défaut « Standard » + backfill                                                                                                                                                                               | Angelo L. + Claude |
 | 2026-08-03 | Fiabilité PTT voix (fix batch) — Option maintenu ≥250 ms quand le champ a le focus (composition d'accent préservée), health check du stream micro caché (veille/changement périphérique), erreurs micro transitoires (`unavailable`) distinguées d'un refus de permission | Angelo L. + Claude |
 | 2026-08-03 | Assistant voix V1.5 — PTT ⌥ Option, Deepgram nova-3 (STT), ElevenLabs flash (TTS streaming phrase par phrase), confirmation vocale stricte, routes voice rate-limitées, E2E fake-media                                                                                    | Angelo L. + Claude |
+| 2026-08-03 | Assistant visibilité totale — tools notifications (list/mark lu), bulk mail by-filter gated (comptes réels + labels sanitisés), pagination search_mails, indicateurs total/truncated, règles d'exhaustivité prompt                                                        | Angelo L. + Claude |
 
 > **Règle :** chaque modification de ce fichier ajoute une ligne ici.
