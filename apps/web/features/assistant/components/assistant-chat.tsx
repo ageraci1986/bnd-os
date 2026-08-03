@@ -1,11 +1,14 @@
 'use client';
 
 import { Fragment, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { matchVoiceConfirm, SentenceChunker } from '@nexushub/agent';
 import { briefParts } from '@/lib/assistant/brief-sentence';
 import type { TodayOverview } from '@/lib/assistant/overview-core';
+import { useVoiceMode } from '../hooks/use-voice-mode';
 import { parseSseLines, type StreamWidget } from '../lib/sse';
 import { AssistantOrb, deriveOrbActivity } from './assistant-orb';
 import { NoticeStack, type AgentNotice } from './notice-stack';
+import { VoiceCapsule } from './voice-capsule';
 import { renderWidget, type WidgetActions } from './widgets';
 import { appendWidget } from './widgets/dedupe-widgets';
 import { KpiCards } from './widgets/kpi-cards';
@@ -148,6 +151,19 @@ export function AssistantChat({ csrfToken, firstName, overview, notices }: Assis
   const confirmWasOpen = useRef(false);
   const escNoteId = useId();
 
+  // --- Mode voix (V1.5, spec 2026-08-03) -----------------------------------
+  // Tour vocal ? → sortie symétrique : le TTS ne lit que les réponses aux
+  // questions posées à la voix. Ref (pas state) : lu dans la boucle SSE.
+  const voiceTurnRef = useRef(false);
+  // Armé par onTranscript juste avant send() — un envoi clavier/widget trouve
+  // ce flag à false. Voir le bloc « tour vocal ? » au début de send().
+  const nextTurnIsVoiceRef = useRef(false);
+  // Chunker du tour en cours — recréé à chaque tour vocal (une instance = un tour).
+  const chunkerRef = useRef<SentenceChunker | null>(null);
+  const pendingConfirmRef = useRef<{ id: string } | null>(null);
+  // Évite le cycle « voice utilisé avant sa déclaration » dans onVoiceConfirm.
+  const speakRef = useRef<(s: string) => void>(() => undefined);
+
   // Annule la requête en cours au démontage (navigation) — silencieux côté UI.
   useEffect(() => () => abortRef.current?.abort(), []);
 
@@ -219,6 +235,13 @@ export function AssistantChat({ csrfToken, firstName, overview, notices }: Assis
       // Lu depuis la ref (pas le state `input`) : `send` reste une fonction
       // stable entre deux frappes — voir le commentaire sur `inputValueRef`.
       const text = (useOverride ? textOverride : inputValueRef.current).trim();
+      // Tour vocal ? Armé par onTranscript uniquement (nextTurnIsVoiceRef) —
+      // sortie symétrique : les envois clavier/widget restent silencieux.
+      // Consommé AVANT le garde busy/vide : un envoi vocal refusé (tour déjà
+      // en cours, transcript devenu vide) ne doit jamais laisser le flag armé
+      // pour un tour clavier ultérieur.
+      const isVoiceTurn = nextTurnIsVoiceRef.current;
+      nextTurnIsVoiceRef.current = false;
       if (text === '' || busy) return;
       setBusy(true);
       setError(null);
@@ -229,6 +252,8 @@ export function AssistantChat({ csrfToken, firstName, overview, notices }: Assis
       setMessages((prev) => [...prev, { role: 'user', content: text }]);
       setStreamText('');
       setStreamWidgets([]);
+      voiceTurnRef.current = isVoiceTurn;
+      chunkerRef.current = isVoiceTurn ? new SentenceChunker() : null;
 
       const controller = new AbortController();
       abortRef.current = controller;
@@ -292,6 +317,12 @@ export function AssistantChat({ csrfToken, firstName, overview, notices }: Assis
             if (event.type === 'chunk') {
               accumulated += event.text;
               setStreamText(accumulated);
+              // Tour vocal : vocaliser les phrases complètes au fil de l'eau.
+              if (chunkerRef.current !== null) {
+                for (const sentence of chunkerRef.current.push(event.text)) {
+                  speakRef.current(sentence);
+                }
+              }
             }
             if (event.type === 'tool_start')
               setActivity(ACTIVITY_LABELS[event.name] ?? 'travaille…');
@@ -311,6 +342,8 @@ export function AssistantChat({ csrfToken, firstName, overview, notices }: Assis
             if (event.type === 'confirm_request') {
               setPendingConfirm({ id: event.id, tool: event.tool, description: event.description });
               setAnswering(null);
+              // Tour vocal : lire le récapitulatif à voix haute (spec §4.1).
+              if (voiceTurnRef.current) speakRef.current(event.description);
             }
             if (event.type === 'confirm_resolved') {
               setPendingConfirm(null);
@@ -332,6 +365,12 @@ export function AssistantChat({ csrfToken, firstName, overview, notices }: Assis
           setError('Connexion interrompue — réessayez.');
         }
       } finally {
+        // Fin de réponse : vocaliser le reliquat sans délimiteur final.
+        if (chunkerRef.current !== null) {
+          const rest = chunkerRef.current.flush();
+          if (rest !== '') speakRef.current(rest);
+          chunkerRef.current = null;
+        }
         abortRef.current = null;
         setStreamText(null);
         setStreamWidgets([]);
@@ -346,8 +385,85 @@ export function AssistantChat({ csrfToken, firstName, overview, notices }: Assis
     // `input` volontairement absent des deps — `send` lit `inputValueRef.current`
     // (toujours à jour, synchronisée par l'onChange du champ) pour rester stable
     // indépendamment de la frappe. Voir le commentaire sur `inputValueRef`.
+    // `voice.speak` volontairement absent aussi : `send` est déclaré AVANT le
+    // hook voix (`voice` référencerait un identifiant pas encore initialisé
+    // dans ce tableau de dépendances — TDZ). `speakRef.current` (toujours à
+    // jour, réassigné à chaque render juste après `useVoiceMode`) est lu à la
+    // place — même pattern que `inputValueRef`/`propsRef`.
     [busy, csrfToken],
   );
+
+  const voice = useVoiceMode({
+    csrfToken,
+    busy,
+    onTranscript: (text) => {
+      nextTurnIsVoiceRef.current = true;
+      void send(text);
+    },
+    onVoiceConfirm: (transcript) => {
+      const pending = pendingConfirmRef.current;
+      if (pending === null) return false;
+      const intent = matchVoiceConfirm(transcript);
+      if (intent === null) {
+        // Ambigu (spec §4.4) : redemander à voix haute, widget toujours cliquable.
+        speakRef.current('Dis clairement oui ou non, ou clique sur le bouton.');
+        return true; // consommé — ne part pas en message
+      }
+      void answerConfirm(pending.id, intent === 'allow');
+      return true;
+    },
+    // Interruption : tuer le chunker AVANT l'abort — sinon le `finally` de
+    // send() flusherait le reliquat vers la file TTS fraîchement vidée (le
+    // runId bumpé par queue.stop() ne protège pas d'un enqueue POSTÉRIEUR) et
+    // la voix reprendrait par-dessus l'écoute. Ce tour ne vocalise plus rien.
+    // `voiceTurnRef` reste vrai : une interruption OUVRE un nouvel échange
+    // vocal (contrairement au bouton Stop, demande de silence explicite).
+    onInterrupt: () => {
+      chunkerRef.current = null;
+      abortRef.current?.abort();
+    },
+  });
+  speakRef.current = voice.speak;
+  // Miroir du pendingConfirm pour le hook voix (état → ref, même valeur).
+  pendingConfirmRef.current = pendingConfirm === null ? null : { id: pendingConfirm.id };
+
+  // PTT ⌥ Option (décision produit) : maintien = écoute, relâche = envoi.
+  // Ignoré quand la saisie a le focus (Option+lettre y produit des caractères).
+  useEffect(() => {
+    const isTyping = () => {
+      const el = document.activeElement;
+      return el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement;
+    };
+    const down = (e: KeyboardEvent) => {
+      if (e.key === 'Alt' && !e.repeat && !isTyping()) {
+        e.preventDefault();
+        void voice.pressStart();
+      }
+      if (e.key === 'Escape' && voice.mode === 'recording') voice.cancel();
+    };
+    const up = (e: KeyboardEvent) => {
+      // INCONDITIONNEL (pas de garde `mode === 'recording'`) : le state peut
+      // être en retard d'un render, et surtout la relâche peut arriver PENDANT
+      // l'attente getUserMedia (dialogue de permission) — pressEnd no-ope sans
+      // risque et recorder.stop() bump le jeton de génération, ce qui tue tout
+      // start() encore suspendu (sinon : capture ambiante de 60 s auto-envoyée).
+      if (e.key === 'Alt') void voice.pressEnd();
+    };
+    const blur = () => {
+      // Alt+Tab / changement de fenêtre pendant l'écoute : le keyup n'arrivera
+      // jamais — annuler (PAS pressEnd : l'utilisateur n'a pas voulu envoyer),
+      // sinon capture d'ambiance de 60 s auto-transmise (vie privée).
+      if (voice.mode === 'recording') voice.cancel();
+    };
+    window.addEventListener('keydown', down);
+    window.addEventListener('keyup', up);
+    window.addEventListener('blur', blur);
+    return () => {
+      window.removeEventListener('keydown', down);
+      window.removeEventListener('keyup', up);
+      window.removeEventListener('blur', blur);
+    };
+  }, [voice]);
 
   /**
    * Canal d'actions transmis à `renderWidget` (Plan 5c) — identique pour les
@@ -363,7 +479,13 @@ export function AssistantChat({ csrfToken, firstName, overview, notices }: Assis
   return (
     <div className="mx-auto flex h-full max-w-2xl flex-col items-center gap-4 px-6 py-8">
       <AssistantOrb
-        activity={deriveOrbActivity({ busy, streaming: streamText !== null && streamText !== '' })}
+        activity={deriveOrbActivity({
+          busy,
+          streaming: streamText !== null && streamText !== '',
+          listening: voice.mode === 'recording',
+          // SSE fini mais la file TTS parle encore : l'orbe reste `responding`.
+          speaking: voice.mode === 'speaking',
+        })}
       />
       <h1 className="text-lg font-bold text-[color:var(--color-text-main)]">
         Bonjour {firstName} 👋
@@ -497,6 +619,24 @@ export function AssistantChat({ csrfToken, firstName, overview, notices }: Assis
         <div ref={bottomRef} aria-hidden />
       </div>
 
+      <VoiceCapsule
+        mode={voice.mode}
+        onStop={() => {
+          // Stop explicite = demande de silence pour TOUT le reste du tour :
+          // tuer le chunker (sinon la prochaine phrase SSE ré-enqueue et la
+          // voix reprend) ET désarmer voiceTurnRef (décision produit : un
+          // confirm_request ultérieur du même tour ne doit pas être lu).
+          chunkerRef.current = null;
+          voiceTurnRef.current = false;
+          voice.speakStop();
+        }}
+      />
+      {voice.notice !== null && (
+        <p className="text-xs text-[color:var(--color-text-ghost)]" role="status">
+          {voice.notice}
+        </p>
+      )}
+
       <form
         className="flex w-full items-center gap-2 rounded-full border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] px-4 py-2"
         onSubmit={(e) => {
@@ -507,7 +647,7 @@ export function AssistantChat({ csrfToken, firstName, overview, notices }: Assis
         <input
           ref={inputRef}
           className="flex-1 bg-transparent text-sm text-[color:var(--color-text-main)] outline-none"
-          placeholder="Demandez quelque chose, ou dictez une série d'actions…"
+          placeholder="Demandez quelque chose… ou maintenez ⌥ Option pour parler"
           aria-label="Message"
           value={input}
           onChange={(e) => {
@@ -518,10 +658,19 @@ export function AssistantChat({ csrfToken, firstName, overview, notices }: Assis
         />
         <button
           type="button"
-          className="h-8 w-8 rounded-full bg-[color:var(--color-bg-hover)] text-sm opacity-45"
-          title="Voix — bientôt"
-          aria-label="Voix — bientôt"
-          disabled
+          className="h-8 w-8 rounded-full bg-[color:var(--color-bg-hover)] text-sm disabled:opacity-45"
+          title="Maintenir pour parler (ou maintenir ⌥ Option)"
+          aria-label="Maintenir pour parler"
+          disabled={voice.recorderUnsupported}
+          onPointerDown={(e) => {
+            e.preventDefault(); // pas de focus-steal du champ
+            void voice.pressStart();
+          }}
+          onPointerUp={() => void voice.pressEnd()}
+          onPointerLeave={() => {
+            // Souris sortie du bouton pendant le maintien : équivalent relâche.
+            if (voice.mode === 'recording') void voice.pressEnd();
+          }}
         >
           🎙
         </button>

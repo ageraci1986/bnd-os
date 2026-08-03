@@ -87,6 +87,11 @@ const ServerEnvSchema = z.object({
 
   // Assistant (agent conversationnel)
   ANTHROPIC_API_KEY: optionalString(1),
+  // --- Assistant voice (V1.5) — clés 100 % serveur, jamais NEXT_PUBLIC_ ---
+  DEEPGRAM_API_KEY: optionalString(10),
+  ELEVENLABS_API_KEY: optionalString(10),
+  /** Voice ID ElevenLabs (identifiant public d'une voix, pas un secret — mais serveur quand même). */
+  ELEVENLABS_VOICE_ID: optionalString(5),
   ASSISTANT_MODEL: optionalString(1),
   // E2E : bascule le provider sur l'implémentation scriptée (aucun réseau,
   // aucun coût token) — voir apps/web/lib/assistant/{e2e-provider,provider}.ts.

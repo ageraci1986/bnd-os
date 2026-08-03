@@ -64,6 +64,8 @@ Threat model détaillé à finaliser en Phase 12 (audit).
 | `INNGEST_SIGNING_KEY`       |  🟡 moyen   |       semestrielle        | Angelo L. |
 | `UPSTASH_REDIS_REST_TOKEN`  |  🟡 moyen   |         annuelle          | Angelo L. |
 | `SENTRY_AUTH_TOKEN`         |  🟡 moyen   |         annuelle          | Angelo L. |
+| `DEEPGRAM_API_KEY`          |  🟠 élevé   |       semestrielle        | Angelo L. |
+| `ELEVENLABS_API_KEY`        |  🟠 élevé   |       semestrielle        | Angelo L. |
 
 ### Détection automatique
 
@@ -83,6 +85,14 @@ Threat model détaillé à finaliser en Phase 12 (audit).
 4. **Webhook Slack** : vérification `v0=` + timestamp < 5 min.
 5. **Webhook Graph** : `validationToken` au handshake + `clientState` à chaque notification.
 6. **Logs** : aucun token n'apparaît dans les logs (filtre Sentry + lint).
+
+### 4.1 Assistant voix (V1.5) — Deepgram (STT) / ElevenLabs (TTS)
+
+1. Clés **serveur uniquement** : `DEEPGRAM_API_KEY`, `ELEVENLABS_API_KEY` (`ELEVENLABS_VOICE_ID` en config, non sensible). Jamais exposées côté client, jamais en `NEXT_PUBLIC_*`.
+2. **Audio jamais stocké ni loggé** — ni l'entrée micro (STT) ni la sortie synthétisée (TTS), en dev comme en prod.
+3. **Pas de rétention provider activée** côté Deepgram/ElevenLabs (options de conservation désactivées à la configuration du compte).
+4. **Erreurs génériques** renvoyées au client : aucun détail provider (message d'erreur brut, code interne, quota) ne fuite dans la réponse HTTP, un log applicatif ou Sentry.
+5. **Rate limiting** Upstash par utilisateur : 30 req/min sur la route STT, 60 req/min sur la route TTS.
 
 ---
 
@@ -152,6 +162,7 @@ Procédure synthétique :
 
 ## 8. Journal des modifications de ce document
 
-| Date       | Modification                                         | Auteur            |
-| ---------- | ---------------------------------------------------- | ----------------- |
-| 2026-04-27 | Version initiale (squelette à compléter en Phase 12) | Claude (Opus 4.7) |
+| Date       | Modification                                                                                                                                                                                | Auteur             |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
+| 2026-04-27 | Version initiale (squelette à compléter en Phase 12)                                                                                                                                        | Claude (Opus 4.7)  |
+| 2026-08-03 | §3/§4.1 — Assistant voix V1.5 : `DEEPGRAM_API_KEY`/`ELEVENLABS_API_KEY` (inventaire secrets), pas de stockage/log audio, pas de rétention provider, erreurs génériques, rate limits STT/TTS | Angelo L. + Claude |

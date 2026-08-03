@@ -1,8 +1,15 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 // jsdom's global `Blob` doesn't implement `.stream()` — use Node's, which does.
 import { Blob as NodeBlob } from 'node:buffer';
+import {
+  FakeAudioContext,
+  FakeMediaRecorder,
+  fakeStream,
+  installFakeAudioContext,
+  installFakeMediaRecorder,
+} from '../hooks/fake-media-recorder';
 // Vitest hoists vi.mock above all imports — la closure doit passer par
 // vi.hoisted() (même convention que ailleurs dans ce fichier de tests).
 const { markNotificationReadSpy } = vi.hoisted(() => ({
@@ -838,6 +845,341 @@ describe('AssistantChat', () => {
     it('la pile de notices reste hors de toute région aria-live', () => {
       render(<AssistantChat csrfToken="tok" firstName="Angelo" notices={[notice]} />);
       expect(screen.getByText(notice.message).closest('[aria-live]')).toBeNull();
+    });
+  });
+
+  describe('mode voix', () => {
+    beforeEach(() => {
+      installFakeMediaRecorder();
+      installFakeAudioContext();
+    });
+    afterEach(() => vi.unstubAllGlobals());
+
+    /**
+     * Route le fetch mocké par URL : /api/assistant/voice/transcribe renvoie
+     * le transcript configurable, /api/assistant/voice/speak un petit buffer
+     * audio, /api/assistant/confirm un OK par défaut, /api/assistant/chat le
+     * flux SSE fourni par le test (voir sseResponse/openSseResponse en tête
+     * de fichier).
+     */
+    function routeFetch(handlers: {
+      /** Reçoit l'init de la requête — nécessaire pour observer `init.signal` (abort). */
+      chat?: (init?: RequestInit) => Response;
+      transcript?: string;
+      confirm?: () => Response;
+    }) {
+      return vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, init) => {
+        const u = String(url);
+        if (u.endsWith('/api/assistant/voice/transcribe')) {
+          return Response.json({ ok: true, transcript: handlers.transcript ?? '' });
+        }
+        if (u.endsWith('/api/assistant/voice/speak')) {
+          return new Response(new Uint8Array([1, 2]), { status: 200 });
+        }
+        if (u.endsWith('/api/assistant/confirm')) {
+          return handlers.confirm ? handlers.confirm() : Response.json({ ok: true });
+        }
+        if (u.endsWith('/api/assistant/chat') && handlers.chat) {
+          return handlers.chat(init as RequestInit | undefined);
+        }
+        throw new Error(`URL non routée dans ce test : ${u}`);
+      });
+    }
+
+    /** Maintien ⌥ Option → relâche, en dehors de tout champ de saisie. */
+    async function pressAltAndRelease(): Promise<void> {
+      fireEvent.keyDown(window, { key: 'Alt' });
+      await waitFor(() => {
+        expect(screen.getByTestId('voice-capsule')).toHaveAttribute('data-mode', 'recording');
+      });
+      fireEvent.keyUp(window, { key: 'Alt' });
+    }
+
+    it('PTT clavier bout en bout : ⌥ Option maintenu → transcript → bulle user + POST /chat', async () => {
+      const fetchMock = routeFetch({
+        transcript: 'quelles cartes sont bloquées ?',
+        chat: () => sseResponse([{ type: 'done', text: 'Aucune carte bloquée.' }]),
+      });
+      render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
+
+      await pressAltAndRelease();
+
+      await waitFor(() => {
+        expect(screen.getByText('quelles cartes sont bloquées ?')).toBeInTheDocument();
+      });
+      expect(fetchMock.mock.calls.some(([u]) => String(u).endsWith('/api/assistant/chat'))).toBe(
+        true,
+      );
+    });
+
+    it('symétrie : un tour vocal vocalise la réponse, le même tour au clavier reste silencieux', async () => {
+      const fetchMock = routeFetch({
+        transcript: 'fais le',
+        chat: () =>
+          sseResponse([
+            { type: 'chunk', text: "C'est fait. " },
+            { type: 'chunk', text: 'Voilà.' },
+            { type: 'done', text: "C'est fait. Voilà." },
+          ]),
+      });
+      render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
+
+      // Tour VOCAL : au moins une phrase part vers /speak.
+      await pressAltAndRelease();
+      await waitFor(() => {
+        expect(screen.getByText("C'est fait. Voilà.")).toBeInTheDocument();
+      });
+      const speakCallsVoiceTurn = fetchMock.mock.calls.filter(([u]) =>
+        String(u).endsWith('/api/assistant/voice/speak'),
+      ).length;
+      expect(speakCallsVoiceTurn).toBeGreaterThan(0);
+
+      // Tour CLAVIER identique : aucune vocalisation.
+      fetchMock.mockClear();
+      await userEvent.type(screen.getByRole('textbox'), 'fais le');
+      await userEvent.click(screen.getByRole('button', { name: /envoyer/i }));
+      await waitFor(() => {
+        expect(screen.getAllByText("C'est fait. Voilà.")).toHaveLength(2);
+      });
+      const speakCallsKeyboardTurn = fetchMock.mock.calls.filter(([u]) =>
+        String(u).endsWith('/api/assistant/voice/speak'),
+      ).length;
+      expect(speakCallsKeyboardTurn).toBe(0);
+    });
+
+    it('confirmation vocale : transcript « oui » pendant un confirm_request → POST /confirm allowed:true', async () => {
+      const confirmId = '7'.repeat(32);
+      const fetchMock = routeFetch({
+        transcript: 'oui',
+        chat: () =>
+          openSseResponse([
+            {
+              type: 'confirm_request',
+              id: confirmId,
+              tool: 'send_mail',
+              description: 'Envoyer un mail à a@b.test',
+            },
+          ]),
+      });
+      render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
+
+      // Tour vocal initial : déclenche le confirm_request côté serveur (mocké).
+      await pressAltAndRelease();
+      await screen.findByRole('alertdialog');
+
+      // Nouveau PTT pendant la confirmation en attente : le transcript "oui"
+      // est consommé comme réponse Autoriser — pas de nouveau message.
+      await pressAltAndRelease();
+
+      await waitFor(() => {
+        const confirmCall = fetchMock.mock.calls.find(([u]) =>
+          String(u).endsWith('/api/assistant/confirm'),
+        );
+        expect(confirmCall).toBeDefined();
+        const [, init] = confirmCall ?? [];
+        expect(JSON.parse(String(init?.body))).toEqual({ id: confirmId, allowed: true });
+      });
+    });
+
+    it('confirmation vocale : transcript ambigu → pas de POST /confirm, redemande à voix haute via /speak', async () => {
+      const confirmId = '8'.repeat(32);
+      const fetchMock = routeFetch({
+        transcript: 'euh peut-être',
+        chat: () =>
+          openSseResponse([
+            {
+              type: 'confirm_request',
+              id: confirmId,
+              tool: 'send_mail',
+              description: 'Envoyer un mail à a@b.test',
+            },
+          ]),
+      });
+      render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
+
+      await pressAltAndRelease();
+      await screen.findByRole('alertdialog');
+
+      fetchMock.mockClear();
+      await pressAltAndRelease();
+
+      await waitFor(() => {
+        const speakCall = fetchMock.mock.calls.find(([u]) =>
+          String(u).endsWith('/api/assistant/voice/speak'),
+        );
+        expect(speakCall).toBeDefined();
+        const [, init] = speakCall ?? [];
+        expect(JSON.parse(String(init?.body)) as { text: string }).toMatchObject({
+          text: expect.stringContaining('Dis clairement') as unknown as string,
+        });
+      });
+      expect(fetchMock.mock.calls.some(([u]) => String(u).endsWith('/api/assistant/confirm'))).toBe(
+        false,
+      );
+    });
+
+    it('Échap pendant l’écoute → annule sans transcription (aucun POST /transcribe)', async () => {
+      const fetchMock = routeFetch({});
+      render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
+
+      fireEvent.keyDown(window, { key: 'Alt' });
+      await waitFor(() => {
+        expect(screen.getByTestId('voice-capsule')).toHaveAttribute('data-mode', 'recording');
+      });
+
+      fireEvent.keyDown(window, { key: 'Escape' });
+      await waitFor(() => {
+        expect(screen.queryByTestId('voice-capsule')).not.toBeInTheDocument();
+      });
+
+      expect(
+        fetchMock.mock.calls.some(([u]) => String(u).endsWith('/api/assistant/voice/transcribe')),
+      ).toBe(false);
+    });
+
+    it('interruption vocale : le reliquat du chunker ne repart jamais vers /speak après le PTT', async () => {
+      // Tour vocal dont le flux SSE reste OUVERT avec un fragment SANS
+      // délimiteur : il dort dans le buffer du chunker. Un nouveau PTT
+      // (interruption) aborte le tour → le finally de send() ne doit PAS
+      // flusher ce reliquat vers la file TTS fraîchement vidée.
+      const encoder = new TextEncoder();
+      let push!: (e: object) => void;
+      let errorOut!: (err: Error) => void;
+      const stream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          push = (e) => controller.enqueue(encoder.encode(`data: ${JSON.stringify(e)}\n\n`));
+          errorOut = (err) => controller.error(err);
+        },
+      });
+      const fetchMock = routeFetch({
+        transcript: 'déplace la carte',
+        // Fidèle au vrai fetch : l'abort du signal fait rejeter reader.read()
+        // avec un AbortError — sans ce câblage, le mock resterait pendu.
+        chat: (init) => {
+          init?.signal?.addEventListener('abort', () => {
+            const err = new Error('aborted');
+            err.name = 'AbortError';
+            errorOut(err);
+          });
+          return new Response(stream as unknown as BodyInit, {
+            status: 200,
+            headers: { 'Content-Type': 'text/event-stream' },
+          });
+        },
+      });
+      render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
+
+      await pressAltAndRelease();
+      await screen.findByText('déplace la carte'); // bulle user : le tour est parti
+      act(() => push({ type: 'chunk', text: 'Je déplace la carte' })); // pas de délimiteur
+      await waitFor(() => {
+        expect(screen.getByText('Je déplace la carte')).toBeInTheDocument();
+      });
+
+      // Nouveau PTT pendant le tour : interruption (abort du stream).
+      fireEvent.keyDown(window, { key: 'Alt' });
+      await waitFor(() => {
+        expect(screen.getByRole('textbox')).not.toBeDisabled(); // tour terminé
+      });
+
+      // SANS le fix, flush() enverrait « Je déplace la carte » vers /speak.
+      expect(
+        fetchMock.mock.calls.some(([u]) => String(u).endsWith('/api/assistant/voice/speak')),
+      ).toBe(false);
+    });
+
+    it('Stop pendant la lecture : les phrases SSE suivantes ne repartent plus vers /speak', async () => {
+      // La lecture ne se termine jamais toute seule → la capsule reste en
+      // mode 'speaking' et son bouton Stop est cliquable.
+      FakeAudioContext.autoEnd = false;
+      const encoder = new TextEncoder();
+      let push!: (e: object) => void;
+      const stream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          push = (e) => controller.enqueue(encoder.encode(`data: ${JSON.stringify(e)}\n\n`));
+        },
+      });
+      const fetchMock = routeFetch({
+        transcript: 'fais le',
+        chat: () =>
+          new Response(stream as unknown as BodyInit, {
+            status: 200,
+            headers: { 'Content-Type': 'text/event-stream' },
+          }),
+      });
+      render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
+
+      await pressAltAndRelease();
+      await screen.findByText('fais le');
+      act(() => push({ type: 'chunk', text: 'Première phrase. ' }));
+
+      const stopButton = await screen.findByRole('button', { name: /arrêter la lecture/i });
+      const speakCallsBefore = fetchMock.mock.calls.filter(([u]) =>
+        String(u).endsWith('/api/assistant/voice/speak'),
+      ).length;
+      expect(speakCallsBefore).toBeGreaterThan(0);
+
+      await userEvent.click(stopButton);
+      act(() => push({ type: 'chunk', text: 'Deuxième phrase. ' }));
+      await waitFor(() => {
+        expect(screen.getByText(/Deuxième phrase/)).toBeInTheDocument();
+      });
+
+      // SANS le fix, le chunker survivant ré-enqueuerait la 2e phrase.
+      const speakCallsAfter = fetchMock.mock.calls.filter(([u]) =>
+        String(u).endsWith('/api/assistant/voice/speak'),
+      ).length;
+      expect(speakCallsAfter).toBe(speakCallsBefore);
+    });
+
+    it('relâche AVANT la permission micro : aucun enregistrement orphelin, aucun /transcribe', async () => {
+      const fetchMock = routeFetch({});
+      // getUserMedia suspendu — simule le dialogue de permission (même
+      // pattern deferred que use-voice-recorder.test.ts).
+      let resolvePermission!: (s: MediaStream) => void;
+      (navigator.mediaDevices.getUserMedia as ReturnType<typeof vi.fn>).mockReturnValue(
+        new Promise<MediaStream>((res) => {
+          resolvePermission = res;
+        }),
+      );
+      render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
+
+      fireEvent.keyDown(window, { key: 'Alt' });
+      // Relâche pendant l'attente : le keyup INCONDITIONNEL doit invalider le
+      // start() suspendu (sinon : capture ambiante de 60 s auto-envoyée).
+      fireEvent.keyUp(window, { key: 'Alt' });
+
+      await act(async () => {
+        resolvePermission(fakeStream); // l'utilisateur accorde ENSUITE la permission
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(FakeMediaRecorder.instances).toHaveLength(0);
+      expect(screen.queryByTestId('voice-capsule')).not.toBeInTheDocument();
+      expect(
+        fetchMock.mock.calls.some(([u]) => String(u).endsWith('/api/assistant/voice/transcribe')),
+      ).toBe(false);
+    });
+
+    it('blur de la fenêtre pendant l’écoute → annulation, aucun /transcribe (vie privée)', async () => {
+      const fetchMock = routeFetch({});
+      render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
+
+      fireEvent.keyDown(window, { key: 'Alt' });
+      await waitFor(() => {
+        expect(screen.getByTestId('voice-capsule')).toHaveAttribute('data-mode', 'recording');
+      });
+
+      // Alt+Tab / changement de fenêtre : le keyup n'arrivera jamais.
+      fireEvent(window, new Event('blur'));
+      await waitFor(() => {
+        expect(screen.queryByTestId('voice-capsule')).not.toBeInTheDocument();
+      });
+
+      expect(
+        fetchMock.mock.calls.some(([u]) => String(u).endsWith('/api/assistant/voice/transcribe')),
+      ).toBe(false);
     });
   });
 });

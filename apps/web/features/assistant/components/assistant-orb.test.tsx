@@ -16,7 +16,7 @@ describe('deriveOrbActivity', () => {
     expect(deriveOrbActivity({ busy: true, streaming: true })).toBe('responding');
   });
 
-  it('ne dérive jamais listening (réservé V1.5)', () => {
+  it('sans flag listening, ne dérive jamais listening', () => {
     const cases = [
       { busy: false, streaming: false },
       { busy: false, streaming: true },
@@ -26,6 +26,29 @@ describe('deriveOrbActivity', () => {
     for (const c of cases) {
       expect(deriveOrbActivity(c)).not.toBe('listening');
     }
+  });
+
+  it('listening prime sur tous les autres états', () => {
+    expect(deriveOrbActivity({ busy: true, streaming: true, listening: true })).toBe('listening');
+    expect(deriveOrbActivity({ busy: false, streaming: false, listening: true })).toBe('listening');
+  });
+
+  it('responding quand le SSE est fini (busy=false) mais la file TTS parle encore', () => {
+    // Spec §1 : « Je parle… » (capsule) va de pair avec l'orbe `responding` —
+    // le stream peut se terminer avant que la file TTS ait fini de se vider.
+    expect(deriveOrbActivity({ busy: false, streaming: false, speaking: true })).toBe('responding');
+  });
+
+  it('précédence de speaking : sous listening, sans effet pendant busy, idle sans lui', () => {
+    // listening prime toujours, même en parlant.
+    expect(
+      deriveOrbActivity({ busy: false, streaming: false, listening: true, speaking: true }),
+    ).toBe('listening');
+    // Pendant busy, le couple busy/streaming décide — speaking n'ajoute rien.
+    expect(deriveOrbActivity({ busy: true, streaming: false, speaking: true })).toBe('thinking');
+    expect(deriveOrbActivity({ busy: true, streaming: true, speaking: true })).toBe('responding');
+    // speaking=false explicite : comportement inchangé.
+    expect(deriveOrbActivity({ busy: false, streaming: false, speaking: false })).toBe('idle');
   });
 });
 

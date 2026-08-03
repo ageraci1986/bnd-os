@@ -18,3 +18,5 @@ export {
   type RunTurnDeps,
   type RunTurnResult,
 } from './run-turn';
+export { SentenceChunker } from './sentence-chunker';
+export { matchVoiceConfirm, type VoiceConfirmIntent } from './voice-confirm';
