@@ -41,7 +41,10 @@ const nextConfig: NextConfig = {
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
           {
             key: 'Permissions-Policy',
-            value: 'camera=(), microphone=(), geolocation=(), interest-cohort=()',
+            // microphone=(self) : requis par le mode voix (PTT, V1.5) — sans
+            // lui, getUserMedia est rejeté par la policy AVANT tout prompt
+            // navigateur et la voix est inutilisable. Origine propre uniquement.
+            value: 'camera=(), microphone=(self), geolocation=(), interest-cohort=()',
           },
           {
             key: 'Strict-Transport-Security',
