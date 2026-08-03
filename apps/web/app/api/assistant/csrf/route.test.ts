@@ -20,6 +20,7 @@ describe('GET /api/assistant/csrf', () => {
     const res = await GET();
 
     expect(res.status).toBe(401);
+    expect(res.headers.get('Cache-Control')).toBe('no-store');
     const body = (await res.json()) as { ok: boolean };
     expect(body.ok).toBe(false);
     expect(mocks.mintCsrfToken).not.toHaveBeenCalled();
@@ -38,6 +39,9 @@ describe('GET /api/assistant/csrf', () => {
     const res = await GET();
 
     expect(res.status).toBe(200);
+    // no-store explicite : la réponse porte un jeton vivant — aucun cache
+    // (navigateur, CDN, proxy) ne doit pouvoir la retenir.
+    expect(res.headers.get('Cache-Control')).toBe('no-store');
     const body = (await res.json()) as { ok: boolean; token: string };
     expect(body).toEqual({ ok: true, token: 'fresh-token-123' });
     expect(mocks.mintCsrfToken).toHaveBeenCalledTimes(1);

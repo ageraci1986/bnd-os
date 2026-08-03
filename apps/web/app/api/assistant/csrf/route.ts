@@ -22,8 +22,15 @@ export const dynamic = 'force-dynamic';
 export async function GET(): Promise<Response> {
   const ctx = await getAuthContext();
   if (ctx === null) {
-    return Response.json({ ok: false, message: 'Non authentifié.' }, { status: 401 });
+    return Response.json(
+      { ok: false, message: 'Non authentifié.' },
+      { status: 401, headers: { 'Cache-Control': 'no-store' } },
+    );
   }
   const token = await mintCsrfToken();
-  return Response.json({ ok: true, token });
+  // no-store explicite (défense en profondeur, même convention que
+  // voice/speak) : la réponse porte un jeton vivant par-utilisateur —
+  // `force-dynamic` empêche le cache Next, mais aucun cache intermédiaire
+  // (CDN, proxy, navigateur) ne doit pouvoir la retenir non plus.
+  return Response.json({ ok: true, token }, { headers: { 'Cache-Control': 'no-store' } });
 }
