@@ -590,6 +590,23 @@ describe('buildReadTools', () => {
     expect(prismaMock.membership.findMany.mock.calls[0]?.[0]?.take).toBe(50);
   });
 
+  it("get_team_members ne signale pas de troncature quand le workspace compte EXACTEMENT 50 membres (le total réel n'excède pas le plafond)", async () => {
+    // Régression : `members.length === 50` seul ne suffit pas — il faut aussi
+    // `total > 50`, sinon un workspace de pile 50 membres serait annoncé
+    // « liste partielle » à tort (même borne que get_project_board).
+    prismaMock.membership.count.mockResolvedValue(50);
+    prismaMock.membership.findMany.mockResolvedValue(
+      Array.from({ length: 50 }, (_, i) => ({
+        role: 'user',
+        user: { id: `u${i}`, email: `m${i}@acme.com`, firstName: null, lastName: null },
+      })),
+    );
+    const out = JSON.parse(await execute('get_team_members', {}));
+    expect(out.total).toBe(50);
+    expect(out.members).toHaveLength(50);
+    expect(out.truncated).toBeUndefined();
+  });
+
   it('get_card renvoie le détail scoped, ou une erreur si carte introuvable', async () => {
     prismaMock.card.findFirst.mockResolvedValue(null);
     const out = await execute('get_card', { cardId: '4c9d3f0a-2222-4444-8888-aaaaaaaaaaaa' });
@@ -664,6 +681,43 @@ describe('buildReadTools', () => {
     expect(out.totalItems).toBe(73);
     const select = prismaMock.card.findFirst.mock.calls[0]?.[0]?.select;
     expect(select?.checklistItems?.take).toBe(50);
+  });
+
+  it('get_card : checklist de PILE 50 items → pas de troncature ; 51 → troncature (borne sur le total réel)', async () => {
+    // Régression : `checklistItems.length === 50` seul ne suffit pas — il faut
+    // que le total réel (_count) excède le plafond, sinon une carte de pile
+    // 50 items serait annoncée tronquée à tort.
+    const fullChecklist = Array.from({ length: 50 }, (_, i) => ({
+      title: `Item ${i}`,
+      isChecked: false,
+    }));
+    const cardBase = {
+      id: 'c1',
+      title: 'Checklist pleine',
+      description: null,
+      dueDate: null,
+      shortRef: 1,
+      column: { id: 'col1', name: 'À faire', isBlockedSystem: false },
+      project: { id: 'p1', name: 'Site' },
+      assignees: [],
+      checklistItems: fullChecklist,
+    };
+
+    prismaMock.card.findFirst.mockResolvedValueOnce({
+      ...cardBase,
+      _count: { checklistItems: 50 },
+    });
+    const exactAtCap = JSON.parse(await execute('get_card', { cardId: 'c1' }));
+    expect(exactAtCap.totalItems).toBe(50);
+    expect(exactAtCap.checklistTruncated).toBeUndefined();
+
+    prismaMock.card.findFirst.mockResolvedValueOnce({
+      ...cardBase,
+      _count: { checklistItems: 51 },
+    });
+    const oneAboveCap = JSON.parse(await execute('get_card', { cardId: 'c1' }));
+    expect(oneAboveCap.totalItems).toBe(51);
+    expect(oneAboveCap.checklistTruncated).toBe(true);
   });
 
   it('get_card_details renvoie le JSON complet (échéance, colonne, assignés, checklist ordonnée avec ids)', async () => {

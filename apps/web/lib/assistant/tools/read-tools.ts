@@ -437,7 +437,12 @@ export async function buildReadTools(ctx: AuthContext): Promise<ToolSpec[]> {
               name: [m.user.firstName, m.user.lastName].filter(Boolean).join(' ') || null,
               role: m.role,
             })),
-            ...(members.length === TEAM_MEMBERS_MAX ? { truncated: true } : {}),
+            // Même borne que get_project_board : troncature seulement si le
+            // total RÉEL excède le plafond — pile 50 membres n'est pas une
+            // liste partielle.
+            ...(members.length === TEAM_MEMBERS_MAX && total > TEAM_MEMBERS_MAX
+              ? { truncated: true }
+              : {}),
           });
         }),
     }),
@@ -485,9 +490,10 @@ export async function buildReadTools(ctx: AuthContext): Promise<ToolSpec[]> {
             ...cardWithoutCount,
             description,
             totalItems: _count.checklistItems,
-            ...(card.checklistItems.length === CARD_CHECKLIST_MAX
-              ? { checklistTruncated: true }
-              : {}),
+            // Même borne que get_project_board : troncature seulement si le
+            // total RÉEL excède le plafond — pile 50 items n'est pas une
+            // liste partielle.
+            ...(_count.checklistItems > CARD_CHECKLIST_MAX ? { checklistTruncated: true } : {}),
           });
         }),
     }),
