@@ -471,9 +471,12 @@ export function AssistantChat({ csrfToken, firstName, overview, notices }: Assis
         void voice.pressStart();
         return;
       }
-      // N'importe quelle autre touche pendant le délai = composition d'accent
-      // (Option+e…), pas un maintien PTT — on annule silencieusement.
-      if (focusedHoldTimer !== null) clearFocusedHoldTimer();
+      // N'importe quelle AUTRE touche pendant le délai = composition d'accent
+      // (Option+e…), pas un maintien PTT — on annule silencieusement. Les
+      // keydown Alt repeat:true (Alt tenu émet des répétitions sous
+      // Windows/Linux) ne comptent pas : c'est le même maintien, pas une
+      // composition.
+      if (focusedHoldTimer !== null && e.key !== 'Alt') clearFocusedHoldTimer();
       if (e.key === 'Escape' && voice.mode === 'recording') voice.cancel();
     };
     const up = (e: KeyboardEvent) => {
@@ -487,6 +490,10 @@ export function AssistantChat({ csrfToken, firstName, overview, notices }: Assis
       void voice.pressEnd();
     };
     const blur = () => {
+      // Maintien armé mais fenêtre quittée : ne jamais démarrer — sans ce
+      // clear, le timer partirait sans personne devant (capture de 60 s
+      // non surveillée, auto-envoyée à la borne).
+      clearFocusedHoldTimer();
       // Alt+Tab / changement de fenêtre pendant l'écoute : le keyup n'arrivera
       // jamais — annuler (PAS pressEnd : l'utilisateur n'a pas voulu envoyer),
       // sinon capture d'ambiance de 60 s auto-transmise (vie privée).

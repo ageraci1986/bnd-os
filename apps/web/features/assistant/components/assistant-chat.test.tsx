@@ -1232,6 +1232,53 @@ describe('AssistantChat', () => {
       expect(input).toHaveFocus();
     });
 
+    it('blur de la fenêtre pendant le délai de maintien (250 ms) → timer annulé, aucun enregistrement non surveillé', async () => {
+      const fetchMock = routeFetch({});
+      render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
+      const input = screen.getByRole('textbox');
+      act(() => input.focus());
+
+      fireEvent.keyDown(window, { key: 'Alt' });
+      // Fenêtre quittée (Cmd+Tab…) AVANT l'échéance : le keyup Alt n'arrivera
+      // jamais — si le timer survivait, il armerait une capture de 60 s sans
+      // personne devant l'écran (vie privée).
+      fireEvent(window, new Event('blur'));
+
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 300));
+      });
+
+      expect(screen.queryByTestId('voice-capsule')).not.toBeInTheDocument();
+      expect(
+        fetchMock.mock.calls.some(([u]) => String(u).endsWith('/api/assistant/voice/transcribe')),
+      ).toBe(false);
+    });
+
+    it('auto-repeat d’Alt maintenu (Windows/Linux) pendant le délai → n’annule pas le timer, le PTT s’arme à 250 ms', async () => {
+      routeFetch({});
+      render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
+      const input = screen.getByRole('textbox');
+      act(() => input.focus());
+
+      fireEvent.keyDown(window, { key: 'Alt' });
+      // Sous Windows/Linux, Alt tenu émet des keydown repeat:true — ils ne
+      // doivent PAS passer pour une « autre touche » (composition) qui annule.
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 100));
+      });
+      fireEvent.keyDown(window, { key: 'Alt', repeat: true });
+
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 200));
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('voice-capsule')).toHaveAttribute('data-mode', 'recording');
+      });
+
+      fireEvent.keyUp(window, { key: 'Alt' });
+    });
+
     it('blur de la fenêtre pendant l’écoute → annulation, aucun /transcribe (vie privée)', async () => {
       const fetchMock = routeFetch({});
       render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
