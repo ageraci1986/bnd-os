@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { fetchWithCsrfRetry } from '../lib/csrf-retry';
 
 /**
  * File TTS séquentielle (spec §3) : enqueue(phrase) → fetch /speak →
@@ -19,7 +20,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
  * encore en train de dérouler son fetch/décodage en arrière-plan.
  */
 
-export function useSpeechQueue(csrfToken: string) {
+/** No-op par défaut : couvre les appelants (tests, callers historiques) qui
+ * n'ont pas encore besoin du recovery CSRF (voir fetchWithCsrfRetry). */
+const NOOP_CSRF_REFRESH = (): void => undefined;
+
+export function useSpeechQueue(
+  csrfToken: string,
+  onCsrfRefresh: (token: string) => void = NOOP_CSRF_REFRESH,
+) {
   const [speaking, setSpeaking] = useState(false);
   const queueRef = useRef<string[]>([]);
   const playingRef = useRef(false);
@@ -31,6 +39,8 @@ export function useSpeechQueue(csrfToken: string) {
   // « Latest ref » volontaire : réécrit à chaque render pour que drain() lise
   // toujours le token courant sans invalider ses callbacks mémoïsés.
   csrfRef.current = csrfToken;
+  const onCsrfRefreshRef = useRef(onCsrfRefresh);
+  onCsrfRefreshRef.current = onCsrfRefresh;
 
   const stop = useCallback((): void => {
     queueRef.current = [];
@@ -72,12 +82,17 @@ export function useSpeechQueue(csrfToken: string) {
       const controller = new AbortController();
       abortRef.current = controller;
       try {
-        const res = await fetch('/api/assistant/voice/speak', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfRef.current },
-          body: JSON.stringify({ text }),
-          signal: controller.signal,
-        });
+        const res = await fetchWithCsrfRetry(
+          '/api/assistant/voice/speak',
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text }),
+            signal: controller.signal,
+          },
+          () => csrfRef.current,
+          (token) => onCsrfRefreshRef.current(token),
+        );
         if (runIdRef.current !== runId) return;
         if (!res.ok) continue; // phrase sautée
         const bytes = await res.arrayBuffer();
