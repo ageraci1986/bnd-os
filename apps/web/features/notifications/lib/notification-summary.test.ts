@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { toNotificationSummary } from './notification-summary';
+import { extractCardId, toNotificationSummary } from './notification-summary';
 
 const base = {
   id: 'n1',
   createdAt: new Date('2026-08-03T08:00:00Z'),
   readAt: null as Date | null,
 };
+
+const VALID_CARD_ID = '11111111-1111-4111-8111-111111111111';
 
 describe('toNotificationSummary', () => {
   it('mappe une notice agent : label FR + titre = data.message', () => {
@@ -73,5 +75,57 @@ describe('toNotificationSummary', () => {
       data: {},
     });
     expect(out?.read).toBe(true);
+  });
+});
+
+describe('extractCardId', () => {
+  it('extrait un cardId valide (UUID strict)', () => {
+    expect(extractCardId({ cardId: VALID_CARD_ID })).toBe(VALID_CARD_ID);
+  });
+
+  it('rejette une valeur non-UUID (anti-injection : jamais faire confiance à une string arbitraire)', () => {
+    expect(extractCardId({ cardId: 'DROP TABLE cards;' })).toBeNull();
+    expect(extractCardId({ cardId: 'not-a-uuid' })).toBeNull();
+    expect(extractCardId({ cardId: '11111111-1111-1111-1111-111111111111x' })).toBeNull();
+  });
+
+  it('cardId absent, non-string, ou data invalide → null', () => {
+    expect(extractCardId({})).toBeNull();
+    expect(extractCardId({ cardId: 42 })).toBeNull();
+    expect(extractCardId(null)).toBeNull();
+    expect(extractCardId('nope')).toBeNull();
+  });
+});
+
+describe('toNotificationSummary — cardId', () => {
+  it('expose cardId quand data.cardId est un UUID valide (ex: card_commented)', () => {
+    const out = toNotificationSummary({
+      ...base,
+      kind: 'card_commented',
+      data: { cardId: VALID_CARD_ID, commentId: '22222222-2222-4222-8222-222222222222' },
+    });
+    expect(out.cardId).toBe(VALID_CARD_ID);
+    // Pas de titre disponible dans data (pas de message/title/subject/cardTitle) → reste null,
+    // c'est la résolution DB côté tool qui le remplira.
+    expect(out.title).toBeNull();
+  });
+
+  it("n'expose pas cardId quand data.cardId est absent ou invalide", () => {
+    expect(
+      toNotificationSummary({ ...base, kind: 'email_new', data: { subject: 'x' } }).cardId,
+    ).toBeUndefined();
+    expect(
+      toNotificationSummary({ ...base, kind: 'card_commented', data: { cardId: 'evil' } }).cardId,
+    ).toBeUndefined();
+  });
+
+  it('agent_card_blocked référence la carte via data.ref (pas data.cardId) → cardId non exposé, titre déjà rempli via data.message', () => {
+    const out = toNotificationSummary({
+      ...base,
+      kind: 'agent_card_blocked',
+      data: { message: 'Carte bloquée', discuss: 'x', ref: VALID_CARD_ID },
+    });
+    expect(out.cardId).toBeUndefined();
+    expect(out.title).toBe('Carte bloquée');
   });
 });

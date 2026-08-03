@@ -3,7 +3,11 @@ import { z } from 'zod';
 import { prisma } from '@nexushub/db';
 import { defineTool, type ToolSpec } from '@nexushub/agent';
 import type { AuthContext } from '@/lib/auth';
-import { toNotificationSummary } from '@/features/notifications/lib/notification-summary';
+import {
+  TITLE_MAX_CHARS,
+  toNotificationSummary,
+  type NotificationSummary,
+} from '@/features/notifications/lib/notification-summary';
 import { safeDb } from './safe-wrappers';
 
 /**
@@ -41,6 +45,46 @@ const markSchema = z
     message: 'Fournissez soit "ids" (tableau), soit "all": true, exclusivement.',
   });
 
+/**
+ * Résout en un seul aller-retour les cartes référencées par `data.cardId`
+ * dans un lot de résumés (jamais de N+1) — suivi de la revue de sécurité
+ * « total visibility » : une notification affiche un titre humain et un
+ * `cardId` actionnable (chaînable avec `get_card`) SEULEMENT si la carte est
+ * résolue dans LE workspace courant. Une carte inconnue/soft-deleted/d'un
+ * autre workspace ne doit jamais laisser fuiter un id inaccessible — on la
+ * retire alors du résumé plutôt que d'exposer un cardId que `get_card`
+ * refuserait de toute façon.
+ */
+async function enrichWithCardContext(
+  summaries: readonly NotificationSummary[],
+  workspaceId: string,
+): Promise<NotificationSummary[]> {
+  const cardIds = Array.from(
+    new Set(summaries.flatMap((s) => (s.cardId !== undefined ? [s.cardId] : []))),
+  );
+  if (cardIds.length === 0) return summaries.slice();
+
+  const cards = await prisma.card.findMany({
+    where: { id: { in: cardIds }, workspaceId, deletedAt: null },
+    select: { id: true, title: true, project: { select: { name: true } } },
+  });
+  const cardById = new Map(cards.map((c) => [c.id, c]));
+
+  return summaries.map((summary) => {
+    if (summary.cardId === undefined) return summary;
+    const card = cardById.get(summary.cardId);
+    if (card === undefined) {
+      // Non résolue dans ce workspace (autre workspace, supprimée…) : on ne
+      // renvoie JAMAIS un cardId que l'utilisateur ne peut pas ouvrir.
+      const { cardId: _drop, ...rest } = summary;
+      return rest;
+    }
+    if (summary.title !== null) return summary; // titre déjà rempli (agent_*), on ne l'écrase pas
+    const composedTitle = `${card.title} — ${card.project.name}`.slice(0, TITLE_MAX_CHARS);
+    return { ...summary, title: composedTitle };
+  });
+}
+
 export function buildNotificationTools(ctx: AuthContext): ToolSpec[] {
   const { workspaceId, userId } = ctx;
   return [
@@ -75,10 +119,14 @@ export function buildNotificationTools(ctx: AuthContext): ToolSpec[] {
               skip: input.offset ?? 0,
             }),
           ]);
+          const notifications = await enrichWithCardContext(
+            rows.map(toNotificationSummary),
+            workspaceId,
+          );
           return JSON.stringify({
             total,
             offset: input.offset ?? 0,
-            notifications: rows.map(toNotificationSummary),
+            notifications,
           });
         }),
     }),

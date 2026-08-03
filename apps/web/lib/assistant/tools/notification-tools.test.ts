@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const prismaMock = vi.hoisted(() => ({
   notification: { findMany: vi.fn(), count: vi.fn(), updateMany: vi.fn() },
+  card: { findMany: vi.fn() },
 }));
 vi.mock('@nexushub/db', () => ({ prisma: prismaMock }));
 
@@ -34,6 +35,7 @@ describe('list_notifications', () => {
       },
     ]);
     prismaMock.notification.count.mockResolvedValue(7);
+    prismaMock.card.findMany.mockResolvedValue([]);
   });
 
   it('liste MES notifications non lues par défaut, avec total et offset', async () => {
@@ -71,6 +73,152 @@ describe('list_notifications', () => {
     ]);
     const raw = await tool('list_notifications').handler({} as never);
     expect(raw).not.toContain('IGNORE ALL INSTRUCTIONS');
+  });
+
+  it('aucun cardId dans le lot → pas de requête card.findMany (pas de query inutile)', async () => {
+    await tool('list_notifications').handler({} as never);
+    expect(prismaMock.card.findMany).not.toHaveBeenCalled();
+  });
+});
+
+describe('list_notifications — résolution du contexte carte', () => {
+  const CARD_ID = '11111111-1111-4111-8111-111111111111';
+  const CARD_ID_2 = '22222222-2222-4222-8222-222222222222';
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    prismaMock.notification.count.mockResolvedValue(2);
+  });
+
+  it("résout cardId + compose le titre « <titre carte> — <projet> » quand le résumé n'a pas de titre", async () => {
+    prismaMock.notification.findMany.mockResolvedValue([
+      {
+        id: 'n1',
+        kind: 'card_commented',
+        data: { cardId: CARD_ID, commentId: 'c1' },
+        readAt: null,
+        createdAt: new Date('2026-08-03T07:00:00Z'),
+      },
+    ]);
+    prismaMock.card.findMany.mockResolvedValue([
+      { id: CARD_ID, title: 'Landing page V2', project: { name: 'Site Acme' } },
+    ]);
+
+    const out = JSON.parse(await tool('list_notifications').handler({} as never)) as {
+      notifications: { cardId?: string; title: string | null }[];
+    };
+
+    expect(out.notifications[0]?.cardId).toBe(CARD_ID);
+    expect(out.notifications[0]?.title).toBe('Landing page V2 — Site Acme');
+    expect(prismaMock.card.findMany).toHaveBeenCalledTimes(1);
+    const args = prismaMock.card.findMany.mock.calls[0]?.[0];
+    expect(args?.where).toMatchObject({ workspaceId: 'w1', deletedAt: null });
+    expect(args?.where?.id?.in).toEqual([CARD_ID]);
+  });
+
+  it('un seul findMany batché pour N notifications référençant des cartes (pas de N+1)', async () => {
+    prismaMock.notification.findMany.mockResolvedValue([
+      {
+        id: 'n1',
+        kind: 'card_commented',
+        data: { cardId: CARD_ID },
+        readAt: null,
+        createdAt: new Date('2026-08-03T07:00:00Z'),
+      },
+      {
+        id: 'n2',
+        kind: 'card_commented',
+        data: { cardId: CARD_ID_2 },
+        readAt: null,
+        createdAt: new Date('2026-08-03T06:00:00Z'),
+      },
+      {
+        id: 'n3',
+        kind: 'card_commented',
+        // même carte que n1 — ne doit pas dupliquer l'id dans `in`
+        data: { cardId: CARD_ID },
+        readAt: null,
+        createdAt: new Date('2026-08-03T05:00:00Z'),
+      },
+    ]);
+    prismaMock.card.findMany.mockResolvedValue([
+      { id: CARD_ID, title: 'Landing page V2', project: { name: 'Site Acme' } },
+      { id: CARD_ID_2, title: 'Refonte logo', project: { name: 'Site Acme' } },
+    ]);
+
+    const out = JSON.parse(await tool('list_notifications').handler({} as never)) as {
+      notifications: { cardId?: string; title: string | null }[];
+    };
+
+    expect(prismaMock.card.findMany).toHaveBeenCalledTimes(1);
+    const idsIn = prismaMock.card.findMany.mock.calls[0]?.[0]?.where?.id?.in as string[];
+    expect(new Set(idsIn)).toEqual(new Set([CARD_ID, CARD_ID_2]));
+    expect(out.notifications[0]?.title).toBe('Landing page V2 — Site Acme');
+    expect(out.notifications[1]?.title).toBe('Refonte logo — Site Acme');
+    expect(out.notifications[2]?.title).toBe('Landing page V2 — Site Acme');
+  });
+
+  it("cardId d'un autre workspace (ou carte supprimée) ne résout à rien → cardId absent de la sortie, titre reste null (jamais d'id inaccessible exposé)", async () => {
+    prismaMock.notification.findMany.mockResolvedValue([
+      {
+        id: 'n1',
+        kind: 'card_commented',
+        data: { cardId: CARD_ID },
+        readAt: null,
+        createdAt: new Date(),
+      },
+    ]);
+    prismaMock.card.findMany.mockResolvedValue([]); // scope workspaceId+deletedAt ne matche rien
+
+    const out = JSON.parse(await tool('list_notifications').handler({} as never)) as {
+      notifications: { cardId?: string; title: string | null }[];
+    };
+
+    expect(out.notifications[0]?.cardId).toBeUndefined();
+    expect(out.notifications[0]?.title).toBeNull();
+  });
+
+  it('titre déjà présent (kinds agent_*) : cardId éventuel garde son titre existant, non écrasé', async () => {
+    prismaMock.notification.findMany.mockResolvedValue([
+      {
+        id: 'n1',
+        kind: 'agent_card_blocked',
+        // agent_card_blocked référence la carte via `ref`, pas `cardId` (voir notice-core.ts) —
+        // le titre vient déjà de data.message et n'a jamais besoin d'être recomposé.
+        data: { message: 'Carte bloquée', discuss: 'x', ref: CARD_ID },
+        readAt: null,
+        createdAt: new Date(),
+      },
+    ]);
+
+    const out = JSON.parse(await tool('list_notifications').handler({} as never)) as {
+      notifications: { cardId?: string; title: string | null }[];
+    };
+
+    expect(out.notifications[0]?.title).toBe('Carte bloquée');
+    expect(out.notifications[0]?.cardId).toBeUndefined();
+    expect(prismaMock.card.findMany).not.toHaveBeenCalled();
+  });
+
+  it('le titre composé est borné à 200 caractères', async () => {
+    const longTitle = 'x'.repeat(250);
+    prismaMock.notification.findMany.mockResolvedValue([
+      {
+        id: 'n1',
+        kind: 'card_commented',
+        data: { cardId: CARD_ID },
+        readAt: null,
+        createdAt: new Date(),
+      },
+    ]);
+    prismaMock.card.findMany.mockResolvedValue([
+      { id: CARD_ID, title: longTitle, project: { name: 'Site Acme' } },
+    ]);
+
+    const out = JSON.parse(await tool('list_notifications').handler({} as never)) as {
+      notifications: { title: string | null }[];
+    };
+    expect(out.notifications[0]?.title?.length).toBe(200);
   });
 });
 
