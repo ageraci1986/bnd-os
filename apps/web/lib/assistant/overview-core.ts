@@ -42,13 +42,21 @@ export async function loadTodayOverview(ctx: OverviewAuthContext): Promise<Today
   const start = startOfTodayUtc();
   const endExclusive = new Date(start);
   endExclusive.setUTCDate(endExclusive.getUTCDate() + 1);
+  // Seules les cartes de projets VIVANTS comptent : un projet en corbeille
+  // (soft delete 30 j) ou archivé disparaît de tous les boards, ses cartes ne
+  // doivent plus alimenter les compteurs du briefing (sinon « 6 cartes
+  // bloquées » introuvables — bug du 2026-08-03). AND explicite : comme dans
+  // read-tools.ts, `scopedCardWhere` pose sa propre clé `project` — un spread
+  // à plat écraserait ce filtre.
+  const liveProjectFilter = { project: { deletedAt: null, archivedAt: null } };
   const [blockedCards, dueTodayCards, unreadMails, unreadNotifications] = await Promise.all([
     prisma.card.count({
       where: {
         workspaceId,
         deletedAt: null,
+        archivedAt: null,
         column: { isBlockedSystem: true },
-        ...scopedCardWhere(scope),
+        AND: [liveProjectFilter, scopedCardWhere(scope)],
       },
     }),
     prisma.card.count({
@@ -57,7 +65,7 @@ export async function loadTodayOverview(ctx: OverviewAuthContext): Promise<Today
         deletedAt: null,
         archivedAt: null,
         dueDate: { gte: start, lt: endExclusive },
-        ...scopedCardWhere(scope),
+        AND: [liveProjectFilter, scopedCardWhere(scope)],
       },
     }),
     prisma.emailMessage.count({ where: { workspaceId, deletedAt: null, isRead: false } }),
