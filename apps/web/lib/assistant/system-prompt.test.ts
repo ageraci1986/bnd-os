@@ -91,4 +91,15 @@ describe('buildSystemPrompt', () => {
       "avant d'envoyer, relis get_draft et passe son updatedAt à send_draft",
     );
   });
+
+  it('contient les règles d’exhaustivité (pagination, by_filter, troncatures)', () => {
+    const prompt = buildSystemPrompt(base);
+    // Boucler sur offset tant que total dépasse les éléments reçus avant de
+    // conclure « pas trouvé ».
+    expect(prompt).toMatch(/total.*offset/i);
+    // Demandes de masse mail → tools *_by_filter, jamais de boucles d'ids.
+    expect(prompt).toContain('_by_filter');
+    // Annoncer les troncatures (truncated: true) et proposer d'affiner.
+    expect(prompt).toMatch(/tronqu/i);
+  });
 });

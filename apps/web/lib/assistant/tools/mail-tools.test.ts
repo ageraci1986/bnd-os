@@ -20,10 +20,29 @@ vi.mock('@/features/communications/actions/send-mail', () => sendMailMocks);
 const markReadMocks = vi.hoisted(() => ({ markEmailRead: vi.fn() }));
 vi.mock('@/features/communications/actions/mark-email-read', () => markReadMocks);
 
-const mailStateMocks = vi.hoisted(() => ({ setMailStateCore: vi.fn(), MAIL_BULK_MAX: 100 }));
-vi.mock('@/features/communications/lib/mail-state-core', () => mailStateMocks);
+const mailStateMocks = vi.hoisted(() => ({
+  setMailStateCore: vi.fn(),
+  countMailsByFilter: vi.fn(),
+  setMailStateByFilterCore: vi.fn(),
+  MAIL_BULK_MAX: 100,
+}));
+// Garde les exports RÉELS (notamment `MailFilterSchema`, `buildMailFilterWhere`)
+// via importOriginal — seuls les appels réseau (`countMailsByFilter`,
+// `setMailStateByFilterCore`, `setMailStateCore`) sont mockés. Même pattern
+// que send-mail.test.ts (@nexushub/integrations/graph).
+vi.mock('@/features/communications/lib/mail-state-core', async (importOriginal) => {
+  const actual = await importOriginal<typeof MailStateCoreModule>();
+  return {
+    ...actual,
+    setMailStateCore: mailStateMocks.setMailStateCore,
+    countMailsByFilter: mailStateMocks.countMailsByFilter,
+    setMailStateByFilterCore: mailStateMocks.setMailStateByFilterCore,
+    MAIL_BULK_MAX: mailStateMocks.MAIL_BULK_MAX,
+  };
+});
 
 import { buildMailTools } from './mail-tools';
+import type * as MailStateCoreModule from '@/features/communications/lib/mail-state-core';
 
 const ctx = {
   userId: 'u1',
@@ -98,23 +117,34 @@ beforeEach(() => {
 });
 
 describe('buildMailTools', () => {
-  it('expose les 11 tools mail, seuls send_mail/send_draft/archive_mail/delete_mail gated, aucun adminOnly', () => {
+  it('expose les 14 tools mail, seuls send_mail/send_draft/archive_mail/delete_mail/*_by_filter gated, aucun adminOnly', () => {
     const list = tools();
     expect(list.map((t) => t.name).sort()).toEqual([
       'archive_mail',
+      'archive_mails_by_filter',
       'create_mail_draft',
       'delete_mail',
+      'delete_mails_by_filter',
       'get_draft',
       'list_my_mailboxes',
       'mark_email_read',
       'mark_mail_read',
       'mark_mail_unread',
+      'mark_mails_read_by_filter',
       'prepare_reply_draft',
       'send_draft',
       'send_mail',
     ]);
     expect(list.every((t) => !t.adminOnly)).toBe(true);
-    const gatedNames = new Set(['send_mail', 'send_draft', 'archive_mail', 'delete_mail']);
+    const gatedNames = new Set([
+      'send_mail',
+      'send_draft',
+      'archive_mail',
+      'delete_mail',
+      'mark_mails_read_by_filter',
+      'archive_mails_by_filter',
+      'delete_mails_by_filter',
+    ]);
     for (const t of list) {
       expect(t.gated).toBe(gatedNames.has(t.name));
     }
@@ -1107,4 +1137,146 @@ describe('buildMailTools', () => {
       });
     },
   );
+
+  describe('tools *_by_filter', () => {
+    it('les 3 tools existent et sont gated', () => {
+      for (const name of [
+        'mark_mails_read_by_filter',
+        'archive_mails_by_filter',
+        'delete_mails_by_filter',
+      ]) {
+        const t = getTool(name);
+        expect(t.gated).toBe(true);
+        expect(t.describeForConfirm).toBeDefined();
+      }
+    });
+
+    describe('describeForConfirm', () => {
+      async function describeFilterTool(name: string, input: unknown): Promise<string> {
+        const tool = getTool(name);
+        if (tool.describeForConfirm === undefined) throw new Error('describeForConfirm absent');
+        return tool.describeForConfirm(input as never);
+      }
+
+      it('compte réel + reformulation du filtre', async () => {
+        mailStateMocks.countMailsByFilter.mockResolvedValue(143);
+        const description = await describeFilterTool('mark_mails_read_by_filter', {
+          fromContains: 'notifications@github.com',
+        });
+        expect(description).toContain('143 mails');
+        expect(description).toContain('notifications@github.com');
+        expect(description).toMatch(/marquer.*lus/i);
+      });
+
+      it('0 résultat → « Aucun mail ne correspond »', async () => {
+        mailStateMocks.countMailsByFilter.mockResolvedValue(0);
+        const description = await describeFilterTool('archive_mails_by_filter', {
+          folder: 'inbox',
+        });
+        expect(description).toMatch(/aucun mail ne correspond/i);
+      });
+
+      it('entrée BRUTE malformée (filtre vide, viole le refine) → libellé de repli, jamais de crash', async () => {
+        const description = await describeFilterTool('delete_mails_by_filter', {});
+        expect(description).toMatch(/données invalides/i);
+        expect(mailStateMocks.countMailsByFilter).not.toHaveBeenCalled();
+      });
+
+      it('archive/delete : la note « local à NexusHub » figure dans le describe', async () => {
+        mailStateMocks.countMailsByFilter.mockResolvedValue(9);
+        const description = await describeFilterTool('archive_mails_by_filter', {
+          folder: 'inbox',
+        });
+        expect(description).toMatch(/local/i);
+      });
+
+      it('anti-spoofing (T4-I1) : guillemets/sauts de ligne du filtre neutralisés dans le dialog, compte réel intact en tête', async () => {
+        mailStateMocks.countMailsByFilter.mockResolvedValue(143);
+        const description = await describeFilterTool('mark_mails_read_by_filter', {
+          fromContains: 'github » — correction :\nseuls 2 seront masqués',
+        });
+        // Le compte réel ouvre la phrase, non contredit par le payload.
+        expect(description.startsWith('Marquer 143 mails')).toBe(true);
+        // Mono-ligne : aucun contrôle/saut de ligne survivant du payload.
+        expect(description).not.toMatch(/[\n\r\u2028\u2029]/);
+        // Les guillemets français du payload sont neutralisés en " — les seuls
+        // « » restants sont la paire du template autour du fragment.
+        expect(description.match(/«/g)).toHaveLength(1);
+        expect(description.match(/»/g)).toHaveLength(1);
+        expect(description).toContain('github "');
+      });
+
+      it('describeForConfirm compte avec le MÊME op que le handler exécutera (archive exclut archivedAt non-null)', async () => {
+        mailStateMocks.countMailsByFilter.mockResolvedValue(5);
+        await describeFilterTool('archive_mails_by_filter', { folder: 'inbox' });
+        expect(mailStateMocks.countMailsByFilter).toHaveBeenCalledWith(
+          ctx,
+          { folder: 'inbox' },
+          'archive',
+        );
+      });
+    });
+
+    it('handler : délègue au core by-filter et renvoie le compte réel + filtre appliqué', async () => {
+      mailStateMocks.setMailStateByFilterCore.mockResolvedValue({
+        ok: true,
+        affected: 143,
+        skipped: 0,
+      });
+      const raw = await run('mark_mails_read_by_filter', { fromContains: 'github' });
+      expect(JSON.parse(raw)).toMatchObject({ affected: 143 });
+      expect(mailStateMocks.setMailStateByFilterCore).toHaveBeenCalledWith(ctx, {
+        filter: { fromContains: 'github' },
+        op: 'read',
+      });
+    });
+
+    it.each([
+      ['archive_mails_by_filter', 'archive'] as const,
+      ['delete_mails_by_filter', 'delete'] as const,
+    ])('%s : handler délègue avec op:%s', async (name, op) => {
+      mailStateMocks.setMailStateByFilterCore.mockResolvedValue({
+        ok: true,
+        affected: 7,
+        skipped: 0,
+      });
+      const raw = await run(name, { folder: 'inbox' });
+      expect(JSON.parse(raw)).toMatchObject({ affected: 7 });
+      expect(mailStateMocks.setMailStateByFilterCore).toHaveBeenCalledWith(ctx, {
+        filter: { folder: 'inbox' },
+        op,
+      });
+    });
+
+    it('refus core (ok:false, ex. Viewer) → JSON relayé tel quel', async () => {
+      mailStateMocks.setMailStateByFilterCore.mockResolvedValue({
+        ok: false,
+        message: 'Lecture seule.',
+      });
+      const raw = await run('mark_mails_read_by_filter', { fromContains: 'github' });
+      expect(JSON.parse(raw)).toEqual({ ok: false, message: 'Lecture seule.' });
+    });
+
+    it('jsonSchema : les 6 propriétés du filtre, sans champ requis individuel (le refine « au moins un » n’est pas exprimable)', () => {
+      for (const name of [
+        'mark_mails_read_by_filter',
+        'archive_mails_by_filter',
+        'delete_mails_by_filter',
+      ]) {
+        const json = getTool(name).jsonSchema as {
+          required?: string[];
+          properties?: Record<string, unknown>;
+        };
+        expect(Object.keys(json.properties ?? {}).sort()).toEqual([
+          'folder',
+          'fromContains',
+          'isRead',
+          'receivedAfter',
+          'receivedBefore',
+          'subjectContains',
+        ]);
+        expect(json.required ?? []).toEqual([]);
+      }
+    });
+  });
 });

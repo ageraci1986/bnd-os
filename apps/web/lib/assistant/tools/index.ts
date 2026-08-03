@@ -7,6 +7,7 @@ import { buildKanbanTools } from './kanban-tools';
 import { buildClientTools } from './client-tools';
 import { buildMailTools } from './mail-tools';
 import { buildMemoryTools } from './memory-tools';
+import { buildNotificationTools } from './notification-tools';
 import { buildTeamTools } from './team-tools';
 import { buildTemplateTools } from './template-tools';
 
@@ -36,6 +37,9 @@ export async function buildRegistry(ctx: AuthContext): Promise<ToolRegistry> {
     registry.register(tool);
   }
   for (const tool of buildMemoryTools(ctx)) {
+    registry.register(tool);
+  }
+  for (const tool of buildNotificationTools(ctx)) {
     registry.register(tool);
   }
   for (const tool of buildTemplateTools(ctx)) {

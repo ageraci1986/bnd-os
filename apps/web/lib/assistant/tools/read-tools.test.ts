@@ -6,12 +6,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // features/communications/actions/*.test.ts).
 const prismaMock = vi.hoisted(() => ({
   card: { count: vi.fn(), findMany: vi.fn(), findFirst: vi.fn() },
-  project: { findMany: vi.fn(), findFirst: vi.fn() },
+  project: { count: vi.fn(), findMany: vi.fn(), findFirst: vi.fn() },
   emailMessage: { count: vi.fn(), findMany: vi.fn(), findFirst: vi.fn() },
   notification: { count: vi.fn() },
   client: { findMany: vi.fn() },
   column: { findMany: vi.fn() },
-  membership: { findMany: vi.fn() },
+  membership: { count: vi.fn(), findMany: vi.fn() },
   $queryRaw: vi.fn(),
   $queryRawUnsafe: vi.fn(),
 }));
@@ -132,14 +132,37 @@ describe('buildReadTools', () => {
     spy.mockRestore();
   });
 
-  it('list_projects renvoie les projets scoped', async () => {
+  it('list_projects renvoie les projets scoped dans une enveloppe { total, projects }', async () => {
+    prismaMock.project.count.mockResolvedValue(1);
     prismaMock.project.findMany.mockResolvedValue([
       { id: 'p1', name: 'Site', client: { name: 'Acme' }, _count: { cards: 4 } },
     ]);
     const out = JSON.parse(await execute('list_projects', {}));
-    expect(out[0]).toEqual({ id: 'p1', name: 'Site', client: 'Acme', cards: 4 });
+    expect(out.total).toBe(1);
+    expect(out.truncated).toBe(false);
+    expect(out.projects[0]).toEqual({ id: 'p1', name: 'Site', client: 'Acme', cards: 4 });
     expect(prismaMock.project.findMany.mock.calls[0]?.[0]?.where?.workspaceId).toBe('w1');
     expect(scopeMocks.scopedProjectWhere).toHaveBeenCalled();
+    // count() porte le MÊME where que findMany (même scope, même workspace).
+    expect(prismaMock.project.count.mock.calls[0]?.[0]?.where).toEqual(
+      prismaMock.project.findMany.mock.calls[0]?.[0]?.where,
+    );
+  });
+
+  it('list_projects : enveloppe { total, projects }, truncated quand le plafond de 50 est atteint', async () => {
+    prismaMock.project.count.mockResolvedValue(63);
+    prismaMock.project.findMany.mockResolvedValue(
+      Array.from({ length: 50 }, (_, i) => ({
+        id: `p${i}`,
+        name: `Projet ${i}`,
+        client: { name: 'Acme' },
+        _count: { cards: 0 },
+      })),
+    );
+    const out = JSON.parse(await execute('list_projects', {}));
+    expect(out.total).toBe(63);
+    expect(out.truncated).toBe(true);
+    expect(out.projects).toHaveLength(50);
   });
 
   it('cherche via unaccent et ne renvoie que les projets du workspace visibles par le scope', async () => {
@@ -154,7 +177,10 @@ describe('buildReadTools', () => {
       },
     ]);
     const out = JSON.parse(await execute('find_projects', { query: 'liste de courses' }));
-    expect(out).toEqual([{ id: PROJECT_ID, name: 'Liste de course', client: 'Perso', cards: 3 }]);
+    expect(out.projects).toEqual([
+      { id: PROJECT_ID, name: 'Liste de course', client: 'Perso', cards: 3 },
+    ]);
+    expect(out.truncated).toBeUndefined();
     const call = prismaMock.project.findMany.mock.calls[0]?.[0];
     expect(call?.where?.workspaceId).toBe('w1');
     expect(call?.where?.deletedAt).toBeNull();
@@ -176,11 +202,27 @@ describe('buildReadTools', () => {
     expect(where?.AND).toEqual([{ id: { in: [PROJECT_ID] } }, { id: { in: ['scope-p1'] } }]);
   });
 
-  it('find_projects : zéro candidat → tableau vide sans requête findMany', async () => {
+  it('find_projects : zéro candidat → liste vide sans requête findMany', async () => {
     prismaMock.$queryRaw.mockResolvedValue([]);
     const out = JSON.parse(await execute('find_projects', { query: 'introuvable' }));
-    expect(out).toEqual([]);
+    expect(out).toEqual({ projects: [] });
     expect(prismaMock.project.findMany).not.toHaveBeenCalled();
+  });
+
+  it('find_projects : truncated=true quand le plafond de 10 candidats est atteint', async () => {
+    const ids = Array.from({ length: 10 }, (_, i) => ({ id: `p${i}` }));
+    prismaMock.$queryRaw.mockResolvedValue(ids);
+    prismaMock.project.findMany.mockResolvedValue(
+      ids.map((c) => ({
+        id: c.id,
+        name: 'Projet',
+        client: { name: 'Acme' },
+        _count: { cards: 0 },
+      })),
+    );
+    const out = JSON.parse(await execute('find_projects', { query: 'projet' }));
+    expect(out.projects).toHaveLength(10);
+    expect(out.truncated).toBe(true);
   });
 
   it('find_projects : la requête SQL est un tagged template paramétré ($queryRaw, pas $queryRawUnsafe)', async () => {
@@ -225,7 +267,7 @@ describe('buildReadTools', () => {
     expect(where?.deletedAt).toBeNull();
   });
 
-  it('get_project_board borne les cartes à 100 par colonne et signale la troncature', async () => {
+  it('get_project_board borne les cartes à 100 par colonne, expose totalCards et signale la troncature', async () => {
     const fullColumn = Array.from({ length: 100 }, (_, i) => ({
       id: `c${i}`,
       title: `Carte ${i}`,
@@ -235,19 +277,62 @@ describe('buildReadTools', () => {
       id: 'p1',
       name: 'Site',
       columns: [
-        { id: 'col1', name: 'À faire', isBlockedSystem: false, cards: fullColumn },
-        { id: 'col2', name: 'Bloqué', isBlockedSystem: true, cards: [] },
+        {
+          id: 'col1',
+          name: 'À faire',
+          isBlockedSystem: false,
+          cards: fullColumn,
+          _count: { cards: 140 },
+        },
+        { id: 'col2', name: 'Bloqué', isBlockedSystem: true, cards: [], _count: { cards: 0 } },
       ],
     });
     const out = JSON.parse(
       await execute('get_project_board', { projectId: '4c9d3f0a-2222-4444-8888-aaaaaaaaaaaa' }),
     );
+    expect(out.columns[0].totalCards).toBe(140);
     expect(out.columns[0].truncated).toBe(true);
     expect(out.columns[0].cards).toHaveLength(100);
+    expect(out.columns[1].totalCards).toBe(0);
     expect(out.columns[1].truncated).toBeUndefined();
-    const cardsSelect =
-      prismaMock.project.findFirst.mock.calls[0]?.[0]?.select?.columns?.select?.cards;
-    expect(cardsSelect?.take).toBe(100);
+    const columnSelect = prismaMock.project.findFirst.mock.calls[0]?.[0]?.select?.columns?.select;
+    expect(columnSelect?.cards?.take).toBe(100);
+    // Filtre du _count aligné sur celui des cartes réellement récupérées
+    // (deletedAt/archivedAt) — sinon totalCards compterait des cartes
+    // supprimées/archivées jamais visibles dans `cards`.
+    expect(columnSelect?._count?.select?.cards?.where).toEqual({
+      deletedAt: null,
+      archivedAt: null,
+    });
+  });
+
+  it("get_project_board ne signale pas de troncature quand le total réel n'excède pas 100 malgré 100 cartes récupérées", async () => {
+    // Régression : `cards.length === 100` seul ne suffit plus — il faut aussi
+    // `totalCards > 100`. Un projet avec exactement 100 cartes ne doit pas
+    // afficher « liste partielle » à tort.
+    const fullColumn = Array.from({ length: 100 }, (_, i) => ({
+      id: `c${i}`,
+      title: `Carte ${i}`,
+      dueDate: null,
+    }));
+    prismaMock.project.findFirst.mockResolvedValue({
+      id: 'p1',
+      name: 'Site',
+      columns: [
+        {
+          id: 'col1',
+          name: 'À faire',
+          isBlockedSystem: false,
+          cards: fullColumn,
+          _count: { cards: 100 },
+        },
+      ],
+    });
+    const out = JSON.parse(
+      await execute('get_project_board', { projectId: '4c9d3f0a-2222-4444-8888-aaaaaaaaaaaa' }),
+    );
+    expect(out.columns[0].totalCards).toBe(100);
+    expect(out.columns[0].truncated).toBeUndefined();
   });
 
   it('list_clients renvoie les clients scoped du workspace', async () => {
@@ -261,6 +346,7 @@ describe('buildReadTools', () => {
   });
 
   it('search_mails filtre par texte sur sujet/expéditeur', async () => {
+    prismaMock.emailMessage.count.mockResolvedValue(1);
     prismaMock.emailMessage.findMany.mockResolvedValue([
       {
         id: 'm1',
@@ -274,13 +360,30 @@ describe('buildReadTools', () => {
       },
     ]);
     const out = JSON.parse(await execute('search_mails', { query: 'devis' }));
-    expect(out[0].subject).toBe('Devis');
+    expect(out.mails[0].subject).toBe('Devis');
+    expect(out.total).toBe(1);
+    expect(out.offset).toBe(0);
     const where = prismaMock.emailMessage.findMany.mock.calls[0]?.[0]?.where;
     expect(where.workspaceId).toBe('w1');
     expect(where.deletedAt).toBeNull();
   });
 
+  it('search_mails : renvoie { total, offset, mails } et transmet skip', async () => {
+    prismaMock.emailMessage.count.mockResolvedValue(88);
+    prismaMock.emailMessage.findMany.mockResolvedValue([]);
+    const out = JSON.parse(await execute('search_mails', { offset: 25, limit: 25 }));
+    expect(out.total).toBe(88);
+    expect(out.offset).toBe(25);
+    expect(Array.isArray(out.mails)).toBe(true);
+    expect(prismaMock.emailMessage.findMany.mock.calls[0]?.[0]?.skip).toBe(25);
+    // le count porte le MÊME where que le findMany
+    expect(prismaMock.emailMessage.count.mock.calls[0]?.[0]?.where).toEqual(
+      prismaMock.emailMessage.findMany.mock.calls[0]?.[0]?.where,
+    );
+  });
+
   it('search_mails exclut les mails archivés (archivedAt: null)', async () => {
+    prismaMock.emailMessage.count.mockResolvedValue(0);
     prismaMock.emailMessage.findMany.mockResolvedValue([]);
     await execute('search_mails', { query: 'devis' });
     const where = prismaMock.emailMessage.findMany.mock.calls[0]?.[0]?.where;
@@ -288,6 +391,7 @@ describe('buildReadTools', () => {
   });
 
   it('search_mails select `integrationId` (nécessaire au deep-link du widget mail)', async () => {
+    prismaMock.emailMessage.count.mockResolvedValue(0);
     prismaMock.emailMessage.findMany.mockResolvedValue([]);
     await execute('search_mails', { query: 'devis' });
     const select = prismaMock.emailMessage.findMany.mock.calls[0]?.[0]?.select;
@@ -304,6 +408,7 @@ describe('buildReadTools', () => {
   });
 
   it('search_mails renvoie `integrationId` dans le JSON de sortie de chaque mail', async () => {
+    prismaMock.emailMessage.count.mockResolvedValue(1);
     prismaMock.emailMessage.findMany.mockResolvedValue([
       {
         id: 'm1',
@@ -317,7 +422,7 @@ describe('buildReadTools', () => {
       },
     ]);
     const out = JSON.parse(await execute('search_mails', { query: 'devis' }));
-    expect(out).toEqual([
+    expect(out.mails).toEqual([
       {
         id: 'm1',
         subject: 'Devis',
@@ -444,7 +549,8 @@ describe('buildReadTools', () => {
     expect(out.body.length).toBe(5000 + ' […corps tronqué]'.length);
   });
 
-  it('get_team_members renvoie userId/email/name/role, scoped au workspace', async () => {
+  it('get_team_members renvoie userId/email/name/role + total, scoped au workspace', async () => {
+    prismaMock.membership.count.mockResolvedValue(2);
     prismaMock.membership.findMany.mockResolvedValue([
       {
         role: 'admin',
@@ -453,6 +559,7 @@ describe('buildReadTools', () => {
       { role: 'user', user: { id: 'u2', email: 'b@acme.com', firstName: null, lastName: null } },
     ]);
     const out = JSON.parse(await execute('get_team_members', {}));
+    expect(out.total).toBe(2);
     expect(out.members).toEqual([
       { userId: 'u1', email: 'a@acme.com', name: 'Ada Lovelace', role: 'admin' },
       { userId: 'u2', email: 'b@acme.com', name: null, role: 'user' },
@@ -462,9 +569,14 @@ describe('buildReadTools', () => {
     expect(prismaMock.membership.findMany.mock.calls[0]?.[0]?.orderBy).toEqual({
       user: { email: 'asc' },
     });
+    // count() porte le MÊME where que findMany.
+    expect(prismaMock.membership.count.mock.calls[0]?.[0]?.where).toEqual(
+      prismaMock.membership.findMany.mock.calls[0]?.[0]?.where,
+    );
   });
 
-  it('get_team_members signale la troncature quand la limite de 50 est atteinte', async () => {
+  it('get_team_members signale la troncature quand la limite de 50 est atteinte, total au-delà', async () => {
+    prismaMock.membership.count.mockResolvedValue(51);
     prismaMock.membership.findMany.mockResolvedValue(
       Array.from({ length: 50 }, (_, i) => ({
         role: 'user',
@@ -472,9 +584,27 @@ describe('buildReadTools', () => {
       })),
     );
     const out = JSON.parse(await execute('get_team_members', {}));
+    expect(out.total).toBe(51);
     expect(out.members).toHaveLength(50);
     expect(out.truncated).toBe(true);
     expect(prismaMock.membership.findMany.mock.calls[0]?.[0]?.take).toBe(50);
+  });
+
+  it("get_team_members ne signale pas de troncature quand le workspace compte EXACTEMENT 50 membres (le total réel n'excède pas le plafond)", async () => {
+    // Régression : `members.length === 50` seul ne suffit pas — il faut aussi
+    // `total > 50`, sinon un workspace de pile 50 membres serait annoncé
+    // « liste partielle » à tort (même borne que get_project_board).
+    prismaMock.membership.count.mockResolvedValue(50);
+    prismaMock.membership.findMany.mockResolvedValue(
+      Array.from({ length: 50 }, (_, i) => ({
+        role: 'user',
+        user: { id: `u${i}`, email: `m${i}@acme.com`, firstName: null, lastName: null },
+      })),
+    );
+    const out = JSON.parse(await execute('get_team_members', {}));
+    expect(out.total).toBe(50);
+    expect(out.members).toHaveLength(50);
+    expect(out.truncated).toBeUndefined();
   });
 
   it('get_card renvoie le détail scoped, ou une erreur si carte introuvable', async () => {
@@ -487,7 +617,7 @@ describe('buildReadTools', () => {
     expect(scopeMocks.scopedCardWhere).toHaveBeenCalled();
   });
 
-  it('get_card renvoie titre, colonne, projet, assignés et checklist', async () => {
+  it('get_card renvoie titre, colonne, projet, assignés, checklist et totalItems (sans fuite de _count)', async () => {
     prismaMock.card.findFirst.mockResolvedValue({
       id: 'c1',
       title: 'Créer le devis',
@@ -498,12 +628,18 @@ describe('buildReadTools', () => {
       project: { id: 'p1', name: 'Site' },
       assignees: [{ userId: 'u1', raci: 'responsible' }],
       checklistItems: [{ title: 'Étape 1', isChecked: false }],
+      _count: { checklistItems: 1 },
     });
     const out = JSON.parse(await execute('get_card', { cardId: 'c1' }));
     expect(out.title).toBe('Créer le devis');
     expect(out.assignees).toEqual([{ userId: 'u1', raci: 'responsible' }]);
     expect(out.checklistItems).toEqual([{ title: 'Étape 1', isChecked: false }]);
+    expect(out.totalItems).toBe(1);
     expect(out.checklistTruncated).toBeUndefined();
+    // Le champ brut `_count` de Prisma ne doit jamais fuiter tel quel.
+    expect(out._count).toBeUndefined();
+    const select = prismaMock.card.findFirst.mock.calls[0]?.[0]?.select;
+    expect(select?._count?.select?.checklistItems).toBe(true);
   });
 
   it('get_card tronque la description à 5000 caractères', async () => {
@@ -517,13 +653,14 @@ describe('buildReadTools', () => {
       project: { id: 'p1', name: 'Site' },
       assignees: [],
       checklistItems: [],
+      _count: { checklistItems: 0 },
     });
     const out = JSON.parse(await execute('get_card', { cardId: 'c1' }));
     expect(out.description.endsWith(' […tronqué]')).toBe(true);
     expect(out.description.length).toBe(5000 + ' […tronqué]'.length);
   });
 
-  it('get_card signale la troncature de checklist quand la limite de 50 est atteinte', async () => {
+  it('get_card signale la troncature de checklist quand la limite de 50 est atteinte, totalItems porte le vrai total', async () => {
     prismaMock.card.findFirst.mockResolvedValue({
       id: 'c1',
       title: 'Grosse checklist',
@@ -537,11 +674,50 @@ describe('buildReadTools', () => {
         title: `Item ${i}`,
         isChecked: false,
       })),
+      _count: { checklistItems: 73 },
     });
     const out = JSON.parse(await execute('get_card', { cardId: 'c1' }));
     expect(out.checklistTruncated).toBe(true);
+    expect(out.totalItems).toBe(73);
     const select = prismaMock.card.findFirst.mock.calls[0]?.[0]?.select;
     expect(select?.checklistItems?.take).toBe(50);
+  });
+
+  it('get_card : checklist de PILE 50 items → pas de troncature ; 51 → troncature (borne sur le total réel)', async () => {
+    // Régression : `checklistItems.length === 50` seul ne suffit pas — il faut
+    // que le total réel (_count) excède le plafond, sinon une carte de pile
+    // 50 items serait annoncée tronquée à tort.
+    const fullChecklist = Array.from({ length: 50 }, (_, i) => ({
+      title: `Item ${i}`,
+      isChecked: false,
+    }));
+    const cardBase = {
+      id: 'c1',
+      title: 'Checklist pleine',
+      description: null,
+      dueDate: null,
+      shortRef: 1,
+      column: { id: 'col1', name: 'À faire', isBlockedSystem: false },
+      project: { id: 'p1', name: 'Site' },
+      assignees: [],
+      checklistItems: fullChecklist,
+    };
+
+    prismaMock.card.findFirst.mockResolvedValueOnce({
+      ...cardBase,
+      _count: { checklistItems: 50 },
+    });
+    const exactAtCap = JSON.parse(await execute('get_card', { cardId: 'c1' }));
+    expect(exactAtCap.totalItems).toBe(50);
+    expect(exactAtCap.checklistTruncated).toBeUndefined();
+
+    prismaMock.card.findFirst.mockResolvedValueOnce({
+      ...cardBase,
+      _count: { checklistItems: 51 },
+    });
+    const oneAboveCap = JSON.parse(await execute('get_card', { cardId: 'c1' }));
+    expect(oneAboveCap.totalItems).toBe(51);
+    expect(oneAboveCap.checklistTruncated).toBe(true);
   });
 
   it('get_card_details renvoie le JSON complet (échéance, colonne, assignés, checklist ordonnée avec ids)', async () => {

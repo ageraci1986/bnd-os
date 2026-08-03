@@ -16,6 +16,10 @@ import {
   setMailStateCore,
   MAIL_BULK_MAX,
   type MailStateOp,
+  MailFilterSchema,
+  type MailFilter,
+  countMailsByFilter,
+  setMailStateByFilterCore,
 } from '@/features/communications/lib/mail-state-core';
 import { safeDb, safeMutation } from './safe-wrappers';
 
@@ -205,6 +209,112 @@ const MAIL_LOCAL_NOTE =
 
 function pluralS(n: number): string {
   return n > 1 ? 's' : '';
+}
+
+/**
+ * jsonSchema des tools `*_by_filter` — décrit les 6 propriétés de
+ * `MailFilterSchema` (mail-state-core.ts). Pas de `required` : le refine
+ * « au moins un critère » n'est pas exprimable en propriétés individuelles
+ * requises côté JSON Schema (voir le test de parité required/properties).
+ */
+const MAIL_FILTER_JSON = {
+  type: 'object',
+  description: 'Filtre serveur mail — au moins UN critère requis (jamais de « tout » implicite).',
+  properties: {
+    fromContains: {
+      type: 'string',
+      minLength: 3,
+      maxLength: 120,
+      description: "Sous-chaîne recherchée dans l'expéditeur (nom ou email), insensible à la casse",
+    },
+    subjectContains: {
+      type: 'string',
+      minLength: 3,
+      maxLength: 120,
+      description: 'Sous-chaîne recherchée dans le sujet, insensible à la casse',
+    },
+    folder: {
+      type: 'string',
+      enum: ['inbox', 'sent'],
+      description: 'Dossier mail — valeurs exactes en minuscules',
+    },
+    isRead: {
+      type: 'boolean',
+      description: 'true = déjà lus uniquement, false = non lus uniquement',
+    },
+    receivedBefore: {
+      type: 'string',
+      format: 'date-time',
+      description: 'Reçus avant cette date ISO 8601 (borne exclue)',
+    },
+    receivedAfter: {
+      type: 'string',
+      format: 'date-time',
+      description: 'Reçus après cette date ISO 8601 (borne incluse)',
+    },
+  },
+} as const;
+
+/**
+ * Fragment sûr pour le dialog de confirmation (revue sécurité T4-I1) : les
+ * chaînes du filtre viennent du MODÈLE et sont interpolées dans un texte
+ * affiché ET lu (TTS) — sans neutralisation, un `fromContains` contenant des
+ * sauts de ligne ou des guillemets français pourrait mimer la voix du dialog
+ * et contredire visuellement le compte réel annoncé. Contrôle/format/
+ * séparateurs de ligne aplatis en espace, guillemets « » remplacés par ".
+ * Affichage uniquement — le `where` (count + updateMany) reçoit la valeur
+ * brute validée : la parité compte annoncé / lignes affectées est intacte.
+ */
+function confirmSafe(text: string): string {
+  return text.replace(/[\p{Cc}\p{Cf}\u2028\u2029]/gu, ' ').replace(/[«»]/g, '"');
+}
+
+/** Reformulation courte du filtre pour les dialogs/résultats — jamais de contenu de mail. */
+function describeFilter(filter: MailFilter): string {
+  const parts: string[] = [];
+  if (filter.fromContains !== undefined) parts.push(`de « ${confirmSafe(filter.fromContains)} »`);
+  if (filter.subjectContains !== undefined)
+    parts.push(`sujet « ${confirmSafe(filter.subjectContains)} »`);
+  // `folder` est un enum strict ('inbox' | 'sent', mail-state-core.ts) — pas
+  // de texte libre à neutraliser.
+  if (filter.folder !== undefined) parts.push(`dossier ${filter.folder}`);
+  if (filter.isRead === false) parts.push('non lus');
+  if (filter.isRead === true) parts.push('déjà lus');
+  if (filter.receivedAfter !== undefined)
+    parts.push(`reçus après le ${filter.receivedAfter.slice(0, 10)}`);
+  if (filter.receivedBefore !== undefined)
+    parts.push(`reçus avant le ${filter.receivedBefore.slice(0, 10)}`);
+  return parts.join(', ');
+}
+
+/**
+ * Fabrique `describeForConfirm` des tools by-filter : re-parse BRUT (le gate
+ * précède la validation du registry — même pattern anti-injection que
+ * `buildMailBulkDescribeForConfirm` ci-dessus), puis compte en DB avec
+ * EXACTEMENT le même `where` que l'exécution — `countMailsByFilter` partage
+ * `buildMailFilterWhere` avec `setMailStateByFilterCore` (mail-state-core.ts),
+ * y compris le même `op` (invariant central : le nombre annoncé ici DOIT être
+ * celui réellement affecté par le handler).
+ *
+ * TOCTOU assumé (spec §2) : le compte est celui du moment de la confirmation ;
+ * l'exécution re-filtre avec le même where — le prédicat ne s'élargit jamais,
+ * seul le nombre de lignes peut varier entre le dialog et le Allow.
+ */
+function buildByFilterDescribe(
+  ctx: AuthContext,
+  op: MailStateOp,
+  fallback: string,
+  phrase: (count: number, filterLabel: string) => string,
+): (input: unknown) => Promise<string> {
+  return async (input: unknown): Promise<string> => {
+    const parsed = MailFilterSchema.safeParse(input);
+    if (!parsed.success) return fallback;
+    const count = await countMailsByFilter(ctx, parsed.data, op);
+    if (count === 0) {
+      return `Aucun mail ne correspond (${describeFilter(parsed.data)}) — rien ne sera fait.`;
+    }
+    return phrase(count, describeFilter(parsed.data));
+  };
 }
 
 /**
@@ -804,6 +914,69 @@ export function buildMailTools(ctx: AuthContext): ToolSpec[] {
         describeDeleteConfirm,
       ),
       handler: buildMailStateHandler(ctx, 'delete_mail', 'delete'),
+    }),
+
+    defineTool({
+      name: 'mark_mails_read_by_filter',
+      description:
+        'Marque comme lus TOUS les mails de vos boîtes correspondant à un filtre serveur (expéditeur, sujet, dossier, lu/non-lu, période) — sans plafond, pour « marque tous les mails de X comme lus ». Au moins un critère requis. Action de masse : confirmation utilisateur requise (le nombre exact est annoncé).',
+      inputSchema: MailFilterSchema,
+      jsonSchema: MAIL_FILTER_JSON,
+      gated: true,
+      describeForConfirm: buildByFilterDescribe(
+        ctx,
+        'read',
+        'Marquer des mails comme lus ? (données invalides)',
+        (count, label) => `Marquer ${count} mail${pluralS(count)} (${label}) comme lus ?`,
+      ),
+      handler: async (input) =>
+        safeMutation('mark_mails_read_by_filter', async () => {
+          const result = await setMailStateByFilterCore(ctx, { filter: input, op: 'read' });
+          if (!result.ok) return JSON.stringify(result);
+          return JSON.stringify({ affected: result.affected, filter: describeFilter(input) });
+        }),
+    }),
+
+    defineTool({
+      name: 'archive_mails_by_filter',
+      description: `Archive TOUS les mails de vos boîtes correspondant à un filtre serveur (expéditeur, sujet, dossier, lu/non-lu, période) — sans plafond, pour « archive tous les mails de X ». Action LOCALE à NexusHub : ${MAIL_LOCAL_NOTE}. Au moins un critère requis. Action de masse : confirmation utilisateur requise (le nombre exact est annoncé).`,
+      inputSchema: MailFilterSchema,
+      jsonSchema: MAIL_FILTER_JSON,
+      gated: true,
+      describeForConfirm: buildByFilterDescribe(
+        ctx,
+        'archive',
+        'Archiver des mails ? (données invalides)',
+        (count, label) =>
+          `Archiver ${count} mail${pluralS(count)} (${label}) ? (archivage local — ${MAIL_LOCAL_NOTE})`,
+      ),
+      handler: async (input) =>
+        safeMutation('archive_mails_by_filter', async () => {
+          const result = await setMailStateByFilterCore(ctx, { filter: input, op: 'archive' });
+          if (!result.ok) return JSON.stringify(result);
+          return JSON.stringify({ affected: result.affected, filter: describeFilter(input) });
+        }),
+    }),
+
+    defineTool({
+      name: 'delete_mails_by_filter',
+      description: `Masque (supprime localement) TOUS les mails de vos boîtes correspondant à un filtre serveur (expéditeur, sujet, dossier, lu/non-lu, période) — sans plafond, pour « supprime tous les mails de X ». Action LOCALE à NexusHub : ${MAIL_LOCAL_NOTE}. Au moins un critère requis. Action de masse : confirmation utilisateur requise (le nombre exact est annoncé).`,
+      inputSchema: MailFilterSchema,
+      jsonSchema: MAIL_FILTER_JSON,
+      gated: true,
+      describeForConfirm: buildByFilterDescribe(
+        ctx,
+        'delete',
+        'Masquer des mails ? (données invalides)',
+        (count, label) =>
+          `Masquer ${count} mail${pluralS(count)} (${label}) dans NexusHub (suppression locale : ${MAIL_LOCAL_NOTE}) ?`,
+      ),
+      handler: async (input) =>
+        safeMutation('delete_mails_by_filter', async () => {
+          const result = await setMailStateByFilterCore(ctx, { filter: input, op: 'delete' });
+          if (!result.ok) return JSON.stringify(result);
+          return JSON.stringify({ affected: result.affected, filter: describeFilter(input) });
+        }),
     }),
   ];
 }

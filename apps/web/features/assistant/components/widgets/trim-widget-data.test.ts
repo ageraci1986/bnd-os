@@ -34,6 +34,19 @@ describe('trimWidgetData', () => {
     expect(trimmed.name).toBe('Refonte');
   });
 
+  it('préserve le vrai totalCards du tool (Task 6, via _count) plutôt que de le dériver de cards.length', () => {
+    // Régression : le tool peut désormais renvoyer un total réel supérieur au
+    // plafond de 100 cartes fetchées (ex. 140 cartes en base, 100 renvoyées).
+    // Avant ce correctif, le trim écrasait ce total avec `cards.length`
+    // (=100), perdant l'information.
+    const board = boardWithCards(100);
+    (board.columns[0] as { totalCards?: number }).totalCards = 140;
+    const trimmed = trimWidgetData('get_project_board', board) as {
+      columns: { totalCards?: number }[];
+    };
+    expect(trimmed.columns[0]?.totalCards).toBe(140);
+  });
+
   it('laisse intacte une colonne déjà sous la limite (même référence)', () => {
     const board = boardWithCards(3);
     const trimmed = trimWidgetData('get_project_board', board) as {

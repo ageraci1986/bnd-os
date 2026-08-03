@@ -151,6 +151,63 @@ describe('<MailListWidget /> — rendu de base', () => {
   });
 });
 
+describe('<MailListWidget /> — enveloppe { mails, total, offset }', () => {
+  it('rend la même liste que le tableau nu quand les données arrivent en enveloppe', () => {
+    render(
+      <MailListWidget
+        data={{
+          mails: [mailRow({ id: 'mail-1', subject: 'Point client', fromEmail: 'alice@acme.test' })],
+          total: 1,
+          offset: 0,
+        }}
+      />,
+    );
+    expect(screen.getByText('Alice')).toBeInTheDocument();
+    expect(screen.getByText('Point client')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Ouvrir dans Communications' })).toHaveAttribute(
+      'href',
+      '/communications?mail=mail-1',
+    );
+  });
+
+  it('affiche le pied « N affichés sur total » quand total > mails affichés', () => {
+    const mails = Array.from({ length: 5 }, (_, i) => mailRow({ id: `m${i}`, isRead: true }));
+    render(<MailListWidget data={{ mails, total: 42 }} />);
+    expect(screen.getByText('5 affichés sur 42')).toBeInTheDocument();
+  });
+
+  it('le pied compte les mails réellement affichés (cap 10), pas le total brut renvoyé', () => {
+    const mails = Array.from({ length: 15 }, (_, i) => mailRow({ id: `m${i}`, isRead: true }));
+    render(<MailListWidget data={{ mails, total: 88 }} />);
+    expect(screen.getByText('10 affichés sur 88')).toBeInTheDocument();
+  });
+
+  it('pas de pied quand total === mails affichés', () => {
+    render(<MailListWidget data={{ mails: [mailRow({ id: 'm1' })], total: 1 }} />);
+    expect(screen.queryByText(/affichés sur/)).not.toBeInTheDocument();
+  });
+
+  it("pas de pied quand l'enveloppe ne porte pas de total", () => {
+    render(<MailListWidget data={{ mails: [mailRow({ id: 'm1' })] }} />);
+    expect(screen.queryByText(/affichés sur/)).not.toBeInTheDocument();
+  });
+
+  it('pas de pied avec le tableau nu legacy (pas de total possible)', () => {
+    render(<MailListWidget data={[mailRow({ id: 'm1' })]} />);
+    expect(screen.queryByText(/affichés sur/)).not.toBeInTheDocument();
+  });
+
+  it('enveloppe malformée → aucun rendu, même warn que le tableau nu invalide', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const { container } = render(<MailListWidget data={{ mails: 'nope' }} />);
+    expect(container.firstChild).toBeNull();
+    expect(warn).toHaveBeenCalledWith('[assistant] widget data invalide', {
+      tool: 'search_mails',
+    });
+    warn.mockRestore();
+  });
+});
+
 describe('<MailListWidget /> — deep-link Communications', () => {
   it('href pinned WITH integrationId', () => {
     render(<MailListWidget data={[mailRow({ id: 'mail-9', integrationId: 'int-7' })]} />);

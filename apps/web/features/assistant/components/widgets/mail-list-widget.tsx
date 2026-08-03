@@ -28,7 +28,22 @@ const MailRowSchema = z.object({
   integrationId: z.string().optional(),
 });
 
-const MailListSchema = z.array(MailRowSchema);
+/**
+ * Deux formes acceptées (Task 5, pagination) :
+ * - tableau nu (legacy) : messages déjà commités dans le fil AVANT l'ajout de
+ *   l'enveloppe, ou tool antérieur — rendu identique, jamais de pied de page.
+ * - enveloppe `{ mails, total, offset }` (search_mails actuel) : `total`
+ *   permet d'afficher un pied « N affichés sur total » quand le serveur en
+ *   détient plus que ce qui est montré.
+ */
+const MailListEnvelopeSchema = z.union([
+  z.array(MailRowSchema),
+  z.object({
+    mails: z.array(MailRowSchema),
+    total: z.number().optional(),
+    offset: z.number().optional(),
+  }),
+]);
 
 type MailRow = z.infer<typeof MailRowSchema>;
 
@@ -136,7 +151,7 @@ function renderBody(state: BodyState | undefined) {
  * pinnés textuellement dans `mail-list-widget.test.tsx`.
  */
 export function MailListWidget({ data, actions }: MailListWidgetProps) {
-  const parsed = parseWidgetData('search_mails', MailListSchema, data);
+  const parsed = parseWidgetData('search_mails', MailListEnvelopeSchema, data);
 
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
   const [bodies, setBodies] = useState<Record<string, BodyState>>({});
@@ -148,8 +163,11 @@ export function MailListWidget({ data, actions }: MailListWidgetProps) {
 
   // Liste vide : rien à montrer — le texte du modèle explique déjà l'absence
   // de résultats, un cadre vide n'apporterait que du bruit.
-  if (parsed === null || parsed.length === 0) return null;
-  const mails = parsed.slice(0, MAILS_SHOWN_MAX);
+  if (parsed === null) return null;
+  const allMails = Array.isArray(parsed) ? parsed : parsed.mails;
+  const total = Array.isArray(parsed) ? undefined : parsed.total;
+  if (allMails.length === 0) return null;
+  const mails = allMails.slice(0, MAILS_SHOWN_MAX);
 
   function isRead(mail: MailRow): boolean {
     return readOverrides[mail.id] ?? mail.isRead;
@@ -368,6 +386,11 @@ export function MailListWidget({ data, actions }: MailListWidgetProps) {
           );
         })}
       </ul>
+      {total !== undefined && total > mails.length && (
+        <div className="border-t border-[color:var(--color-border-soft)] px-3.5 py-1.5 text-[10px] text-[color:var(--color-text-ghost)]">
+          {`${mails.length} affichés sur ${total}`}
+        </div>
+      )}
     </div>
   );
 }

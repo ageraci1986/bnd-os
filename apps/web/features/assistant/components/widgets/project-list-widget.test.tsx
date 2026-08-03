@@ -64,4 +64,50 @@ describe('<ProjectListWidget />', () => {
     });
     warn.mockRestore();
   });
+
+  it('renders the { total, truncated, projects } envelope (list_projects) identically to the legacy array', () => {
+    render(
+      <ProjectListWidget
+        data={{
+          total: 63,
+          truncated: true,
+          projects: [{ id: 'p1', name: 'Refonte site', client: 'Acme', cards: 12 }],
+        }}
+      />,
+    );
+    expect(screen.getByText('Refonte site')).toBeInTheDocument();
+    expect(screen.getByText(/Acme · 12 cartes/)).toBeInTheDocument();
+  });
+
+  it('shows a footer « N affichés sur total » only when total exceeds the shown projects', () => {
+    render(
+      <ProjectListWidget
+        data={{
+          total: 63,
+          projects: [{ id: 'p1', name: 'Refonte site', client: 'Acme', cards: 12 }],
+        }}
+      />,
+    );
+    expect(screen.getByText('1 affichés sur 63')).toBeInTheDocument();
+  });
+
+  it('shows no footer when total equals the shown projects, or when total is absent (find_projects)', () => {
+    render(
+      <ProjectListWidget
+        data={{
+          total: 1,
+          projects: [{ id: 'p1', name: 'Refonte site', client: 'Acme', cards: 12 }],
+        }}
+      />,
+    );
+    expect(screen.queryByText(/affichés sur/)).not.toBeInTheDocument();
+
+    render(
+      <ProjectListWidget
+        tool="find_projects"
+        data={{ projects: [{ id: 'p1', name: 'Refonte site', client: 'Acme', cards: 12 }] }}
+      />,
+    );
+    expect(screen.queryAllByText(/affichés sur/)).toHaveLength(0);
+  });
 });
