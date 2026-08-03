@@ -102,4 +102,17 @@ describe('buildSystemPrompt', () => {
     // Annoncer les troncatures (truncated: true) et proposer d'affiner.
     expect(prompt).toMatch(/tronqu/i);
   });
+
+  it('contient la consigne de travail par tranches pour une analyse volumineuse (limit=25, réponses intermédiaires)', () => {
+    const prompt = buildSystemPrompt(base);
+    expect(prompt).toMatch(/tranches?/i);
+    expect(prompt).toContain('limit=25');
+    expect(prompt).toContain('search_mails');
+  });
+
+  it('contient la consigne des actions de masse directes via *_by_filter, sans relire un par un', () => {
+    const prompt = buildSystemPrompt(base);
+    expect(prompt).toMatch(/un par un/i);
+    expect(prompt).toContain('*_by_filter');
+  });
 });

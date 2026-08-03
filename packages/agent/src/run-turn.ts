@@ -20,6 +20,10 @@ const ADMIN_ONLY_OUTPUT =
   'Refusé : cette action est réservée aux administrateurs du workspace. Ne pas réessayer.';
 const CONFIRM_UNAVAILABLE_OUTPUT = 'Confirmation indisponible — action non exécutée.';
 const TRUNCATED_OUTPUT = 'Tour interrompu (limite de tokens atteinte) — action non exécutée.';
+const DEADLINE_SUFFIX =
+  '\n\nJe me suis arrêté avant la fin (temps imparti écoulé) — dis « continue » pour poursuivre.';
+const DEADLINE_STANDALONE =
+  "Le temps imparti pour ce tour est écoulé — j'ai déjà exécuté des actions ci-dessus. Dis « continue » pour poursuivre.";
 
 /** Contexte sans humain pour répondre (jobs) : on refuse, toujours. */
 export const autoDeny: Confirmer = async () => false;
@@ -38,6 +42,15 @@ export interface RunTurnDeps {
    * appels modèle pour un client déjà parti.
    */
   readonly signal?: AbortSignal;
+  /**
+   * Budget temps du tour (epoch ms). Vérifié en tête de chaque round, AVANT
+   * l'appel provider — un round déjà en cours va toujours à son terme (pas
+   * d'abort en plein round, juste une frontière propre entre deux rounds).
+   * Absent = pas de budget (comportement historique inchangé).
+   */
+  readonly deadlineAt?: number;
+  /** Horloge injectable pour les tests. Par défaut `Date.now`. */
+  readonly now?: () => number;
 }
 
 export interface RunTurnResult {
@@ -46,6 +59,13 @@ export interface RunTurnResult {
   readonly history: readonly ChatMessage[];
   readonly inputTokens: number;
   readonly outputTokens: number;
+  /**
+   * Présent uniquement quand le tour s'est arrêté prématurément faute de temps
+   * (deadline dépassée avant de démarrer un nouveau round provider) — distinct
+   * du garde-fou `MAX_TOOL_ROUNDS` (pas de champ dédié) et du `stopReason` du
+   * provider (qui, lui, est par round). Absent = arrêt normal.
+   */
+  readonly stopReason?: 'deadline';
 }
 
 /** Décrit une action pour l'humain qui doit confirmer. */
@@ -80,6 +100,18 @@ export async function runTurn(
     // API-valide : chaque tool_use a déjà reçu son tool_result).
     if (deps.signal?.aborted === true) {
       return { text: spokenParts.join('\n'), history: messages, inputTokens, outputTokens };
+    }
+    // Budget temps du tour dépassé : on s'arrête proprement à la frontière de
+    // round plutôt que de risquer le hard kill serverless (maxDuration Vercel)
+    // en plein milieu d'un round provider ou d'exécution d'un tool.
+    const now = deps.now ?? Date.now;
+    if (deps.deadlineAt !== undefined && now() >= deps.deadlineAt) {
+      const hasText = spokenParts.length > 0;
+      const chunk = hasText ? DEADLINE_SUFFIX : DEADLINE_STANDALONE;
+      deps.onText?.(chunk);
+      const text = hasText ? `${spokenParts.join('\n')}${chunk}` : chunk;
+      messages.push({ role: 'assistant', content: text });
+      return { text, history: messages, inputTokens, outputTokens, stopReason: 'deadline' };
     }
     const result: ProviderTurnResult = await deps.provider.streamTurn({
       system: deps.system,

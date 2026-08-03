@@ -463,6 +463,81 @@ describe('runTurn', () => {
     expect('signal' in (streamTurnMock.mock.calls[0]?.[0] as object)).toBe(false);
   });
 
+  it('deadline dépassée AVANT le premier round → message standalone, stopReason deadline', async () => {
+    const provider = scriptedProvider([textResult('jamais atteint')]);
+    const onText = vi.fn();
+    const result = await runTurn(
+      [],
+      'x',
+      deps(provider, makeRegistry(), { deadlineAt: 1_000, now: () => 1_000, onText }),
+    );
+    expect(provider.streamTurn).not.toHaveBeenCalled();
+    expect(result.text).toBe(
+      "Le temps imparti pour ce tour est écoulé — j'ai déjà exécuté des actions ci-dessus. Dis « continue » pour poursuivre.",
+    );
+    expect(result.stopReason).toBe('deadline');
+    expect(onText).toHaveBeenCalledWith(result.text);
+    expect(result.history.at(-1)).toEqual({ role: 'assistant', content: result.text });
+  });
+
+  it('deadline dépassée APRÈS un round avec du texte → suffixe ajouté, emis via onText', async () => {
+    const registry = makeRegistry([{ name: 'lookup' }]);
+    const provider = scriptedProvider([
+      {
+        ...toolUseResult('lookup', {}),
+        text: 'Je regarde…',
+        content: [
+          { type: 'text', text: 'Je regarde…' },
+          { type: 'tool_use', id: 'tu_1', name: 'lookup', input: {} },
+        ],
+      },
+      textResult('jamais atteint'),
+    ]);
+    const onText = vi.fn();
+    // now() : 0 au round 1 (avant le deadline), >= deadline au round 2.
+    let call = 0;
+    const nowFn = () => {
+      call += 1;
+      return call === 1 ? 0 : 5_000;
+    };
+    const result = await runTurn(
+      [],
+      'x',
+      deps(provider, registry, { deadlineAt: 5_000, now: nowFn, onText }),
+    );
+    expect(provider.streamTurn).toHaveBeenCalledTimes(1);
+    expect(result.stopReason).toBe('deadline');
+    expect(result.text).toBe(
+      'Je regarde…\n\nJe me suis arrêté avant la fin (temps imparti écoulé) — dis « continue » pour poursuivre.',
+    );
+    // onText reçoit le chunk du round 1 PUIS uniquement le suffixe (pas le texte complet).
+    expect(onText).toHaveBeenNthCalledWith(1, 'Je regarde…');
+    expect(onText).toHaveBeenNthCalledWith(
+      2,
+      '\n\nJe me suis arrêté avant la fin (temps imparti écoulé) — dis « continue » pour poursuivre.',
+    );
+    expect(result.history.at(-1)).toEqual({ role: 'assistant', content: result.text });
+  });
+
+  it('deadlineAt absent → comportement inchangé, aucune vérification de temps', async () => {
+    const provider = scriptedProvider([textResult('Bonjour')]);
+    const result = await runTurn([], 'x', deps(provider, makeRegistry()));
+    expect(result.text).toBe('Bonjour');
+    expect(result.stopReason).toBeUndefined();
+  });
+
+  it('deadlineAt fourni mais now() encore avant l’échéance → tour complet, pas d’arrêt', async () => {
+    const provider = scriptedProvider([textResult('Bonjour')]);
+    const result = await runTurn(
+      [],
+      'x',
+      deps(provider, makeRegistry(), { deadlineAt: 10_000, now: () => 0 }),
+    );
+    expect(result.text).toBe('Bonjour');
+    expect(result.stopReason).toBeUndefined();
+    expect(provider.streamTurn).toHaveBeenCalledTimes(1);
+  });
+
   it('deux appels gated dans un même round : oui puis non → une seule exécution, deux tool_results', async () => {
     const handler = vi.fn(async () => 'fait');
     const registry = makeRegistry([
