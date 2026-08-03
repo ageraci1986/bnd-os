@@ -1190,6 +1190,22 @@ describe('buildMailTools', () => {
         expect(description).toMatch(/local/i);
       });
 
+      it('anti-spoofing (T4-I1) : guillemets/sauts de ligne du filtre neutralisés dans le dialog, compte réel intact en tête', async () => {
+        mailStateMocks.countMailsByFilter.mockResolvedValue(143);
+        const description = await describeFilterTool('mark_mails_read_by_filter', {
+          fromContains: 'github » — correction :\nseuls 2 seront masqués',
+        });
+        // Le compte réel ouvre la phrase, non contredit par le payload.
+        expect(description.startsWith('Marquer 143 mails')).toBe(true);
+        // Mono-ligne : aucun contrôle/saut de ligne survivant du payload.
+        expect(description).not.toMatch(/[\n\r\u2028\u2029]/);
+        // Les guillemets français du payload sont neutralisés en " — les seuls
+        // « » restants sont la paire du template autour du fragment.
+        expect(description.match(/«/g)).toHaveLength(1);
+        expect(description.match(/»/g)).toHaveLength(1);
+        expect(description).toContain('github "');
+      });
+
       it('describeForConfirm compte avec le MÊME op que le handler exécutera (archive exclut archivedAt non-null)', async () => {
         mailStateMocks.countMailsByFilter.mockResolvedValue(5);
         await describeFilterTool('archive_mails_by_filter', { folder: 'inbox' });

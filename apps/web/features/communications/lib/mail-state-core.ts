@@ -98,7 +98,12 @@ export const MailFilterSchema = z
   .object({
     fromContains: z.string().min(3).max(120).optional(),
     subjectContains: z.string().min(3).max(120).optional(),
-    folder: z.string().min(1).max(16).optional(),
+    // Enum strict (revue sécurité T4-M2) : seules valeurs réellement écrites
+    // en DB ('inbox' par les syncs IMAP/Graph et important-mails, 'sent' par
+    // send-mail — les brouillons vivent dans une table à part, jamais dans
+    // EmailMessage.folder). Tue le piège de casse ('Inbox' → 0 résultat
+    // silencieux) et borne le jsonSchema montré au modèle.
+    folder: z.enum(['inbox', 'sent']).optional(),
     isRead: z.boolean().optional(),
     receivedBefore: z.string().datetime({ offset: true }).optional(),
     receivedAfter: z.string().datetime({ offset: true }).optional(),

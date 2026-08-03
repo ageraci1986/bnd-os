@@ -235,9 +235,8 @@ const MAIL_FILTER_JSON = {
     },
     folder: {
       type: 'string',
-      minLength: 1,
-      maxLength: 16,
-      description: 'Dossier mail (ex. inbox)',
+      enum: ['inbox', 'sent'],
+      description: 'Dossier mail — valeurs exactes en minuscules',
     },
     isRead: {
       type: 'boolean',
@@ -256,11 +255,28 @@ const MAIL_FILTER_JSON = {
   },
 } as const;
 
+/**
+ * Fragment sûr pour le dialog de confirmation (revue sécurité T4-I1) : les
+ * chaînes du filtre viennent du MODÈLE et sont interpolées dans un texte
+ * affiché ET lu (TTS) — sans neutralisation, un `fromContains` contenant des
+ * sauts de ligne ou des guillemets français pourrait mimer la voix du dialog
+ * et contredire visuellement le compte réel annoncé. Contrôle/format/
+ * séparateurs de ligne aplatis en espace, guillemets « » remplacés par ".
+ * Affichage uniquement — le `where` (count + updateMany) reçoit la valeur
+ * brute validée : la parité compte annoncé / lignes affectées est intacte.
+ */
+function confirmSafe(text: string): string {
+  return text.replace(/[\p{Cc}\p{Cf}\u2028\u2029]/gu, ' ').replace(/[«»]/g, '"');
+}
+
 /** Reformulation courte du filtre pour les dialogs/résultats — jamais de contenu de mail. */
 function describeFilter(filter: MailFilter): string {
   const parts: string[] = [];
-  if (filter.fromContains !== undefined) parts.push(`de « ${filter.fromContains} »`);
-  if (filter.subjectContains !== undefined) parts.push(`sujet « ${filter.subjectContains} »`);
+  if (filter.fromContains !== undefined) parts.push(`de « ${confirmSafe(filter.fromContains)} »`);
+  if (filter.subjectContains !== undefined)
+    parts.push(`sujet « ${confirmSafe(filter.subjectContains)} »`);
+  // `folder` est un enum strict ('inbox' | 'sent', mail-state-core.ts) — pas
+  // de texte libre à neutraliser.
   if (filter.folder !== undefined) parts.push(`dossier ${filter.folder}`);
   if (filter.isRead === false) parts.push('non lus');
   if (filter.isRead === true) parts.push('déjà lus');
@@ -279,6 +295,10 @@ function describeFilter(filter: MailFilter): string {
  * `buildMailFilterWhere` avec `setMailStateByFilterCore` (mail-state-core.ts),
  * y compris le même `op` (invariant central : le nombre annoncé ici DOIT être
  * celui réellement affecté par le handler).
+ *
+ * TOCTOU assumé (spec §2) : le compte est celui du moment de la confirmation ;
+ * l'exécution re-filtre avec le même where — le prédicat ne s'élargit jamais,
+ * seul le nombre de lignes peut varier entre le dialog et le Allow.
  */
 function buildByFilterDescribe(
   ctx: AuthContext,

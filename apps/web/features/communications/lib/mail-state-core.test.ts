@@ -236,6 +236,12 @@ describe('MailFilterSchema', () => {
     expect(MailFilterSchema.safeParse({ fromContains: 'ab' }).success).toBe(false);
     expect(MailFilterSchema.safeParse({ fromContains: 'x'.repeat(121) }).success).toBe(false);
   });
+
+  it("folder : enum strict 'inbox' | 'sent' — pas de texte libre ni de variante de casse (T4-M2)", () => {
+    expect(MailFilterSchema.safeParse({ folder: 'sent' }).success).toBe(true);
+    expect(MailFilterSchema.safeParse({ folder: 'Inbox' }).success).toBe(false);
+    expect(MailFilterSchema.safeParse({ folder: 'spam' }).success).toBe(false);
+  });
 });
 
 describe('buildMailFilterWhere', () => {
