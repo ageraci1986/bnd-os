@@ -926,8 +926,16 @@ describe('AssistantChat', () => {
 
       // Tour VOCAL : au moins une phrase part vers /speak.
       await pressAltAndRelease();
+      // Attend le texte final ET le champ réactivé (busy=false) — pas juste le
+      // texte : celui-ci peut matcher la bulle de STREAM en cours (identique
+      // une fois les deux chunks accumulés) UN TICK avant que la boucle de
+      // lecture SSE ne détecte la fin de flux et ne relâche `busy` dans le
+      // `finally` de send(). Sans ce garde, taper dans le champ juste après
+      // peut tomber sur un instant où il est encore `disabled` → no-op
+      // silencieux de userEvent.type (repro : `pnpm test -t symétrie` en boucle).
       await waitFor(() => {
         expect(screen.getByText("C'est fait. Voilà.")).toBeInTheDocument();
+        expect(screen.getByRole('textbox')).not.toBeDisabled();
       });
       const speakCallsVoiceTurn = fetchMock.mock.calls.filter(([u]) =>
         String(u).endsWith('/api/assistant/voice/speak'),
