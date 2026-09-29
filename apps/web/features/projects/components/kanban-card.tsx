@@ -1,9 +1,13 @@
 'use client';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Tag, type TagVariant } from '@nexushub/ui';
+import { Avatar, Tag, type TagVariant } from '@nexushub/ui';
 import { BUILTIN_CARD_CATEGORIES } from '@nexushub/domain';
-import { OPEN_CARD_EVENT, type OpenCardEventDetail } from './card-modal-controller';
+import {
+  OPEN_CARD_EVENT,
+  type CardUpdatedAssignee,
+  type OpenCardEventDetail,
+} from './card-modal-controller';
 import { CardAdvanceCheckbox } from './card-advance-checkbox';
 import { CardCompletedBadge } from './card-completed-badge';
 import { DeleteKanbanCardButton } from './delete-kanban-card-button';
@@ -16,7 +20,11 @@ export interface KanbanCardData {
   readonly columnId: string;
   readonly categoryTag: string | null;
   readonly commentCount?: number;
+  readonly assignees?: readonly CardUpdatedAssignee[];
 }
+
+/** Avatars shown before collapsing the rest into a "+N" pill. */
+const MAX_AVATARS = 3;
 
 export interface KanbanCardProps {
   readonly card: KanbanCardData;
@@ -185,6 +193,32 @@ export function KanbanCard({
             <path d="M2 4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H6.5L4 14.5V12a2 2 0 0 1-2-2V4z" />
           </svg>
           <span>{card.commentCount}</span>
+        </div>
+      ) : null}
+      {card.assignees && card.assignees.length > 0 ? (
+        <div className="kcard-footer">
+          <div className="kcard-avatars">
+            {card.assignees.slice(0, MAX_AVATARS).map((a) => (
+              <Avatar
+                key={a.userId}
+                initials={a.initials}
+                title={a.displayName}
+                variant="gradient"
+                size="sm"
+              />
+            ))}
+            {card.assignees.length > MAX_AVATARS ? (
+              <span
+                className="kcard-avatars-more"
+                title={card.assignees
+                  .slice(MAX_AVATARS)
+                  .map((a) => a.displayName)
+                  .join(', ')}
+              >
+                +{card.assignees.length - MAX_AVATARS}
+              </span>
+            ) : null}
+          </div>
         </div>
       ) : null}
     </article>

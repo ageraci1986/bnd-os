@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { prisma } from '@nexushub/db';
 import { Roles } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
+import { buildHrefWithClient } from '@/features/shell/lib/client-filter-url';
 import { getClientFilterFromSearchParams, resolveActiveClient } from '@/lib/client-filter/server';
 import { loadUserScope, scopedProjectWhere } from '@/lib/auth/scope';
 import { CalendarIcon, KanbanIcon } from '@/features/shell/components/icons';
@@ -101,7 +102,7 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
                 </div>
               ) : null}
               <Link
-                href={`/projects/${p.id}`}
+                href={buildHrefWithClient(`/projects/${p.id}`, '', activeClient?.slug ?? null)}
                 className="block rounded-2xl border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] p-5 shadow-[var(--shadow-card)] transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-hover)]"
               >
                 <div className="mb-2 flex items-center gap-2 text-xs text-[color:var(--color-text-muted)]">

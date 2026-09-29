@@ -5,6 +5,7 @@ import {
   nextYearMonth,
   previousYearMonth,
 } from '@nexushub/domain';
+import { buildHrefWithClient } from '@/features/shell/lib/client-filter-url';
 
 const MONTHS_FR = [
   'Janvier',
@@ -22,6 +23,9 @@ const MONTHS_FR = [
 ];
 
 const DOW = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
+
+/** Cards shown per day before the rest collapse behind "+N autres". */
+const MAX_VISIBLE_PER_DAY = 3;
 
 export interface CalendarCardItem {
   readonly id: string;
@@ -148,19 +152,31 @@ export function CalendarView({
           const className = ['cal-day', !cell.inMonth && 'muted', isToday && 'today']
             .filter(Boolean)
             .join(' ');
-          const visible = dayCards.slice(0, 3);
-          const hidden = dayCards.length - visible.length;
+          const visible = dayCards.slice(0, MAX_VISIBLE_PER_DAY);
+          const overflow = dayCards.slice(MAX_VISIBLE_PER_DAY);
           return (
             <div key={cell.isoDate} className={className} role="gridcell">
               <div className="cal-date">{cell.date.getUTCDate()}</div>
               <div className="cal-items">
                 {visible.map((card) => (
-                  <CalendarItem key={card.id} card={card} />
+                  <CalendarItem key={card.id} card={card} clientSlug={clientSlug} />
                 ))}
-                {hidden > 0 ? (
-                  <span className="cal-more">
-                    +{hidden} autre{hidden > 1 ? 's' : ''}
-                  </span>
+                {overflow.length > 0 ? (
+                  // Native <details>: expandable without turning this server
+                  // component into a client one.
+                  <details className="cal-more-group">
+                    <summary className="cal-more">
+                      <span className="cal-more-closed">
+                        +{overflow.length} autre{overflow.length > 1 ? 's' : ''}
+                      </span>
+                      <span className="cal-more-open">Réduire</span>
+                    </summary>
+                    <div className="cal-items">
+                      {overflow.map((card) => (
+                        <CalendarItem key={card.id} card={card} clientSlug={clientSlug} />
+                      ))}
+                    </div>
+                  </details>
                 ) : null}
               </div>
             </div>
@@ -171,7 +187,7 @@ export function CalendarView({
   );
 }
 
-function CalendarItem({ card }: { card: CalendarCardItem }) {
+function CalendarItem({ card, clientSlug }: { card: CalendarCardItem; clientSlug: string | null }) {
   const colorClass =
     card.clientColorToken === 'c-acme'
       ? 'i-acme'
@@ -189,7 +205,7 @@ function CalendarItem({ card }: { card: CalendarCardItem }) {
 
   return (
     <Link
-      href={`/projects/${card.projectId}?card=${card.id}`}
+      href={buildHrefWithClient(`/projects/${card.projectId}`, `card=${card.id}`, clientSlug)}
       className={className}
       title={`#${String(card.shortRef).padStart(3, '0')} · ${card.title}`}
     >

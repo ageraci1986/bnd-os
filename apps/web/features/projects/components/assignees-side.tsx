@@ -1,5 +1,5 @@
 'use client';
-import { useState, useTransition } from 'react';
+import { useRef, useState, useTransition } from 'react';
 import { Avatar } from '@nexushub/ui';
 import { RACI_VALUES, raciLabelFr, type Raci } from '@nexushub/domain';
 import {
@@ -26,6 +26,9 @@ export interface AssigneesSideProps {
   readonly cardId: string;
   readonly assignments: readonly CardAssignment[];
   readonly members: readonly WorkspaceMemberOption[];
+  /** Called with the current list after each change the server accepted,
+   *  so the board/list rows can show the new assignees. */
+  readonly onSaved?: (assignments: readonly CardAssignment[]) => void;
 }
 
 const RACI_FULL_FR: Record<Raci, string> = {
@@ -42,9 +45,18 @@ const RACI_COLOR: Record<Raci, string> = {
   informed: 'var(--color-text-muted)',
 };
 
-export function AssigneesSide({ cardId, assignments: initial, members }: AssigneesSideProps) {
+export function AssigneesSide({
+  cardId,
+  assignments: initial,
+  members,
+  onSaved,
+}: AssigneesSideProps) {
   // Local optimistic copy so role/add/remove feel instant.
   const [list, setList] = useState<readonly CardAssignment[]>(initial);
+  // Latest committed list, read when a server call resolves (a concurrent
+  // edit may have changed it since the call started).
+  const listRef = useRef(list);
+  listRef.current = list;
   const [adding, setAdding] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -73,7 +85,9 @@ export function AssigneesSide({ cardId, assignments: initial, members }: Assigne
         // Responsible per card" partial-unique).
         setList((prev) => prev.filter((a) => a.userId !== member.userId));
         setError(res.message);
+        return;
       }
+      onSaved?.(listRef.current);
     });
   };
 
@@ -96,10 +110,12 @@ export function AssigneesSide({ cardId, assignments: initial, members }: Assigne
     setList((prev) => prev.filter((a) => a.userId !== userId));
     startTransition(async () => {
       const res = await removeCardAssignee({ cardId, userId });
-      if (!res.ok && removed) {
-        setList((prev) => [...prev, removed]);
+      if (!res.ok) {
+        if (removed) setList((prev) => [...prev, removed]);
         setError(res.message);
+        return;
       }
+      onSaved?.(listRef.current);
     });
   };
 
