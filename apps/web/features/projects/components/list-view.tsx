@@ -161,6 +161,8 @@ export function ListView({
     const onUpdated = (e: Event) => {
       const detail = (e as CustomEvent<CardUpdatedEventDetail>).detail;
       if (!detail || typeof detail.id !== 'string') return;
+      const nextColumn =
+        detail.columnId !== undefined ? columns.find((c) => c.id === detail.columnId) : undefined;
       setLocalCards((prev) =>
         prev.map((c) =>
           c.id === detail.id
@@ -168,6 +170,9 @@ export function ListView({
                 ...c,
                 ...(detail.title !== undefined ? { title: detail.title } : {}),
                 ...(detail.categoryTag !== undefined ? { categoryTag: detail.categoryTag } : {}),
+                ...(detail.dueDate !== undefined ? { dueDate: detail.dueDate } : {}),
+                ...(detail.assignees !== undefined ? { assignees: detail.assignees } : {}),
+                ...(nextColumn ? { columnId: nextColumn.id, columnName: nextColumn.name } : {}),
               }
             : c,
         ),

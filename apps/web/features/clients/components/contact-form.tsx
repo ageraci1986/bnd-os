@@ -67,18 +67,29 @@ function CreateContactForm({
   onAfterCreate: () => void;
 }) {
   const [state, action, pending] = useActionState(createContact, CREATE_INITIAL);
-  const formRef = useRef<HTMLFormElement>(null);
+  // Bumped after each successful create to remount the fields: clears the
+  // inputs AND the RACI picker state (a native form.reset() misses it).
+  const [formKey, setFormKey] = useState(0);
+  const onAfterCreateRef = useRef(onAfterCreate);
+  onAfterCreateRef.current = onAfterCreate;
+  const handledRef = useRef<CreateContactState>(state);
 
+  // Keyed on the state object, which useActionState replaces on every
+  // submission: runs once per create. Keying on `status` + the parent's
+  // inline callback re-ran it on every refresh re-render — an endless
+  // refresh loop that blocked the next submission until a page reload.
   useEffect(() => {
-    if (state.status === 'success' && formRef.current) {
-      formRef.current.reset();
-      onAfterCreate();
+    if (state === handledRef.current) return;
+    handledRef.current = state;
+    if (state.status === 'success') {
+      setFormKey((k) => k + 1);
+      onAfterCreateRef.current();
     }
-  }, [state.status, onAfterCreate]);
+  }, [state]);
 
   return (
     <form
-      ref={formRef}
+      key={formKey}
       action={action}
       noValidate
       className="rounded-2xl border border-dashed border-[color:var(--color-border-light)] p-4"

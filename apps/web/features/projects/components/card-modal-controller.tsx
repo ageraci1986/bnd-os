@@ -82,16 +82,27 @@ export interface CardAdvancedEventDetail {
 
 /**
  * Dispatched when a board-visible card field is edited in the modal (title,
- * category). The board + list view patch their local row instantly — no
- * full-page refetch, and no race with the debounced save (the event fires
- * only once the save has actually landed).
+ * category, due date, assignees). The board + list view patch their local
+ * row instantly — no full-page refetch, and no race with the debounced save
+ * (the event fires only once the save has actually landed).
  */
 export const CARD_UPDATED_EVENT = 'nx:card-updated' as const;
+
+export interface CardUpdatedAssignee {
+  readonly userId: string;
+  readonly displayName: string;
+  readonly initials: string;
+}
 
 export interface CardUpdatedEventDetail {
   readonly id: string;
   readonly title?: string;
   readonly categoryTag?: string | null;
+  /** ISO string, or null when the due date was cleared. */
+  readonly dueDate?: string | null;
+  readonly assignees?: readonly CardUpdatedAssignee[];
+  /** Set when a due-date change auto-routed the card in/out of Bloqué. */
+  readonly columnId?: string;
 }
 
 export interface CardModalControllerProps {

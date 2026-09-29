@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { prisma } from '@nexushub/db';
 import { monthGridRange, parseYearMonth } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
+import { buildHrefWithClient } from '@/features/shell/lib/client-filter-url';
 import { loadUserScope } from '@/lib/auth/scope';
 import { CalendarView, type CalendarCardItem } from '@/features/projects/components/calendar-view';
 import { reconcileBeforeRead } from '@/features/projects/lib/reconcile';
@@ -36,6 +37,8 @@ export default async function ProjectCalendarPage({
   const { id } = await params;
   const sp = (await searchParams) ?? {};
   const monthParam = readParam(sp['month']);
+  // Global client filter (PRD §8.1) — kept on month nav and the way back.
+  const clientSlug = readParam(sp['client']);
   const parsed = parseYearMonth(monthParam);
   const now = new Date();
   const year = parsed?.year ?? now.getUTCFullYear();
@@ -141,7 +144,7 @@ export default async function ProjectCalendarPage({
   return (
     <div className="mx-auto max-w-[1400px]">
       <nav className="mb-3 text-xs text-[color:var(--color-text-muted)]">
-        <Link href="/projects" className="underline">
+        <Link href={buildHrefWithClient('/projects', '', clientSlug)} className="underline">
           ← Tous les projets
         </Link>
       </nav>
@@ -181,7 +184,7 @@ export default async function ProjectCalendarPage({
         month1={month1}
         cards={items}
         basePath={`/projects/${project.id}/calendar`}
-        clientSlug={null}
+        clientSlug={clientSlug}
         legend={legend}
       />
     </div>

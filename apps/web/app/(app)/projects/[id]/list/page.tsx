@@ -4,6 +4,8 @@ import { notFound } from 'next/navigation';
 import { prisma } from '@nexushub/db';
 import { Roles } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
+import { readSearchParamString } from '@/lib/client-filter/server';
+import { buildHrefWithClient } from '@/features/shell/lib/client-filter-url';
 import { loadUserScope } from '@/lib/auth/scope';
 import { getCsrfTokenForForm } from '@/lib/csrf';
 import { reconcileBeforeRead } from '@/features/projects/lib/reconcile';
@@ -30,6 +32,8 @@ export default async function ProjectListPage({ params, searchParams }: ProjectL
   const { id } = await params;
   const sp = (await searchParams) ?? {};
   const filter = parseProjectCardFilter(sp);
+  // Global client filter (PRD §8.1) — carried on the way back to /projects.
+  const clientSlug = readSearchParamString(sp['client']);
   const filterClauses = buildCardFilterClauses(filter);
 
   // Scope and reconcile are independent — run them together (reconcile is
@@ -169,7 +173,10 @@ export default async function ProjectListPage({ params, searchParams }: ProjectL
   return (
     <div className="mx-auto max-w-[1400px]">
       <nav className="mb-4">
-        <Link href="/projects" className="btn btn-ghost btn-sm">
+        <Link
+          href={buildHrefWithClient('/projects', '', clientSlug)}
+          className="btn btn-ghost btn-sm"
+        >
           ← Tous les projets
         </Link>
       </nav>

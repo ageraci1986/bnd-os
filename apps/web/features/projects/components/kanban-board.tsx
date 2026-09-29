@@ -55,7 +55,13 @@ export function KanbanBoard({
   // Re-sync when the server pushes a new ordering (e.g. after revalidate).
   // We watch a stringified key so we only resync on real shape changes.
   const incomingKey = useMemo(
-    () => cards.map((c) => `${c.id}:${c.columnId}:${c.title}`).join('|'),
+    () =>
+      cards
+        .map(
+          (c) =>
+            `${c.id}:${c.columnId}:${c.title}:${(c.assignees ?? []).map((a) => a.userId).join(',')}`,
+        )
+        .join('|'),
     [cards],
   );
   useEffect(() => {
@@ -113,6 +119,8 @@ export function KanbanBoard({
                 ...c,
                 ...(detail.title !== undefined ? { title: detail.title } : {}),
                 ...(detail.categoryTag !== undefined ? { categoryTag: detail.categoryTag } : {}),
+                ...(detail.assignees !== undefined ? { assignees: detail.assignees } : {}),
+                ...(detail.columnId !== undefined ? { columnId: detail.columnId } : {}),
               }
             : c,
         ),

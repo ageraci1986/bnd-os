@@ -4,6 +4,8 @@ import { notFound } from 'next/navigation';
 import { prisma } from '@nexushub/db';
 import { Roles, validateCardTemplateItems } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
+import { readSearchParamString } from '@/lib/client-filter/server';
+import { buildHrefWithClient } from '@/features/shell/lib/client-filter-url';
 import { loadUserScope, scopedProjectWhere } from '@/lib/auth/scope';
 import { getCsrfTokenForForm } from '@/lib/csrf';
 import { KanbanBoard } from '@/features/projects/components/kanban-board';
@@ -28,6 +30,18 @@ interface ProjectPageProps {
   readonly searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }
 
+function memberLabel(user: { firstName: string | null; lastName: string | null; email: string }): {
+  displayName: string;
+  initials: string;
+} {
+  const displayName =
+    [user.firstName, user.lastName].filter(Boolean).join(' ').trim() || user.email;
+  const initials =
+    [user.firstName?.[0], user.lastName?.[0]].filter(Boolean).join('').toUpperCase() ||
+    user.email.slice(0, 2).toUpperCase();
+  return { displayName, initials };
+}
+
 function readParam(value: string | string[] | undefined): string | null {
   if (typeof value === 'string') return value;
   if (Array.isArray(value)) return value[0] ?? null;
@@ -41,6 +55,8 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
   const openCardId = readParam(sp['card']);
   const isNew = readParam(sp['new']) === '1';
   const filter = parseProjectCardFilter(sp);
+  // Global client filter (PRD §8.1) — carried on the way back to /projects.
+  const clientSlug = readSearchParamString(sp['client']);
   const filterClauses = buildCardFilterClauses(filter);
 
   // Scope and reconcile are independent — run them together. Scope gates
@@ -93,6 +109,13 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
             title: true,
             categoryTag: true,
             _count: { select: { comments: { where: { deletedAt: null } } } },
+            assignees: {
+              orderBy: { createdAt: 'asc' },
+              select: {
+                userId: true,
+                user: { select: { firstName: true, lastName: true, email: true } },
+              },
+            },
           },
         },
       },
@@ -237,7 +260,10 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
   return (
     <div className="mx-auto max-w-[1400px]">
       <nav className="mb-4">
-        <Link href="/projects" className="btn btn-ghost btn-sm">
+        <Link
+          href={buildHrefWithClient('/projects', '', clientSlug)}
+          className="btn btn-ghost btn-sm"
+        >
           ← Tous les projets
         </Link>
       </nav>
@@ -306,6 +332,7 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
           title: c.title,
           categoryTag: c.categoryTag,
           commentCount: c._count.comments,
+          assignees: c.assignees.map((a) => ({ userId: a.userId, ...memberLabel(a.user) })),
         }))}
         isReadOnly={isViewer}
       />

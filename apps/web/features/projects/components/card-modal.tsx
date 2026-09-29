@@ -406,11 +406,17 @@ export function CardModal({
 
               <div className="side-row" hidden={isLoading}>
                 <div className="side-label">Assignés{assignments(card.assignees)}</div>
-                <AssigneesSide
-                  cardId={card.id}
-                  assignments={card.assignees}
-                  members={workspaceMembers}
-                />
+                {/* Mounted only once the detail has loaded: AssigneesSide seeds
+                 *  its optimistic state from props once, so mounting it on the
+                 *  skeleton (no assignees) would pin "Aucun assigné". */}
+                {!isLoading ? (
+                  <AssigneesSide
+                    cardId={card.id}
+                    assignments={card.assignees}
+                    members={workspaceMembers}
+                    onSaved={(assignees) => emitCardUpdated({ id: card.id, assignees })}
+                  />
+                ) : null}
               </div>
 
               <div className="side-row" hidden={isLoading}>
@@ -424,7 +430,11 @@ export function CardModal({
 
               <div className="side-row" hidden={isLoading}>
                 <div className="side-label">Échéance</div>
-                <DueDateInput cardId={card.id} initial={card.dueDate} onAfterUpdate={close} />
+                {/* Same as AssigneesSide: seeded once, so wait for the detail
+                 *  (the skeleton has no due date). */}
+                {!isLoading ? (
+                  <DueDateInput cardId={card.id} initial={card.dueDate} onAfterUpdate={close} />
+                ) : null}
               </div>
 
               <div className="side-row" hidden={isLoading}>
@@ -585,6 +595,13 @@ function DueDateInput({
         window.alert(res.message);
         return;
       }
+      // Patch the board/list row (due date + Bloqué routing) so closing the
+      // modal doesn't show the stale pre-edit state.
+      emitCardUpdated({
+        id: cardId,
+        dueDate: res.newDueDate,
+        ...(res.autoBlocked || res.autoUnblocked ? { columnId: res.newColumnId } : {}),
+      });
       if (res.autoBlocked) {
         window.alert('Échéance dépassée — la carte a été déplacée vers Bloqué.');
         onAfterUpdate();

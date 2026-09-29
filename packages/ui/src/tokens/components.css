@@ -850,6 +850,30 @@
   align-items: center;
   margin-top: 10px;
 }
+.kcard-avatars {
+  display: flex;
+  margin-left: auto;
+}
+/* Overlapping stack, as in mockups/04-kanban.html. */
+.kcard-avatars > * {
+  border: 2px solid var(--bg-card);
+  margin-left: -6px;
+}
+.kcard-avatars > :first-child {
+  margin-left: 0;
+}
+.kcard-avatars-more {
+  display: inline-grid;
+  place-items: center;
+  height: 28px;
+  min-width: 28px;
+  padding: 0 4px;
+  border-radius: 9999px;
+  background: var(--color-bg-muted);
+  color: var(--text-soft);
+  font-size: 10px;
+  font-weight: 700;
+}
 .kcard-due {
   font-size: 11px;
   font-weight: 600;
@@ -1860,6 +1884,27 @@
   font-weight: 700;
   color: var(--text-muted);
   padding: 2px 7px;
+  cursor: pointer;
+  list-style: none;
+  border-radius: 6px;
+}
+.cal-more::-webkit-details-marker {
+  display: none;
+}
+.cal-more:hover {
+  color: var(--text-main);
+  background: var(--color-bg-hover);
+}
+.cal-more:focus-visible {
+  outline: 2px solid var(--color-accent-primary);
+  outline-offset: 1px;
+}
+.cal-more-group[open] > .cal-more {
+  margin-bottom: 3px;
+}
+.cal-more-group[open] .cal-more-closed,
+.cal-more-group:not([open]) .cal-more-open {
+  display: none;
 }
 
 .view-toggle {

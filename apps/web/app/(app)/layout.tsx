@@ -21,11 +21,7 @@ import {
 
 import { requireUser } from '@/lib/auth';
 import { loadUserScope, scopedClientWhere, scopedProjectWhere } from '@/lib/auth/scope';
-import {
-  getClientFilterFromSearchParams,
-  resolveActiveClient,
-  clientSlug,
-} from '@/lib/client-filter/server';
+import { clientSlug } from '@/lib/client-filter/server';
 
 import { NavLink } from '@/features/shell/components/nav-link';
 import { AGENT_NOTICE_KINDS } from '@/features/notifications/lib/agent-notice-mapping';
@@ -38,78 +34,73 @@ import { Toaster } from '@/features/shell/components/toaster';
 
 interface AppLayoutProps {
   readonly children: React.ReactNode;
-  readonly searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }
 
-export default async function AppLayout({ children, searchParams }: AppLayoutProps) {
+export default async function AppLayout({ children }: AppLayoutProps) {
   const ctx = await requireUser();
-  const sp = (await searchParams) ?? {};
-  const filter = getClientFilterFromSearchParams(sp);
   const scope = await loadUserScope(ctx);
 
-  const [workspace, profile, clients, projectsCount, activeClient, unreadAgentNoticesCount] =
-    await Promise.all([
-      prisma.workspace.findUniqueOrThrow({
-        where: { id: ctx.workspaceId },
-        select: { name: true, slug: true },
-      }),
-      prisma.user.findUniqueOrThrow({
-        where: { id: ctx.userId },
-        select: { firstName: true, lastName: true, email: true },
-      }),
-      prisma.client.findMany({
-        where: {
-          workspaceId: ctx.workspaceId,
-          deletedAt: null,
-          archivedAt: null,
-          ...scopedClientWhere(scope),
-        },
-        orderBy: { name: 'asc' },
-        select: {
-          id: true,
-          name: true,
-          colorToken: true,
-          _count: {
-            select: {
-              // Scope-aware count: for a project-scoped User whose access to
-              // this client only comes from a single project, the sidebar
-              // pill must show 1, not the workspace-wide project count.
-              projects: {
-                where: { deletedAt: null, archivedAt: null, ...scopedProjectWhere(scope) },
-              },
+  const [workspace, profile, clients, projectsCount, unreadAgentNoticesCount] = await Promise.all([
+    prisma.workspace.findUniqueOrThrow({
+      where: { id: ctx.workspaceId },
+      select: { name: true, slug: true },
+    }),
+    prisma.user.findUniqueOrThrow({
+      where: { id: ctx.userId },
+      select: { firstName: true, lastName: true, email: true },
+    }),
+    prisma.client.findMany({
+      where: {
+        workspaceId: ctx.workspaceId,
+        deletedAt: null,
+        archivedAt: null,
+        ...scopedClientWhere(scope),
+      },
+      orderBy: { name: 'asc' },
+      select: {
+        id: true,
+        name: true,
+        colorToken: true,
+        _count: {
+          select: {
+            // Scope-aware count: for a project-scoped User whose access to
+            // this client only comes from a single project, the sidebar
+            // pill must show 1, not the workspace-wide project count.
+            projects: {
+              where: { deletedAt: null, archivedAt: null, ...scopedProjectWhere(scope) },
             },
           },
         },
-      }),
-      prisma.project.count({
+      },
+    }),
+    prisma.project.count({
+      where: {
+        workspaceId: ctx.workspaceId,
+        deletedAt: null,
+        archivedAt: null,
+        ...scopedProjectWhere(scope),
+      },
+    }),
+    // Point animé sidebar (Plan 3b Task 7) — count léger indexé
+    // ([userId, kind, readAt], packages/db/prisma/schema.prisma). Best-effort :
+    // une panne DB sur ce SEUL count ne doit jamais faire échouer le layout de
+    // toute l'app (contrairement aux autres requêtes ci-dessus, qui restent
+    // volontairement bloquantes) — `.catch` local plutôt qu'un try/catch autour
+    // de tout le `Promise.all`, pour ne pas dégrader les autres données du shell.
+    prisma.notification
+      .count({
         where: {
           workspaceId: ctx.workspaceId,
-          deletedAt: null,
-          archivedAt: null,
-          ...scopedProjectWhere(scope),
+          userId: ctx.userId,
+          kind: { in: [...AGENT_NOTICE_KINDS] },
+          readAt: null,
         },
+      })
+      .catch(() => {
+        console.error('[shell] unread agent notices count failed');
+        return 0;
       }),
-      resolveActiveClient(filter, ctx.workspaceId, scope),
-      // Point animé sidebar (Plan 3b Task 7) — count léger indexé
-      // ([userId, kind, readAt], packages/db/prisma/schema.prisma). Best-effort :
-      // une panne DB sur ce SEUL count ne doit jamais faire échouer le layout de
-      // toute l'app (contrairement aux autres requêtes ci-dessus, qui restent
-      // volontairement bloquantes) — `.catch` local plutôt qu'un try/catch autour
-      // de tout le `Promise.all`, pour ne pas dégrader les autres données du shell.
-      prisma.notification
-        .count({
-          where: {
-            workspaceId: ctx.workspaceId,
-            userId: ctx.userId,
-            kind: { in: [...AGENT_NOTICE_KINDS] },
-            readAt: null,
-          },
-        })
-        .catch(() => {
-          console.error('[shell] unread agent notices count failed');
-          return 0;
-        }),
-    ]);
+  ]);
 
   const displayName =
     [profile.firstName, profile.lastName]
@@ -214,10 +205,11 @@ export default async function AppLayout({ children, searchParams }: AppLayoutPro
         <div className="px-10 pb-10">
           <ContextBarHost
             workspaceName={workspace.name}
-            activeClient={
-              activeClient ? { name: activeClient.name, colorToken: activeClient.colorToken } : null
-            }
-            totalClients={clients.length}
+            clients={clients.map((c) => ({
+              slug: clientSlug(c.name),
+              name: c.name,
+              colorToken: c.colorToken,
+            }))}
           />
           {children}
         </div>
