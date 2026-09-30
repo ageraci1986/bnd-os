@@ -5,7 +5,8 @@ import {
   nextYearMonth,
   previousYearMonth,
 } from '@nexushub/domain';
-import { buildHrefWithClient } from '@/features/shell/lib/client-filter-url';
+import { CalendarDayOverflow } from './calendar-day-overflow';
+import { CalendarItem } from './calendar-item';
 
 const MONTHS_FR = [
   'Janvier',
@@ -162,21 +163,7 @@ export function CalendarView({
                   <CalendarItem key={card.id} card={card} clientSlug={clientSlug} />
                 ))}
                 {overflow.length > 0 ? (
-                  // Native <details>: expandable without turning this server
-                  // component into a client one.
-                  <details className="cal-more-group">
-                    <summary className="cal-more">
-                      <span className="cal-more-closed">
-                        +{overflow.length} autre{overflow.length > 1 ? 's' : ''}
-                      </span>
-                      <span className="cal-more-open">Réduire</span>
-                    </summary>
-                    <div className="cal-items">
-                      {overflow.map((card) => (
-                        <CalendarItem key={card.id} card={card} clientSlug={clientSlug} />
-                      ))}
-                    </div>
-                  </details>
+                  <CalendarDayOverflow cards={overflow} clientSlug={clientSlug} />
                 ) : null}
               </div>
             </div>
@@ -184,33 +171,6 @@ export function CalendarView({
         })}
       </div>
     </>
-  );
-}
-
-function CalendarItem({ card, clientSlug }: { card: CalendarCardItem; clientSlug: string | null }) {
-  const colorClass =
-    card.clientColorToken === 'c-acme'
-      ? 'i-acme'
-      : card.clientColorToken === 'c-tech'
-        ? 'i-tech'
-        : card.clientColorToken === 'c-nova'
-          ? 'i-nova'
-          : card.clientColorToken === 'c-lumen'
-            ? 'i-lumen'
-            : 'i-orbit';
-
-  const className = ['cal-item', colorClass, card.columnIsBlocked && 'blocked']
-    .filter(Boolean)
-    .join(' ');
-
-  return (
-    <Link
-      href={buildHrefWithClient(`/projects/${card.projectId}`, `card=${card.id}`, clientSlug)}
-      className={className}
-      title={`#${String(card.shortRef).padStart(3, '0')} · ${card.title}`}
-    >
-      {card.title}
-    </Link>
   );
 }
 

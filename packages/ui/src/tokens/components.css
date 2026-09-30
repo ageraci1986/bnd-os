@@ -1885,11 +1885,11 @@
   color: var(--text-muted);
   padding: 2px 7px;
   cursor: pointer;
-  list-style: none;
+  border: 0;
   border-radius: 6px;
-}
-.cal-more::-webkit-details-marker {
-  display: none;
+  background: transparent;
+  text-align: left;
+  font-family: inherit;
 }
 .cal-more:hover {
   color: var(--text-main);
@@ -1898,13 +1898,6 @@
 .cal-more:focus-visible {
   outline: 2px solid var(--color-accent-primary);
   outline-offset: 1px;
-}
-.cal-more-group[open] > .cal-more {
-  margin-bottom: 3px;
-}
-.cal-more-group[open] .cal-more-closed,
-.cal-more-group:not([open]) .cal-more-open {
-  display: none;
 }
 
 .view-toggle {

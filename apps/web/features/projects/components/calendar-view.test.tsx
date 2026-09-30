@@ -37,20 +37,31 @@ function renderMonth(cards: readonly CalendarCardItem[], clientSlug: string | nu
 }
 
 describe('<CalendarView /> — busy days', () => {
-  it('shows 3 cards and a "+N autres" toggle when a day has more', () => {
+  it('shows 3 cards and a collapsed "+N autres" toggle when a day has more', () => {
     renderMonth([1, 2, 3, 4, 5].map((i) => card(i)));
-    const toggle = screen.getByText('+2 autres');
-    expect(toggle.closest('summary')).not.toBeNull();
-    expect(toggle.closest('details')?.open).toBe(false);
+    const toggle = screen.getByRole('button', { name: '+2 autres' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('link', { name: 'Carte 4' })).toBeNull();
   });
 
-  it('expands the day to reveal every card', () => {
+  it('expands the day with "Réduire" placed after the last card', () => {
     renderMonth([1, 2, 3, 4, 5].map((i) => card(i)));
-    fireEvent.click(screen.getByText('+2 autres'));
-    expect(screen.getByText('+2 autres').closest('details')?.open).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: '+2 autres' }));
     for (const i of [1, 2, 3, 4, 5]) {
       expect(screen.getByRole('link', { name: `Carte ${i}` })).toBeInTheDocument();
     }
+    const collapse = screen.getByRole('button', { name: 'Réduire' });
+    expect(collapse).toHaveAttribute('aria-expanded', 'true');
+    const last = screen.getByRole('link', { name: 'Carte 5' });
+    expect(last.compareDocumentPosition(collapse) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('collapses back to 3 cards on "Réduire"', () => {
+    renderMonth([1, 2, 3, 4, 5].map((i) => card(i)));
+    fireEvent.click(screen.getByRole('button', { name: '+2 autres' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Réduire' }));
+    expect(screen.queryByRole('link', { name: 'Carte 5' })).toBeNull();
+    expect(screen.getByRole('button', { name: '+2 autres' })).toBeInTheDocument();
   });
 
   it('renders no toggle when the day has 3 cards or fewer', () => {

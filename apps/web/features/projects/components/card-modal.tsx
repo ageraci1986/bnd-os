@@ -25,6 +25,7 @@ import { updateCard } from '../actions/update-card';
 import { updateCardDueDate } from '../actions/update-card-due-date';
 import { deleteCard } from '../actions/delete-card';
 import { CSRF_FIELD_NAME } from '@/lib/csrf/field';
+import { notify } from '@/features/shell/components/toaster';
 import { CardCommentsThread } from './card-comments-thread';
 import {
   CARD_REMOVED_EVENT,
@@ -592,7 +593,7 @@ function DueDateInput({
     startTransition(async () => {
       const res = await updateCardDueDate({ cardId, dueDate: next });
       if (!res.ok) {
-        window.alert(res.message);
+        notify({ tone: 'error', message: res.message });
         return;
       }
       // Patch the board/list row (due date + Bloqué routing) so closing the
@@ -603,10 +604,13 @@ function DueDateInput({
         ...(res.autoBlocked || res.autoUnblocked ? { columnId: res.newColumnId } : {}),
       });
       if (res.autoBlocked) {
-        window.alert('Échéance dépassée — la carte a été déplacée vers Bloqué.');
+        notify({
+          tone: 'error',
+          message: 'Échéance dépassée — la carte a été déplacée vers Bloqué.',
+        });
         onAfterUpdate();
       } else if (res.autoUnblocked) {
-        window.alert('La carte est sortie de Bloqué.');
+        notify({ tone: 'success', message: 'La carte est sortie de Bloqué.' });
         onAfterUpdate();
       }
       // No router.refresh(): the date value is already in local state via

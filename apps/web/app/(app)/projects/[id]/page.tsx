@@ -1,11 +1,11 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { prisma } from '@nexushub/db';
 import { Roles, validateCardTemplateItems } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
 import { readSearchParamString } from '@/lib/client-filter/server';
-import { buildHrefWithClient } from '@/features/shell/lib/client-filter-url';
+import { buildHrefWithClient, isOutsideClientFilter } from '@/features/shell/lib/client-filter-url';
 import { loadUserScope, scopedProjectWhere } from '@/lib/auth/scope';
 import { getCsrfTokenForForm } from '@/lib/csrf';
 import { KanbanBoard } from '@/features/projects/components/kanban-board';
@@ -195,6 +195,12 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
     const allowed =
       scope.projectIds.includes(project.id) || scope.clientIds.includes(project.client.id);
     if (!allowed) notFound();
+  }
+
+  // Active client filter excludes this project (e.g. another client picked
+  // in the sidebar while inside it) → show that client's projects instead.
+  if (isOutsideClientFilter(clientSlug, project.client)) {
+    redirect(buildHrefWithClient('/projects', '', clientSlug));
   }
 
   const initialCardComments = openCard
