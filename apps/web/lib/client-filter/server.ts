@@ -15,6 +15,7 @@ import 'server-only';
 import { prisma } from '@nexushub/db';
 import { fromQueryParam, type ClientFilter, type UserScope } from '@nexushub/domain';
 import { scopedClientWhere } from '@/lib/auth/scope';
+import { clientSlugFromName } from '@/features/shell/lib/client-filter-url';
 
 export interface ResolvedClient {
   readonly id: string;
@@ -68,7 +69,7 @@ export async function resolveActiveClient(
   });
 
   for (const c of candidates) {
-    const slug = c.name.toLowerCase().replaceAll(/\s+/g, '-');
+    const slug = clientSlugFromName(c.name);
     if (slug === wanted || c.id === filter.clientId) {
       return { id: c.id, name: c.name, slug, colorToken: c.colorToken };
     }
@@ -77,6 +78,4 @@ export async function resolveActiveClient(
 }
 
 /** Derive the URL slug used in `?client=<slug>` from a client name. */
-export function clientSlug(name: string): string {
-  return name.toLowerCase().replaceAll(/\s+/g, '-');
-}
+export const clientSlug = clientSlugFromName;

@@ -30,3 +30,22 @@ export function buildHrefWithClient(
 }
 
 export const CLIENT_FILTER_PARAM = CLIENT_PARAM;
+
+/** URL slug used in `?client=<slug>`: lowercased name, whitespace → `-`. */
+export function clientSlugFromName(name: string): string {
+  return name.toLowerCase().replaceAll(/\s+/g, '-');
+}
+
+/**
+ * True when a `?client=` filter is active and targets a different client
+ * than `client` (matched by slug, case-insensitive, or by id — the same
+ * rules as the server-side resolver). Project pages use it to leave a
+ * project the active filter excludes (PRD §8.1: every view recomposes).
+ */
+export function isOutsideClientFilter(
+  filter: string | null,
+  client: { readonly id: string; readonly name: string },
+): boolean {
+  if (!filter) return false;
+  return filter.toLowerCase() !== clientSlugFromName(client.name) && filter !== client.id;
+}
