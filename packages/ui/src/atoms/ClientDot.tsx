@@ -1,3 +1,4 @@
+import { clientColorCss } from '../client-color';
 import { cn } from '../utils';
 
 export type ClientColorToken =
@@ -26,8 +27,7 @@ export interface ClientDotProps {
  * Falls back to a literal CSS color if `colorToken` is not a known token.
  */
 export function ClientDot({ colorToken, size = 8, className }: ClientDotProps) {
-  const isToken = colorToken.startsWith('c-');
-  const background = isToken ? `var(--color-${colorToken})` : colorToken;
+  const background = clientColorCss(colorToken);
 
   return (
     <span

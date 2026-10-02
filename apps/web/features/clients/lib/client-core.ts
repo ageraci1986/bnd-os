@@ -1,6 +1,6 @@
 import 'server-only';
 import { Prisma, prisma } from '@nexushub/db';
-import { NotFoundError, Roles, canDeleteClient } from '@nexushub/domain';
+import { NotFoundError, Roles, canDeleteClient, isValidClientColor } from '@nexushub/domain';
 import type { Raci } from '@nexushub/domain';
 import type { AuthContext } from '@/lib/auth';
 import { loadUserScope } from '@/lib/auth/scope';
@@ -25,6 +25,7 @@ import type { CreateClientInput, CreateContactInput } from './schemas';
  */
 
 const DUPLICATE_NAME_MESSAGE = 'Un client porte déjà ce nom.';
+const INVALID_COLOR_MESSAGE = 'Couleur invalide.';
 
 // =====================================================================
 // createClientCore
@@ -46,6 +47,10 @@ export async function createClientCore(
   if (scope.kind === 'restricted') {
     // Restricted users cannot create top-level resources outside their scope.
     return { ok: false, message: SCOPE_ERROR_MESSAGE };
+  }
+
+  if (!isValidClientColor(input.colorToken)) {
+    return { ok: false, message: INVALID_COLOR_MESSAGE };
   }
 
   try {
@@ -125,6 +130,10 @@ export async function updateClientCore(
   if (scope.kind === 'restricted') {
     const allowed = scope.clientIds.includes(input.clientId);
     if (!allowed) return { ok: false, message: SCOPE_ERROR_MESSAGE };
+  }
+
+  if (input.colorToken !== undefined && !isValidClientColor(input.colorToken)) {
+    return { ok: false, message: INVALID_COLOR_MESSAGE };
   }
 
   try {

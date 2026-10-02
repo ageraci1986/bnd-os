@@ -1,5 +1,5 @@
 'use client';
-import { useActionState, useEffect, useRef, useState } from 'react';
+import { useActionState, useEffect, useId, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   CLIENT_COLOR_LABELS_FR,
@@ -155,6 +155,7 @@ function Fields({
   setColor: (c: string) => void;
   defaults?: { name: string; initials: string; domains: string; notes: string };
 }) {
+  const colorLabelId = useId();
   return (
     <div className="grid gap-3">
       <div>
@@ -174,9 +175,11 @@ function Fields({
       </div>
 
       <div>
-        <span className="field-label">Couleur</span>
+        <span className="field-label" id={colorLabelId}>
+          Couleur
+        </span>
         <input type="hidden" name="colorToken" value={color} />
-        <div className="mt-1 flex flex-wrap gap-2">
+        <div role="group" aria-labelledby={colorLabelId} className="mt-1 flex flex-wrap gap-2">
           {CLIENT_COLOR_TOKENS.map((token) => (
             <ColorSwatch
               key={token}
@@ -260,8 +263,9 @@ function ColorSwatch({
       className="grid h-9 w-9 place-items-center rounded-full transition"
       style={{
         background: clientColorCss(value),
-        outline: selected ? '2px solid var(--color-text-main)' : '2px solid transparent',
-        outlineOffset: 2,
+        boxShadow: selected
+          ? '0 0 0 2px var(--color-bg-card), 0 0 0 4px var(--color-text-main)'
+          : 'none',
       }}
     >
       {selected ? (
@@ -280,15 +284,22 @@ function CustomColorButton({ value, onChange }: { value: string; onChange: (c: s
   const open = () => {
     const el = inputRef.current;
     if (!el) return;
-    if (typeof el.showPicker === 'function') el.showPicker();
-    else el.click();
+    if (typeof el.showPicker === 'function') {
+      try {
+        el.showPicker();
+      } catch {
+        el.click();
+      }
+    } else {
+      el.click();
+    }
   };
   return (
     <>
       <button
         type="button"
         onClick={open}
-        aria-label="Couleur personnalisée"
+        aria-label={isCustom ? `Couleur personnalisée (${value})` : 'Couleur personnalisée'}
         aria-pressed={isCustom}
         title="Couleur personnalisée"
         className="grid h-9 w-9 place-items-center rounded-full border border-dashed border-[color:var(--color-border-light)] text-[color:var(--color-text-soft)] transition"
@@ -298,8 +309,7 @@ function CustomColorButton({ value, onChange }: { value: string; onChange: (c: s
                 background: clientColorCss(value),
                 color: clientColorForeground(value),
                 borderStyle: 'solid',
-                outline: '2px solid var(--color-text-main)',
-                outlineOffset: 2,
+                boxShadow: '0 0 0 2px var(--color-bg-card), 0 0 0 4px var(--color-text-main)',
               }
             : undefined
         }
