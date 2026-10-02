@@ -57,7 +57,7 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
   const filter = parseProjectCardFilter(sp);
   // Global client filter (PRD §8.1) — carried on the way back to /projects.
   const clientSlug = readSearchParamString(sp['client']);
-  const filterClauses = buildCardFilterClauses(filter);
+  const filterClauses = buildCardFilterClauses(filter, ctx.userId);
 
   // Scope and reconcile are independent — run them together. Scope gates
   // the parallel openCard fetch (?card=<id> must not leak data from an

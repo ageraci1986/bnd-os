@@ -45,7 +45,7 @@ export default async function ProjectCalendarPage({
   const month1 = parsed?.month1 ?? now.getUTCMonth() + 1;
 
   const filter = parseProjectCardFilter(sp);
-  const filterClauses = buildCardFilterClauses(filter);
+  const filterClauses = buildCardFilterClauses(filter, ctx.userId);
 
   const project = await prisma.project.findFirst({
     where: { id, workspaceId: ctx.workspaceId, deletedAt: null },

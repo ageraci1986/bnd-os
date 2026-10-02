@@ -34,7 +34,7 @@ export default async function ProjectListPage({ params, searchParams }: ProjectL
   const filter = parseProjectCardFilter(sp);
   // Global client filter (PRD §8.1) — carried on the way back to /projects.
   const clientSlug = readSearchParamString(sp['client']);
-  const filterClauses = buildCardFilterClauses(filter);
+  const filterClauses = buildCardFilterClauses(filter, ctx.userId);
 
   // Scope and reconcile are independent — run them together (reconcile is
   // throttled per-workspace, so it's usually a no-op). Scope is needed by
