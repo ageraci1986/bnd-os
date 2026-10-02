@@ -1,14 +1,17 @@
 'use server';
 import 'server-only';
 import { z } from 'zod';
+import { normalizeMailHost } from '@nexushub/integrations/mail';
 import { prisma } from '@nexushub/db';
 import { requireUser } from '@/lib/auth';
 import { encryptSecret } from '@/lib/oauth/crypto';
 import { testImapConnection } from '@nexushub/integrations/imap';
 
+// Users paste URLs (`http://ex3.mail.ovh.net/`) or `host:port` — store a bare host.
+const mailHostSchema = z.string().max(255).transform(normalizeMailHost).pipe(z.string().min(1));
 const inputSchema = z.object({
   integrationId: z.string().uuid(),
-  host: z.string().min(1).max(255),
+  host: mailHostSchema,
   port: z.number().int().positive().max(65535),
   secure: z.boolean(),
   password: z.string().min(1).max(1024),
@@ -58,7 +61,7 @@ export async function updateImapCredentials(raw: UpdateImapInput): Promise<Updat
     password: parsed.password,
   });
   if (!test.ok) {
-    return { ok: false, message: `Connexion refusée (${test.code}).` };
+    return { ok: false, message: `Connexion refusée : ${test.message}` };
   }
 
   const encrypted = encryptSecret(

@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
+import { normalizeMailHost } from '../mail/host';
 
 export interface SmtpCredentials {
   readonly host: string;
@@ -31,7 +32,7 @@ const CONNECT_TIMEOUT_MS = 15_000;
  */
 export async function openSmtpTransport(creds: SmtpCredentials): Promise<Transporter> {
   const transport = nodemailer.createTransport({
-    host: creds.host,
+    host: normalizeMailHost(creds.host),
     port: creds.port,
     secure: creds.secure,
     requireTLS: creds.requireTls ?? false,

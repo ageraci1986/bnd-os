@@ -42,3 +42,26 @@ describe('testSmtpConnection error mapping', () => {
     if (!r.ok) expect(r.code).toBe('UNKNOWN');
   });
 });
+
+describe('testSmtpConnection with wrapped errors (real client shape)', () => {
+  class Wrapped extends Error {
+    constructor(
+      message: string,
+      override readonly cause?: unknown,
+    ) {
+      super(message);
+    }
+  }
+  it('HOST when the DNS error is only in the cause', async () => {
+    const dns = Object.assign(new Error('getaddrinfo ENOTFOUND smtp.nope'), { code: 'ENOTFOUND' });
+    const r = await runWithMock(new Wrapped('SMTP connect failed', dns));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe('HOST');
+  });
+  it('AUTH when nodemailer reports EAUTH in the cause', async () => {
+    const auth = Object.assign(new Error('Invalid login: 535 5.7.8'), { code: 'EAUTH' });
+    const r = await runWithMock(new Wrapped('SMTP connect failed', auth));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe('AUTH');
+  });
+});

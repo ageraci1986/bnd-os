@@ -32,6 +32,44 @@ beforeEach(() => {
 });
 
 describe('addImapMailbox', () => {
+  it('normalizes a pasted URL to a bare host before testing and storing', async () => {
+    mocks.testImapConnection.mockResolvedValueOnce({ ok: true });
+    mocks.integrationCreate.mockResolvedValueOnce({ id: 'i1' });
+    await expect(
+      addImapMailbox({
+        email: 'me@ex.com',
+        host: 'http://ex3.mail.ovh.net/',
+        port: 993,
+        secure: true,
+        password: 'p',
+      }),
+    ).rejects.toThrow('NEXT_REDIRECT');
+    expect(mocks.testImapConnection).toHaveBeenCalledWith(
+      expect.objectContaining({ host: 'ex3.mail.ovh.net' }),
+    );
+    expect(mocks.auditLogCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        data: expect.objectContaining({ host: 'ex3.mail.ovh.net' }),
+      }),
+    });
+  });
+
+  it('surfaces the classified reason when the pre-save test fails', async () => {
+    mocks.testImapConnection.mockResolvedValueOnce({
+      ok: false,
+      code: 'HOST',
+      message: 'Serveur introuvable.',
+    });
+    const r = await addImapMailbox({
+      email: 'me@ex.com',
+      host: 'h',
+      port: 993,
+      secure: true,
+      password: 'p',
+    });
+    expect(r).toEqual({ ok: false, message: 'Connexion refusée : Serveur introuvable.' });
+  });
+
   it('rejects when the pre-save test connection fails', async () => {
     mocks.testImapConnection.mockResolvedValueOnce({ ok: false, code: 'AUTH', message: 'nope' });
     const r = await addImapMailbox({

@@ -1,4 +1,5 @@
 import { ImapFlow } from 'imapflow';
+import { normalizeMailHost } from '../mail/host';
 
 export interface ImapCredentials {
   readonly host: string;
@@ -27,7 +28,7 @@ const CONNECT_TIMEOUT_MS = 15_000;
  */
 export async function openImapSession(creds: ImapCredentials): Promise<ImapFlow> {
   const client = new ImapFlow({
-    host: creds.host,
+    host: normalizeMailHost(creds.host),
     port: creds.port,
     secure: creds.secure,
     auth: { user: creds.username, pass: creds.password },
