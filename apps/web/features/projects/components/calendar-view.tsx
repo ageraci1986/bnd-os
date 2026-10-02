@@ -37,6 +37,8 @@ export interface CalendarCardItem {
   readonly isoDate: string;
   readonly clientColorToken: string;
   readonly columnIsBlocked: boolean;
+  /** Carte dans la dernière colonne utilisateur de son projet. */
+  readonly isDone: boolean;
 }
 
 export interface CalendarLegendItem {
@@ -54,6 +56,8 @@ export interface CalendarViewProps {
   readonly clientSlug: string | null;
   /** Clients to display in the legend (only those actually drawn on the grid). */
   readonly legend: readonly CalendarLegendItem[];
+  /** Params conservés sur la navigation mois (ex. filtres, mine). */
+  readonly extraParams?: Readonly<Record<string, string>>;
 }
 
 function buildHref(
@@ -61,10 +65,14 @@ function buildHref(
   year: number,
   month1: number,
   clientSlug: string | null,
+  extraParams: Readonly<Record<string, string>> = {},
 ): string {
   const params = new URLSearchParams();
   params.set('month', formatYearMonth(year, month1));
   if (clientSlug) params.set('client', clientSlug);
+  for (const [k, v] of Object.entries(extraParams)) {
+    if (k !== 'month' && k !== 'client') params.set(k, v);
+  }
   return `${basePath}?${params.toString()}`;
 }
 
@@ -75,6 +83,7 @@ export function CalendarView({
   basePath,
   clientSlug,
   legend,
+  extraParams = {},
 }: CalendarViewProps) {
   const prev = previousYearMonth(year, month1);
   const next = nextYearMonth(year, month1);
@@ -85,6 +94,7 @@ export function CalendarView({
     today.getUTCFullYear(),
     today.getUTCMonth() + 1,
     clientSlug,
+    extraParams,
   );
 
   const cells = buildMonthGrid(year, month1);
@@ -102,7 +112,7 @@ export function CalendarView({
       <div className="cal-toolbar">
         <div className="cal-nav">
           <Link
-            href={buildHref(basePath, prev.year, prev.month1, clientSlug)}
+            href={buildHref(basePath, prev.year, prev.month1, clientSlug, extraParams)}
             aria-label="Mois précédent"
             className="cal-nav-btn"
           >
@@ -112,7 +122,7 @@ export function CalendarView({
             {MONTHS_FR[month1 - 1]} <span>{year}</span>
           </div>
           <Link
-            href={buildHref(basePath, next.year, next.month1, clientSlug)}
+            href={buildHref(basePath, next.year, next.month1, clientSlug, extraParams)}
             aria-label="Mois suivant"
             className="cal-nav-btn"
           >

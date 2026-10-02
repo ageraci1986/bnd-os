@@ -2,7 +2,12 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { prisma } from '@nexushub/db';
-import { clientColorCss, monthGridRange, parseYearMonth } from '@nexushub/domain';
+import {
+  clientColorCss,
+  lastUserColumnIds,
+  monthGridRange,
+  parseYearMonth,
+} from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
 import { buildHrefWithClient, isOutsideClientFilter } from '@/features/shell/lib/client-filter-url';
 import { loadUserScope } from '@/lib/auth/scope';
@@ -14,6 +19,7 @@ import { listCustomCategories } from '@/features/projects/lib/categories';
 import {
   buildCardFilterClauses,
   parseProjectCardFilter,
+  writeProjectCardFilter,
 } from '@/features/projects/lib/card-filter';
 
 export const metadata: Metadata = { title: 'Calendrier · Projet' };
@@ -55,7 +61,7 @@ export default async function ProjectCalendarPage({
       client: { select: { id: true, name: true, colorToken: true } },
       columns: {
         orderBy: { position: 'asc' },
-        select: { id: true, name: true, isBlockedSystem: true },
+        select: { id: true, name: true, position: true, isBlockedSystem: true },
       },
     },
   });
@@ -80,15 +86,15 @@ export default async function ProjectCalendarPage({
 
   const range = monthGridRange(year, month1);
 
-  // The calendar always constrains by the visible month. If the user
-  // also set a `due` filter (today / overdue / range…), we AND it with
-  // the month range so the chips visible on screen are the intersection
-  // — never widen beyond the displayed grid.
-  const { dueDate: filterDueDate, ...restFilterClauses } = filterClauses;
+  // Mois visible ∩ éventuel filtre `due` ∩ éventuel AND du filtre (asg + mine) :
+  // tout passe dans un seul AND pour qu'aucune clé n'en écrase une autre.
+  const { dueDate: filterDueDate, AND: filterAnd, ...restFilterClauses } = filterClauses;
   const monthDue = { gte: range.start, lt: range.endExclusive };
-  const dueWhere = filterDueDate
-    ? { AND: [{ dueDate: monthDue }, { dueDate: filterDueDate }] }
-    : { dueDate: monthDue };
+  const andClauses = [
+    ...(Array.isArray(filterAnd) ? filterAnd : filterAnd ? [filterAnd] : []),
+    { dueDate: monthDue },
+    ...(filterDueDate ? [{ dueDate: filterDueDate }] : []),
+  ];
 
   const [cards, customCategories, workspaceMembers, availableTemplates] = await Promise.all([
     prisma.card.findMany({
@@ -97,7 +103,7 @@ export default async function ProjectCalendarPage({
         projectId: project.id,
         deletedAt: null,
         ...restFilterClauses,
-        ...dueWhere,
+        AND: andClauses,
       },
       orderBy: { dueDate: 'asc' },
       select: {
@@ -105,6 +111,7 @@ export default async function ProjectCalendarPage({
         title: true,
         shortRef: true,
         dueDate: true,
+        columnId: true,
         column: { select: { isBlockedSystem: true } },
       },
     }),
@@ -124,6 +131,10 @@ export default async function ProjectCalendarPage({
     }),
   ]);
 
+  const doneColumnIds = new Set(
+    lastUserColumnIds(project.columns.map((c) => ({ ...c, projectId: project.id }))),
+  );
+
   const items: CalendarCardItem[] = cards.map((c) => ({
     id: c.id,
     projectId: project.id,
@@ -132,6 +143,7 @@ export default async function ProjectCalendarPage({
     isoDate: c.dueDate ? c.dueDate.toISOString().slice(0, 10) : '',
     clientColorToken: project.client.colorToken,
     columnIsBlocked: c.column.isBlockedSystem,
+    isDone: doneColumnIds.has(c.columnId),
   }));
 
   // Project-scoped: legend only contains the project's client.
@@ -192,6 +204,7 @@ export default async function ProjectCalendarPage({
         basePath={`/projects/${project.id}/calendar`}
         clientSlug={clientSlug}
         legend={legend}
+        extraParams={Object.fromEntries(writeProjectCardFilter(new URLSearchParams(), filter))}
       />
     </div>
   );

@@ -20,10 +20,15 @@ function card(i: number, isoDate = '2026-10-15'): CalendarCardItem {
     isoDate,
     clientColorToken: 'c-acme',
     columnIsBlocked: false,
+    isDone: false,
   };
 }
 
-function renderMonth(cards: readonly CalendarCardItem[], clientSlug: string | null = null) {
+function renderMonth(
+  cards: readonly CalendarCardItem[],
+  clientSlug: string | null = null,
+  extraParams?: Readonly<Record<string, string>>,
+) {
   return render(
     <CalendarView
       year={2026}
@@ -32,6 +37,7 @@ function renderMonth(cards: readonly CalendarCardItem[], clientSlug: string | nu
       basePath="/projects/calendar"
       clientSlug={clientSlug}
       legend={[]}
+      {...(extraParams ? { extraParams } : {})}
     />,
   );
 }
@@ -73,6 +79,33 @@ describe('<CalendarView /> — busy days', () => {
     renderMonth([card(1)], 'acme');
     expect(screen.getByRole('link', { name: 'Carte 1' }).getAttribute('href')).toBe(
       '/projects/p-1?card=card-1&client=acme',
+    );
+  });
+});
+
+describe('<CalendarView /> — done cards & params', () => {
+  it('strikes through a card that sits in the last column', () => {
+    renderMonth([{ ...card(1), isDone: true }]);
+    const link = screen.getByRole('link', { name: /Carte 1/ });
+    expect(link.className).toMatch(/\bdone\b/);
+    expect(link).toHaveTextContent('(terminée)');
+  });
+
+  it('keeps extra params (mine) on month navigation', () => {
+    render(
+      <CalendarView
+        year={2026}
+        month1={10}
+        cards={[]}
+        basePath="/projects/calendar"
+        clientSlug="acme"
+        legend={[]}
+        extraParams={{ mine: '1' }}
+      />,
+    );
+    expect(screen.getByRole('link', { name: 'Mois suivant' })).toHaveAttribute(
+      'href',
+      '/projects/calendar?month=2026-11&client=acme&mine=1',
     );
   });
 });
