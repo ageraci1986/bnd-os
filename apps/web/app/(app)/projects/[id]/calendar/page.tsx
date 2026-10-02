@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { prisma } from '@nexushub/db';
-import { monthGridRange, parseYearMonth } from '@nexushub/domain';
+import { clientColorCss, monthGridRange, parseYearMonth } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
 import { buildHrefWithClient, isOutsideClientFilter } from '@/features/shell/lib/client-filter-url';
 import { loadUserScope } from '@/lib/auth/scope';
@@ -161,7 +161,7 @@ export default async function ProjectCalendarPage({
             <span
               aria-hidden="true"
               className="inline-block h-2 w-2 rounded-full"
-              style={{ background: `var(--${project.client.colorToken})` }}
+              style={{ background: clientColorCss(project.client.colorToken) }}
             />
             {project.client.name}
           </div>

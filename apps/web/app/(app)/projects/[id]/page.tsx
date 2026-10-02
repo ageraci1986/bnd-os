@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { prisma } from '@nexushub/db';
-import { Roles, validateCardTemplateItems } from '@nexushub/domain';
+import { Roles, clientColorCss, validateCardTemplateItems } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
 import { readSearchParamString } from '@/lib/client-filter/server';
 import { buildHrefWithClient, isOutsideClientFilter } from '@/features/shell/lib/client-filter-url';
@@ -280,7 +280,7 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
             <span
               aria-hidden="true"
               className="inline-block h-2 w-2 rounded-full"
-              style={{ background: `var(--${project.client.colorToken})` }}
+              style={{ background: clientColorCss(project.client.colorToken) }}
             />
             {project.client.name}
             {project.type ? (

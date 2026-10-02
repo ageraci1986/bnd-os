@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useRef, useState, useTransition } from 'react';
+import { clientColorCss } from '@nexushub/domain';
 import { markEmailRead } from '../actions/mark-email-read';
 import type { MailDTO } from '../lib/mail-dto';
 import { MailReader } from './mail-reader';
@@ -127,12 +128,12 @@ export function MailList({
                 {m.client ? (
                   <span
                     className="mt-1 inline-flex items-center gap-1 rounded-full bg-[color:var(--color-bg-muted)] px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide"
-                    style={{ color: `var(--${m.client.colorToken})` }}
+                    style={{ color: clientColorCss(m.client.colorToken) }}
                   >
                     <span
                       aria-hidden="true"
                       className="h-1.5 w-1.5 rounded-full"
-                      style={{ background: `var(--${m.client.colorToken})` }}
+                      style={{ background: clientColorCss(m.client.colorToken) }}
                     />
                     {m.client.name}
                   </span>

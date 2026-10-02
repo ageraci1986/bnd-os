@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { CreateClientSchema, CreateContactSchema, UpdateClientSchema } from './schemas';
 
+const validCreateInput = {
+  name: 'Acme',
+  colorToken: 'c-acme',
+  initials: '',
+  domains: '',
+  notes: undefined,
+};
+
 describe('CreateClientSchema', () => {
   it('accepts a minimal payload and auto-derives initials when blank', () => {
     const r = CreateClientSchema.safeParse({
@@ -52,6 +60,27 @@ describe('CreateClientSchema', () => {
       notes: undefined,
     });
     expect(r.success).toBe(false);
+  });
+
+  it('accepts a custom hex color and lowercases it', () => {
+    const res = CreateClientSchema.safeParse({ ...validCreateInput, colorToken: '#1A2B3C' });
+    expect(res.success).toBe(true);
+    if (res.success) expect(res.data.colorToken).toBe('#1a2b3c');
+  });
+
+  it('accepts one of the new palette tokens', () => {
+    expect(
+      CreateClientSchema.safeParse({ ...validCreateInput, colorToken: 'c-teal' }).success,
+    ).toBe(true);
+  });
+
+  it('rejects a CSS injection attempt as color', () => {
+    expect(
+      CreateClientSchema.safeParse({
+        ...validCreateInput,
+        colorToken: 'red;background:url(x)',
+      }).success,
+    ).toBe(false);
   });
 
   it('parses + dedupes + lowercases the domains list', () => {

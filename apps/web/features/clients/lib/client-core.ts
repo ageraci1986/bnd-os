@@ -1,7 +1,7 @@
 import 'server-only';
 import { Prisma, prisma } from '@nexushub/db';
 import { NotFoundError, Roles, canDeleteClient } from '@nexushub/domain';
-import type { ClientColorToken, Raci } from '@nexushub/domain';
+import type { Raci } from '@nexushub/domain';
 import type { AuthContext } from '@/lib/auth';
 import { loadUserScope } from '@/lib/auth/scope';
 import { recordAudit } from '@/lib/audit';
@@ -89,7 +89,8 @@ export async function createClientCore(
 export interface UpdateClientCoreInput {
   readonly clientId: string;
   readonly name?: string;
-  readonly colorToken?: ClientColorToken;
+  /** Token de palette ou couleur libre `#rrggbb` — cf. `isValidClientColor`. */
+  readonly colorToken?: string;
   readonly initials?: string;
   readonly domains?: readonly string[];
   readonly notes?: string | null;

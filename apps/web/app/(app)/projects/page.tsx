@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { prisma } from '@nexushub/db';
-import { Roles } from '@nexushub/domain';
+import { Roles, clientColorCss } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
 import { buildHrefWithClient } from '@/features/shell/lib/client-filter-url';
 import { getClientFilterFromSearchParams, resolveActiveClient } from '@/lib/client-filter/server';
@@ -109,7 +109,7 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
                   <span
                     aria-hidden="true"
                     className="inline-block h-2 w-2 rounded-full"
-                    style={{ background: `var(--${p.client.colorToken})` }}
+                    style={{ background: clientColorCss(p.client.colorToken) }}
                   />
                   {p.client.name}
                   {p.type ? (

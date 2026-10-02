@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState, useTransition } from 'react';
+import { clientColorCss } from '@nexushub/domain';
 import { fetchMailBody } from '../actions/fetch-mail-body';
 import { retrySendMail } from '../actions/retry-send-mail';
 import { MailAttachmentRow } from './mail-attachment-row';
@@ -90,12 +91,12 @@ export function MailReader({ mail }: { readonly mail: MailDTO | null }) {
             {mail.client ? (
               <span
                 className="ml-2 inline-flex items-center gap-1 rounded-full bg-[color:var(--color-bg-muted)] px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide"
-                style={{ color: `var(--${mail.client.colorToken})` }}
+                style={{ color: clientColorCss(mail.client.colorToken) }}
               >
                 <span
                   aria-hidden="true"
                   className="h-1.5 w-1.5 rounded-full"
-                  style={{ background: `var(--${mail.client.colorToken})` }}
+                  style={{ background: clientColorCss(mail.client.colorToken) }}
                 />
                 {mail.client.name}
               </span>

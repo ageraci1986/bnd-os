@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import {
   buildMonthGrid,
+  clientColorCss,
   formatYearMonth,
   nextYearMonth,
   previousYearMonth,
@@ -177,7 +178,7 @@ export function CalendarView({
 function LegendItem({ token, label }: { token: string; label: string }) {
   return (
     <span className="cal-legend-item">
-      <span className="cal-legend-dot" style={{ background: `var(--${token})` }} />
+      <span className="cal-legend-dot" style={{ background: clientColorCss(token) }} />
       {label}
     </span>
   );
