@@ -1,12 +1,15 @@
 'use server';
 import 'server-only';
 import { z } from 'zod';
+import { normalizeMailHost } from '@nexushub/integrations/mail';
 import { requireUser } from '@/lib/auth';
 import { getRateLimiter } from '@/lib/rate-limit';
 import { testImapConnection, type ConnectionTestResult } from '@nexushub/integrations/imap';
 
+// Users paste URLs (`http://ex3.mail.ovh.net/`) or `host:port` — store a bare host.
+const mailHostSchema = z.string().max(255).transform(normalizeMailHost).pipe(z.string().min(1));
 const inputSchema = z.object({
-  host: z.string().min(1).max(255),
+  host: mailHostSchema,
   port: z.number().int().positive().max(65535),
   secure: z.boolean(),
   username: z.string().min(1).max(320),
