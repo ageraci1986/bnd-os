@@ -429,5 +429,6 @@ Avant chaque action :
 | 2026-08-03 | Fiabilité PTT voix (fix batch) — Option maintenu ≥250 ms quand le champ a le focus (composition d'accent préservée), health check du stream micro caché (veille/changement périphérique), erreurs micro transitoires (`unavailable`) distinguées d'un refus de permission | Angelo L. + Claude |
 | 2026-08-03 | Assistant voix V1.5 — PTT ⌥ Option, Deepgram nova-3 (STT), ElevenLabs flash (TTS streaming phrase par phrase), confirmation vocale stricte, routes voice rate-limitées, E2E fake-media                                                                                    | Angelo L. + Claude |
 | 2026-08-03 | Assistant visibilité totale — tools notifications (list/mark lu), bulk mail by-filter gated (comptes réels + labels sanitisés), pagination search_mails, indicateurs total/truncated, règles d'exhaustivité prompt                                                        | Angelo L. + Claude |
+| 2026-10-02 | Lot A quick wins — renommage projet inline, widget + filtre « Mes cartes » (`mine`, userId de session), palette clients 12 tokens + couleur libre hex (contraste WCAG, sanitisation `clientColorCss` domain + ui), cartes terminées barrées au calendrier                 | Angelo L. + Claude |
 
 > **Règle :** chaque modification de ce fichier ajoute une ligne ici.

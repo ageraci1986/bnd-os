@@ -10,13 +10,13 @@
 Retours utilisateurs regroupés en 7 points, découpés en 3 lots. Ce lot A couvre les 5 points petits et
 indépendants. Chaque point s'appuie sur de l'existant :
 
-| #   | Besoin                                         | Existant réutilisé                                                                  |
-| --- | ---------------------------------------------- | ----------------------------------------------------------------------------------- |
-| 1   | Renommer rapidement un projet                  | `updateProjectCore` (`features/projects/lib/project-core.ts`), `NameSchema`         |
-| 2   | Widget « Mes cartes » → calendrier             | `getOverviewMetrics`, `MetricCard`, table `CardAssignee`, `/projects/calendar`      |
-| 3   | Filtrer ses cartes dans un projet              | `card-filter.ts` (`asg`), `project-filters-bar.tsx`                                 |
-| 4   | Palette clients plus large + couleur libre     | `CLIENT_COLOR_TOKENS`, `tokens.css`, `ClientDot` (accepte déjà une couleur littérale) |
-| 5   | Calendrier : carte en dernière colonne barrée  | `isLastUserColumn` (`packages/domain/src/kanban`)                                   |
+| #   | Besoin                                        | Existant réutilisé                                                                    |
+| --- | --------------------------------------------- | ------------------------------------------------------------------------------------- |
+| 1   | Renommer rapidement un projet                 | `updateProjectCore` (`features/projects/lib/project-core.ts`), `NameSchema`           |
+| 2   | Widget « Mes cartes » → calendrier            | `getOverviewMetrics`, `MetricCard`, table `CardAssignee`, `/projects/calendar`        |
+| 3   | Filtrer ses cartes dans un projet             | `card-filter.ts` (`asg`), `project-filters-bar.tsx`                                   |
+| 4   | Palette clients plus large + couleur libre    | `CLIENT_COLOR_TOKENS`, `tokens.css`, `ClientDot` (accepte déjà une couleur littérale) |
+| 5   | Calendrier : carte en dernière colonne barrée | `isLastUserColumn` (`packages/domain/src/kanban`)                                     |
 
 ## 1. Renommer un projet
 
@@ -34,10 +34,10 @@ indépendants. Chaque point s'appuie sur de l'existant :
 
 **Serveur**
 
-- Server Action `features/projects/actions/update-project-name.ts` :
+- Server Action `features/projects/actions/rename-project.ts` (`renameProject`) :
   `requireUserVerified` → validation Zod `{ projectId: uuid, name: NameSchema }` → `updateProjectCore(ctx,
-  { projectId, name })` (même pattern que `deleteProject`, protection Origin native des Server Actions) → `revalidatePath('/projects')` et
-  `revalidatePath('/projects/[id]', 'layout')`.
+{ projectId, name })` (même pattern que `deleteProject`, protection Origin native des Server Actions) → `revalidatePath('/projects')` et
+  `revalidatePath('/projects/<id>', 'layout')` (chemin concret, couvre Liste et Calendrier) ; `NotFoundError` → « Projet introuvable. ».
 - Permissions : celles de `updateProjectCore` (viewer refusé, scope workspace). Aucune règle nouvelle.
 - Audit : aucun (`updateProjectCore` n'audite pas, et le renommage ne figure pas dans la liste §4.7.3 des
   événements audités).
