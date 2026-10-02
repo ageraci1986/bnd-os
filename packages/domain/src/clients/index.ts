@@ -7,12 +7,101 @@
 
 // ---------- Color tokens ----------------------------------------------------
 
-/** Tailwind tokens derived from `mockups/styles.css` (.cm-* gradients). */
-export const CLIENT_COLOR_TOKENS = ['c-acme', 'c-tech', 'c-nova', 'c-lumen', 'c-orbit'] as const;
+/**
+ * Palette workspace. Valeurs CSS dans `packages/ui/src/tokens/tokens.css`
+ * (`--color-<token>`, clair + `[data-theme='dark']`). Un client peut aussi
+ * porter une couleur libre `#rrggbb` (même colonne `colorToken`).
+ */
+export const CLIENT_COLOR_TOKENS = [
+  'c-acme',
+  'c-tech',
+  'c-nova',
+  'c-lumen',
+  'c-orbit',
+  'c-red',
+  'c-orange',
+  'c-lime',
+  'c-teal',
+  'c-cyan',
+  'c-indigo',
+  'c-slate',
+] as const;
 export type ClientColorToken = (typeof CLIENT_COLOR_TOKENS)[number];
+
+export const CLIENT_COLOR_LABELS_FR: Readonly<Record<ClientColorToken, string>> = {
+  'c-acme': 'Rose',
+  'c-tech': 'Bleu',
+  'c-nova': 'Vert',
+  'c-lumen': 'Ambre',
+  'c-orbit': 'Violet',
+  'c-red': 'Rouge',
+  'c-orange': 'Orange',
+  'c-lime': 'Lime',
+  'c-teal': 'Sarcelle',
+  'c-cyan': 'Cyan',
+  'c-indigo': 'Indigo',
+  'c-slate': 'Ardoise',
+};
+
+/** Valeurs claires de `tokens.css` — utilisées uniquement pour le calcul de contraste. */
+const CLIENT_TOKEN_HEX: Readonly<Record<ClientColorToken, string>> = {
+  'c-acme': '#ff2a6d',
+  'c-tech': '#2563eb',
+  'c-nova': '#059669',
+  'c-lumen': '#f59e0b',
+  'c-orbit': '#8b2be2',
+  'c-red': '#dc2626',
+  'c-orange': '#ea580c',
+  'c-lime': '#65a30d',
+  'c-teal': '#0d9488',
+  'c-cyan': '#0891b2',
+  'c-indigo': '#4f46e5',
+  'c-slate': '#475569',
+};
+
+const CLIENT_HEX_RE = /^#[0-9a-f]{6}$/;
 
 export function isValidColorToken(value: unknown): value is ClientColorToken {
   return typeof value === 'string' && (CLIENT_COLOR_TOKENS as readonly string[]).includes(value);
+}
+
+/** Token de la palette OU couleur libre `#rrggbb` (minuscules). */
+export function isValidClientColor(value: unknown): value is string {
+  return isValidColorToken(value) || (typeof value === 'string' && CLIENT_HEX_RE.test(value));
+}
+
+/** Valeur CSS sûre à injecter dans un `style` (jamais la chaîne brute si invalide). */
+export function clientColorCss(value: string): string {
+  if (isValidColorToken(value)) return `var(--color-${value})`;
+  if (CLIENT_HEX_RE.test(value)) return value;
+  return 'var(--color-c-acme)';
+}
+
+function channel(v: number): number {
+  const s = v / 255;
+  return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+}
+
+function relativeLuminance(hex: string): number {
+  const n = Number.parseInt(hex.slice(1), 16);
+  const r = channel((n >> 16) & 255);
+  const g = channel((n >> 8) & 255);
+  const b = channel(n & 255);
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/** Noir ou blanc, celui qui offre le meilleur contraste WCAG sur la couleur du client. */
+export function clientColorForeground(value: string): '#000000' | '#ffffff' {
+  const hex = isValidColorToken(value)
+    ? CLIENT_TOKEN_HEX[value]
+    : CLIENT_HEX_RE.test(value)
+      ? value
+      : null;
+  if (hex === null) return '#ffffff';
+  const l = relativeLuminance(hex);
+  const contrastWhite = 1.05 / (l + 0.05);
+  const contrastBlack = (l + 0.05) / 0.05;
+  return contrastBlack > contrastWhite ? '#000000' : '#ffffff';
 }
 
 // ---------- Initials --------------------------------------------------------
