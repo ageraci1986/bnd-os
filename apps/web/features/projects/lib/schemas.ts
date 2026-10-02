@@ -11,7 +11,7 @@ import {
   validateProjectName,
 } from '@nexushub/domain';
 
-const NameSchema = z
+export const NameSchema = z
   .string()
   .max(160)
   .transform((raw) => validateProjectName(raw))
