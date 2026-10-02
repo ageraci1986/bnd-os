@@ -8,6 +8,7 @@ import { getClientFilterFromSearchParams, resolveActiveClient } from '@/lib/clie
 import { loadUserScope, scopedProjectWhere } from '@/lib/auth/scope';
 import { CalendarIcon, KanbanIcon } from '@/features/shell/components/icons';
 import { DeleteProjectButton } from '@/features/projects/components/delete-project-button';
+import { ProjectTitleEditor } from '@/features/projects/components/project-title-editor';
 
 export const metadata: Metadata = { title: 'Projets' };
 
@@ -95,16 +96,21 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
       ) : (
         <ul className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {projects.map((p) => (
-            <li key={p.id} className="group relative">
+            <li
+              key={p.id}
+              className="group relative rounded-2xl border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] p-5 shadow-[var(--shadow-card)] transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-hover)]"
+            >
+              <Link
+                href={buildHrefWithClient(`/projects/${p.id}`, '', activeClient?.slug ?? null)}
+                aria-label={p.name}
+                className="absolute inset-0 z-[1] rounded-2xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--color-accent-primary)]"
+              />
               {!isViewer ? (
                 <div className="pointer-events-none absolute right-3 top-3 z-10 opacity-0 transition-opacity duration-150 focus-within:pointer-events-auto focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100">
                   <DeleteProjectButton projectId={p.id} projectName={p.name} size="sm" />
                 </div>
               ) : null}
-              <Link
-                href={buildHrefWithClient(`/projects/${p.id}`, '', activeClient?.slug ?? null)}
-                className="block rounded-2xl border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] p-5 shadow-[var(--shadow-card)] transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-hover)]"
-              >
+              <div className="pointer-events-none relative">
                 <div className="mb-2 flex items-center gap-2 text-xs text-[color:var(--color-text-muted)]">
                   <span
                     aria-hidden="true"
@@ -118,7 +124,13 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
                     </span>
                   ) : null}
                 </div>
-                <h2 className="text-lg font-extrabold tracking-tight">{p.name}</h2>
+                <ProjectTitleEditor
+                  projectId={p.id}
+                  name={p.name}
+                  canEdit={!isViewer}
+                  as="h2"
+                  className="text-lg font-extrabold tracking-tight"
+                />
                 {p.description ? (
                   <p className="mt-1 line-clamp-2 text-sm text-[color:var(--color-text-muted)]">
                     {p.description}
@@ -131,7 +143,7 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
                       ? '1 carte'
                       : `${p._count.cards} cartes`}
                 </div>
-              </Link>
+              </div>
             </li>
           ))}
         </ul>

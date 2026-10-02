@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { prisma } from '@nexushub/db';
 import {
+  Roles,
   clientColorCss,
   lastUserColumnIds,
   monthGridRange,
@@ -14,6 +15,7 @@ import { loadUserScope } from '@/lib/auth/scope';
 import { CalendarView, type CalendarCardItem } from '@/features/projects/components/calendar-view';
 import { reconcileBeforeRead } from '@/features/projects/lib/reconcile';
 import { ProjectFiltersBar } from '@/features/projects/components/project-filters-bar';
+import { ProjectTitleEditor } from '@/features/projects/components/project-title-editor';
 import { ViewToggle } from '@/features/projects/components/view-toggle';
 import { listCustomCategories } from '@/features/projects/lib/categories';
 import {
@@ -177,15 +179,23 @@ export default async function ProjectCalendarPage({
             />
             {project.client.name}
           </div>
-          <h1 className="text-[32px] font-extrabold tracking-tight">
-            {project.name}{' '}
-            <span
-              className="bg-clip-text text-transparent"
-              style={{ backgroundImage: 'var(--accent-gradient)' }}
-            >
-              · calendrier
-            </span>
-          </h1>
+          <ProjectTitleEditor
+            projectId={project.id}
+            name={project.name}
+            canEdit={ctx.role !== Roles.Viewer}
+            className="text-[32px] font-extrabold tracking-tight"
+            suffix={
+              <>
+                {' '}
+                <span
+                  className="bg-clip-text text-transparent"
+                  style={{ backgroundImage: 'var(--accent-gradient)' }}
+                >
+                  · calendrier
+                </span>
+              </>
+            }
+          />
         </div>
         <ViewToggle projectId={project.id} />
       </header>

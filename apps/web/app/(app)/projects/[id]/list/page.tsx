@@ -13,6 +13,7 @@ import { listCustomCategories } from '@/features/projects/lib/categories';
 import { ListView, type ListViewCard } from '@/features/projects/components/list-view';
 import { DeleteProjectButton } from '@/features/projects/components/delete-project-button';
 import { ProjectFiltersBar } from '@/features/projects/components/project-filters-bar';
+import { ProjectTitleEditor } from '@/features/projects/components/project-title-editor';
 import { ViewToggle } from '@/features/projects/components/view-toggle';
 import { CardModalController } from '@/features/projects/components/card-modal-controller';
 import {
@@ -210,7 +211,12 @@ export default async function ProjectListPage({ params, searchParams }: ProjectL
                   : `${project.cards.length} cartes`}
             </span>
           </div>
-          <h1 className="text-[32px] font-extrabold tracking-tight">{project.name}</h1>
+          <ProjectTitleEditor
+            projectId={project.id}
+            name={project.name}
+            canEdit={!isViewer}
+            className="text-[32px] font-extrabold tracking-tight"
+          />
           {project.description ? (
             <p className="mt-1 max-w-3xl text-sm text-[color:var(--color-text-muted)]">
               {project.description}
