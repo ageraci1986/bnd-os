@@ -35,8 +35,8 @@ indépendants. Chaque point s'appuie sur de l'existant :
 **Serveur**
 
 - Server Action `features/projects/actions/update-project-name.ts` :
-  `requireUser` → validation Zod `{ projectId: uuid, name: NameSchema }` → CSRF double-submit (pattern des
-  actions existantes) → `updateProjectCore(ctx, { projectId, name })` → `revalidatePath('/projects')` et
+  `requireUserVerified` → validation Zod `{ projectId: uuid, name: NameSchema }` → `updateProjectCore(ctx,
+  { projectId, name })` (même pattern que `deleteProject`, protection Origin native des Server Actions) → `revalidatePath('/projects')` et
   `revalidatePath('/projects/[id]', 'layout')`.
 - Permissions : celles de `updateProjectCore` (viewer refusé, scope workspace). Aucune règle nouvelle.
 - Audit : aucun (`updateProjectCore` n'audite pas, et le renommage ne figure pas dans la liste §4.7.3 des
@@ -46,11 +46,12 @@ indépendants. Chaque point s'appuie sur de l'existant :
 
 **Métrique**
 
-- `getOverviewMetrics` retourne en plus `myOpenCards` et `myOverdueCards`, dans le même `$transaction`.
+- Nouvelle fonction `getMyCardsMetrics` (`features/overview/lib/my-cards.ts`) → `{ open, overdue }`, séparée de
+  `getOverviewMetrics` pour ne pas toucher au tuple de transaction existant.
 - **Carte ouverte** = `deletedAt: null`, `archivedAt: null`, `assignees: { some: { userId } }` (tout rôle RACI),
   et **pas** dans la dernière colonne utilisateur de son projet. Les cartes en colonne Bloqué **comptent**
   (elles sont ouvertes et en retard).
-- **En retard** = carte ouverte avec `dueDate < now()`.
+- **En retard** = carte ouverte avec `dueDate < startOfTodayInParis()` (même convention que le filtre `overdue`).
 - Le scope existant (`scopedCardWhere`) et le filtre client actif (`clientId`) s'appliquent.
 - Exclusion de la dernière colonne : on charge les colonnes (`id`, `projectId`, `position`, `isBlockedSystem`)
   des projets accessibles, on calcule l'id de dernière colonne utilisateur par projet via `isLastUserColumn`,
@@ -59,10 +60,10 @@ indépendants. Chaque point s'appuie sur de l'existant :
 
 **UI**
 
-- `MetricCard` (`packages/ui`) accepte `href?: string`. Avec `href`, la carte est rendue comme un lien
-  (focus visible, hover). Sans `href`, rendu inchangé. Story Storybook mise à jour (variante lien).
-- Libellé « Mes cartes », valeur `myOpenCards`, sous-ligne « dont X en retard » (tonalité `danger` si X > 0),
-  traduite FR/EN (ICU pluriel).
+- `MetricCard` reste inchangé : la page l'enveloppe dans un `next/link` (navigation client, focus visible,
+  hover) — pas de dépendance Next dans `packages/ui`.
+- Libellé « Mes cartes », valeur `open`, sous-ligne « dont X en retard » (tonalité `danger`) si X > 0.
+  Textes en dur FR, comme le reste de la page Overview (pas encore sous next-intl).
 - Clic → `/projects/calendar?mine=1` (+ `&client=<slug>` si filtre client actif).
 
 ## 3. Bascule « Mes cartes »
@@ -71,8 +72,9 @@ indépendants. Chaque point s'appuie sur de l'existant :
 - Côté serveur, `buildCardFilterClauses` ajoute `assignees: { some: { userId: <session.userId> } }`.
   L'id utilisateur provient **exclusivement** de la session (`requireUser`), jamais de l'URL.
 - Combinable avec tous les autres filtres (dont `asg`, en ET logique).
-- UI : bouton bascule « Mes cartes » (`aria-pressed`) dans `project-filters-bar` → présent dans les vues
-  Kanban, Liste et Calendrier d'un projet. Compte dans l'indicateur « filtres actifs » / « Réinitialiser ».
+- UI : composant `MyCardsToggle` (bouton bascule `aria-pressed`) rendu dans `project-filters-bar` → présent
+  dans les vues Kanban, Liste et Calendrier d'un projet. Il porte lui-même son état actif ; il n'entre pas
+  dans le badge « Filtres », mais « Tout effacer » le réinitialise.
 - Calendrier global `/projects/calendar` : supporte `mine=1` et affiche la même bascule (destination du
   widget #2). Le paramètre est conservé par la navigation mois précédent/suivant.
 
@@ -124,9 +126,9 @@ indépendants. Chaque point s'appuie sur de l'existant :
 - **Web (Vitest)** : `parseProjectCardFilter` / `writeProjectCardFilter` avec `mine`, `buildCardFilterClauses`
   (userId de session), schéma Zod couleur client, `getOverviewMetrics` (exclusion dernière colonne, Bloqué
   inclus, filtre client), Server Action `updateProjectName` (succès, nom vide, viewer refusé).
-- **Composants** : `ProjectTitleEditor` (Entrée, Échap, blur, rollback erreur), `MetricCard` avec `href`.
-- **E2E (Playwright)** : renommer un projet depuis le header ; clic widget « Mes cartes » → calendrier
-  filtré.
+- **Composants** : `ProjectTitleEditor` (Entrée, Échap, blur, rollback erreur), `MyCardsToggle`.
+- **E2E** : pas de nouveau parcours Playwright dans ce lot (suite E2E complète = flux local) ; vérification
+  manuelle des 6 parcours listés dans le plan (Task 11).
 
 ## Risques & notes
 
