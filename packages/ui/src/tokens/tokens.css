@@ -43,6 +43,13 @@
   --color-c-nova: #059669;
   --color-c-lumen: #f59e0b;
   --color-c-orbit: #8b2be2;
+  --color-c-red: #dc2626;
+  --color-c-orange: #ea580c;
+  --color-c-lime: #65a30d;
+  --color-c-teal: #0d9488;
+  --color-c-cyan: #0891b2;
+  --color-c-indigo: #4f46e5;
+  --color-c-slate: #475569;
 
   /* — Typography — */
   --font-sans: 'Plus Jakarta Sans', system-ui, sans-serif;
@@ -96,6 +103,13 @@
   --c-nova: var(--color-c-nova);
   --c-lumen: var(--color-c-lumen);
   --c-orbit: var(--color-c-orbit);
+  --c-red: var(--color-c-red);
+  --c-orange: var(--color-c-orange);
+  --c-lime: var(--color-c-lime);
+  --c-teal: var(--color-c-teal);
+  --c-cyan: var(--color-c-cyan);
+  --c-indigo: var(--color-c-indigo);
+  --c-slate: var(--color-c-slate);
 
   /* Gradients & shadows expected by mockup classes */
   --accent-gradient: linear-gradient(135deg, #8b2be2 0%, #ff2a6d 100%);
@@ -152,4 +166,11 @@
   --color-c-nova: #00f0ff;
   --color-c-lumen: #ffb000;
   --color-c-orbit: #c084fc;
+  --color-c-red: #f87171;
+  --color-c-orange: #fb923c;
+  --color-c-lime: #a3e635;
+  --color-c-teal: #2dd4bf;
+  --color-c-cyan: #22d3ee;
+  --color-c-indigo: #818cf8;
+  --color-c-slate: #94a3b8;
 }

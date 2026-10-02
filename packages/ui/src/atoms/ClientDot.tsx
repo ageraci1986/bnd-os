@@ -1,6 +1,18 @@
 import { cn } from '../utils';
 
-export type ClientColorToken = 'c-acme' | 'c-tech' | 'c-nova' | 'c-lumen' | 'c-orbit';
+export type ClientColorToken =
+  | 'c-acme'
+  | 'c-tech'
+  | 'c-nova'
+  | 'c-lumen'
+  | 'c-orbit'
+  | 'c-red'
+  | 'c-orange'
+  | 'c-lime'
+  | 'c-teal'
+  | 'c-cyan'
+  | 'c-indigo'
+  | 'c-slate';
 
 export interface ClientDotProps {
   /** Token from the workspace palette (matches Client.colorToken in DB). */
