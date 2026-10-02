@@ -70,4 +70,12 @@ describe('renameProject', () => {
     });
     expect(mocks.projectUpdate).not.toHaveBeenCalled();
   });
+
+  it('returns a friendly message when the project is gone (NotFoundError)', async () => {
+    mocks.requireUserVerified.mockResolvedValue(admin);
+    mocks.projectFindFirst.mockResolvedValueOnce(null);
+    const res = await renameProject({ projectId: PROJECT_ID, name: 'X' });
+    expect(res).toEqual({ ok: false, message: 'Projet introuvable.' });
+    expect(mocks.projectUpdate).not.toHaveBeenCalled();
+  });
 });

@@ -72,4 +72,60 @@ describe('<ProjectTitleEditor />', () => {
       message: 'Un projet porte déjà ce nom.',
     });
   });
+
+  it('rolls back and toasts on a rejected server action (network/5xx)', async () => {
+    mocks.renameProject.mockRejectedValue(new Error('fetch failed'));
+    render(<ProjectTitleEditor projectId={ID} name="Alpha" canEdit />);
+    const input = startEditing();
+    fireEvent.change(input, { target: { value: 'Beta' } });
+    await act(async () => fireEvent.blur(input));
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Alpha' })).toBeInTheDocument());
+    expect(mocks.notify).toHaveBeenCalledWith({
+      tone: 'error',
+      message: 'Renommage impossible. Réessayez.',
+    });
+  });
+
+  it('restores focus to the pencil button after Escape', () => {
+    render(<ProjectTitleEditor projectId={ID} name="Alpha" canEdit />);
+    const input = startEditing();
+    fireEvent.keyDown(input, { key: 'Escape' });
+    expect(screen.getByRole('button', { name: 'Renommer le projet' })).toHaveFocus();
+  });
+
+  it('restores focus to the pencil button after Enter', async () => {
+    mocks.renameProject.mockResolvedValue({ ok: true, name: 'Beta' });
+    render(<ProjectTitleEditor projectId={ID} name="Alpha" canEdit />);
+    const input = startEditing();
+    fireEvent.change(input, { target: { value: 'Beta' } });
+    await act(async () => fireEvent.keyDown(input, { key: 'Enter' }));
+    expect(screen.getByRole('button', { name: 'Renommer le projet' })).toHaveFocus();
+  });
+
+  it('does not restore focus to the pencil on a plain blur (click elsewhere)', () => {
+    render(<ProjectTitleEditor projectId={ID} name="Alpha" canEdit />);
+    const input = startEditing();
+    fireEvent.change(input, { target: { value: '   ' } });
+    fireEvent.blur(input);
+    expect(screen.queryByRole('button', { name: 'Renommer le projet' })).not.toHaveFocus();
+  });
+
+  it('a blur that follows Escape does not call renameProject', () => {
+    render(<ProjectTitleEditor projectId={ID} name="Alpha" canEdit />);
+    const input = startEditing();
+    fireEvent.change(input, { target: { value: 'Beta' } });
+    fireEvent.keyDown(input, { key: 'Escape' });
+    fireEvent.blur(input);
+    expect(mocks.renameProject).not.toHaveBeenCalled();
+    expect(screen.getByRole('heading', { name: 'Alpha' })).toBeInTheDocument();
+  });
+
+  it('Enter triggers exactly one renameProject call', async () => {
+    mocks.renameProject.mockResolvedValue({ ok: true, name: 'Beta' });
+    render(<ProjectTitleEditor projectId={ID} name="Alpha" canEdit />);
+    const input = startEditing();
+    fireEvent.change(input, { target: { value: 'Beta' } });
+    await act(async () => fireEvent.keyDown(input, { key: 'Enter' }));
+    expect(mocks.renameProject).toHaveBeenCalledTimes(1);
+  });
 });

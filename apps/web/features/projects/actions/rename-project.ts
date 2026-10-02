@@ -2,6 +2,7 @@
 import 'server-only';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
+import { NotFoundError } from '@nexushub/domain';
 import { requireUserVerified } from '@/lib/auth';
 import { updateProjectCore } from '../lib/project-core';
 import { NameSchema } from '../lib/schemas';
@@ -30,10 +31,17 @@ export async function renameProject(input: {
     return { ok: false, message: parsed.error.issues[0]?.message ?? 'Nom de projet invalide.' };
   }
 
-  const res = await updateProjectCore(ctx, parsed.data);
-  if (!res.ok) return res;
+  try {
+    const res = await updateProjectCore(ctx, parsed.data);
+    if (!res.ok) return res;
 
-  revalidatePath('/projects');
-  revalidatePath(`/projects/${parsed.data.projectId}`, 'layout');
-  return { ok: true, name: res.name };
+    revalidatePath('/projects');
+    revalidatePath(`/projects/${parsed.data.projectId}`, 'layout');
+    return { ok: true, name: res.name };
+  } catch (err) {
+    if (err instanceof NotFoundError) {
+      return { ok: false, message: 'Projet introuvable.' };
+    }
+    throw err;
+  }
 }

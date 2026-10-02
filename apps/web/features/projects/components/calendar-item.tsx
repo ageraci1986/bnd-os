@@ -19,9 +19,14 @@ export function CalendarItem({
     .filter(Boolean)
     .join(' ');
   // Bloqué garde son style danger (classe) : pas de couleur client inline.
+  // Le texte se mélange à `--color-text-main` (60%) plutôt que la couleur
+  // client brute : contraste suffisant sur fond clair ET sombre.
   const style = card.columnIsBlocked
     ? undefined
-    : { background: `color-mix(in srgb, ${color} 12%, transparent)`, color };
+    : {
+        background: `color-mix(in srgb, ${color} 12%, transparent)`,
+        color: `color-mix(in srgb, ${color} 60%, var(--color-text-main))`,
+      };
 
   return (
     <Link

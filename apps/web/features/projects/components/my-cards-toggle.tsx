@@ -27,7 +27,21 @@ export function MyCardsToggle() {
       aria-pressed={on}
       className={['nx-filter-trigger', on && 'has-active'].filter(Boolean).join(' ')}
     >
-      <span aria-hidden="true">👤</span>
+      <svg
+        aria-hidden="true"
+        width={12}
+        height={12}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        style={{ display: 'block' }}
+      >
+        <circle cx="12" cy="8" r="3.5" />
+        <path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6" />
+      </svg>
       Mes cartes
     </button>
   );

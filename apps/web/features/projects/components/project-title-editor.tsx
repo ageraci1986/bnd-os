@@ -35,12 +35,22 @@ export function ProjectTitleEditor({
   const [, startTransition] = useTransition();
   const cancelledRef = useRef(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const pencilRef = useRef<HTMLButtonElement | null>(null);
+  // Entrée/Échap doivent rendre le focus au crayon (WCAG 2.4.3) ; un blur
+  // causé par un clic ailleurs laisse le focus suivre ce clic naturellement.
+  const endedViaKeyboardRef = useRef(false);
+  // Ignore la réponse d'une requête de renommage qui n'est plus la dernière
+  // (double Entrée rapide) pour éviter un flicker display → ancien → nouveau.
+  const requestIdRef = useRef(0);
 
   useEffect(() => setDisplay(name), [name]);
   useEffect(() => {
     if (editing) {
       inputRef.current?.focus();
       inputRef.current?.select();
+    } else if (endedViaKeyboardRef.current) {
+      endedViaKeyboardRef.current = false;
+      pencilRef.current?.focus();
     }
   }, [editing]);
 
@@ -59,12 +69,20 @@ export function ProjectTitleEditor({
     if (next.length === 0 || next === display) return;
     const previous = display;
     setDisplay(next);
+    const requestId = ++requestIdRef.current;
     startTransition(async () => {
-      const res = await renameProject({ projectId, name: next });
-      if (res.ok) setDisplay(res.name);
-      else {
+      try {
+        const res = await renameProject({ projectId, name: next });
+        if (requestIdRef.current !== requestId) return;
+        if (res.ok) setDisplay(res.name);
+        else {
+          setDisplay(previous);
+          notify({ tone: 'error', message: res.message });
+        }
+      } catch {
+        if (requestIdRef.current !== requestId) return;
         setDisplay(previous);
-        notify({ tone: 'error', message: res.message });
+        notify({ tone: 'error', message: 'Renommage impossible. Réessayez.' });
       }
     });
   };
@@ -84,9 +102,11 @@ export function ProjectTitleEditor({
         onKeyDown={(e) => {
           if (e.key === 'Enter') {
             e.preventDefault();
+            endedViaKeyboardRef.current = true;
             inputRef.current?.blur();
           } else if (e.key === 'Escape') {
             e.preventDefault();
+            endedViaKeyboardRef.current = true;
             cancelledRef.current = true;
             setEditing(false);
           }
@@ -98,13 +118,14 @@ export function ProjectTitleEditor({
   }
 
   return (
-    <div className="group/title flex items-center gap-2">
-      <Heading className={className}>
+    <div className="group/title flex min-w-0 items-center gap-2">
+      <Heading className={['min-w-0 break-words', className].filter(Boolean).join(' ')}>
         {display}
         {suffix}
       </Heading>
       {canEdit ? (
         <button
+          ref={pencilRef}
           type="button"
           onClick={begin}
           aria-label="Renommer le projet"
