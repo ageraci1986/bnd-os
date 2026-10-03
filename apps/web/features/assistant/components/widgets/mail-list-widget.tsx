@@ -115,7 +115,9 @@ function renderBody(state: BodyState | undefined) {
   if (state.bodyHtmlSanitized !== null) {
     return (
       <div
-        className="max-h-80 overflow-y-auto text-xs leading-relaxed text-[color:var(--color-text-soft)]"
+        // Corps « papier » clair (spec lot B §2, même classe que MailReader) :
+        // le HTML d'un mail externe suppose un fond blanc, pas le thème app.
+        className="mail-paper max-h-80 overflow-y-auto text-xs leading-relaxed"
         // `bodyHtmlSanitized` est assaini côté serveur par l'allowlist partagée
         // (packages/integrations/src/imap/body.ts, action `fetchMailBody`)
         // avant d'être renvoyé — même garantie que `MailReader`

@@ -2731,3 +2731,13 @@
 .nx-comment__delete-form {
   display: inline;
 }
+
+/* Corps HTML des mails externes : toujours sur « papier » clair (spec lot B §2),
+   les mails supposent un fond blanc. */
+.mail-paper {
+  color-scheme: light;
+  background: #ffffff;
+  color: #111827;
+  border-radius: 12px;
+  padding: 16px 18px;
+}
