@@ -8,19 +8,25 @@ const actions = vi.hoisted(() => ({
   getCardAttachmentUrl: vi.fn(),
   deleteCardAttachment: vi.fn(),
 }));
-const { uploadToSignedUrl, notify, getAttachmentInlineUrl, downloadCardAttachment } = vi.hoisted(
-  () => ({
-    uploadToSignedUrl: vi.fn(),
-    notify: vi.fn(),
-    getAttachmentInlineUrl: vi.fn(),
-    downloadCardAttachment: vi.fn(),
-  }),
-);
+const {
+  uploadToSignedUrl,
+  notify,
+  getAttachmentInlineUrl,
+  getAttachmentThumbUrl,
+  downloadCardAttachment,
+} = vi.hoisted(() => ({
+  uploadToSignedUrl: vi.fn(),
+  notify: vi.fn(),
+  getAttachmentInlineUrl: vi.fn(),
+  getAttachmentThumbUrl: vi.fn(),
+  downloadCardAttachment: vi.fn(),
+}));
 
 vi.mock('../actions/card-attachments', () => actions);
 vi.mock('../lib/upload-to-signed-url', () => ({ uploadToSignedUrl }));
 vi.mock('../lib/attachment-url-cache', () => ({
   getAttachmentInlineUrl,
+  getAttachmentThumbUrl,
   forgetAttachmentUrl: vi.fn(),
 }));
 vi.mock('../lib/attachment-download', () => ({ downloadCardAttachment }));
@@ -66,6 +72,8 @@ describe('<CardAttachmentsSection />', () => {
     downloadCardAttachment.mockReset();
     getAttachmentInlineUrl.mockReset();
     getAttachmentInlineUrl.mockResolvedValue('https://cdn.test/thumb');
+    getAttachmentThumbUrl.mockReset();
+    getAttachmentThumbUrl.mockResolvedValue('https://cdn.test/thumb');
   });
   afterEach(() => {
     vi.clearAllTimers();
@@ -142,7 +150,11 @@ describe('<CardAttachmentsSection />', () => {
         }),
     );
     actions.finalizeCardAttachment.mockResolvedValue({ ok: true });
-    actions.listCardAttachments.mockResolvedValue({ ok: true, attachments: [] });
+    actions.listCardAttachments.mockResolvedValue({
+      ok: true,
+      attachments: [],
+      recentlyRejected: [],
+    });
 
     render(<CardAttachmentsSection cardId={CARD_ID} initial={[]} canUpload />);
     pick([new File(['png'], 'maquette.png', { type: 'image/png' })]);
@@ -214,6 +226,7 @@ describe('<CardAttachmentsSection />', () => {
     actions.listCardAttachments.mockResolvedValue({
       ok: true,
       attachments: [att({ id: 'p1', filename: 'scan.pdf' })],
+      recentlyRejected: [],
     });
 
     render(
@@ -242,12 +255,45 @@ describe('<CardAttachmentsSection />', () => {
     window.removeEventListener('nx:card-updated', listener);
   });
 
-  it('toasts when a pending attachment disappears (rejected by the scan)', async () => {
-    actions.listCardAttachments.mockResolvedValue({ ok: true, attachments: [] });
+  it.each([
+    ['virus', 'Fichier refusé par l’antivirus.'],
+    ['type', 'Type de fichier non conforme.'],
+    ['size', 'Taille de fichier incohérente.'],
+    ['scan_failed', 'Analyse impossible, réessaie plus tard.'],
+  ] as const)(
+    'toasts the explicit reason when my pending attachment is rejected (%s)',
+    async (rejectReason, message) => {
+      actions.listCardAttachments.mockResolvedValue({
+        ok: true,
+        attachments: [],
+        recentlyRejected: [{ id: 'p1', rejectReason }],
+      });
+      render(
+        <CardAttachmentsSection
+          cardId={CARD_ID}
+          initial={[att({ id: 'p1', filename: 'bad.zip', scanStatus: 'pending' })]}
+          canUpload
+        />,
+      );
+      await act(async () => {
+        vi.advanceTimersByTime(3000);
+      });
+      await flush();
+      expect(notify).toHaveBeenCalledWith({ tone: 'error', message: `« bad.zip » : ${message}` });
+      expect(screen.queryByText('bad.zip')).toBeNull();
+    },
+  );
+
+  it('does not toast when someone else’s pending attachment disappears (no known reason)', async () => {
+    actions.listCardAttachments.mockResolvedValue({
+      ok: true,
+      attachments: [],
+      recentlyRejected: [],
+    });
     render(
       <CardAttachmentsSection
         cardId={CARD_ID}
-        initial={[att({ id: 'p1', filename: 'bad.zip', scanStatus: 'pending' })]}
+        initial={[att({ id: 'p1', filename: 'theirs.zip', scanStatus: 'pending' })]}
         canUpload
       />,
     );
@@ -255,17 +301,15 @@ describe('<CardAttachmentsSection />', () => {
       vi.advanceTimersByTime(3000);
     });
     await flush();
-    expect(notify).toHaveBeenCalledWith({
-      tone: 'error',
-      message: 'Fichier refusé par l’analyse antivirus.',
-    });
-    expect(screen.queryByText('bad.zip')).toBeNull();
+    expect(notify).not.toHaveBeenCalled();
+    expect(screen.queryByText('theirs.zip')).toBeNull();
   });
 
   it('stops polling after 2 minutes', async () => {
     actions.listCardAttachments.mockResolvedValue({
       ok: true,
       attachments: [att({ id: 'p1', scanStatus: 'pending' })],
+      recentlyRejected: [],
     });
     render(
       <CardAttachmentsSection
@@ -284,10 +328,41 @@ describe('<CardAttachmentsSection />', () => {
     expect(calls).toBeGreaterThanOrEqual(39);
   });
 
+  it('offers an "Actualiser" button once polling gave up, which restarts polling', async () => {
+    actions.listCardAttachments.mockResolvedValue({
+      ok: true,
+      attachments: [att({ id: 'p1', scanStatus: 'pending' })],
+      recentlyRejected: [],
+    });
+    render(
+      <CardAttachmentsSection
+        cardId={CARD_ID}
+        initial={[att({ id: 'p1', scanStatus: 'pending' })]}
+        canUpload
+      />,
+    );
+    expect(screen.queryByRole('button', { name: 'Actualiser' })).toBeNull();
+    for (let i = 0; i < 45; i++) {
+      await act(async () => {
+        vi.advanceTimersByTime(3000);
+      });
+    }
+    const before = actions.listCardAttachments.mock.calls.length;
+    const refresh = screen.getByRole('button', { name: 'Actualiser' });
+    fireEvent.click(refresh);
+    expect(screen.queryByRole('button', { name: 'Actualiser' })).toBeNull();
+    await act(async () => {
+      vi.advanceTimersByTime(3000);
+    });
+    await flush();
+    expect(actions.listCardAttachments.mock.calls.length).toBe(before + 1);
+  });
+
   it('stops polling on unmount', async () => {
     actions.listCardAttachments.mockResolvedValue({
       ok: true,
       attachments: [att({ id: 'p1', scanStatus: 'pending' })],
+      recentlyRejected: [],
     });
     const { unmount } = render(
       <CardAttachmentsSection
@@ -357,8 +432,10 @@ describe('<CardAttachmentsSection />', () => {
       />,
     );
     await flush();
-    expect(getAttachmentInlineUrl).toHaveBeenCalledTimes(1);
-    expect(getAttachmentInlineUrl).toHaveBeenCalledWith('i1');
+    // Lot de vignettes par carte (un seul appel serveur partagé), pas d'URL unitaire.
+    expect(getAttachmentThumbUrl).toHaveBeenCalledTimes(1);
+    expect(getAttachmentThumbUrl).toHaveBeenCalledWith(CARD_ID, 'i1');
+    expect(getAttachmentInlineUrl).not.toHaveBeenCalled();
     // Decorative thumbnail (alt="") inside the "Ouvrir a.png" button.
     const open = screen.getByRole('button', { name: 'Ouvrir a.png' });
     const img = within(open).getByRole('presentation');

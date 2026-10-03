@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { formatAttachmentSize, resolveUploadContentType } from './attachment-format';
+import {
+  attachmentRejectionMessage,
+  formatAttachmentSize,
+  resolveUploadContentType,
+} from './attachment-format';
 
 describe('resolveUploadContentType', () => {
   it('keeps an allowed declared type', () => {
@@ -28,5 +32,16 @@ describe('formatAttachmentSize', () => {
     expect(formatAttachmentSize(500)).toBe('500 o');
     expect(formatAttachmentSize(2048)).toBe('2 Ko');
     expect(formatAttachmentSize(1.5 * 1024 * 1024)).toBe('1,5 Mo');
+  });
+});
+
+describe('attachmentRejectionMessage', () => {
+  it('maps each rejection category to an explicit message', () => {
+    expect(attachmentRejectionMessage('virus')).toBe('Fichier refusé par l’antivirus.');
+    expect(attachmentRejectionMessage('type')).toBe('Type de fichier non conforme.');
+    expect(attachmentRejectionMessage('size')).toBe('Taille de fichier incohérente.');
+    expect(attachmentRejectionMessage('scan_failed')).toBe(
+      'Analyse impossible, réessaie plus tard.',
+    );
   });
 });

@@ -1,4 +1,5 @@
 import { ALLOWED_CARD_ATTACHMENT_TYPES, isAllowedAttachment } from '@nexushub/domain';
+import type { AttachmentRejectReason } from './card-attachment-core';
 
 /**
  * MIME que certains navigateurs/OS posent à la place du MIME canonique
@@ -41,4 +42,16 @@ const dateFr = new Intl.DateTimeFormat('fr-FR', {
 export function formatAttachmentDate(iso: string): string {
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? '' : dateFr.format(d);
+}
+
+const REJECTION_MESSAGES: Readonly<Record<AttachmentRejectReason, string>> = {
+  virus: 'Fichier refusé par l’antivirus.',
+  type: 'Type de fichier non conforme.',
+  size: 'Taille de fichier incohérente.',
+  scan_failed: 'Analyse impossible, réessaie plus tard.',
+};
+
+/** Message du toast quand une de MES PJ est rejetée par le scan. */
+export function attachmentRejectionMessage(reason: AttachmentRejectReason): string {
+  return REJECTION_MESSAGES[reason];
 }

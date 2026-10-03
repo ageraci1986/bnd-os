@@ -16,9 +16,10 @@ import {
 } from '../actions/card-attachments';
 import type { CardAttachmentDTO } from '../lib/card-attachment-core';
 import { uploadToSignedUrl } from '../lib/upload-to-signed-url';
-import { forgetAttachmentUrl, getAttachmentInlineUrl } from '../lib/attachment-url-cache';
+import { forgetAttachmentUrl, getAttachmentThumbUrl } from '../lib/attachment-url-cache';
 import { downloadCardAttachment } from '../lib/attachment-download';
 import {
+  attachmentRejectionMessage,
   formatAttachmentDate,
   formatAttachmentSize,
   resolveUploadContentType,
@@ -42,7 +43,6 @@ interface UploadRow {
 const MAX_PARALLEL_UPLOADS = 3;
 const POLL_INTERVAL_MS = 3000;
 const POLL_MAX_MS = 2 * 60 * 1000;
-const REJECTED_MESSAGE = 'Fichier refusé par l’analyse antivirus.';
 
 /**
  * Section « Pièces jointes » du modal de carte (lot C, spec §5).
@@ -52,7 +52,9 @@ const REJECTED_MESSAGE = 'Fichier refusé par l’analyse antivirus.';
  * vers Storage avec progression → `finalizeCardAttachment` (déclenche le
  * scan). La PJ reste « Analyse en cours… » tant que le scan n'a pas tranché :
  * polling `listCardAttachments` toutes les 3 s, arrêté à 2 min ou au
- * démontage. Une PJ `pending` qui disparaît de la liste a été rejetée.
+ * démontage ; au-delà de 2 min, un bouton « Actualiser » relance le polling.
+ * Une de MES PJ `pending` qui disparaît a été rejetée : toast explicite
+ * selon la catégorie renvoyée par le serveur (`recentlyRejected`).
  */
 export function CardAttachmentsSection({
   cardId,
@@ -64,6 +66,8 @@ export function CardAttachmentsSection({
   const [viewerId, setViewerId] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const [pollEpoch, setPollEpoch] = useState(0);
+  /** Polling abandonné après 2 min alors que des PJ restent en analyse. */
+  const [pollExpired, setPollExpired] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const hintId = useId();
   const titleId = useId();
@@ -96,6 +100,7 @@ export function CardAttachmentsSection({
     const timer = window.setInterval(() => {
       if (Date.now() - startedAt > POLL_MAX_MS) {
         window.clearInterval(timer);
+        setPollExpired(true);
         return;
       }
       if (inflight) return;
@@ -108,10 +113,18 @@ export function CardAttachmentsSection({
             (a) => !uploadingIds.current.has(a.id) && !deletedIds.current.has(a.id),
           );
           const serverIds = new Set(server.map((a) => a.id));
+          const rejected = new Map(res.recentlyRejected.map((r) => [r.id, r.rejectReason]));
           const prev = itemsRef.current;
           for (const a of prev) {
-            if (a.scanStatus === 'pending' && known.has(a.id) && !serverIds.has(a.id)) {
-              notify({ tone: 'error', message: REJECTED_MESSAGE });
+            if (a.scanStatus !== 'pending' || !known.has(a.id) || serverIds.has(a.id)) continue;
+            // Raison connue = MA PJ rejetée. Sinon (PJ d'un autre supprimée
+            // ou rejetée), disparition silencieuse.
+            const reason = rejected.get(a.id);
+            if (reason) {
+              notify({
+                tone: 'error',
+                message: `« ${a.filename} » : ${attachmentRejectionMessage(reason)}`,
+              });
             }
           }
           // Keep rows added locally after this request started.
@@ -191,6 +204,7 @@ export function CardAttachmentsSection({
       };
       setItems((prev) => (prev.some((a) => a.id === attachmentId) ? prev : [...prev, pending]));
       // Restart the 2-min polling window for this new file.
+      setPollExpired(false);
       setPollEpoch((n) => n + 1);
     },
     [cardId],
@@ -309,6 +323,22 @@ export function CardAttachmentsSection({
         </div>
       ) : null}
 
+      {pollExpired && hasPending ? (
+        <p className="nx-attachments__hint" role="status">
+          L’analyse prend plus de temps que prévu.{' '}
+          <button
+            type="button"
+            className="nx-btn nx-btn--ghost"
+            onClick={() => {
+              setPollExpired(false);
+              setPollEpoch((n) => n + 1);
+            }}
+          >
+            Actualiser
+          </button>
+        </p>
+      ) : null}
+
       {total === 0 && uploads.length === 0 ? (
         <p className="nx-attachments__empty">Aucune pièce jointe.</p>
       ) : (
@@ -316,6 +346,7 @@ export function CardAttachmentsSection({
           {items.map((a) => (
             <AttachmentRow
               key={a.id}
+              cardId={cardId}
               attachment={a}
               onOpen={() => setViewerId(a.id)}
               onDelete={() => void remove(a)}
@@ -341,10 +372,12 @@ export function CardAttachmentsSection({
 }
 
 function AttachmentRow({
+  cardId,
   attachment: a,
   onOpen,
   onDelete,
 }: {
+  readonly cardId: string;
   readonly attachment: CardAttachmentDTO;
   readonly onOpen: () => void;
   readonly onDelete: () => void;
@@ -366,7 +399,7 @@ function AttachmentRow({
           onClick={onOpen}
           aria-label={`Ouvrir ${a.filename}`}
         >
-          <AttachmentThumb attachment={a} kind={kind} />
+          <AttachmentThumb cardId={cardId} attachment={a} kind={kind} />
         </button>
       ) : (
         <div className="nx-attachment__preview" aria-hidden="true">
@@ -462,11 +495,17 @@ function UploadingRow({ row }: { readonly row: UploadRow }) {
   );
 }
 
-/** Image vignette (clean images only), fetched when scrolled into view. */
+/**
+ * Image vignette (clean images only), fetched when scrolled into view. Les
+ * URL viennent d'un lot signé par carte (`getAttachmentThumbUrl`) : un seul
+ * appel serveur pour toutes les vignettes visibles.
+ */
 function AttachmentThumb({
+  cardId,
   attachment,
   kind,
 }: {
+  readonly cardId: string;
   readonly attachment: CardAttachmentDTO;
   readonly kind: AttachmentKind;
 }) {
@@ -479,7 +518,7 @@ function AttachmentThumb({
     if (!isImage) return;
     let cancelled = false;
     const load = () => {
-      void getAttachmentInlineUrl(attachment.id).then((url) => {
+      void getAttachmentThumbUrl(cardId, attachment.id).then((url) => {
         if (!cancelled && url) setSrc(url);
       });
     };
@@ -501,7 +540,7 @@ function AttachmentThumb({
       cancelled = true;
       io.disconnect();
     };
-  }, [attachment.id, isImage]);
+  }, [cardId, attachment.id, isImage]);
 
   return (
     <span ref={ref} className="nx-attachment__thumb">
@@ -518,7 +557,7 @@ function AttachmentThumb({
             // Expired / revoked URL: refresh once.
             if (retried.current) return;
             retried.current = true;
-            void getAttachmentInlineUrl(attachment.id, { force: true }).then((url) => {
+            void getAttachmentThumbUrl(cardId, attachment.id, { force: true }).then((url) => {
               if (url) setSrc(url);
             });
           }}
