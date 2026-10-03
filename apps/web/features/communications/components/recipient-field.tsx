@@ -244,7 +244,7 @@ export function RecipientField({
                   )}
                 </div>
                 {s.source === 'contact' && (
-                  <span className="rounded-full bg-[color:var(--color-bg-muted)] px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[color:var(--color-accent-primary)]">
+                  <span className="rounded-full bg-[color:var(--color-bg-muted)] px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[color:var(--color-accent-text)]">
                     Contact
                   </span>
                 )}

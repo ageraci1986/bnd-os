@@ -106,7 +106,7 @@ export function BoardView({
           <button
             type="button"
             onClick={onAddColumn}
-            className="w-full rounded-md border-2 border-dashed border-[color:var(--color-border-light)] bg-transparent p-6 text-[11px] font-extrabold uppercase tracking-[0.5px] text-[color:var(--color-text-muted)] transition hover:border-[color:var(--color-accent-primary)] hover:text-[color:var(--color-accent-primary)]"
+            className="w-full rounded-md border-2 border-dashed border-[color:var(--color-border-light)] bg-transparent p-6 text-[11px] font-extrabold uppercase tracking-[0.5px] text-[color:var(--color-text-muted)] transition hover:border-[color:var(--color-accent-primary)] hover:text-[color:var(--color-accent-text)]"
           >
             + Nouvelle colonne
           </button>

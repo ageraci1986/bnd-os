@@ -77,7 +77,7 @@ export function ContactRow({ csrfToken, contact }: ContactRowProps) {
         <button
           type="button"
           onClick={() => setEditing(true)}
-          className="text-xs text-[color:var(--color-accent-primary)] underline"
+          className="text-xs text-[color:var(--color-accent-text)] underline"
         >
           Modifier
         </button>

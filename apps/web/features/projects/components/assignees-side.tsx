@@ -219,7 +219,7 @@ function RaciSwitch({
             onClick={() => onChange(r)}
             title={RACI_FULL_FR[r]}
             className={['raci-pill', active && 'active'].filter(Boolean).join(' ')}
-            style={active ? { background: RACI_COLOR[r], color: 'white' } : undefined}
+            style={active ? { background: RACI_COLOR[r], color: '#fff' } : undefined} // theme-exempt: texte sur pastille RACI
           >
             {raciLabelFr(r)}
           </button>

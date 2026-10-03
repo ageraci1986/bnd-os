@@ -89,7 +89,7 @@ function communicationsHref(mail: MailRow): string {
 const PILL_BASE =
   'inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-bold disabled:opacity-50';
 const PILL_GRAD = `${PILL_BASE} bg-[image:var(--accent-gradient)] text-white shadow-[0_3px_10px_rgba(139,43,226,0.3)]`;
-const PILL_SOFT = `${PILL_BASE} bg-[image:var(--accent-gradient-soft)] text-[color:var(--color-accent-primary)]`;
+const PILL_SOFT = `${PILL_BASE} bg-[image:var(--accent-gradient-soft)] text-[color:var(--color-accent-text)]`;
 const PILL_GHOST = `${PILL_BASE} border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] text-[color:var(--color-text-muted)] hover:bg-[color:var(--color-bg-hover)]`;
 // Bordure pâle thème-aware : on réutilise --color-danger-bg (plutôt que la
 // teinte fixe de la maquette) pour que le pill reste lisible en sombre.

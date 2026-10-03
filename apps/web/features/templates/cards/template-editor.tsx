@@ -64,7 +64,7 @@ export function TemplateEditor({
               ? {
                   background: 'var(--accent-gradient)',
                   borderColor: 'transparent',
-                  color: 'white',
+                  color: '#fff', // theme-exempt: texte sur fond de marque
                   boxShadow: '0 4px 15px rgba(138, 43, 226, 0.3)',
                 }
               : {
