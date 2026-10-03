@@ -27,6 +27,7 @@ import { deleteCard } from '../actions/delete-card';
 import { CSRF_FIELD_NAME } from '@/lib/csrf/field';
 import { notify } from '@/features/shell/components/toaster';
 import { CardCommentsThread } from './card-comments-thread';
+import { CardAttachmentsSection } from './card-attachments-section';
 import {
   CARD_REMOVED_EVENT,
   CARD_UPDATED_EVENT,
@@ -373,6 +374,17 @@ export function CardModal({
                 />
               </section>
             </fieldset>
+
+            {/* Attachments sit outside the fieldset too: the section gates
+             *  its own mutations (`canUpload`, per-item `canDelete`) while
+             *  download / preview stay available to read-only viewers. */}
+            {!isLoading ? (
+              <CardAttachmentsSection
+                cardId={card.id}
+                initial={card.attachments}
+                canUpload={!isReadOnly}
+              />
+            ) : null}
 
             {/* CardCommentsThread sits OUTSIDE the main fieldset so the
              *  posting form stays interactive for in-scope Viewers (per

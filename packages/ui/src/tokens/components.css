@@ -2441,6 +2441,322 @@
   color: var(--danger);
 }
 
+/* ===== Card attachments (lot C) ===== */
+.nx-attachments {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-light);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.nx-attachments__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 0;
+}
+.nx-attachments__count {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--bg-hover);
+  color: var(--text-soft);
+  font-size: 11px;
+  letter-spacing: 0;
+}
+.nx-attachments__drop {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 14px 16px;
+  border: 1.5px dashed var(--border-light);
+  border-radius: 12px;
+  background: var(--bg-card-alt);
+  transition:
+    border-color 120ms ease,
+    background 120ms ease;
+}
+.nx-attachments__drop--active {
+  border-color: var(--color-accent-primary);
+  background: var(--accent-gradient-soft);
+}
+.nx-attachments__add {
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 12px;
+}
+.nx-attachments__add:focus-visible,
+.nx-attachment__preview:focus-visible,
+.nx-attachment__action:focus-visible,
+.nx-viewer__close:focus-visible,
+.nx-viewer__nav:focus-visible,
+.nx-viewer__action:focus-visible {
+  outline: 2px solid var(--color-accent-primary);
+  outline-offset: 2px;
+}
+.nx-attachments__hint,
+.nx-attachments__empty {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.nx-attachments__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 8px;
+}
+.nx-attachment {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--border-light);
+  border-radius: 10px;
+  background: var(--bg-card);
+}
+.nx-attachment__preview {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: var(--bg-muted);
+  color: var(--text-soft);
+  font: inherit;
+}
+button.nx-attachment__preview {
+  cursor: zoom-in;
+}
+.nx-attachment__thumb {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+}
+.nx-attachment__thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.nx-attachment__icon {
+  display: block;
+}
+.nx-attachment__meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.nx-attachment__name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.nx-attachment__sub {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.nx-attachment__status {
+  align-self: flex-start;
+  margin-top: 2px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--warning-bg);
+  color: var(--text-main);
+  font-size: 10px;
+  font-weight: 700;
+}
+.nx-attachment__actions {
+  flex: none;
+  display: flex;
+  gap: 2px;
+}
+.nx-attachment__action {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-soft);
+  cursor: pointer;
+}
+.nx-attachment__action:hover {
+  background: var(--bg-hover);
+  color: var(--text-main);
+}
+.nx-attachment__action--danger:hover {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+.nx-progress {
+  height: 4px;
+  margin-top: 4px;
+  border-radius: 999px;
+  background: var(--bg-hover);
+  overflow: hidden;
+}
+.nx-progress__bar {
+  height: 100%;
+  background: var(--color-accent-primary);
+  transition: width 150ms linear;
+}
+
+/* Viewer (portal on body, above the card modal z-index 101). */
+.nx-viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+}
+.nx-viewer__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(7, 9, 16, 0.85);
+}
+.nx-viewer__dialog {
+  position: relative;
+  width: min(1100px, 96vw);
+  height: min(860px, 94vh);
+  display: grid;
+  grid-template-rows: auto 1fr;
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  box-shadow: var(--shadow-lg);
+}
+.nx-viewer__bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px 10px 18px;
+  border-bottom: 1px solid var(--border-light);
+}
+.nx-viewer__title {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.nx-viewer__counter {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.nx-viewer__action {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 12px;
+}
+.nx-viewer__close {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--bg-hover);
+  color: var(--text-main);
+  cursor: pointer;
+}
+.nx-viewer__stage {
+  position: relative;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  background: var(--bg-muted);
+}
+.nx-viewer__media {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  display: block;
+}
+/* next/image `fill` positions it absolutely over the stage. */
+.nx-viewer__image {
+  object-fit: contain;
+}
+.nx-viewer__frame {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: var(--bg-card);
+}
+.nx-viewer__fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 24px;
+  font-size: 14px;
+  color: var(--text-soft);
+  text-align: center;
+}
+.nx-viewer__fallback p {
+  margin: 0;
+}
+.nx-viewer__nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 1;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--border-light);
+  border-radius: 50%;
+  background: var(--bg-card);
+  color: var(--text-main);
+  box-shadow: var(--shadow-card);
+  cursor: pointer;
+}
+.nx-viewer__nav--prev {
+  left: 12px;
+}
+.nx-viewer__nav--next {
+  right: 12px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .nx-progress__bar,
+  .nx-attachments__drop {
+    transition: none;
+  }
+}
+
 /* ===== Card comments ===== */
 .nx-comments {
   margin-top: 24px;
