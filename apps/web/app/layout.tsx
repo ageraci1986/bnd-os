@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { Plus_Jakarta_Sans } from 'next/font/google';
+import { readThemeCookie } from '@/lib/theme/cookie';
 import '../styles/globals.css';
 
 const jakarta = Plus_Jakarta_Sans({
@@ -26,9 +27,10 @@ export const viewport: Viewport = {
   ],
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const theme = await readThemeCookie();
   return (
-    <html lang="fr" className={jakarta.variable} suppressHydrationWarning>
+    <html lang="fr" className={jakarta.variable} data-theme={theme} suppressHydrationWarning>
       <body>{children}</body>
     </html>
   );

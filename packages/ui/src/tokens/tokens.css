@@ -1,55 +1,72 @@
 /* ============================================================
    NEXUSHUB — Design tokens
    Source: mockups/styles.css → ported to Tailwind v4 @theme
-   Modes: light (default) + dark via [data-theme="dark"]
+   Modes: light / dark / system via color-scheme + light-dark()
    ============================================================ */
 
 @theme {
   /* — Canvas — */
-  --color-bg-app: #f4f6f9;
-  --color-bg-sidebar: #ffffff;
-  --color-bg-card: #ffffff;
-  --color-bg-card-alt: #fafbfc;
-  --color-bg-hover: #f0f2f5;
-  --color-bg-muted: #f8f9fb;
+  --color-bg-app: light-dark(#f4f6f9, #0b0c10);
+  --color-bg-sidebar: light-dark(#ffffff, #12141a);
+  --color-bg-card: light-dark(#ffffff, #1c1e26);
+  --color-bg-card-alt: light-dark(#fafbfc, #171923);
+  --color-bg-hover: light-dark(#f0f2f5, rgba(255, 255, 255, 0.05));
+  --color-bg-muted: light-dark(#f8f9fb, #14161e);
 
   /* — Text — */
-  --color-text-main: #111827;
-  --color-text-soft: #374151;
-  --color-text-muted: #6b7280;
-  --color-text-ghost: #9ca3af;
+  --color-text-main: light-dark(#111827, #f9fafb);
+  --color-text-soft: light-dark(#374151, #e5e7eb);
+  --color-text-muted: light-dark(#6b7280, #9ca3af);
+  --color-text-ghost: light-dark(#9ca3af, #6b7280);
 
   /* — Borders — */
-  --color-border-light: #e5e7eb;
-  --color-border-soft: #eef0f3;
+  --color-border-light: light-dark(#e5e7eb, rgba(255, 255, 255, 0.08));
+  --color-border-soft: light-dark(#eef0f3, rgba(255, 255, 255, 0.05));
 
   /* — Brand — */
   --color-accent-primary: #8b2be2;
   --color-accent-secondary: #ff2a6d;
 
+  /* Texte d'accent (liens, kickers) — violet plus clair en sombre */
+  --color-accent-text: light-dark(#8b2be2, #c084fc);
+
   /* — Semantic — */
-  --color-success: #059669;
-  --color-success-bg: #d1fae5;
-  --color-warning: #d97706;
-  --color-warning-bg: #fef3c7;
-  --color-danger: #e11d48;
-  --color-danger-bg: #ffe4e6;
-  --color-info: #2563eb;
-  --color-info-bg: #dbeafe;
+  --color-success: light-dark(#059669, #00f0ff);
+  --color-success-bg: light-dark(#d1fae5, rgba(0, 240, 255, 0.1));
+  --color-warning: light-dark(#d97706, #ffb000);
+  --color-warning-bg: light-dark(#fef3c7, rgba(255, 176, 0, 0.1));
+  --color-danger: light-dark(#e11d48, #ff0055);
+  --color-danger-bg: light-dark(#ffe4e6, rgba(255, 0, 85, 0.08));
+  --color-info: light-dark(#2563eb, #60a5fa);
+  --color-info-bg: light-dark(#dbeafe, rgba(96, 165, 250, 0.1));
 
   /* — Client palette (5 fixed clients per workspace style guide) — */
-  --color-c-acme: #ff2a6d;
-  --color-c-tech: #2563eb;
-  --color-c-nova: #059669;
-  --color-c-lumen: #f59e0b;
-  --color-c-orbit: #8b2be2;
-  --color-c-red: #dc2626;
-  --color-c-orange: #ea580c;
-  --color-c-lime: #65a30d;
-  --color-c-teal: #0d9488;
-  --color-c-cyan: #0891b2;
-  --color-c-indigo: #4f46e5;
-  --color-c-slate: #475569;
+  --color-c-acme: light-dark(#ff2a6d, #ff2a6d);
+  --color-c-tech: light-dark(#2563eb, #60a5fa);
+  --color-c-nova: light-dark(#059669, #00f0ff);
+  --color-c-lumen: light-dark(#f59e0b, #ffb000);
+  --color-c-orbit: light-dark(#8b2be2, #c084fc);
+  --color-c-red: light-dark(#dc2626, #f87171);
+  --color-c-orange: light-dark(#ea580c, #fb923c);
+  --color-c-lime: light-dark(#65a30d, #a3e635);
+  --color-c-teal: light-dark(#0d9488, #2dd4bf);
+  --color-c-cyan: light-dark(#0891b2, #22d3ee);
+  --color-c-indigo: light-dark(#4f46e5, #818cf8);
+  --color-c-slate: light-dark(#475569, #94a3b8);
+
+  /* Texte posé sur une couleur client (contraste WCAG, cf. clientColorForeground) */
+  --color-c-acme-fg: light-dark(#000000, #000000);
+  --color-c-tech-fg: light-dark(#ffffff, #000000);
+  --color-c-nova-fg: light-dark(#000000, #000000);
+  --color-c-lumen-fg: light-dark(#000000, #000000);
+  --color-c-orbit-fg: light-dark(#ffffff, #000000);
+  --color-c-red-fg: light-dark(#ffffff, #000000);
+  --color-c-orange-fg: light-dark(#000000, #000000);
+  --color-c-lime-fg: light-dark(#000000, #000000);
+  --color-c-teal-fg: light-dark(#000000, #000000);
+  --color-c-cyan-fg: light-dark(#000000, #000000);
+  --color-c-indigo-fg: light-dark(#ffffff, #000000);
+  --color-c-slate-fg: light-dark(#ffffff, #000000);
 
   /* — Typography — */
   --font-sans: 'Plus Jakarta Sans', system-ui, sans-serif;
@@ -118,59 +135,25 @@
     rgba(139, 43, 226, 0.08),
     rgba(255, 42, 109, 0.08)
   );
-  --shadow-card: 0 4px 15px rgba(0, 0, 0, 0.03);
-  --shadow-hover: 0 10px 25px rgba(138, 43, 226, 0.1);
-  --shadow-lg: 0 20px 60px rgba(17, 24, 39, 0.15);
-  --glass-bg: rgba(255, 255, 255, 0.85);
+  --shadow-card: 0 4px 15px light-dark(rgba(0, 0, 0, 0.03), rgba(0, 0, 0, 0.3));
+  --shadow-hover: 0 10px 25px light-dark(rgba(138, 43, 226, 0.1), rgba(138, 43, 226, 0.25));
+  --shadow-lg: 0 20px 60px light-dark(rgba(17, 24, 39, 0.15), rgba(0, 0, 0, 0.5));
+  --glass-bg: light-dark(rgba(255, 255, 255, 0.85), rgba(11, 12, 16, 0.75));
   --transition: all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1);
 
   --sidebar-w: 260px;
   --topbar-h: 72px;
 }
 
-[data-theme='dark'] {
-  --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.3);
-  --shadow-hover: 0 8px 25px rgba(138, 43, 226, 0.25);
-  --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.5);
-  --glass-bg: rgba(11, 12, 16, 0.75);
+/* Pilotage du thème (spec lot B §2) : `light-dark()` suit `color-scheme`.
+   system → suit l'OS ; light/dark → forcé. Aucun script. */
+:root,
+[data-theme='system'] {
+  color-scheme: light dark;
 }
-
-/* Dark mode overrides (cf. mockups/styles.css [data-theme="dark"]) */
+[data-theme='light'] {
+  color-scheme: light;
+}
 [data-theme='dark'] {
-  --color-bg-app: #0b0c10;
-  --color-bg-sidebar: #12141a;
-  --color-bg-card: #1c1e26;
-  --color-bg-card-alt: #171923;
-  --color-bg-hover: rgba(255, 255, 255, 0.05);
-  --color-bg-muted: #14161e;
-
-  --color-text-main: #f9fafb;
-  --color-text-soft: #e5e7eb;
-  --color-text-muted: #9ca3af;
-  --color-text-ghost: #6b7280;
-
-  --color-border-light: rgba(255, 255, 255, 0.08);
-  --color-border-soft: rgba(255, 255, 255, 0.05);
-
-  --color-success: #00f0ff;
-  --color-success-bg: rgba(0, 240, 255, 0.1);
-  --color-warning: #ffb000;
-  --color-warning-bg: rgba(255, 176, 0, 0.1);
-  --color-danger: #ff0055;
-  --color-danger-bg: rgba(255, 0, 85, 0.08);
-  --color-info: #60a5fa;
-  --color-info-bg: rgba(96, 165, 250, 0.1);
-
-  --color-c-acme: #ff2a6d;
-  --color-c-tech: #60a5fa;
-  --color-c-nova: #00f0ff;
-  --color-c-lumen: #ffb000;
-  --color-c-orbit: #c084fc;
-  --color-c-red: #f87171;
-  --color-c-orange: #fb923c;
-  --color-c-lime: #a3e635;
-  --color-c-teal: #2dd4bf;
-  --color-c-cyan: #22d3ee;
-  --color-c-indigo: #818cf8;
-  --color-c-slate: #94a3b8;
+  color-scheme: dark;
 }

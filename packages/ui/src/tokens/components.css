@@ -314,13 +314,9 @@
   color: var(--text-main);
 }
 .nav-item.active {
-  background: var(--accent-gradient-soft);
-  color: var(--color-accent-primary);
+  background: light-dark(var(--accent-gradient-soft), rgba(139, 43, 226, 0.15));
+  color: var(--color-accent-text);
   font-weight: 700;
-}
-[data-theme='dark'] .nav-item.active {
-  background: rgba(139, 43, 226, 0.15);
-  color: #c084fc;
 }
 .nav-item .ico {
   width: 18px;
@@ -349,15 +345,12 @@
 }
 .nav-item .count {
   margin-left: auto;
-  background: var(--bg-hover);
+  background: light-dark(var(--bg-hover), rgba(255, 255, 255, 0.08));
   color: var(--text-main);
   padding: 2px 9px;
   border-radius: 9999px;
   font-size: 11px;
   font-weight: 600;
-}
-[data-theme='dark'] .nav-item .count {
-  background: rgba(255, 255, 255, 0.08);
 }
 .nav-item .count.new {
   background: var(--accent-gradient);
@@ -509,12 +502,9 @@
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 1.5px;
-  color: var(--color-accent-primary);
+  color: var(--color-accent-text);
   font-weight: 700;
   margin-bottom: 10px;
-}
-[data-theme='dark'] .wiz-kicker {
-  color: #c084fc;
 }
 .wiz-title {
   font-size: 32px;
@@ -1300,10 +1290,7 @@
   align-items: center;
 }
 .modal-breadcrumb strong {
-  color: var(--color-accent-primary);
-}
-[data-theme='dark'] .modal-breadcrumb strong {
-  color: #c084fc;
+  color: var(--color-accent-text);
 }
 .card-title-input {
   font-size: 24px;
@@ -2034,11 +2021,8 @@
   padding: 0;
   font-size: 11px;
   font-weight: 600;
-  color: var(--color-accent-primary);
+  color: var(--color-accent-text);
   text-decoration: underline;
-}
-[data-theme='dark'] .assignee-add-link {
-  color: #c084fc;
 }
 .assignee-cancel {
   margin-top: 6px;
@@ -2160,14 +2144,11 @@
 }
 .auth-kicker {
   font-size: 12px;
-  color: var(--accent-primary);
+  color: var(--color-accent-text);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 1.5px;
   margin-bottom: 14px;
-}
-[data-theme='dark'] .auth-kicker {
-  color: #c084fc;
 }
 .auth-title {
   font-size: 38px;
@@ -2184,11 +2165,8 @@
 }
 .auth-link {
   font-size: 12px;
-  color: var(--accent-primary);
+  color: var(--color-accent-text);
   font-weight: 700;
-}
-[data-theme='dark'] .auth-link {
-  color: #c084fc;
 }
 .auth-foot {
   margin-top: 32px;
