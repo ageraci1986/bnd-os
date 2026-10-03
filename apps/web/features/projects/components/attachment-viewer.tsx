@@ -15,17 +15,24 @@ export interface AttachmentViewerProps {
   readonly onDownload: (item: CardAttachmentDTO) => void;
 }
 
+/**
+ * Éléments du piège à focus. L'iframe PDF en est EXCLUE (et `tabIndex=-1`) :
+ * une fois le focus dans le lecteur PDF du navigateur, les touches n'arrivent
+ * plus à notre document — Échap ne fermerait plus la visionneuse au clavier.
+ */
 const FOCUSABLE =
-  'button:not([disabled]), [href], input:not([disabled]), select, textarea, iframe, video[controls], [tabindex]:not([tabindex="-1"])';
+  'button:not([disabled]), [href], input:not([disabled]), select, textarea, video[controls], [tabindex]:not([tabindex="-1"])';
 
 /**
  * Visionneuse plein écran des PJ (lot C, spec §5). Dialog modal accessible :
  * focus initial sur « Fermer », focus piégé, Échap ferme, ←/→ naviguent ;
  * le focus revient à l'élément déclencheur à la fermeture.
  *
- * Les touches sont écoutées sur `document` en phase de capture et stoppées :
- * le modal de carte sous-jacent écoute Échap sur `window` et se fermerait
- * sinon en même temps que la visionneuse.
+ * Les touches sont écoutées sur `document` en phase de CAPTURE, donc avant
+ * le listener `keydown` (phase de bouillonnement) que `card-modal.tsx` pose
+ * sur `window` pour fermer le modal de carte sur Échap. Échap et ←/→ sont
+ * stoppés (`stopPropagation`) : sans cela, Échap fermerait aussi le modal de
+ * carte sous-jacent. Tab n'est pas stoppé (seulement bouclé dans le piège).
  */
 export function AttachmentViewer({
   items,
@@ -276,5 +283,9 @@ function ViewerContent({
   // de Firefox) refuse de s'afficher dans une iframe sandboxée. Le risque
   // est couvert par le re-typage `application/pdf` du blob (ci-dessus) et
   // le contrôle magic bytes du scan.
-  return <iframe className="nx-viewer__frame" src={state.src} title={item.filename} />;
+  // `tabIndex={-1}` : hors de l'ordre de tabulation (voir FOCUSABLE) — le
+  // lecteur PDF capturerait le clavier et Échap ne fermerait plus.
+  return (
+    <iframe className="nx-viewer__frame" src={state.src} title={item.filename} tabIndex={-1} />
+  );
 }
