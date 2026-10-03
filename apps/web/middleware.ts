@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { verifyAccessToken } from '@/lib/auth/verify-jwt';
+import { buildCsp } from '@/lib/security/csp';
 
 /**
  * SECURITY middleware (CLAUDE.md §4.6 + §4.3).
@@ -130,29 +131,7 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
   const isProd = process.env['NODE_ENV'] === 'production';
   const supabaseHost = supabaseUrl ? new URL(supabaseUrl).host : '*.supabase.co';
 
-  // `'strict-dynamic'` is required so that the nonced framework scripts
-  // can in turn load Next.js's chunk files without each one needing its
-  // own nonce. Without it, the bootstrap nonce only covers the inline
-  // tags themselves and every dynamic import is rejected by the browser.
-  const csp = [
-    `default-src 'self'`,
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' ${isProd ? '' : "'unsafe-eval'"}`.trim(),
-    `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`,
-    `img-src 'self' data: blob: https:`,
-    `font-src 'self' https://fonts.gstatic.com`,
-    `connect-src 'self' https://${supabaseHost} wss://${supabaseHost} https://*.ingest.sentry.io`,
-    // Card attachments (lot C): videos stream from short-lived Supabase
-    // signed URLs; PDFs are previewed from a local blob: (typed
-    // application/pdf) in an iframe. `frame-ancestors` (below) still forbids
-    // anyone from framing OUR pages — frame-src only governs what we embed.
-    `media-src 'self' blob: https://${supabaseHost}`,
-    `frame-src 'self' blob:`,
-    `frame-ancestors 'none'`,
-    `base-uri 'self'`,
-    `form-action 'self'`,
-    `object-src 'none'`,
-    `upgrade-insecure-requests`,
-  ].join('; ');
+  const csp = buildCsp({ nonce, supabaseHost, isProd });
 
   // Set CSP on BOTH request and response headers. Next.js 15 reads the
   // CSP from the request headers (alongside x-nonce) to know it must
