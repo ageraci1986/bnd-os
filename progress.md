@@ -169,7 +169,7 @@
 ### 3.1 Design tokens ✅
 
 - [x] Variables CSS de `mockups/styles.css` portées dans `packages/ui/src/tokens/components.css`
-- [x] Mode clair (V1) ; mode sombre reporté V1.5 (decision tokens already split)
+- [x] Mode clair + mode sombre + mode Système (lot B, 2026-10-03 — avancé depuis V1.5)
 - [x] Polices Plus Jakarta Sans via `next/font`
 - [ ] Storybook 8 — reporté Phase 12 (tests visuels Chromatic)
 
@@ -706,5 +706,6 @@ Correctifs sortis suite aux tests d'acceptation B.2 :
 
 | 2026-09-30 | — | bugfix | **Retours clients — suite (branche `fix/client-feedback-followups`).** Calendrier : dépliage d'une journée via composant client, « Réduire » placé après la dernière carte. Échéance : entrée/sortie de Bloqué et erreurs signalées par toast de l'app (`notify`) au lieu de `window.alert`. Pastille filtre client : « × » en SVG centré. Filtre client : ouvrir/rester sur un projet d'un autre client que le filtre redirige vers `/projects?client=` (helper `isOutsideClientFilter`, après contrôle de périmètre). |
 | 2026-10-02 | — | feature | **Lot A quick wins (branche `feature/optim`).** Renommage inline du titre de projet (crayon sur les cartes /projects en « stretched link » + headers Kanban/Liste/Calendrier ; Server Action `renameProject` → `updateProjectCore`, optimiste + rollback/toast, focus restauré). Widget Overview « Mes cartes » (ouvertes hors dernière colonne, Bloqué inclus, « dont X en retard ») → `/projects/calendar?mine=1`. Filtre `mine` (bascule « Mes cartes » dans la barre de filtres projet + calendrier global ; userId de session uniquement, AND avec `asg`). Palette clients 12 tokens (clair + sombre) + couleur libre `#rrggbb` (helpers domain `clientColorCss`/`clientColorForeground`, garde-fou ui `clientColorCss`, validation core). Calendrier : carte en dernière colonne barrée (`isDone` via `lastUserColumnIds`), filtres conservés sur la navigation mois. Aucune migration. Spec `docs/superpowers/specs/2026-10-02-quick-wins-design.md`, plan `docs/superpowers/plans/2026-10-02-quick-wins.md`. Lots B (dark mode) et C (pièces jointes cartes) à venir. |
+| 2026-10-03 | — | feature | **Lot B dark mode (branche `feature/dark-mode`, empilée sur `feature/optim`).** Thème Système / Clair / Sombre : `User.theme` (enum `ThemePreference`, migration `20261003120000_user_theme_preference` — **à appliquer manuellement sur Supabase avant test/merge**) + cookie httpOnly `nx-theme` lu par le root layout (`<html data-theme>`, rendu serveur sans flash, aucun script → CSP OK). Tokens `light-dark()` pilotés par `color-scheme` (une source par token ; `--color-accent-text` pour le texte d'accent AA en sombre ; `--color-c-*-fg` hors `@theme` car référencés dynamiquement). Bouton topbar (`useSyncExternalStore` sur `data-theme` + OS), Paramètres › Apparence (auto-save + toast), `ThemeSync` nouvel appareil. Couleurs en dur → tokens + garde-fou Vitest (apps/web + packages/ui, `dark:` interdit). Corps HTML des mails sur surface « papier » claire. |
 
 > **Règle :** chaque session de travail ajoute une ligne ici (ou plusieurs si plusieurs étapes touchées).
