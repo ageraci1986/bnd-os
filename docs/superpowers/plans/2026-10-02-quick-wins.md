@@ -11,6 +11,7 @@
 **Spec :** `docs/superpowers/specs/2026-10-02-quick-wins-design.md`
 
 **Conventions repo :**
+
 - Lancer les tests web : `pnpm --filter @nexushub/web exec vitest run <chemin>` ; domain : `pnpm --filter @nexushub/domain exec vitest run <chemin>`.
 - Avant commit : `pnpm --filter <pkg> typecheck`.
 - Commits Conventional, terminés par `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
@@ -20,34 +21,35 @@
 
 ## File Structure
 
-| Fichier | Rôle |
-| --- | --- |
-| `packages/domain/src/kanban/index.ts` (mod) | + `lastUserColumnIds` |
-| `packages/domain/src/clients/index.ts` (mod) | 12 tokens, labels, `isValidClientColor`, `clientColorCss`, `clientColorForeground` |
-| `packages/ui/src/tokens/tokens.css` (mod) | 7 nouvelles couleurs (clair + sombre) |
-| `packages/ui/src/tokens/components.css` (mod) | `.cal-item` sans classes par client, `.cal-item.done` |
-| `packages/ui/src/atoms/ClientDot.tsx` (mod) | type union étendu |
-| `apps/web/features/clients/lib/schemas.ts` (mod) | Zod couleur token \| hex |
-| `apps/web/features/clients/components/client-form.tsx` (mod) | 12 pastilles + « + » couleur libre |
-| `apps/web/features/clients/components/client-mono.tsx` (mod) | rendu via helpers domain |
-| 8 fichiers consommateurs `var(--${colorToken})` (mod) | `clientColorCss()` |
-| `apps/web/features/projects/lib/card-filter.ts` (mod) | param `mine`, clauses avec userId |
-| `apps/web/features/projects/components/my-cards-toggle.tsx` (new) | bascule `?mine=1` |
-| `apps/web/features/projects/components/project-filters-bar.tsx` (mod) | rend la bascule, reset |
-| `apps/web/features/projects/components/calendar-view.tsx` / `calendar-item.tsx` (mod) | `isDone`, `extraParams` nav mois |
-| `apps/web/app/(app)/projects/calendar/page.tsx` (mod) | `mine`, `isDone`, bascule |
-| `apps/web/app/(app)/projects/[id]/{page,list/page,calendar/page}.tsx` (mod) | userId au filtre, `isDone`, éditeur de titre |
-| `apps/web/features/overview/lib/my-cards.ts` (new) | `getMyCardsMetrics` |
-| `apps/web/app/(app)/overview/page.tsx` (mod) | widget « Mes cartes » |
-| `apps/web/features/projects/actions/rename-project.ts` (new) | Server Action |
-| `apps/web/features/projects/components/project-title-editor.tsx` (new) | édition inline |
-| `apps/web/app/(app)/projects/page.tsx` (mod) | carte en « stretched link » + éditeur |
+| Fichier                                                                               | Rôle                                                                               |
+| ------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `packages/domain/src/kanban/index.ts` (mod)                                           | + `lastUserColumnIds`                                                              |
+| `packages/domain/src/clients/index.ts` (mod)                                          | 12 tokens, labels, `isValidClientColor`, `clientColorCss`, `clientColorForeground` |
+| `packages/ui/src/tokens/tokens.css` (mod)                                             | 7 nouvelles couleurs (clair + sombre)                                              |
+| `packages/ui/src/tokens/components.css` (mod)                                         | `.cal-item` sans classes par client, `.cal-item.done`                              |
+| `packages/ui/src/atoms/ClientDot.tsx` (mod)                                           | type union étendu                                                                  |
+| `apps/web/features/clients/lib/schemas.ts` (mod)                                      | Zod couleur token \| hex                                                           |
+| `apps/web/features/clients/components/client-form.tsx` (mod)                          | 12 pastilles + « + » couleur libre                                                 |
+| `apps/web/features/clients/components/client-mono.tsx` (mod)                          | rendu via helpers domain                                                           |
+| 8 fichiers consommateurs `var(--${colorToken})` (mod)                                 | `clientColorCss()`                                                                 |
+| `apps/web/features/projects/lib/card-filter.ts` (mod)                                 | param `mine`, clauses avec userId                                                  |
+| `apps/web/features/projects/components/my-cards-toggle.tsx` (new)                     | bascule `?mine=1`                                                                  |
+| `apps/web/features/projects/components/project-filters-bar.tsx` (mod)                 | rend la bascule, reset                                                             |
+| `apps/web/features/projects/components/calendar-view.tsx` / `calendar-item.tsx` (mod) | `isDone`, `extraParams` nav mois                                                   |
+| `apps/web/app/(app)/projects/calendar/page.tsx` (mod)                                 | `mine`, `isDone`, bascule                                                          |
+| `apps/web/app/(app)/projects/[id]/{page,list/page,calendar/page}.tsx` (mod)           | userId au filtre, `isDone`, éditeur de titre                                       |
+| `apps/web/features/overview/lib/my-cards.ts` (new)                                    | `getMyCardsMetrics`                                                                |
+| `apps/web/app/(app)/overview/page.tsx` (mod)                                          | widget « Mes cartes »                                                              |
+| `apps/web/features/projects/actions/rename-project.ts` (new)                          | Server Action                                                                      |
+| `apps/web/features/projects/components/project-title-editor.tsx` (new)                | édition inline                                                                     |
+| `apps/web/app/(app)/projects/page.tsx` (mod)                                          | carte en « stretched link » + éditeur                                              |
 
 ---
 
 ### Task 1: Domain — `lastUserColumnIds`
 
 **Files:**
+
 - Modify: `packages/domain/src/kanban/index.ts` (après `isLastUserColumn`, ~L48)
 - Test: `packages/domain/src/kanban/kanban.test.ts`
 
@@ -127,6 +129,7 @@ git commit -m "feat(domain): lastUserColumnIds helper per project"
 ### Task 2: Domain — palette clients + contraste
 
 **Files:**
+
 - Modify: `packages/domain/src/clients/index.ts` (section « Color tokens », L9-16)
 - Test: `packages/domain/src/clients/clients.test.ts` (bloc `describe('CLIENT_COLOR_TOKENS')`, L18-29)
 
@@ -326,6 +329,7 @@ git commit -m "feat(domain): 12-token client palette, custom hex colors, contras
 ### Task 3: CSS — nouvelles couleurs + calendrier
 
 **Files:**
+
 - Modify: `packages/ui/src/tokens/tokens.css` (L41-45, L94-98, L150-154)
 - Modify: `packages/ui/src/tokens/components.css` (L1857-1881)
 - Modify: `packages/ui/src/atoms/ClientDot.tsx` (L3)
@@ -333,37 +337,37 @@ git commit -m "feat(domain): 12-token client palette, custom hex colors, contras
 - [ ] **Step 1: tokens.css clair** — après `--color-c-orbit: #8b2be2;` (L45) :
 
 ```css
-  --color-c-red: #dc2626;
-  --color-c-orange: #ea580c;
-  --color-c-lime: #65a30d;
-  --color-c-teal: #0d9488;
-  --color-c-cyan: #0891b2;
-  --color-c-indigo: #4f46e5;
-  --color-c-slate: #475569;
+--color-c-red: #dc2626;
+--color-c-orange: #ea580c;
+--color-c-lime: #65a30d;
+--color-c-teal: #0d9488;
+--color-c-cyan: #0891b2;
+--color-c-indigo: #4f46e5;
+--color-c-slate: #475569;
 ```
 
 - [ ] **Step 2: tokens.css alias** — après `--c-orbit: var(--color-c-orbit);` :
 
 ```css
-  --c-red: var(--color-c-red);
-  --c-orange: var(--color-c-orange);
-  --c-lime: var(--color-c-lime);
-  --c-teal: var(--color-c-teal);
-  --c-cyan: var(--color-c-cyan);
-  --c-indigo: var(--color-c-indigo);
-  --c-slate: var(--color-c-slate);
+--c-red: var(--color-c-red);
+--c-orange: var(--color-c-orange);
+--c-lime: var(--color-c-lime);
+--c-teal: var(--color-c-teal);
+--c-cyan: var(--color-c-cyan);
+--c-indigo: var(--color-c-indigo);
+--c-slate: var(--color-c-slate);
 ```
 
 - [ ] **Step 3: tokens.css sombre** — dans le bloc `[data-theme='dark']`, après `--color-c-orbit: #c084fc;` :
 
 ```css
-  --color-c-red: #f87171;
-  --color-c-orange: #fb923c;
-  --color-c-lime: #a3e635;
-  --color-c-teal: #2dd4bf;
-  --color-c-cyan: #22d3ee;
-  --color-c-indigo: #818cf8;
-  --color-c-slate: #94a3b8;
+--color-c-red: #f87171;
+--color-c-orange: #fb923c;
+--color-c-lime: #a3e635;
+--color-c-teal: #2dd4bf;
+--color-c-cyan: #22d3ee;
+--color-c-indigo: #818cf8;
+--color-c-slate: #94a3b8;
 ```
 
 - [ ] **Step 4: components.css** — remplacer les 5 règles `.cal-item.i-acme` … `.cal-item.i-orbit` (L1857-1876) par rien (la couleur passe en style inline, Task 7), et ajouter après `.cal-item.blocked { … }` :
@@ -407,6 +411,7 @@ git commit -m "feat(ui): 7 new client color tokens (light+dark), calendar done s
 ### Task 4: Clients — validation, formulaire, rendu
 
 **Files:**
+
 - Modify: `apps/web/features/clients/lib/schemas.ts` (L9-19)
 - Test: `apps/web/features/clients/lib/schemas.test.ts`
 - Modify: `apps/web/features/clients/components/client-form.tsx`
@@ -416,21 +421,24 @@ git commit -m "feat(ui): 7 new client color tokens (light+dark), calendar done s
 - [ ] **Step 1: Failing test** — ajouter dans `schemas.test.ts` (à côté de `'rejects an unknown colorToken'`, en réutilisant le même objet d'entrée que ce test et en ne changeant que `colorToken`) :
 
 ```ts
-  it('accepts a custom hex color and lowercases it', () => {
-    const res = CreateClientSchema.safeParse({ ...validCreateInput, colorToken: '#1A2B3C' });
-    expect(res.success).toBe(true);
-    if (res.success) expect(res.data.colorToken).toBe('#1a2b3c');
-  });
+it('accepts a custom hex color and lowercases it', () => {
+  const res = CreateClientSchema.safeParse({ ...validCreateInput, colorToken: '#1A2B3C' });
+  expect(res.success).toBe(true);
+  if (res.success) expect(res.data.colorToken).toBe('#1a2b3c');
+});
 
-  it('accepts one of the new palette tokens', () => {
-    expect(CreateClientSchema.safeParse({ ...validCreateInput, colorToken: 'c-teal' }).success).toBe(true);
-  });
+it('accepts one of the new palette tokens', () => {
+  expect(CreateClientSchema.safeParse({ ...validCreateInput, colorToken: 'c-teal' }).success).toBe(
+    true,
+  );
+});
 
-  it('rejects a CSS injection attempt as color', () => {
-    expect(
-      CreateClientSchema.safeParse({ ...validCreateInput, colorToken: 'red;background:url(x)' }).success,
-    ).toBe(false);
-  });
+it('rejects a CSS injection attempt as color', () => {
+  expect(
+    CreateClientSchema.safeParse({ ...validCreateInput, colorToken: 'red;background:url(x)' })
+      .success,
+  ).toBe(false);
+});
 ```
 
 (`validCreateInput` : si le fichier n'a pas de constante partagée, en créer une en tête à partir de l'objet du premier test : `{ name: 'Acme', colorToken: 'c-acme', initials: '', domains: '', notes: '' }` — copier les clés exactes du premier test.)
@@ -465,18 +473,18 @@ import {
 (fusionner `useRef` dans l'import React existant.) Remplacer le bloc `<div className="mt-1 flex gap-2"> … </div>` des pastilles dans `Fields` par :
 
 ```tsx
-        <div className="mt-1 flex flex-wrap gap-2">
-          {CLIENT_COLOR_TOKENS.map((token) => (
-            <ColorSwatch
-              key={token}
-              value={token}
-              label={CLIENT_COLOR_LABELS_FR[token]}
-              selected={color === token}
-              onSelect={() => setColor(token)}
-            />
-          ))}
-          <CustomColorButton value={color} onChange={setColor} />
-        </div>
+<div className="mt-1 flex flex-wrap gap-2">
+  {CLIENT_COLOR_TOKENS.map((token) => (
+    <ColorSwatch
+      key={token}
+      value={token}
+      label={CLIENT_COLOR_LABELS_FR[token]}
+      selected={color === token}
+      onSelect={() => setColor(token)}
+    />
+  ))}
+  <CustomColorButton value={color} onChange={setColor} />
+</div>
 ```
 
 et ajouter, sous `Fields` :
@@ -568,8 +576,8 @@ function CustomColorButton({ value, onChange }: { value: string; onChange: (c: s
 ```tsx
 import { clientColorCss, clientColorForeground } from '@nexushub/domain';
 // …
-  const base = clientColorCss(colorToken);
-  const background = `linear-gradient(135deg, ${base}, color-mix(in srgb, ${base} 65%, white))`;
+const base = clientColorCss(colorToken);
+const background = `linear-gradient(135deg, ${base}, color-mix(in srgb, ${base} 65%, white))`;
 ```
 
 et remplacer la classe `text-white` par `style={{ …, color: clientColorForeground(colorToken) }}` (ajouter `color` dans l'objet `style` existant, retirer `text-white` de `className`).
@@ -594,6 +602,7 @@ git commit -m "feat(clients): 12-color palette + custom color picker, unified cl
 ### Task 5: Filtre `mine` (card-filter)
 
 **Files:**
+
 - Modify: `apps/web/features/projects/lib/card-filter.ts`
 - Create: `apps/web/features/projects/lib/card-filter.test.ts`
 
@@ -687,16 +696,16 @@ export function buildCardFilterClauses(
 remplacer le bloc `if (filter.assigneeIds.length > 0) { … }` par :
 
 ```ts
-  const assigneeClauses: Prisma.CardWhereInput[] = [];
-  if (filter.assigneeIds.length > 0) {
-    assigneeClauses.push({ assignees: { some: { userId: { in: [...filter.assigneeIds] } } } });
-  }
-  if (filter.mine) assigneeClauses.push({ assignees: { some: { userId: viewerUserId } } });
-  if (assigneeClauses.length === 1) Object.assign(where, assigneeClauses[0]);
-  else if (assigneeClauses.length > 1) where.AND = assigneeClauses;
+const assigneeClauses: Prisma.CardWhereInput[] = [];
+if (filter.assigneeIds.length > 0) {
+  assigneeClauses.push({ assignees: { some: { userId: { in: [...filter.assigneeIds] } } } });
+}
+if (filter.mine) assigneeClauses.push({ assignees: { some: { userId: viewerUserId } } });
+if (assigneeClauses.length === 1) Object.assign(where, assigneeClauses[0]);
+else if (assigneeClauses.length > 1) where.AND = assigneeClauses;
 ```
 
-  - `BuildCardWhereOptions` : ajouter `readonly viewerUserId: string;` et dans `buildCardWhere` appeler `buildCardFilterClauses(filter, opts.viewerUserId)`.
+- `BuildCardWhereOptions` : ajouter `readonly viewerUserId: string;` et dans `buildCardWhere` appeler `buildCardFilterClauses(filter, opts.viewerUserId)`.
 
 - [ ] **Step 4: Callers** — dans `apps/web/app/(app)/projects/[id]/page.tsx:60` et `[id]/list/page.tsx:37` : `buildCardFilterClauses(filter, ctx.userId)`. Le calendrier projet est traité Task 7.
 
@@ -714,6 +723,7 @@ git commit -m "feat(projects): mine card filter scoped to the session user"
 ### Task 6: Bascule `MyCardsToggle`
 
 **Files:**
+
 - Create: `apps/web/features/projects/components/my-cards-toggle.tsx`
 - Create: `apps/web/features/projects/components/my-cards-toggle.test.tsx`
 - Modify: `apps/web/features/projects/components/project-filters-bar.tsx` (L57-65 `clear`, L153 avant le `<div ref={popRef}`)
@@ -743,7 +753,9 @@ describe('<MyCardsToggle />', () => {
     const btn = screen.getByRole('button', { name: /mes cartes/i });
     expect(btn).toHaveAttribute('aria-pressed', 'false');
     fireEvent.click(btn);
-    expect(replace).toHaveBeenCalledWith('/projects/calendar?client=acme&mine=1', { scroll: false });
+    expect(replace).toHaveBeenCalledWith('/projects/calendar?client=acme&mine=1', {
+      scroll: false,
+    });
   });
 
   it('turns mine off', () => {
@@ -816,6 +828,7 @@ git commit -m "feat(projects): Mes cartes toggle in the project filters bar"
 ### Task 7: Calendriers — `isDone`, `mine`, navigation
 
 **Files:**
+
 - Modify: `apps/web/features/projects/components/calendar-view.tsx`
 - Modify: `apps/web/features/projects/components/calendar-item.tsx`
 - Modify: `apps/web/features/projects/components/calendar-view.test.tsx`
@@ -912,27 +925,31 @@ export function CalendarItem({
   - Remplacer le calcul `const { dueDate: filterDueDate, ...restFilterClauses } …` jusqu'à `dueWhere` par :
 
 ```ts
-  // Mois visible ∩ éventuel filtre `due` ∩ éventuel AND du filtre (asg + mine) :
-  // tout passe dans un seul AND pour qu'aucune clé n'en écrase une autre.
-  const { dueDate: filterDueDate, AND: filterAnd, ...restFilterClauses } = filterClauses;
-  const monthDue = { gte: range.start, lt: range.endExclusive };
-  const andClauses = [
-    ...(Array.isArray(filterAnd) ? filterAnd : filterAnd ? [filterAnd] : []),
-    { dueDate: monthDue },
-    ...(filterDueDate ? [{ dueDate: filterDueDate }] : []),
-  ];
+// Mois visible ∩ éventuel filtre `due` ∩ éventuel AND du filtre (asg + mine) :
+// tout passe dans un seul AND pour qu'aucune clé n'en écrase une autre.
+const { dueDate: filterDueDate, AND: filterAnd, ...restFilterClauses } = filterClauses;
+const monthDue = { gte: range.start, lt: range.endExclusive };
+const andClauses = [
+  ...(Array.isArray(filterAnd) ? filterAnd : filterAnd ? [filterAnd] : []),
+  { dueDate: monthDue },
+  ...(filterDueDate ? [{ dueDate: filterDueDate }] : []),
+];
 ```
 
-  et dans le `where` de `card.findMany` remplacer `...dueWhere,` par `AND: andClauses,`.
-  - Select carte : ajouter `columnId: true`.
-  - Après la récupération : 
+et dans le `where` de `card.findMany` remplacer `...dueWhere,` par `AND: andClauses,`.
+
+- Select carte : ajouter `columnId: true`.
+- Après la récupération :
+
 ```ts
-  const doneColumnIds = new Set(
-    lastUserColumnIds(project.columns.map((c) => ({ ...c, projectId: project.id }))),
-  );
+const doneColumnIds = new Set(
+  lastUserColumnIds(project.columns.map((c) => ({ ...c, projectId: project.id }))),
+);
 ```
-  et dans le mapping `items` : `isDone: doneColumnIds.has(c.columnId),`.
-  - Sur `<CalendarView … />` ajouter `extraParams={Object.fromEntries(writeProjectCardFilter(new URLSearchParams(), filter))}`.
+
+et dans le mapping `items` : `isDone: doneColumnIds.has(c.columnId),`.
+
+- Sur `<CalendarView … />` ajouter `extraParams={Object.fromEntries(writeProjectCardFilter(new URLSearchParams(), filter))}`.
 
 - [ ] **Step 7: Calendrier global** (`projects/calendar/page.tsx`) :
   - Imports : `lastUserColumnIds` (domain) et `MyCardsToggle` (`@/features/projects/components/my-cards-toggle`).
@@ -942,22 +959,22 @@ export function CalendarItem({
   - Après `findMany` :
 
 ```ts
-  const projectIds = [...new Set(cards.map((c) => c.project.id))];
-  const columns =
-    projectIds.length === 0
-      ? []
-      : await prisma.column.findMany({
-          where: { projectId: { in: projectIds }, project: { workspaceId: ctx.workspaceId } },
-          select: { id: true, name: true, projectId: true, position: true, isBlockedSystem: true },
-        });
-  const doneColumnIds = new Set(lastUserColumnIds(columns));
+const projectIds = [...new Set(cards.map((c) => c.project.id))];
+const columns =
+  projectIds.length === 0
+    ? []
+    : await prisma.column.findMany({
+        where: { projectId: { in: projectIds }, project: { workspaceId: ctx.workspaceId } },
+        select: { id: true, name: true, projectId: true, position: true, isBlockedSystem: true },
+      });
+const doneColumnIds = new Set(lastUserColumnIds(columns));
 ```
 
-  - Mapping `items` : `isDone: doneColumnIds.has(c.columnId),`.
-  - Header : envelopper la `view-toggle` existante dans `<div className="flex items-center gap-3"><MyCardsToggle /> … </div>`.
-  - Lien « Kanban » : conserver le client comme aujourd'hui (pas de `mine` sur /projects).
-  - `<CalendarView … extraParams={mine ? { mine: '1' } : {}} />`.
-  - Sous-titre : si `mine`, préfixer le texte par `Mes cartes · `.
+- Mapping `items` : `isDone: doneColumnIds.has(c.columnId),`.
+- Header : envelopper la `view-toggle` existante dans `<div className="flex items-center gap-3"><MyCardsToggle /> … </div>`.
+- Lien « Kanban » : conserver le client comme aujourd'hui (pas de `mine` sur /projects).
+- `<CalendarView … extraParams={mine ? { mine: '1' } : {}} />`.
+- Sous-titre : si `mine`, préfixer le texte par `Mes cartes · `.
 
 - [ ] **Step 8: Verify** — `pnpm --filter @nexushub/web typecheck` → PASS ; `pnpm --filter @nexushub/web exec vitest run features/projects` → PASS. `grep -n "isDone" apps/web/features/projects/components/calendar-day-overflow.tsx` : si le fichier construit des `CalendarCardItem` lui-même, ajouter le champ ; sinon rien.
 
@@ -973,6 +990,7 @@ git commit -m "feat(calendar): strike through done cards, Mes cartes filter on g
 ### Task 8: Widget « Mes cartes » (Overview)
 
 **Files:**
+
 - Create: `apps/web/features/overview/lib/my-cards.ts`
 - Create: `apps/web/features/overview/lib/my-cards.test.ts`
 - Modify: `apps/web/app/(app)/overview/page.tsx`
@@ -1034,7 +1052,9 @@ describe('getMyCardsMetrics', () => {
     m.txMock.mockResolvedValue([0, 0]);
     await getMyCardsMetrics({ workspaceId: 'ws-1', userId: 'u-1', clientId: 'cl-1' });
     expect(m.columnFindMany.mock.calls[0]![0].where.project).toMatchObject({ clientId: 'cl-1' });
-    const [openArgs] = m.txMock.mock.calls[0]![0] as [{ where: { project: unknown; columnId?: unknown } }];
+    const [openArgs] = m.txMock.mock.calls[0]![0] as [
+      { where: { project: unknown; columnId?: unknown } },
+    ];
     expect(openArgs.where.project).toMatchObject({ clientId: 'cl-1' });
     expect(openArgs.where.columnId).toBeUndefined();
   });
@@ -1112,6 +1132,7 @@ export async function getMyCardsMetrics({
 - [ ] **Step 5: Overview page** — dans `overview/page.tsx` :
   - Imports : `getMyCardsMetrics` depuis `@/features/overview/lib/my-cards`, `buildHrefWithClient` depuis `@/features/shell/lib/client-filter-url`.
   - Ajouter au `Promise.all` un 4e élément :
+
 ```ts
     getMyCardsMetrics({
       workspaceId: ctx.workspaceId,
@@ -1120,28 +1141,30 @@ export async function getMyCardsMetrics({
       ...(activeClient ? { clientId: activeClient.id } : {}),
     }),
 ```
-  et déstructurer `const [, profile, metrics, myCards] = …`.
-  - Grille : `className="mb-10 grid grid-cols-2 gap-5 md:grid-cols-3 xl:grid-cols-5"`.
-  - Après la carte « Cartes bloquées » :
+
+et déstructurer `const [, profile, metrics, myCards] = …`.
+
+- Grille : `className="mb-10 grid grid-cols-2 gap-5 md:grid-cols-3 xl:grid-cols-5"`.
+- Après la carte « Cartes bloquées » :
 
 ```tsx
-        <Link
-          href={buildHrefWithClient('/projects/calendar', 'mine=1', activeClient?.slug ?? null)}
-          aria-label={`Mes cartes : ${myCards.open} ouvertes${myCards.overdue > 0 ? `, dont ${myCards.overdue} en retard` : ''}. Ouvrir le calendrier`}
-          className="block rounded-2xl transition hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--color-accent-primary)]"
-        >
-          <MetricCard
-            label="Mes cartes"
-            value={fmt(myCards.open)}
-            className="h-full hover:shadow-[var(--shadow-hover)]"
-            {...(myCards.overdue > 0
-              ? { trend: `dont ${myCards.overdue} en retard`, trendTone: 'danger' as const }
-              : {})}
-          />
-        </Link>
+<Link
+  href={buildHrefWithClient('/projects/calendar', 'mine=1', activeClient?.slug ?? null)}
+  aria-label={`Mes cartes : ${myCards.open} ouvertes${myCards.overdue > 0 ? `, dont ${myCards.overdue} en retard` : ''}. Ouvrir le calendrier`}
+  className="block rounded-2xl transition hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--color-accent-primary)]"
+>
+  <MetricCard
+    label="Mes cartes"
+    value={fmt(myCards.open)}
+    className="h-full hover:shadow-[var(--shadow-hover)]"
+    {...(myCards.overdue > 0
+      ? { trend: `dont ${myCards.overdue} en retard`, trendTone: 'danger' as const }
+      : {})}
+  />
+</Link>
 ```
 
-  (Vérifier que `activeClient` expose `slug` — c'est le cas via `resolveActiveClient`, cf. `lib/client-filter/server.ts:74`.)
+(Vérifier que `activeClient` expose `slug` — c'est le cas via `resolveActiveClient`, cf. `lib/client-filter/server.ts:74`.)
 
 - [ ] **Step 6: Verify** — `pnpm --filter @nexushub/web typecheck` → PASS ; `pnpm --filter @nexushub/web exec vitest run features/overview` → PASS.
 
@@ -1157,6 +1180,7 @@ git commit -m "feat(overview): Mes cartes widget linking to the filtered calenda
 ### Task 9: Server Action `renameProject`
 
 **Files:**
+
 - Modify: `apps/web/features/projects/lib/schemas.ts:14` (`const NameSchema` → `export const NameSchema`)
 - Create: `apps/web/features/projects/actions/rename-project.ts`
 - Create: `apps/web/features/projects/actions/rename-project.test.ts`
@@ -1187,7 +1211,13 @@ vi.mock('next/cache', () => ({ revalidatePath: mocks.revalidatePath }));
 import { renameProject } from './rename-project';
 
 const PROJECT_ID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
-const admin = { userId: 'admin-1', workspaceId: 'ws-1', role: 'admin', isSuperAdmin: false, email: 'a@t' };
+const admin = {
+  userId: 'admin-1',
+  workspaceId: 'ws-1',
+  role: 'admin',
+  isSuperAdmin: false,
+  email: 'a@t',
+};
 
 beforeEach(() => {
   for (const f of Object.values(mocks)) f.mockReset();
@@ -1199,7 +1229,12 @@ describe('renameProject', () => {
     mocks.requireUserVerified.mockResolvedValue(admin);
     mocks.projectFindFirst
       .mockResolvedValueOnce({ id: PROJECT_ID, clientId: 'c-1', startDate: null, endDate: null })
-      .mockResolvedValueOnce({ name: 'Nouveau nom', description: null, startDate: null, endDate: null });
+      .mockResolvedValueOnce({
+        name: 'Nouveau nom',
+        description: null,
+        startDate: null,
+        endDate: null,
+      });
     mocks.projectUpdate.mockResolvedValue({});
 
     const res = await renameProject({ projectId: PROJECT_ID, name: '  Nouveau nom ' });
@@ -1289,6 +1324,7 @@ git commit -m "feat(projects): renameProject server action"
 ### Task 10: `ProjectTitleEditor` + intégration
 
 **Files:**
+
 - Create: `apps/web/features/projects/components/project-title-editor.tsx`
 - Create: `apps/web/features/projects/components/project-title-editor.test.tsx`
 - Modify: `apps/web/app/(app)/projects/page.tsx` (L96-134)
@@ -1360,9 +1396,7 @@ describe('<ProjectTitleEditor />', () => {
     const input = startEditing();
     fireEvent.change(input, { target: { value: 'Dup' } });
     await act(async () => fireEvent.blur(input));
-    await waitFor(() =>
-      expect(screen.getByRole('heading', { name: 'Alpha' })).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Alpha' })).toBeInTheDocument());
     expect(notify).toHaveBeenCalledWith({ tone: 'error', message: 'Un projet porte déjà ce nom.' });
   });
 });
@@ -1481,7 +1515,7 @@ export function ProjectTitleEditor({
           onClick={begin}
           aria-label="Renommer le projet"
           title="Renommer"
-          className="pointer-events-auto relative z-[2] inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[color:var(--color-text-muted)] opacity-0 transition hover:bg-[color:var(--color-bg-hover)] hover:text-[color:var(--color-text-main)] focus-visible:opacity-100 group-hover:opacity-100 group-hover/title:opacity-100"
+          className="pointer-events-auto relative z-[2] inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[color:var(--color-text-muted)] opacity-0 transition hover:bg-[color:var(--color-bg-hover)] hover:text-[color:var(--color-text-main)] focus-visible:opacity-100 group-hover/title:opacity-100 group-hover:opacity-100"
         >
           <PencilIcon width={14} height={14} style={{ width: 14, height: 14, display: 'block' }} />
         </button>
@@ -1498,55 +1532,55 @@ Note : `getByRole('heading', { name: 'Beta' })` — le heading contient seulemen
 - [ ] **Step 5: Cartes /projects** — dans `apps/web/app/(app)/projects/page.tsx`, remplacer le contenu de `<li key={p.id} …>` (L98-133) par un « stretched link » (pas d'élément interactif imbriqué dans le `<a>`) :
 
 ```tsx
-            <li
-              key={p.id}
-              className="group relative rounded-2xl border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] p-5 shadow-[var(--shadow-card)] transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-hover)]"
-            >
-              <Link
-                href={buildHrefWithClient(`/projects/${p.id}`, '', activeClient?.slug ?? null)}
-                aria-label={p.name}
-                className="absolute inset-0 z-[1] rounded-2xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--color-accent-primary)]"
-              />
-              {!isViewer ? (
-                <div className="pointer-events-none absolute right-3 top-3 z-10 opacity-0 transition-opacity duration-150 focus-within:pointer-events-auto focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100">
-                  <DeleteProjectButton projectId={p.id} projectName={p.name} size="sm" />
-                </div>
-              ) : null}
-              <div className="pointer-events-none relative">
-                <div className="mb-2 flex items-center gap-2 text-xs text-[color:var(--color-text-muted)]">
-                  <span
-                    aria-hidden="true"
-                    className="inline-block h-2 w-2 rounded-full"
-                    style={{ background: clientColorCss(p.client.colorToken) }}
-                  />
-                  {p.client.name}
-                  {p.type ? (
-                    <span>
-                      · {p.type.icon} {p.type.name}
-                    </span>
-                  ) : null}
-                </div>
-                <ProjectTitleEditor
-                  projectId={p.id}
-                  name={p.name}
-                  canEdit={!isViewer}
-                  as="h2"
-                  className="text-lg font-extrabold tracking-tight"
-                />
-                {p.description ? (
-                  <p className="mt-1 line-clamp-2 text-sm text-[color:var(--color-text-muted)]">
-                    {p.description}
-                  </p>
-                ) : null}
-                <div className="mt-3 text-xs text-[color:var(--color-text-muted)]">
-                  {p._count.cards === 0
-                    ? 'Aucune carte'
-                    : p._count.cards === 1
-                      ? '1 carte'
-                      : `${p._count.cards} cartes`}
-                </div>
-              </div>
-            </li>
+<li
+  key={p.id}
+  className="group relative rounded-2xl border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] p-5 shadow-[var(--shadow-card)] transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-hover)]"
+>
+  <Link
+    href={buildHrefWithClient(`/projects/${p.id}`, '', activeClient?.slug ?? null)}
+    aria-label={p.name}
+    className="absolute inset-0 z-[1] rounded-2xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--color-accent-primary)]"
+  />
+  {!isViewer ? (
+    <div className="pointer-events-none absolute right-3 top-3 z-10 opacity-0 transition-opacity duration-150 focus-within:pointer-events-auto focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100">
+      <DeleteProjectButton projectId={p.id} projectName={p.name} size="sm" />
+    </div>
+  ) : null}
+  <div className="pointer-events-none relative">
+    <div className="mb-2 flex items-center gap-2 text-xs text-[color:var(--color-text-muted)]">
+      <span
+        aria-hidden="true"
+        className="inline-block h-2 w-2 rounded-full"
+        style={{ background: clientColorCss(p.client.colorToken) }}
+      />
+      {p.client.name}
+      {p.type ? (
+        <span>
+          · {p.type.icon} {p.type.name}
+        </span>
+      ) : null}
+    </div>
+    <ProjectTitleEditor
+      projectId={p.id}
+      name={p.name}
+      canEdit={!isViewer}
+      as="h2"
+      className="text-lg font-extrabold tracking-tight"
+    />
+    {p.description ? (
+      <p className="mt-1 line-clamp-2 text-sm text-[color:var(--color-text-muted)]">
+        {p.description}
+      </p>
+    ) : null}
+    <div className="mt-3 text-xs text-[color:var(--color-text-muted)]">
+      {p._count.cards === 0
+        ? 'Aucune carte'
+        : p._count.cards === 1
+          ? '1 carte'
+          : `${p._count.cards} cartes`}
+    </div>
+  </div>
+</li>
 ```
 
 Importer `ProjectTitleEditor` depuis `@/features/projects/components/project-title-editor`. Le `z-[2]` du crayon/champ passe au-dessus du lien `z-[1]`.
@@ -1557,23 +1591,23 @@ Importer `ProjectTitleEditor` depuis `@/features/projects/components/project-tit
   - `[id]/calendar/page.tsx:168-176` : importer `Roles` depuis `@nexushub/domain` (fusionner avec l'import existant), puis remplacer le `<h1>` par :
 
 ```tsx
-          <ProjectTitleEditor
-            projectId={project.id}
-            name={project.name}
-            canEdit={ctx.role !== Roles.Viewer}
-            className="text-[32px] font-extrabold tracking-tight"
-            suffix={
-              <>
-                {' '}
-                <span
-                  className="bg-clip-text text-transparent"
-                  style={{ backgroundImage: 'var(--accent-gradient)' }}
-                >
-                  · calendrier
-                </span>
-              </>
-            }
-          />
+<ProjectTitleEditor
+  projectId={project.id}
+  name={project.name}
+  canEdit={ctx.role !== Roles.Viewer}
+  className="text-[32px] font-extrabold tracking-tight"
+  suffix={
+    <>
+      {' '}
+      <span
+        className="bg-clip-text text-transparent"
+        style={{ backgroundImage: 'var(--accent-gradient)' }}
+      >
+        · calendrier
+      </span>
+    </>
+  }
+/>
 ```
 
 - [ ] **Step 7: Verify** — `pnpm --filter @nexushub/web typecheck && pnpm --filter @nexushub/web lint` → PASS ; `pnpm --filter @nexushub/web exec vitest run features/projects` → PASS.
@@ -1590,6 +1624,7 @@ git commit -m "feat(projects): inline project rename on cards and project header
 ### Task 11: Vérification globale + docs
 
 **Files:**
+
 - Modify: `progress.md`, `CLAUDE.md` (§11 journal)
 
 - [ ] **Step 1: Suite complète**
@@ -1606,7 +1641,7 @@ Expected: tout vert, coverage domain ≥ seuils.
   6. Calendrier : carte en dernière colonne barrée.
 
 - [ ] **Step 3: Docs** — `progress.md` : ajouter une entrée datée 2026-10-02 « Lot A quick wins » (5 points, fichiers clés, aucune migration). `CLAUDE.md` §11 : ajouter la ligne
-`| 2026-10-02 | Lot A quick wins — renommage projet inline, widget + filtre « Mes cartes » (`mine`, userId de session), palette clients 12 tokens + couleur libre hex (contraste WCAG), cartes terminées barrées au calendrier | Angelo L. + Claude |`
+      `| 2026-10-02 | Lot A quick wins — renommage projet inline, widget + filtre « Mes cartes » (`mine`, userId de session), palette clients 12 tokens + couleur libre hex (contraste WCAG), cartes terminées barrées au calendrier | Angelo L. + Claude |`
 
 - [ ] **Step 4: Commit**
 
