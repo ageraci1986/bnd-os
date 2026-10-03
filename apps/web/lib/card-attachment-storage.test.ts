@@ -5,6 +5,7 @@ const m = vi.hoisted(() => {
     createSignedUploadUrl: vi.fn(),
     createSignedUrl: vi.fn(),
     download: vi.fn(),
+    info: vi.fn(),
     remove: vi.fn(),
   };
   return { bucket, from: vi.fn(() => bucket) };
@@ -20,6 +21,7 @@ import {
   getCardAttachmentSignedUrl,
   downloadCardAttachment,
   removeCardAttachment,
+  statCardAttachment,
 } from './card-attachment-storage';
 
 beforeEach(() => {
@@ -68,6 +70,27 @@ describe('card attachment storage', () => {
     expect(ok.ok && ok.binary.length).toBe(2);
     m.bucket.download.mockResolvedValueOnce({ data: null, error: { message: 'Object not found' } });
     expect((await downloadCardAttachment('p')).ok).toBe(false);
+  });
+
+  it('stats an object: stored size + MIME, undefined when absent, fail on error', async () => {
+    m.bucket.info.mockResolvedValueOnce({
+      data: { size: 42, contentType: 'application/pdf', name: 'att' },
+      error: null,
+    });
+    expect(await statCardAttachment('p')).toEqual({
+      ok: true,
+      size: 42,
+      contentType: 'application/pdf',
+    });
+    expect(m.bucket.info).toHaveBeenCalledWith('p');
+    m.bucket.info.mockResolvedValueOnce({ data: { name: 'att' }, error: null });
+    expect(await statCardAttachment('p')).toEqual({
+      ok: true,
+      size: undefined,
+      contentType: undefined,
+    });
+    m.bucket.info.mockResolvedValueOnce({ data: null, error: { message: 'Object not found' } });
+    expect((await statCardAttachment('p')).ok).toBe(false);
   });
 
   it('remove is best-effort', async () => {

@@ -56,6 +56,30 @@ export async function getCardAttachmentSignedUrl(
   return { ok: true, signedUrl: data.signedUrl };
 }
 
+/**
+ * Métadonnées stockées de l'objet (`info`) : taille et MIME tels qu'écrits
+ * par storage-api à l'upload. `undefined` si absents (traité `scan_failed`
+ * par l'appelant — jamais supposés conformes).
+ */
+export async function statCardAttachment(path: string): Promise<
+  | {
+      readonly ok: true;
+      readonly size: number | undefined;
+      readonly contentType: string | undefined;
+    }
+  | Fail
+> {
+  const { data, error } = await createSupabaseAdmin()
+    .storage.from(CARD_ATTACHMENTS_BUCKET)
+    .info(path);
+  if (error || !data) return { ok: false, message: error?.message ?? 'Info failed' };
+  return {
+    ok: true,
+    size: typeof data.size === 'number' ? data.size : undefined,
+    contentType: typeof data.contentType === 'string' ? data.contentType : undefined,
+  };
+}
+
 export async function downloadCardAttachment(
   path: string,
 ): Promise<{ readonly ok: true; readonly binary: Buffer } | Fail> {

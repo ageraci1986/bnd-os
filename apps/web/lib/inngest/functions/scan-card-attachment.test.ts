@@ -27,6 +27,11 @@ function row(overrides: Partial<ScanRow> = {}): ScanRow {
 function deps(overrides: Partial<ScanDeps> = {}): ScanDeps {
   return {
     loadAttachment: vi.fn(async () => row()),
+    stat: vi.fn(async () => ({
+      ok: true as const,
+      size: PDF_BYTES.length,
+      contentType: 'application/pdf',
+    })),
     download: vi.fn(async () => ({ ok: true as const, binary: PDF_BYTES })),
     sniff: vi.fn(async () => 'application/pdf'),
     scan: vi.fn(async () => ({ verdict: 'clean' as const })),
@@ -110,10 +115,83 @@ describe('runScanCardAttachment', () => {
     const big = Buffer.alloc(50 * 1024 * 1024 + 1);
     const d = deps({
       loadAttachment: vi.fn(async () => row({ sizeBytes: big.length })),
-      download: vi.fn(async () => ({ ok: true as const, binary: big })),
+      stat: vi.fn(async () => ({
+        ok: true as const,
+        size: big.length,
+        contentType: 'application/pdf',
+      })),
     });
     expect(await runScanCardAttachment(d, ID)).toBe('dirty');
     expect(d.reject).toHaveBeenCalledWith(expect.objectContaining({ reason: 'size_mismatch' }));
+    // Rejeté sur métadonnées : jamais 50 Mo+ téléchargés en mémoire.
+    expect(d.download).not.toHaveBeenCalled();
+  });
+
+  it('still rejects when the downloaded bytes disagree with consistent metadata', async () => {
+    const d = deps({
+      download: vi.fn(async () => ({ ok: true as const, binary: Buffer.from('%PDF-short') })),
+    });
+    expect(await runScanCardAttachment(d, ID)).toBe('dirty');
+    expect(d.reject).toHaveBeenCalledWith(expect.objectContaining({ reason: 'size_mismatch' }));
+  });
+
+  it('checks object metadata BEFORE downloading: stored size mismatch → dirty', async () => {
+    const d = deps({
+      stat: vi.fn(async () => ({ ok: true as const, size: 999, contentType: 'application/pdf' })),
+    });
+    expect(await runScanCardAttachment(d, ID)).toBe('dirty');
+    expect(d.stat).toHaveBeenCalledWith(row().storagePath);
+    expect(d.reject).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'dirty', reason: 'size_mismatch', sha256: null }),
+    );
+    expect(d.download).not.toHaveBeenCalled();
+  });
+
+  it('rejects a stored MIME different from the declared type (type_mismatch)', async () => {
+    const d = deps({
+      stat: vi.fn(async () => ({
+        ok: true as const,
+        size: PDF_BYTES.length,
+        contentType: 'text/html',
+      })),
+    });
+    expect(await runScanCardAttachment(d, ID)).toBe('dirty');
+    expect(d.reject).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'dirty', reason: 'type_mismatch', sha256: null }),
+    );
+    expect(d.download).not.toHaveBeenCalled();
+  });
+
+  it('normalizes the stored MIME (case, parameters) before comparing', async () => {
+    const d = deps({
+      stat: vi.fn(async () => ({
+        ok: true as const,
+        size: PDF_BYTES.length,
+        contentType: 'Application/PDF; charset=binary',
+      })),
+    });
+    expect(await runScanCardAttachment(d, ID)).toBe('clean');
+  });
+
+  it.each([
+    { size: undefined, contentType: 'application/pdf' },
+    { size: PDF_BYTES.length, contentType: undefined },
+  ])('treats missing object metadata as scan_failed (%o)', async (meta) => {
+    const d = deps({ stat: vi.fn(async () => ({ ok: true as const, ...meta })) });
+    expect(await runScanCardAttachment(d, ID)).toBe('scan_failed');
+    expect(d.reject).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'scan_failed', reason: 'missing_metadata' }),
+    );
+    expect(d.download).not.toHaveBeenCalled();
+  });
+
+  it('marks scan_failed (missing_object) when the metadata lookup fails', async () => {
+    const d = deps({ stat: vi.fn(async () => ({ ok: false as const, message: 'not found' })) });
+    expect(await runScanCardAttachment(d, ID)).toBe('scan_failed');
+    expect(d.reject).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'scan_failed', reason: 'missing_object' }),
+    );
+    expect(d.download).not.toHaveBeenCalled();
   });
 
   it('marks scan_failed when the object is missing from Storage', async () => {

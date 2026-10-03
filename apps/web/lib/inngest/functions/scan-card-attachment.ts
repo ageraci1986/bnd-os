@@ -5,7 +5,11 @@ import { z } from 'zod';
 import { prisma } from '@nexushub/db';
 import { CARD_ATTACHMENT_MAX_BYTES, isSniffCompatible } from '@nexushub/domain';
 import { scanFileWithClamAV } from '@nexushub/integrations/antivirus';
-import { downloadCardAttachment, removeCardAttachment } from '@/lib/card-attachment-storage';
+import {
+  downloadCardAttachment,
+  removeCardAttachment,
+  statCardAttachment,
+} from '@/lib/card-attachment-storage';
 import { getServerEnv } from '@/lib/env';
 import { inngestClient } from '../client';
 
@@ -14,10 +18,13 @@ import { inngestClient } from '../client';
  *
  * Déclenché par `card-attachment/uploaded` (émis par `finalizeCardAttachment`
  * après l'upload direct navigateur → Storage). Contrôles, dans l'ordre :
- * objet présent → taille réelle = taille déclarée et ≤ 50 Mo → magic bytes
- * compatibles avec le type déclaré → ClamAV. Tant que la ligne n'est pas
+ * métadonnées de l'objet (présent, taille stockée = déclarée et ≤ 50 Mo,
+ * MIME stocké = déclaré — AVANT tout téléchargement, pour ne jamais charger
+ * en mémoire un objet hors contrat) → octets téléchargés (taille re-vérifiée)
+ * → magic bytes compatibles avec le type déclaré → ClamAV. Tant que la ligne n'est pas
  * `clean`, aucune URL de lecture n'est délivrée (`getCardAttachmentUrl`).
- * Tout rejet SUPPRIME l'objet Storage et trace `card_attachment_rejected`.
+ * Tout rejet SUPPRIME l'objet Storage et trace `card_attachment_rejected` —
+ * uniquement si la ligne était encore `pending` (voir `rejectCardAttachment`).
  *
  * Fail-closed : ClamAV non configuré / injoignable → `scan_failed` (jamais
  * `clean` par défaut).
@@ -44,7 +51,9 @@ export interface ScanRow {
 
 export type RejectReason =
   | 'missing_object'
+  | 'missing_metadata'
   | 'size_mismatch'
+  | 'type_mismatch'
   | 'type_spoof'
   | 'virus'
   | 'scanner_error';
@@ -59,6 +68,15 @@ export interface RejectInput {
 
 export interface ScanDeps {
   readonly loadAttachment: (id: string) => Promise<ScanRow | null>;
+  /** Métadonnées Storage de l'objet (`info`) — taille et MIME stockés. */
+  readonly stat: (path: string) => Promise<
+    | {
+        ok: true;
+        size: number | undefined;
+        contentType: string | undefined;
+      }
+    | { ok: false; message: string }
+  >;
   readonly download: (
     path: string,
   ) => Promise<{ ok: true; binary: Buffer } | { ok: false; message: string }>;
@@ -80,6 +98,11 @@ export type ScanOutcome = 'skipped' | 'clean' | 'dirty' | 'scan_failed';
 
 const IdSchema = z.string().uuid();
 
+/** `Application/PDF; charset=x` → `application/pdf`. */
+function normalizeMime(mime: string): string {
+  return (mime.split(';')[0] ?? '').trim().toLowerCase();
+}
+
 export async function runScanCardAttachment(
   deps: ScanDeps,
   attachmentId: string,
@@ -88,6 +111,36 @@ export async function runScanCardAttachment(
   const row = await deps.loadAttachment(attachmentId);
   // Absent (supprimé entre-temps) ou déjà traité (événement re-livré) → no-op.
   if (!row || row.scanStatus !== 'pending') return 'skipped';
+
+  const meta = await deps.stat(row.storagePath);
+  if (!meta.ok) {
+    await deps.reject({
+      row,
+      status: 'scan_failed',
+      reason: 'missing_object',
+      sha256: null,
+      engines: [],
+    });
+    return 'scan_failed';
+  }
+  if (meta.size === undefined || meta.contentType === undefined) {
+    await deps.reject({
+      row,
+      status: 'scan_failed',
+      reason: 'missing_metadata',
+      sha256: null,
+      engines: [],
+    });
+    return 'scan_failed';
+  }
+  if (meta.size !== row.sizeBytes || meta.size > CARD_ATTACHMENT_MAX_BYTES) {
+    await deps.reject({ row, status: 'dirty', reason: 'size_mismatch', sha256: null, engines: [] });
+    return 'dirty';
+  }
+  if (normalizeMime(meta.contentType) !== normalizeMime(row.contentType)) {
+    await deps.reject({ row, status: 'dirty', reason: 'type_mismatch', sha256: null, engines: [] });
+    return 'dirty';
+  }
 
   const downloaded = await deps.download(row.storagePath);
   if (!downloaded.ok) {
@@ -102,6 +155,7 @@ export async function runScanCardAttachment(
   }
   const { binary } = downloaded;
 
+  // Re-vérifié sur les octets réels (défense en profondeur vs métadonnées).
   if (binary.length !== row.sizeBytes || binary.length > CARD_ATTACHMENT_MAX_BYTES) {
     await deps.reject({ row, status: 'dirty', reason: 'size_mismatch', sha256: null, engines: [] });
     return 'dirty';
@@ -189,12 +243,25 @@ async function markClean(
   });
 }
 
-async function reject({ row, status, reason, sha256, engines }: RejectInput): Promise<void> {
-  await removeCardAttachment(row.storagePath);
-  await prisma.cardAttachment.updateMany({
-    where: { id: row.id, workspaceId: row.workspaceId },
+/**
+ * Rejet prod. ORDRE : bascule CONDITIONNELLE (`pending` → rejeté) d'abord ;
+ * si 0 ligne (déjà `clean` par une exécution concurrente, supprimée, ou déjà
+ * rejetée), no-op total : on ne retire jamais l'objet d'une PJ servie et on
+ * n'écrit pas d'audit trompeur. Sinon : retrait de l'objet puis audit.
+ */
+export async function rejectCardAttachment({
+  row,
+  status,
+  reason,
+  sha256,
+  engines,
+}: RejectInput): Promise<void> {
+  const res = await prisma.cardAttachment.updateMany({
+    where: { id: row.id, workspaceId: row.workspaceId, scanStatus: 'pending' },
     data: { scanStatus: status, sha256, scanReport: { reason } },
   });
+  if (res.count === 0) return;
+  await removeCardAttachment(row.storagePath);
   await prisma.auditLog.create({
     data: {
       action: 'card_attachment_rejected',
@@ -218,11 +285,12 @@ async function reject({ row, status, reason, sha256, engines }: RejectInput): Pr
 
 const prodDeps: ScanDeps = {
   loadAttachment,
+  stat: statCardAttachment,
   download: downloadCardAttachment,
   sniff,
   scan,
   markClean,
-  reject,
+  reject: rejectCardAttachment,
 };
 
 export const scanCardAttachment = inngestClient.createFunction(
