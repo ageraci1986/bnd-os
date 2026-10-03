@@ -64,7 +64,7 @@ export function TemplateEditor({
               ? {
                   background: 'var(--accent-gradient)',
                   borderColor: 'transparent',
-                  color: '#fff',
+                  color: 'white',
                   boxShadow: '0 4px 15px rgba(138, 43, 226, 0.3)',
                 }
               : {

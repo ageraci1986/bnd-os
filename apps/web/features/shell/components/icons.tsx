@@ -161,12 +161,14 @@ export function StarFilledIcon(p: Props) {
  */
 export function StarGradientIcon(p: Props) {
   const gradientId = 'nx-star-gradient';
+  const gradientFrom = '#8b2be2'; // theme-exempt: dégradé de marque fixe de l'icône
+  const gradientTo = '#ff2a6d'; // theme-exempt: dégradé de marque fixe de l'icône
   return (
     <svg {...base} {...p} fill={`url(#${gradientId})`} stroke="none">
       <defs>
         <linearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#8b2be2" />
-          <stop offset="100%" stopColor="#ff2a6d" />
+          <stop offset="0%" stopColor={gradientFrom} />
+          <stop offset="100%" stopColor={gradientTo} />
         </linearGradient>
       </defs>
       <path d="M12 2.5 14.7 8.6l6.6.6-5 4.5 1.5 6.4L12 16.8 6.2 20.1l1.5-6.4-5-4.5 6.6-.6L12 2.5z" />

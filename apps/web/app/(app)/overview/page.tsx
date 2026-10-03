@@ -64,7 +64,7 @@ export default async function OverviewPage({ searchParams }: OverviewPageProps) 
           Hello {greeting},{' '}
           <span
             className="bg-clip-text text-transparent"
-            style={{ backgroundImage: 'linear-gradient(135deg,#8B2BE2,#FF2A6D)' }}
+            style={{ backgroundImage: 'var(--accent-gradient)' }}
           >
             {activeClient ? `vue ${activeClient.name}.` : 'bienvenue sur NexusHub.'}
           </span>
@@ -140,7 +140,8 @@ function EmptyProjectsCard({
       {isAdmin ? (
         <Link
           href="/projects"
-          className="mt-4 inline-flex rounded-full bg-gradient-to-br from-[#8B2BE2] to-[#FF2A6D] px-5 py-2.5 text-[13px] font-bold text-white shadow-md transition hover:-translate-y-0.5"
+          className="mt-4 inline-flex rounded-full px-5 py-2.5 text-[13px] font-bold text-white shadow-md transition hover:-translate-y-0.5"
+          style={{ backgroundImage: 'var(--accent-gradient)' }}
         >
           Créer un projet →
         </Link>
@@ -159,7 +160,8 @@ function AdminWelcomeCard() {
       </p>
       <Link
         href="/team"
-        className="mt-4 inline-flex rounded-full bg-gradient-to-br from-[#8B2BE2] to-[#FF2A6D] px-5 py-2.5 text-[13px] font-bold text-white shadow-md transition hover:-translate-y-0.5"
+        className="mt-4 inline-flex rounded-full px-5 py-2.5 text-[13px] font-bold text-white shadow-md transition hover:-translate-y-0.5"
+        style={{ backgroundImage: 'var(--accent-gradient)' }}
       >
         Aller à la page Équipe →
       </Link>

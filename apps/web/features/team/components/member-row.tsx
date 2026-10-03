@@ -62,7 +62,7 @@ export function MemberRow(props: MemberRowProps) {
     <li className="flex flex-wrap items-center gap-4 border-b border-[color:var(--color-border-soft)] py-4 last:border-b-0">
       <span
         className="grid h-10 w-10 place-items-center rounded-full text-xs font-bold text-white"
-        style={{ background: 'linear-gradient(135deg,#8B2BE2,#FF2A6D)' }}
+        style={{ background: 'var(--accent-gradient)' }}
         aria-hidden="true"
       >
         {initials}
