@@ -16,6 +16,6 @@ describe('<BadgeAuto />', () => {
   it('renders the gradient inline style', () => {
     const { container } = render(<BadgeAuto />);
     const el = container.firstChild as HTMLElement;
-    expect(el.getAttribute('style')).toMatch(/linear-gradient/);
+    expect(el.getAttribute('style')).toMatch(/var\(--accent-gradient\)/);
   });
 });

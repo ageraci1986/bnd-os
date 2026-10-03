@@ -242,7 +242,7 @@
   height: 22px;
   border-radius: 6px;
   background: var(--accent-gradient-soft, rgba(139, 43, 226, 0.08));
-  color: var(--color-accent-primary);
+  color: var(--color-accent-text);
   flex-shrink: 0;
 }
 .nav-label-icon svg {
@@ -314,9 +314,19 @@
   color: var(--text-main);
 }
 .nav-item.active {
-  background: light-dark(var(--accent-gradient-soft), rgba(139, 43, 226, 0.15));
+  background: var(--accent-gradient-soft);
   color: var(--color-accent-text);
   font-weight: 700;
+}
+/* light-dark() n'accepte que des couleurs : le dégradé clair est donc
+   remplacé par un aplat en sombre via le sélecteur de thème. */
+:where([data-theme='dark']) .nav-item.active {
+  background: rgba(139, 43, 226, 0.15);
+}
+@media (prefers-color-scheme: dark) {
+  :where([data-theme='system']) .nav-item.active {
+    background: rgba(139, 43, 226, 0.15);
+  }
 }
 .nav-item .ico {
   width: 18px;
@@ -826,7 +836,7 @@
   padding: 1px 6px;
   border-radius: 999px;
   background: rgba(139, 43, 226, 0.08);
-  color: var(--accent-primary, #8b2be2);
+  color: var(--color-accent-text);
   font-size: 10px;
   font-weight: 700;
   vertical-align: middle;
@@ -1184,7 +1194,7 @@
   border-radius: 6px;
 }
 .nx-filter-pills-clear:hover {
-  color: var(--color-accent-primary);
+  color: var(--color-accent-text);
 }
 
 /* Click-to-advance checkbox shown at the top-left of every card. */
@@ -1209,7 +1219,7 @@
 }
 .nx-card-advance:hover:not(:disabled) {
   border-color: var(--color-accent-primary);
-  color: var(--color-accent-primary);
+  color: var(--color-accent-text);
 }
 .nx-card-advance:focus-visible {
   outline: 2px solid var(--color-accent-primary);
@@ -1244,7 +1254,7 @@
 }
 .add-card-btn:hover {
   border-color: var(--color-accent-primary);
-  color: var(--color-accent-primary);
+  color: var(--color-accent-text);
   background: var(--accent-gradient-soft);
 }
 
@@ -1492,7 +1502,7 @@
 }
 .category-pick.none.active {
   border-color: var(--color-accent-primary);
-  color: var(--color-accent-primary);
+  color: var(--color-accent-text);
 }
 .category-add-form {
   display: flex;
@@ -2413,7 +2423,7 @@
   background: transparent;
   border: 0;
   padding: 0;
-  color: var(--accent-primary);
+  color: var(--color-accent-text);
   text-decoration: underline;
   font-size: 12px;
   font-weight: 600;
@@ -2520,7 +2530,7 @@
   overflow-x: auto;
 }
 .nx-comment__content a {
-  color: var(--accent-primary);
+  color: var(--color-accent-text);
   text-decoration: underline;
 }
 .nx-comment__actions {
@@ -2602,7 +2612,7 @@
 }
 .nx-comment-editor__btn:hover:not([disabled]) {
   background: rgba(139, 43, 226, 0.1);
-  color: var(--accent-primary);
+  color: var(--color-accent-text);
 }
 .nx-comment-editor__btn:focus-visible {
   outline: 2px solid var(--accent-primary);
@@ -2642,7 +2652,7 @@
   margin: 0 0 6px 0;
 }
 .nx-comment-editor__surface a {
-  color: var(--accent-primary);
+  color: var(--color-accent-text);
   text-decoration: underline;
 }
 .nx-comment-editor__surface code {
@@ -2661,7 +2671,7 @@
 }
 .nx-comment-editor__btn.is-active {
   background: rgba(139, 43, 226, 0.14);
-  color: var(--accent-primary);
+  color: var(--color-accent-text);
 }
 
 /* ---- Description variant -------------------------------------------------

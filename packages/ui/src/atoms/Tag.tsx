@@ -30,13 +30,11 @@ const VARIANTS: Record<TagVariant, string> = {
   danger: 'bg-[color:var(--color-danger-bg)] text-[color:var(--color-danger)]',
   warning: 'bg-[color:var(--color-warning-bg)] text-[color:var(--color-warning)]',
   info: 'bg-[color:var(--color-info-bg)] text-[color:var(--color-info)]',
-  primary:
-    'bg-[image:var(--accent-gradient-soft)] text-[color:var(--color-accent-primary)] dark:text-[#C084FC]',
+  primary: 'bg-[image:var(--accent-gradient-soft)] text-[color:var(--color-accent-text)]',
   design: 'bg-[rgba(255,42,109,0.1)] text-[color:var(--color-accent-secondary)]',
   copy: 'bg-[color:var(--color-warning-bg)] text-[color:var(--color-warning)]',
   video: 'bg-[color:var(--color-info-bg)] text-[color:var(--color-info)]',
-  strategy:
-    'bg-[image:var(--accent-gradient-soft)] text-[color:var(--color-accent-primary)] dark:text-[#C084FC]',
+  strategy: 'bg-[image:var(--accent-gradient-soft)] text-[color:var(--color-accent-text)]',
   tiktok: 'bg-[color:var(--color-success-bg)] text-[color:var(--color-success)]',
   insta: 'bg-[color:var(--color-danger-bg)] text-[color:var(--color-danger)]',
 };

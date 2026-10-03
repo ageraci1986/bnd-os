@@ -27,7 +27,7 @@ describe('<Avatar />', () => {
   it('applies the gradient variant via inline style', () => {
     render(<Avatar initials="AL" variant="gradient" />);
     const el = screen.getByRole('img');
-    expect(el.getAttribute('style')).toMatch(/linear-gradient/);
+    expect(el.getAttribute('style')).toMatch(/var\(--accent-gradient\)/);
   });
 
   it('applies the client variant with the provided color', () => {

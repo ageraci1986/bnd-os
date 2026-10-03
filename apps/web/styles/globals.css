@@ -7,6 +7,11 @@
    components (Topbar, Sidebar, …) are also generated. */
 @source '../../../packages/ui/src/**/*.{ts,tsx}';
 
+/* `dark:` suit le thème explicite (data-theme="dark"), pas l'OS. Ne couvre
+   PAS system + OS sombre : préférer les tokens light-dark() — le garde-fou
+   no-hardcoded-colors interdit `dark:` dans le code applicatif. */
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+
 @layer base {
   html,
   body {

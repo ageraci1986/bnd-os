@@ -54,20 +54,6 @@
   --color-c-indigo: light-dark(#4f46e5, #818cf8);
   --color-c-slate: light-dark(#475569, #94a3b8);
 
-  /* Texte posé sur une couleur client (contraste WCAG, cf. clientColorForeground) */
-  --color-c-acme-fg: light-dark(#000000, #000000);
-  --color-c-tech-fg: light-dark(#ffffff, #000000);
-  --color-c-nova-fg: light-dark(#000000, #000000);
-  --color-c-lumen-fg: light-dark(#000000, #000000);
-  --color-c-orbit-fg: light-dark(#ffffff, #000000);
-  --color-c-red-fg: light-dark(#ffffff, #000000);
-  --color-c-orange-fg: light-dark(#000000, #000000);
-  --color-c-lime-fg: light-dark(#000000, #000000);
-  --color-c-teal-fg: light-dark(#000000, #000000);
-  --color-c-cyan-fg: light-dark(#000000, #000000);
-  --color-c-indigo-fg: light-dark(#ffffff, #000000);
-  --color-c-slate-fg: light-dark(#ffffff, #000000);
-
   /* — Typography — */
   --font-sans: 'Plus Jakarta Sans', system-ui, sans-serif;
 
@@ -83,6 +69,25 @@
 
   /* — Transitions — */
   --ease-emphasized: cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+/* Texte posé sur une couleur client (contraste WCAG, cf. clientColorForeground).
+   Hors de @theme : ces variables ne sont référencées que dynamiquement
+   (`var(--color-${token}-fg)` construit au runtime), Tailwind v4 ne les
+   émettrait donc jamais depuis @theme. */
+:root {
+  --color-c-acme-fg: light-dark(#000000, #000000);
+  --color-c-tech-fg: light-dark(#ffffff, #000000);
+  --color-c-nova-fg: light-dark(#000000, #000000);
+  --color-c-lumen-fg: light-dark(#000000, #000000);
+  --color-c-orbit-fg: light-dark(#ffffff, #000000);
+  --color-c-red-fg: light-dark(#ffffff, #000000);
+  --color-c-orange-fg: light-dark(#000000, #000000);
+  --color-c-lime-fg: light-dark(#000000, #000000);
+  --color-c-teal-fg: light-dark(#000000, #000000);
+  --color-c-cyan-fg: light-dark(#000000, #000000);
+  --color-c-indigo-fg: light-dark(#ffffff, #000000);
+  --color-c-slate-fg: light-dark(#ffffff, #000000);
 }
 
 /* ============================================================
