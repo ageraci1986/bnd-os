@@ -57,6 +57,28 @@ describe('mail attachment rate limits', () => {
   });
 });
 
+describe('card attachment rate limits', () => {
+  it('card_attachment_upload allows 60 hits then blocks', async () => {
+    const userId = 'u-card-attachment-upload';
+    for (let i = 0; i < 60; i++) {
+      const r = await getRateLimiter('card_attachment_upload').check(userId);
+      expect(r.success).toBe(true);
+    }
+    const blocked = await getRateLimiter('card_attachment_upload').check(userId);
+    expect(blocked.success).toBe(false);
+  });
+
+  it('card_attachment_download allows 300 hits then blocks', async () => {
+    const userId = 'u-card-attachment-download';
+    for (let i = 0; i < 300; i++) {
+      const r = await getRateLimiter('card_attachment_download').check(userId);
+      expect(r.success).toBe(true);
+    }
+    const blocked = await getRateLimiter('card_attachment_download').check(userId);
+    expect(blocked.success).toBe(false);
+  });
+});
+
 describe('recipient search rate limit', () => {
   it('recipient_search allows 300 hits then blocks', async () => {
     const rl = getRateLimiter('recipient_search');

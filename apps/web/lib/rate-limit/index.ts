@@ -26,7 +26,9 @@ export type RateLimitKey =
   | 'assistant_chat'
   | 'assistant_confirm'
   | 'assistant_voice_stt'
-  | 'assistant_voice_tts';
+  | 'assistant_voice_tts'
+  | 'card_attachment_upload'
+  | 'card_attachment_download';
 
 export interface RateLimitResult {
   readonly success: boolean;
@@ -57,6 +59,8 @@ const WINDOWS: Record<
   assistant_confirm: { limit: 20, window: '1 m' },
   assistant_voice_stt: { limit: 30, window: '1 m' },
   assistant_voice_tts: { limit: 60, window: '1 m' },
+  card_attachment_upload: { limit: 60, window: '1 h' },
+  card_attachment_download: { limit: 300, window: '1 h' },
 };
 
 /* ---------- Upstash backend ---------------------------------------------- */
