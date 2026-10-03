@@ -43,22 +43,6 @@ export const CLIENT_COLOR_LABELS_FR: Readonly<Record<ClientColorToken, string>> 
   'c-slate': 'Ardoise',
 };
 
-/** Valeurs claires de `tokens.css` — utilisées uniquement pour le calcul de contraste. */
-const CLIENT_TOKEN_HEX: Readonly<Record<ClientColorToken, string>> = {
-  'c-acme': '#ff2a6d',
-  'c-tech': '#2563eb',
-  'c-nova': '#059669',
-  'c-lumen': '#f59e0b',
-  'c-orbit': '#8b2be2',
-  'c-red': '#dc2626',
-  'c-orange': '#ea580c',
-  'c-lime': '#65a30d',
-  'c-teal': '#0d9488',
-  'c-cyan': '#0891b2',
-  'c-indigo': '#4f46e5',
-  'c-slate': '#475569',
-};
-
 const CLIENT_HEX_RE = /^#[0-9a-f]{6}$/;
 
 export function isValidColorToken(value: unknown): value is ClientColorToken {
@@ -90,18 +74,24 @@ function relativeLuminance(hex: string): number {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
-/** Noir ou blanc, celui qui offre le meilleur contraste WCAG sur la couleur du client. */
-export function clientColorForeground(value: string): '#000000' | '#ffffff' {
-  const hex = isValidColorToken(value)
-    ? CLIENT_TOKEN_HEX[value]
-    : CLIENT_HEX_RE.test(value)
-      ? value
-      : null;
-  if (hex === null) return '#ffffff';
-  const l = relativeLuminance(hex);
-  const contrastWhite = 1.05 / (l + 0.05);
-  const contrastBlack = (l + 0.05) / 0.05;
-  return contrastBlack > contrastWhite ? '#000000' : '#ffffff';
+/**
+ * Couleur de texte à poser sur la couleur du client (contraste WCAG).
+ *
+ * Pour un token de palette, le contraste change selon le thème (cf.
+ * `--color-c-<token>` dans `tokens.css`, Task 4) : on retourne la variable
+ * CSS thème-aware `--color-c-<token>-fg` plutôt qu'une valeur figée. Pour une
+ * couleur libre `#rrggbb`, le calcul de luminance reste statique (noir ou
+ * blanc, meilleur contraste WCAG).
+ */
+export function clientColorForeground(value: string): string {
+  if (isValidColorToken(value)) return `var(--color-${value}-fg)`;
+  if (CLIENT_HEX_RE.test(value)) {
+    const l = relativeLuminance(value);
+    const contrastWhite = 1.05 / (l + 0.05);
+    const contrastBlack = (l + 0.05) / 0.05;
+    return contrastBlack > contrastWhite ? '#000000' : '#ffffff';
+  }
+  return '#ffffff';
 }
 
 // ---------- Initials --------------------------------------------------------
