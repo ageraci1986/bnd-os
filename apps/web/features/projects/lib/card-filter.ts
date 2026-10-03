@@ -15,6 +15,7 @@ import { startOfTodayInParis } from '@nexushub/domain';
  *   asg — comma-separated assignee user ids (UUIDs)
  *   tpl — comma-separated card-template ids (UUIDs)
  *   due — 'today' | 'week' | 'overdue' | 'none' | 'YYYY-MM-DD..YYYY-MM-DD'
+ *   mine — '1' → seulement les cartes assignées à l'utilisateur de la session
  */
 
 export type DueFilter =
@@ -29,6 +30,7 @@ export interface ProjectCardFilter {
   readonly assigneeIds: readonly string[];
   readonly templateIds: readonly string[];
   readonly due: DueFilter;
+  readonly mine: boolean;
 }
 
 export const EMPTY_PROJECT_CARD_FILTER: ProjectCardFilter = {
@@ -38,6 +40,7 @@ export const EMPTY_PROJECT_CARD_FILTER: ProjectCardFilter = {
   assigneeIds: [],
   templateIds: [],
   due: { mode: 'all' },
+  mine: false,
 };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -101,6 +104,7 @@ export function parseProjectCardFilter(sp: SpLike): ProjectCardFilter {
     assigneeIds: csvUuids(readKey(sp, 'asg')),
     templateIds: csvUuids(readKey(sp, 'tpl')),
     due: parseDue(readKey(sp, 'due')),
+    mine: readKey(sp, 'mine') === '1',
   };
 }
 
@@ -131,6 +135,7 @@ export function writeProjectCardFilter(
         ? `${filter.due.from}..${filter.due.to}`
         : filter.due.mode,
   );
+  setOrDelete('mine', filter.mine ? '1' : '');
   return next;
 }
 
@@ -191,6 +196,7 @@ function buildDueWhere(due: DueFilter): Prisma.CardWhereInput | null {
 export interface BuildCardWhereOptions {
   readonly workspaceId: string;
   readonly projectId: string;
+  readonly viewerUserId: string;
   /**
    * Optional extra constraints merged with the filter (e.g. calendar
    * range, deletedAt: null is added implicitly). Callers can also pass
@@ -204,8 +210,14 @@ export interface BuildCardWhereOptions {
  * Just the filter-derived clauses — meant to be spread into a parent
  * `where` that already scopes by workspace / project / deletedAt
  * (e.g. inside a nested `cards: { where: ... }` include).
+ *
+ * `viewerUserId` provient TOUJOURS de la session (`requireUser`) — c'est lui
+ * qui matérialise `mine`, jamais une valeur lue dans l'URL.
  */
-export function buildCardFilterClauses(filter: ProjectCardFilter): Prisma.CardWhereInput {
+export function buildCardFilterClauses(
+  filter: ProjectCardFilter,
+  viewerUserId: string,
+): Prisma.CardWhereInput {
   const where: Prisma.CardWhereInput = {};
   const q = filter.q.trim();
   if (q.length > 0) {
@@ -218,9 +230,13 @@ export function buildCardFilterClauses(filter: ProjectCardFilter): Prisma.CardWh
   }
   if (filter.columnIds.length > 0) where.columnId = { in: [...filter.columnIds] };
   if (filter.categoryTags.length > 0) where.categoryTag = { in: [...filter.categoryTags] };
+  const assigneeClauses: Prisma.CardWhereInput[] = [];
   if (filter.assigneeIds.length > 0) {
-    where.assignees = { some: { userId: { in: [...filter.assigneeIds] } } };
+    assigneeClauses.push({ assignees: { some: { userId: { in: [...filter.assigneeIds] } } } });
   }
+  if (filter.mine) assigneeClauses.push({ assignees: { some: { userId: viewerUserId } } });
+  if (assigneeClauses.length === 1) Object.assign(where, assigneeClauses[0]);
+  else if (assigneeClauses.length > 1) where.AND = assigneeClauses;
   if (filter.templateIds.length > 0) where.templateId = { in: [...filter.templateIds] };
   const dueWhere = buildDueWhere(filter.due);
   if (dueWhere) Object.assign(where, dueWhere);
@@ -233,7 +249,7 @@ export function buildCardWhere(
 ): Prisma.CardWhereInput {
   return {
     ...opts.extra,
-    ...buildCardFilterClauses(filter),
+    ...buildCardFilterClauses(filter, opts.viewerUserId),
     workspaceId: opts.workspaceId,
     projectId: opts.projectId,
     deletedAt: null,

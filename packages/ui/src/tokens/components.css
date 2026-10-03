@@ -1854,30 +1854,14 @@
 .cal-item:hover {
   transform: translateX(2px);
 }
-.cal-item.i-acme {
-  background: rgba(255, 42, 109, 0.12);
-  color: var(--c-acme);
-}
-.cal-item.i-tech {
-  background: rgba(37, 99, 235, 0.12);
-  color: var(--c-tech);
-}
-.cal-item.i-nova {
-  background: rgba(5, 150, 105, 0.12);
-  color: var(--c-nova);
-}
-.cal-item.i-lumen {
-  background: rgba(245, 158, 11, 0.12);
-  color: var(--c-lumen);
-}
-.cal-item.i-orbit {
-  background: rgba(139, 43, 226, 0.12);
-  color: var(--c-orbit);
-}
 .cal-item.blocked {
   background: var(--color-danger-bg);
   color: var(--color-danger);
   border: 1px solid var(--color-danger);
+}
+.cal-item.done {
+  text-decoration: line-through;
+  opacity: 0.7;
 }
 .cal-more {
   font-size: 9px;

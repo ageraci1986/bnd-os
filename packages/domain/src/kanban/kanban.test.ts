@@ -6,6 +6,7 @@ import {
   getNextColumn,
   isArchiveCandidate,
   isLastUserColumn,
+  lastUserColumnIds,
   shouldMoveToBlocked,
   shouldRestoreFromBlocked,
   type Card,
@@ -234,5 +235,35 @@ describe('shouldMoveToBlocked — end-of-day deadline', () => {
 describe('isDueDateOverdue re-export smoke test', () => {
   it('is importable from the dates module', () => {
     expect(typeof isDueDateOverdue).toBe('function');
+  });
+});
+
+describe('lastUserColumnIds', () => {
+  const col = (id: string, projectId: string, position: number, isBlockedSystem = false) => ({
+    id,
+    projectId,
+    position,
+    isBlockedSystem,
+    name: id,
+  });
+
+  it('returns the highest-position non-blocked column of each project', () => {
+    const ids = lastUserColumnIds([
+      col('a1', 'p1', 1),
+      col('a3', 'p1', 3),
+      col('a2', 'p1', 2),
+      col('ab', 'p1', 99, true),
+      col('b1', 'p2', 10),
+      col('b0', 'p2', 5),
+    ]);
+    expect([...ids].sort()).toEqual(['a3', 'b1']);
+  });
+
+  it('ignores projects that only have the blocked column', () => {
+    expect(lastUserColumnIds([col('x', 'p1', 1, true)])).toEqual([]);
+  });
+
+  it('returns an empty list for no columns', () => {
+    expect(lastUserColumnIds([])).toEqual([]);
   });
 });

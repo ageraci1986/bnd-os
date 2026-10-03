@@ -7,16 +7,20 @@
  */
 import { z } from 'zod';
 import {
-  CLIENT_COLOR_TOKENS,
   RACI_VALUES,
   computeInitials,
+  isValidClientColor,
   parseDomainList,
   validateClientName,
   validateContactName,
   validateInitials,
 } from '@nexushub/domain';
 
-const ClientColorSchema = z.enum(CLIENT_COLOR_TOKENS);
+const ClientColorSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .refine(isValidClientColor, { message: 'Couleur invalide' });
 
 const ClientNameSchema = z
   .string()

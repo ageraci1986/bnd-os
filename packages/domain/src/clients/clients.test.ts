@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  CLIENT_COLOR_LABELS_FR,
   CLIENT_COLOR_TOKENS,
   RACI_VALUES,
+  clientColorCss,
+  clientColorForeground,
   computeInitials,
+  isValidClientColor,
   isValidColorToken,
   isValidRaci,
   normalizeDomain,
@@ -16,15 +20,72 @@ import {
 } from './index';
 
 describe('CLIENT_COLOR_TOKENS', () => {
-  it('exposes the 5 design tokens used across the UI', () => {
-    expect(CLIENT_COLOR_TOKENS).toEqual(['c-acme', 'c-tech', 'c-nova', 'c-lumen', 'c-orbit']);
+  it('exposes the 12 design tokens used across the UI', () => {
+    expect(CLIENT_COLOR_TOKENS).toEqual([
+      'c-acme',
+      'c-tech',
+      'c-nova',
+      'c-lumen',
+      'c-orbit',
+      'c-red',
+      'c-orange',
+      'c-lime',
+      'c-teal',
+      'c-cyan',
+      'c-indigo',
+      'c-slate',
+    ]);
+  });
+
+  it('has a French label for every token', () => {
+    for (const t of CLIENT_COLOR_TOKENS) expect(CLIENT_COLOR_LABELS_FR[t]).toBeTruthy();
   });
 
   it('isValidColorToken accepts known tokens and rejects others', () => {
     expect(isValidColorToken('c-acme')).toBe(true);
-    expect(isValidColorToken('c-orbit')).toBe(true);
+    expect(isValidColorToken('c-slate')).toBe(true);
     expect(isValidColorToken('c-bogus')).toBe(false);
     expect(isValidColorToken('')).toBe(false);
+  });
+});
+
+describe('isValidClientColor', () => {
+  it('accepts tokens and lowercase #rrggbb', () => {
+    expect(isValidClientColor('c-teal')).toBe(true);
+    expect(isValidClientColor('#1a2b3c')).toBe(true);
+  });
+  it('rejects shorthand, uppercase, names and garbage', () => {
+    expect(isValidClientColor('#abc')).toBe(false);
+    expect(isValidClientColor('#ABCDEF')).toBe(false);
+    expect(isValidClientColor('red')).toBe(false);
+    expect(isValidClientColor('var(--x)')).toBe(false);
+    expect(isValidClientColor(42)).toBe(false);
+  });
+});
+
+describe('clientColorCss', () => {
+  it('maps a token to its CSS variable', () => {
+    expect(clientColorCss('c-nova')).toBe('var(--color-c-nova)');
+  });
+  it('passes a valid hex through', () => {
+    expect(clientColorCss('#123456')).toBe('#123456');
+  });
+  it('falls back to c-acme for unknown values', () => {
+    expect(clientColorCss('url(evil)')).toBe('var(--color-c-acme)');
+  });
+});
+
+describe('clientColorForeground', () => {
+  it('uses black text on light colors', () => {
+    expect(clientColorForeground('#ffff00')).toBe('#000000');
+    expect(clientColorForeground('c-lime')).toBe('#000000');
+  });
+  it('uses white text on dark colors', () => {
+    expect(clientColorForeground('#101010')).toBe('#ffffff');
+    expect(clientColorForeground('c-indigo')).toBe('#ffffff');
+  });
+  it('defaults to white for unknown values', () => {
+    expect(clientColorForeground('nope')).toBe('#ffffff');
   });
 });
 

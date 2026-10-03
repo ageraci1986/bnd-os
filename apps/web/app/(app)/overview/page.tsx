@@ -6,8 +6,10 @@ import { MetricCard } from '@nexushub/ui';
 import { requireUser } from '@/lib/auth';
 import { getClientFilterFromSearchParams, resolveActiveClient } from '@/lib/client-filter/server';
 import { getOverviewMetrics } from '@/features/overview/lib/metrics';
+import { getMyCardsMetrics } from '@/features/overview/lib/my-cards';
 import { reconcileBeforeRead } from '@/features/projects/lib/reconcile';
 import { loadUserScope } from '@/lib/auth/scope';
+import { buildHrefWithClient } from '@/features/shell/lib/client-filter-url';
 
 export const metadata: Metadata = {
   title: 'Tableau de bord',
@@ -35,11 +37,17 @@ export default async function OverviewPage({ searchParams }: OverviewPageProps) 
 
   const activeClient = await resolveActiveClient(filter, ctx.workspaceId, scope);
 
-  const [, profile, metrics] = await Promise.all([
+  const [, profile, metrics, myCards] = await Promise.all([
     reconcilePromise,
     profilePromise,
     getOverviewMetrics({
       workspaceId: ctx.workspaceId,
+      scope,
+      ...(activeClient ? { clientId: activeClient.id } : {}),
+    }),
+    getMyCardsMetrics({
+      workspaceId: ctx.workspaceId,
+      userId: ctx.userId,
       scope,
       ...(activeClient ? { clientId: activeClient.id } : {}),
     }),
@@ -68,7 +76,7 @@ export default async function OverviewPage({ searchParams }: OverviewPageProps) 
         </p>
       </div>
 
-      <div className="mb-10 grid grid-cols-2 gap-5 md:grid-cols-4">
+      <div className="mb-10 grid grid-cols-2 gap-5 md:grid-cols-3 xl:grid-cols-5">
         {activeClient ? (
           <MetricCard label="Client actif" value={activeClient.name} />
         ) : (
@@ -84,6 +92,20 @@ export default async function OverviewPage({ searchParams }: OverviewPageProps) 
           value={fmt(metrics.blockedCards)}
           valueTone={metrics.blockedCards > 0 ? 'danger' : 'neutral'}
         />
+        <Link
+          href={buildHrefWithClient('/projects/calendar', 'mine=1', activeClient?.slug ?? null)}
+          aria-label={`Mes cartes : ${myCards.open} ouvertes${myCards.overdue > 0 ? `, dont ${myCards.overdue} en retard` : ''}. Ouvrir le calendrier`}
+          className="block rounded-2xl transition hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--color-accent-primary)]"
+        >
+          <MetricCard
+            label="Mes cartes"
+            value={fmt(myCards.open)}
+            className="h-full hover:shadow-[var(--shadow-hover)]"
+            {...(myCards.overdue > 0
+              ? { trend: `dont ${myCards.overdue} en retard`, trendTone: 'danger' as const }
+              : {})}
+          />
+        </Link>
       </div>
 
       {metrics.projects === 0 ? (

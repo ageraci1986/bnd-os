@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { prisma } from '@nexushub/db';
+import { clientColorCss } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
 import { loadUserScope, scopedProjectWhere } from '@/lib/auth/scope';
 
@@ -63,7 +64,7 @@ export default async function MyProjectsPage() {
                   <span
                     aria-hidden="true"
                     className="inline-block h-2 w-2 rounded-full"
-                    style={{ background: `var(--${first.client.colorToken})` }}
+                    style={{ background: clientColorCss(first.client.colorToken) }}
                   />
                   {clientName}
                 </h2>

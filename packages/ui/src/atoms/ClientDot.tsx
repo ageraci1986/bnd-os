@@ -1,6 +1,19 @@
+import { clientColorCss } from '../client-color';
 import { cn } from '../utils';
 
-export type ClientColorToken = 'c-acme' | 'c-tech' | 'c-nova' | 'c-lumen' | 'c-orbit';
+export type ClientColorToken =
+  | 'c-acme'
+  | 'c-tech'
+  | 'c-nova'
+  | 'c-lumen'
+  | 'c-orbit'
+  | 'c-red'
+  | 'c-orange'
+  | 'c-lime'
+  | 'c-teal'
+  | 'c-cyan'
+  | 'c-indigo'
+  | 'c-slate';
 
 export interface ClientDotProps {
   /** Token from the workspace palette (matches Client.colorToken in DB). */
@@ -14,8 +27,7 @@ export interface ClientDotProps {
  * Falls back to a literal CSS color if `colorToken` is not a known token.
  */
 export function ClientDot({ colorToken, size = 8, className }: ClientDotProps) {
-  const isToken = colorToken.startsWith('c-');
-  const background = isToken ? `var(--color-${colorToken})` : colorToken;
+  const background = clientColorCss(colorToken);
 
   return (
     <span

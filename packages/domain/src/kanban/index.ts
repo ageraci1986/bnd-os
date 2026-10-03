@@ -47,6 +47,25 @@ export function isLastUserColumn(column: Column, columns: readonly Column[]): bo
   return ordered[ordered.length - 1]?.id === column.id;
 }
 
+export interface ProjectColumnRef extends Column {
+  readonly projectId: string;
+}
+
+/**
+ * Id de la dernière colonne utilisateur (hors « Bloqué ») de chaque projet
+ * présent dans `columns`. Sert à exclure / marquer les cartes « terminées »
+ * sans charger les projets un par un (Overview, calendrier global).
+ */
+export function lastUserColumnIds(columns: readonly ProjectColumnRef[]): string[] {
+  const best = new Map<string, ProjectColumnRef>();
+  for (const c of columns) {
+    if (c.isBlockedSystem) continue;
+    const current = best.get(c.projectId);
+    if (!current || c.position > current.position) best.set(c.projectId, c);
+  }
+  return [...best.values()].map((c) => c.id);
+}
+
 /* ---------- Auto-progress (PRD §8.2) ---------- */
 
 export type AutoAdvanceOutcome =

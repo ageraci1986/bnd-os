@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { prisma } from '@nexushub/db';
-import { monthGridRange, parseYearMonth } from '@nexushub/domain';
+import { lastUserColumnIds, monthGridRange, parseYearMonth } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
 import { loadUserScope, scopedProjectWhere } from '@/lib/auth/scope';
 import {
@@ -10,6 +10,7 @@ import {
   clientSlug as toClientSlug,
 } from '@/lib/client-filter/server';
 import { CalendarView, type CalendarCardItem } from '@/features/projects/components/calendar-view';
+import { MyCardsToggle } from '@/features/projects/components/my-cards-toggle';
 import { reconcileBeforeRead } from '@/features/projects/lib/reconcile';
 import { CalendarIcon, KanbanIcon } from '@/features/shell/components/icons';
 
@@ -44,12 +45,14 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
   await reconcileBeforeRead(ctx.workspaceId);
 
   const range = monthGridRange(year, month1);
+  const mine = readParam(sp['mine']) === '1';
 
   const cards = await prisma.card.findMany({
     where: {
       workspaceId: ctx.workspaceId,
       deletedAt: null,
       dueDate: { gte: range.start, lt: range.endExclusive },
+      ...(mine ? { assignees: { some: { userId: ctx.userId } } } : {}),
       project: {
         deletedAt: null,
         archivedAt: null,
@@ -63,6 +66,7 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
       title: true,
       shortRef: true,
       dueDate: true,
+      columnId: true,
       project: {
         select: {
           id: true,
@@ -73,6 +77,16 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
     },
   });
 
+  const projectIds = [...new Set(cards.map((c) => c.project.id))];
+  const columns =
+    projectIds.length === 0
+      ? []
+      : await prisma.column.findMany({
+          where: { projectId: { in: projectIds }, project: { workspaceId: ctx.workspaceId } },
+          select: { id: true, name: true, projectId: true, position: true, isBlockedSystem: true },
+        });
+  const doneColumnIds = new Set(lastUserColumnIds(columns));
+
   const items: CalendarCardItem[] = cards.map((c) => ({
     id: c.id,
     projectId: c.project.id,
@@ -81,6 +95,7 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
     isoDate: c.dueDate ? c.dueDate.toISOString().slice(0, 10) : '',
     clientColorToken: c.project.client.colorToken,
     columnIsBlocked: c.column.isBlockedSystem,
+    isDone: doneColumnIds.has(c.columnId),
   }));
 
   // Dynamic legend: only the clients that actually have cards visible.
@@ -107,20 +122,24 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
             </span>
           </h1>
           <p className="mt-2 text-sm text-[color:var(--color-text-muted)]">
+            {mine ? 'Mes cartes · ' : ''}
             {items.length === 0
               ? 'Aucune carte avec une date d’échéance ce mois.'
               : `${items.length} carte${items.length > 1 ? 's' : ''} avec date d’échéance ce mois. Cliquez une tâche pour l’ouvrir.`}
           </p>
         </div>
-        <div className="view-toggle">
-          <Link
-            href={`/projects${activeClient ? `?client=${toClientSlug(activeClient.name)}` : ''}`}
-          >
-            <KanbanIcon /> Kanban
-          </Link>
-          <Link href="" className="active" aria-current="page">
-            <CalendarIcon /> Calendrier
-          </Link>
+        <div className="flex items-center gap-3">
+          <MyCardsToggle />
+          <div className="view-toggle">
+            <Link
+              href={`/projects${activeClient ? `?client=${toClientSlug(activeClient.name)}` : ''}`}
+            >
+              <KanbanIcon /> Kanban
+            </Link>
+            <Link href="" className="active" aria-current="page">
+              <CalendarIcon /> Calendrier
+            </Link>
+          </div>
         </div>
       </header>
 
@@ -131,6 +150,7 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
         basePath="/projects/calendar"
         clientSlug={activeClient ? toClientSlug(activeClient.name) : null}
         legend={legend}
+        extraParams={mine ? { mine: '1' } : {}}
       />
     </div>
   );

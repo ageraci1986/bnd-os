@@ -9,6 +9,7 @@ import {
   type DueFilter,
   type ProjectCardFilter,
 } from '../lib/card-filter';
+import { MyCardsToggle } from './my-cards-toggle';
 
 export interface FilterColumnOption {
   readonly id: string;
@@ -61,6 +62,7 @@ export function ProjectFiltersBar({
       assigneeIds: [],
       templateIds: [],
       due: { mode: 'all' },
+      mine: false,
     });
 
   // Debounced search input — keep router.replace off the keypress hot path.
@@ -151,6 +153,8 @@ export function ProjectFiltersBar({
           ) : null}
         </div>
 
+        <MyCardsToggle />
+
         <div ref={popRef} className="relative">
           <button
             type="button"
@@ -184,7 +188,7 @@ export function ProjectFiltersBar({
         </div>
       </div>
 
-      {count > 0 ? (
+      {count > 0 || filter.mine ? (
         <ActivePillsBar
           filter={filter}
           columns={columns}

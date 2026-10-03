@@ -160,6 +160,15 @@ describe('createClientCore', () => {
     expect(result).toEqual({ ok: false, message: SCOPE_ERROR_MESSAGE });
     expect(prismaMock.client.create).not.toHaveBeenCalled();
   });
+
+  it('rejects an invalid colorToken before writing (defence in depth)', async () => {
+    const result = await createClientCore(
+      adminCtx,
+      baseCreateClientInput({ colorToken: 'c-x);background:url(//evil)' }),
+    );
+    expect(result).toEqual({ ok: false, message: 'Couleur invalide.' });
+    expect(prismaMock.client.create).not.toHaveBeenCalled();
+  });
 });
 
 // =====================================================================
@@ -244,6 +253,23 @@ describe('updateClientCore', () => {
     });
     const result = await updateClientCore(adminCtx, { clientId: CLIENT_ID, name: 'X' });
     expect(result.ok).toBe(true);
+  });
+
+  it('rejects an invalid colorToken before writing (defence in depth)', async () => {
+    const result = await updateClientCore(adminCtx, {
+      clientId: CLIENT_ID,
+      colorToken: 'red;x:y',
+    });
+    expect(result).toEqual({ ok: false, message: 'Couleur invalide.' });
+    expect(prismaMock.client.update).not.toHaveBeenCalled();
+  });
+
+  it('leaves the stored color untouched when colorToken is omitted', async () => {
+    const result = await updateClientCore(adminCtx, { clientId: CLIENT_ID, name: 'X' });
+    expect(result.ok).toBe(true);
+    expect(prismaMock.client.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { name: 'X' } }),
+    );
   });
 });
 

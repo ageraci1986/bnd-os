@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { prisma } from '@nexushub/db';
-import { Roles } from '@nexushub/domain';
+import { Roles, clientColorCss } from '@nexushub/domain';
 import { requireUser } from '@/lib/auth';
 import { readSearchParamString } from '@/lib/client-filter/server';
 import { buildHrefWithClient, isOutsideClientFilter } from '@/features/shell/lib/client-filter-url';
@@ -13,6 +13,7 @@ import { listCustomCategories } from '@/features/projects/lib/categories';
 import { ListView, type ListViewCard } from '@/features/projects/components/list-view';
 import { DeleteProjectButton } from '@/features/projects/components/delete-project-button';
 import { ProjectFiltersBar } from '@/features/projects/components/project-filters-bar';
+import { ProjectTitleEditor } from '@/features/projects/components/project-title-editor';
 import { ViewToggle } from '@/features/projects/components/view-toggle';
 import { CardModalController } from '@/features/projects/components/card-modal-controller';
 import {
@@ -34,7 +35,7 @@ export default async function ProjectListPage({ params, searchParams }: ProjectL
   const filter = parseProjectCardFilter(sp);
   // Global client filter (PRD §8.1) — carried on the way back to /projects.
   const clientSlug = readSearchParamString(sp['client']);
-  const filterClauses = buildCardFilterClauses(filter);
+  const filterClauses = buildCardFilterClauses(filter, ctx.userId);
 
   // Scope and reconcile are independent — run them together (reconcile is
   // throttled per-workspace, so it's usually a no-op). Scope is needed by
@@ -193,7 +194,7 @@ export default async function ProjectListPage({ params, searchParams }: ProjectL
             <span
               aria-hidden="true"
               className="inline-block h-2 w-2 rounded-full"
-              style={{ background: `var(--${project.client.colorToken})` }}
+              style={{ background: clientColorCss(project.client.colorToken) }}
             />
             {project.client.name}
             {project.type ? (
@@ -210,7 +211,12 @@ export default async function ProjectListPage({ params, searchParams }: ProjectL
                   : `${project.cards.length} cartes`}
             </span>
           </div>
-          <h1 className="text-[32px] font-extrabold tracking-tight">{project.name}</h1>
+          <ProjectTitleEditor
+            projectId={project.id}
+            name={project.name}
+            canEdit={!isViewer}
+            className="text-[32px] font-extrabold tracking-tight"
+          />
           {project.description ? (
             <p className="mt-1 max-w-3xl text-sm text-[color:var(--color-text-muted)]">
               {project.description}

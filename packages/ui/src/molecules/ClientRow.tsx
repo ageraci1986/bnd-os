@@ -1,4 +1,5 @@
 import { type ClientColorToken } from '../atoms/ClientDot';
+import { clientColorCss } from '../client-color';
 import { cn } from '../utils';
 
 export interface ClientRowProps {
@@ -15,8 +16,7 @@ export interface ClientRowProps {
  * with the `.c-acme` / `.c-tech` / etc. token-driven dot color.
  */
 export function ClientRow({ name, colorToken, count, active, className }: ClientRowProps) {
-  const isToken = typeof colorToken === 'string' && colorToken.startsWith('c-');
-  const dotStyle = isToken ? { background: `var(--${colorToken})` } : { background: colorToken };
+  const dotStyle = { background: clientColorCss(colorToken) };
 
   return (
     <span className={cn('client-row', active && 'active', className)}>

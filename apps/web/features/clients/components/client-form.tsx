@@ -1,20 +1,19 @@
 'use client';
-import { useActionState, useEffect, useState } from 'react';
+import { useActionState, useEffect, useId, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import {
+  CLIENT_COLOR_LABELS_FR,
+  CLIENT_COLOR_TOKENS,
+  clientColorCss,
+  clientColorForeground,
+  isValidColorToken,
+} from '@nexushub/domain';
 import { CSRF_FIELD_NAME } from '@/lib/csrf/field';
 import { createClient, type CreateClientState } from '../actions/create-client';
 import { updateClient, type UpdateClientState } from '../actions/update-client';
 
 const CREATE_INITIAL: CreateClientState = { status: 'idle' };
 const UPDATE_INITIAL: UpdateClientState = { status: 'idle' };
-
-const COLOR_TOKENS = [
-  { token: 'c-acme', label: 'Rose' },
-  { token: 'c-tech', label: 'Bleu' },
-  { token: 'c-nova', label: 'Vert' },
-  { token: 'c-lumen', label: 'Ambre' },
-  { token: 'c-orbit', label: 'Violet' },
-] as const;
 
 interface CreateProps {
   readonly mode: 'create';
@@ -156,6 +155,7 @@ function Fields({
   setColor: (c: string) => void;
   defaults?: { name: string; initials: string; domains: string; notes: string };
 }) {
+  const colorLabelId = useId();
   return (
     <div className="grid gap-3">
       <div>
@@ -175,31 +175,21 @@ function Fields({
       </div>
 
       <div>
-        <span className="field-label">Couleur</span>
+        <span className="field-label" id={colorLabelId}>
+          Couleur
+        </span>
         <input type="hidden" name="colorToken" value={color} />
-        <div className="mt-1 flex gap-2">
-          {COLOR_TOKENS.map((c) => (
-            <button
-              key={c.token}
-              type="button"
-              onClick={() => setColor(c.token)}
-              aria-label={c.label}
-              aria-pressed={color === c.token}
-              className="grid h-9 w-9 place-items-center rounded-full transition"
-              style={{
-                background: `var(--color-${c.token})`,
-                outline:
-                  color === c.token ? '2px solid var(--color-text-main)' : '2px solid transparent',
-                outlineOffset: 2,
-              }}
-            >
-              {color === c.token ? (
-                <span aria-hidden="true" className="text-white">
-                  ✓
-                </span>
-              ) : null}
-            </button>
+        <div role="group" aria-labelledby={colorLabelId} className="mt-1 flex flex-wrap gap-2">
+          {CLIENT_COLOR_TOKENS.map((token) => (
+            <ColorSwatch
+              key={token}
+              value={token}
+              label={CLIENT_COLOR_LABELS_FR[token]}
+              selected={color === token}
+              onSelect={() => setColor(token)}
+            />
           ))}
+          <CustomColorButton value={color} onChange={setColor} />
         </div>
       </div>
 
@@ -249,6 +239,93 @@ function Fields({
         />
       </div>
     </div>
+  );
+}
+
+function ColorSwatch({
+  value,
+  label,
+  selected,
+  onSelect,
+}: {
+  value: string;
+  label: string;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-label={label}
+      aria-pressed={selected}
+      title={label}
+      className="grid h-9 w-9 place-items-center rounded-full transition"
+      style={{
+        background: clientColorCss(value),
+        boxShadow: selected
+          ? '0 0 0 2px var(--color-bg-card), 0 0 0 4px var(--color-text-main)'
+          : 'none',
+      }}
+    >
+      {selected ? (
+        <span aria-hidden="true" style={{ color: clientColorForeground(value) }}>
+          ✓
+        </span>
+      ) : null}
+    </button>
+  );
+}
+
+/** « + » : ouvre le sélecteur natif ; une couleur libre devient la sélection. */
+function CustomColorButton({ value, onChange }: { value: string; onChange: (c: string) => void }) {
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const isCustom = !isValidColorToken(value);
+  const open = () => {
+    const el = inputRef.current;
+    if (!el) return;
+    if (typeof el.showPicker === 'function') {
+      try {
+        el.showPicker();
+      } catch {
+        el.click();
+      }
+    } else {
+      el.click();
+    }
+  };
+  return (
+    <>
+      <button
+        type="button"
+        onClick={open}
+        aria-label={isCustom ? `Couleur personnalisée (${value})` : 'Couleur personnalisée'}
+        aria-pressed={isCustom}
+        title="Couleur personnalisée"
+        className="grid h-9 w-9 place-items-center rounded-full border border-dashed border-[color:var(--color-border-light)] text-[color:var(--color-text-soft)] transition"
+        style={
+          isCustom
+            ? {
+                background: clientColorCss(value),
+                color: clientColorForeground(value),
+                borderStyle: 'solid',
+                boxShadow: '0 0 0 2px var(--color-bg-card), 0 0 0 4px var(--color-text-main)',
+              }
+            : undefined
+        }
+      >
+        <span aria-hidden="true">{isCustom ? '✓' : '+'}</span>
+      </button>
+      <input
+        ref={inputRef}
+        type="color"
+        tabIndex={-1}
+        aria-hidden="true"
+        className="sr-only"
+        value={isCustom ? value : '#888888'}
+        onChange={(e) => onChange(e.target.value.toLowerCase())}
+      />
+    </>
   );
 }
 
