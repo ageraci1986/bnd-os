@@ -31,7 +31,8 @@ const EMPTY_STATS = { malicious: 0, suspicious: 0, harmless: 0, undetected: 0 } 
  * INSTREAM. See docs/runbooks/mail-attachments.md for the infra deploy procedure.
  *
  * Contract:
- *  - clean:  isInfected=false  -> { clean:true,  verdict:'clean' }
+ *  - clean:  isInfected===false -> { clean:true,  verdict:'clean' }
+ *  - unknown: isInfected null/undefined -> { clean:false, verdict:'scan_failed' }
  *  - dirty:  isInfected=true   -> { clean:false, verdict:'dirty', detectingEngines:['ClamAV: <name>'] }
  *  - failed: connection/scan throw -> { clean:false, verdict:'scan_failed' } (treated as dirty by callers)
  *
@@ -60,8 +61,14 @@ export async function scanFileWithClamAV(
     const stream = Readable.from([binary]);
     const result = await scanner.scanStream(stream);
 
-    if (!result.isInfected) {
+    // Strict: ONLY an explicit `false` is clean. The `clamscan` library
+    // reports `isInfected: null` when the daemon's reply is unparseable —
+    // a falsy check would turn that unknown state into `clean` (fail-open).
+    if (result.isInfected === false) {
       return { clean: true, verdict: 'clean', stats: EMPTY_STATS, analysisId };
+    }
+    if (result.isInfected !== true) {
+      return { clean: false, verdict: 'scan_failed', stats: EMPTY_STATS, analysisId };
     }
 
     // Defensive: the `clamscan` npm library returns `{isInfected:true,
