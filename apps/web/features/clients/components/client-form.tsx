@@ -322,7 +322,7 @@ function CustomColorButton({ value, onChange }: { value: string; onChange: (c: s
         tabIndex={-1}
         aria-hidden="true"
         className="sr-only"
-        value={isCustom ? value : '#888888'}
+        value={isCustom ? value : '#888888'} // theme-exempt: valeur native input[type=color], pas de var() CSS possible ici
         onChange={(e) => onChange(e.target.value.toLowerCase())}
       />
     </>

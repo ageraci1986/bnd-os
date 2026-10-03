@@ -56,7 +56,8 @@ export function AllClientsLink({ count }: { readonly count: number }) {
       aria-current={active ? 'true' : undefined}
       className="block no-underline"
     >
-      <ClientRow name="Tous les clients" colorToken="#9CA3AF" count={count} active={active} />
+      {/* Token de palette existant (gris ardoise, thème-aware) plutôt qu'une teinte fixe. */}
+      <ClientRow name="Tous les clients" colorToken="c-slate" count={count} active={active} />
     </Link>
   );
 }

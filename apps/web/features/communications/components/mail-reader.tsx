@@ -122,7 +122,7 @@ export function MailReader({ mail }: { readonly mail: MailDTO | null }) {
         </div>
       ) : body.bodyHtmlSanitized ? (
         <div
-          className="text-sm leading-relaxed text-[color:var(--color-text-soft)]"
+          className="mail-paper text-sm leading-relaxed"
           dangerouslySetInnerHTML={{ __html: body.bodyHtmlSanitized }}
         />
       ) : body.bodyText ? (

@@ -108,15 +108,14 @@ export function ColumnTile({
       </header>
 
       <div className="mb-3 text-[10px] font-semibold uppercase tracking-[0.5px] text-[color:var(--color-text-muted)]">
-        <span className="font-extrabold text-[color:var(--color-accent-primary)]">›</span>{' '}
-        {flowHint}
+        <span className="font-extrabold text-[color:var(--color-accent-text)]">›</span> {flowHint}
       </div>
 
       {stepCount > 0 ? (
         <button
           type="button"
           onClick={onEditStepChecklist}
-          className="mb-2 rounded-md border border-dashed border-[color:var(--color-accent-primary)] bg-[rgba(139,43,226,0.06)] px-2.5 py-1.5 text-left text-[11px] text-[color:var(--color-accent-primary)] hover:bg-[rgba(139,43,226,0.1)]"
+          className="mb-2 rounded-md border border-dashed border-[color:var(--color-accent-primary)] bg-[rgba(139,43,226,0.06)] px-2.5 py-1.5 text-left text-[11px] text-[color:var(--color-accent-text)] hover:bg-[rgba(139,43,226,0.1)]"
         >
           ☑ Step-checklist · {stepCount} {stepCount === 1 ? 'item' : 'items'}
         </button>
@@ -124,7 +123,7 @@ export function ColumnTile({
 
       {/* Sample card placeholder (matches the mockup look) */}
       <div className="rounded-md border border-dashed border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] p-3 opacity-60">
-        <div className="mb-2 inline-block rounded-full bg-[image:var(--accent-gradient-soft)] px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.5px] text-[color:var(--color-accent-primary)]">
+        <div className="mb-2 inline-block rounded-full bg-[image:var(--accent-gradient-soft)] px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.5px] text-[color:var(--color-accent-text)]">
           Exemple
         </div>
         <div className="text-[11px] leading-relaxed text-[color:var(--color-text-muted)]">

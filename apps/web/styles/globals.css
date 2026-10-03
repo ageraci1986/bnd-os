@@ -7,6 +7,11 @@
    components (Topbar, Sidebar, …) are also generated. */
 @source '../../../packages/ui/src/**/*.{ts,tsx}';
 
+/* `dark:` suit le thème explicite (data-theme="dark"), pas l'OS. Ne couvre
+   PAS system + OS sombre : préférer les tokens light-dark() — le garde-fou
+   no-hardcoded-colors interdit `dark:` dans le code applicatif. */
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+
 @layer base {
   html,
   body {
@@ -24,14 +29,16 @@
 
   body {
     background-image:
-      radial-gradient(ellipse at top left, rgba(139, 43, 226, 0.04), transparent 50%),
-      radial-gradient(ellipse at bottom right, rgba(255, 42, 109, 0.04), transparent 50%);
-  }
-
-  [data-theme='dark'] body {
-    background-image:
-      radial-gradient(ellipse at top left, rgba(139, 43, 226, 0.12), transparent 50%),
-      radial-gradient(ellipse at bottom right, rgba(255, 42, 109, 0.08), transparent 50%);
+      radial-gradient(
+        ellipse at top left,
+        light-dark(rgba(139, 43, 226, 0.04), rgba(139, 43, 226, 0.12)),
+        transparent 50%
+      ),
+      radial-gradient(
+        ellipse at bottom right,
+        light-dark(rgba(255, 42, 109, 0.04), rgba(255, 42, 109, 0.08)),
+        transparent 50%
+      );
   }
 
   *:focus-visible {

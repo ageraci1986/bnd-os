@@ -89,11 +89,11 @@ function communicationsHref(mail: MailRow): string {
 const PILL_BASE =
   'inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-bold disabled:opacity-50';
 const PILL_GRAD = `${PILL_BASE} bg-[image:var(--accent-gradient)] text-white shadow-[0_3px_10px_rgba(139,43,226,0.3)]`;
-const PILL_SOFT = `${PILL_BASE} bg-[image:var(--accent-gradient-soft)] text-[color:var(--color-accent-primary)]`;
+const PILL_SOFT = `${PILL_BASE} bg-[image:var(--accent-gradient-soft)] text-[color:var(--color-accent-text)]`;
 const PILL_GHOST = `${PILL_BASE} border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] text-[color:var(--color-text-muted)] hover:bg-[color:var(--color-bg-hover)]`;
-// `#fecdd3` : pas de token danger « pâle » dans tokens.css (--color-danger-bg
-// est plus saturé) — valeur reprise telle quelle de la maquette (`.ap-btn.danger`).
-const PILL_DANGER = `${PILL_BASE} border border-[#fecdd3] bg-[color:var(--color-bg-card)] text-[color:var(--color-danger)] hover:bg-[color:var(--color-danger-bg)]`;
+// Bordure pâle thème-aware : on réutilise --color-danger-bg (plutôt que la
+// teinte fixe de la maquette) pour que le pill reste lisible en sombre.
+const PILL_DANGER = `${PILL_BASE} border border-[color:var(--color-danger-bg)] bg-[color:var(--color-bg-card)] text-[color:var(--color-danger)] hover:bg-[color:var(--color-danger-bg)]`;
 
 /** Séparateur vertical entre groupes d'actions (`.ap-open .acts .sep` dans la maquette). */
 function ActionsSeparator() {
@@ -115,7 +115,9 @@ function renderBody(state: BodyState | undefined) {
   if (state.bodyHtmlSanitized !== null) {
     return (
       <div
-        className="max-h-80 overflow-y-auto text-xs leading-relaxed text-[color:var(--color-text-soft)]"
+        // Corps « papier » clair (spec lot B §2, même classe que MailReader) :
+        // le HTML d'un mail externe suppose un fond blanc, pas le thème app.
+        className="mail-paper max-h-80 overflow-y-auto text-xs leading-relaxed"
         // `bodyHtmlSanitized` est assaini côté serveur par l'allowlist partagée
         // (packages/integrations/src/imap/body.ts, action `fetchMailBody`)
         // avant d'être renvoyé — même garantie que `MailReader`

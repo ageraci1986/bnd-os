@@ -158,7 +158,7 @@ function ToggleRow({ label, description, checked, disabled, onChange }: ToggleRo
       >
         <span
           aria-hidden="true"
-          className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform"
+          className="absolute top-0.5 h-5 w-5 rounded-full bg-[color:var(--color-bg-card)] shadow transition-transform"
           style={{ transform: checked ? 'translateX(22px)' : 'translateX(2px)' }}
         />
       </button>

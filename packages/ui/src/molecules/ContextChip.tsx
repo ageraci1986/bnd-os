@@ -30,7 +30,7 @@ export function ContextChip({
       className={cn(
         'inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold shadow-[var(--shadow-card)]',
         active
-          ? 'border-[rgba(139,43,226,0.3)] bg-[image:var(--accent-gradient-soft)] text-[color:var(--color-accent-primary)] dark:text-[#C084FC]'
+          ? 'border-[rgba(139,43,226,0.3)] bg-[image:var(--accent-gradient-soft)] text-[color:var(--color-accent-text)]'
           : 'border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] text-[color:var(--color-text-main)]',
         className,
       )}

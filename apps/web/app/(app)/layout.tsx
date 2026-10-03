@@ -31,6 +31,8 @@ import { ContextBarHost } from '@/features/shell/components/context-bar-host';
 import { DashboardIcon, ClientsIcon, GearIcon } from '@/features/shell/components/icons';
 import { SidebarViewer } from '@/features/shell/components/sidebar-viewer';
 import { Toaster } from '@/features/shell/components/toaster';
+import { ThemeToggle } from '@/features/shell/components/theme-toggle';
+import { ThemeSync } from '@/features/shell/components/theme-sync';
 
 interface AppLayoutProps {
   readonly children: React.ReactNode;
@@ -47,7 +49,7 @@ export default async function AppLayout({ children }: AppLayoutProps) {
     }),
     prisma.user.findUniqueOrThrow({
       where: { id: ctx.userId },
-      select: { firstName: true, lastName: true, email: true },
+      select: { firstName: true, lastName: true, email: true, theme: true },
     }),
     prisma.client.findMany({
       where: {
@@ -187,18 +189,22 @@ export default async function AppLayout({ children }: AppLayoutProps) {
       )}
 
       <div className="flex min-w-0 flex-col overflow-x-hidden bg-[color:var(--color-bg-app)]">
+        <ThemeSync theme={profile.theme} />
         <Topbar
           left={<SearchBar disabled />}
           right={
-            isViewer ? null : (
-              <Link
-                href="/projects"
-                className="btn btn-primary btn-sm"
-                aria-label="Créer un nouveau projet"
-              >
-                + Nouveau projet
-              </Link>
-            )
+            <div className="flex items-center gap-2">
+              <ThemeToggle />
+              {isViewer ? null : (
+                <Link
+                  href="/projects"
+                  className="btn btn-primary btn-sm"
+                  aria-label="Créer un nouveau projet"
+                >
+                  + Nouveau projet
+                </Link>
+              )}
+            </div>
           }
         />
 

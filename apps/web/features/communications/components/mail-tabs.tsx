@@ -42,7 +42,7 @@ export function MailTabs({
   return (
     <header className="flex items-center justify-between border-b border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] px-6 py-4">
       <nav className="flex items-center gap-1" aria-label="Onglets communications">
-        <span className="rounded-lg bg-[color:var(--color-bg-muted)] px-3 py-2 text-sm font-bold text-[color:var(--color-accent-primary)]">
+        <span className="rounded-lg bg-[color:var(--color-bg-muted)] px-3 py-2 text-sm font-bold text-[color:var(--color-accent-text)]">
           📧 Mails
           {unreadCount > 0 ? (
             <span className="ml-2 inline-flex min-w-[18px] items-center justify-center rounded-full bg-[color:var(--color-accent-primary)] px-1.5 py-0.5 text-[10px] font-extrabold text-white">

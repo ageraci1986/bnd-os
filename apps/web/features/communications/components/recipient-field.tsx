@@ -32,7 +32,7 @@ function highlightMatch(text: string, query: string) {
   return (
     <>
       {text.slice(0, idx)}
-      <mark className="rounded bg-[color:var(--color-warning-soft,#fef3c7)] px-0.5 text-[color:var(--color-text-main)]">
+      <mark className="rounded bg-[color:var(--color-warning-bg)] px-0.5 text-[color:var(--color-text-main)]">
         {text.slice(idx, idx + query.length)}
       </mark>
       {text.slice(idx + query.length)}
@@ -164,7 +164,7 @@ export function RecipientField({
               data-invalid={invalid ? 'true' : 'false'}
               className={
                 invalid
-                  ? 'inline-flex items-center gap-1 rounded-full border border-red-300 bg-red-50 px-2 py-0.5 text-xs text-red-700'
+                  ? 'inline-flex items-center gap-1 rounded-full border border-[color:var(--color-danger)] bg-[color:var(--color-danger-bg)] px-2 py-0.5 text-xs text-[color:var(--color-danger)]'
                   : 'inline-flex items-center gap-1 rounded-full border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-muted)] px-2 py-0.5 text-xs text-[color:var(--color-text-main)]'
               }
               title={invalid ? 'email invalide' : undefined}
@@ -244,7 +244,7 @@ export function RecipientField({
                   )}
                 </div>
                 {s.source === 'contact' && (
-                  <span className="rounded-full bg-[color:var(--color-bg-muted)] px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[color:var(--color-accent-primary)]">
+                  <span className="rounded-full bg-[color:var(--color-bg-muted)] px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-[color:var(--color-accent-text)]">
                     Contact
                   </span>
                 )}

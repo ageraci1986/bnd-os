@@ -97,7 +97,7 @@ export function Toaster() {
                   t.action?.onClick();
                   dismiss(t.id);
                 }}
-                className="shrink-0 whitespace-nowrap text-xs font-bold text-[color:var(--color-accent-primary)] hover:underline"
+                className="shrink-0 whitespace-nowrap text-xs font-bold text-[color:var(--color-accent-text)] hover:underline"
               >
                 {t.action.label}
               </button>

@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { prisma } from '@nexushub/db';
 import { requireUser } from '@/lib/auth';
 import { AssistantPreferences } from '@/features/settings/components/assistant-preferences';
+import { AppearancePreferences } from '@/features/settings/components/appearance-preferences';
 
 export const metadata: Metadata = { title: 'Paramètres' };
 
@@ -19,7 +20,7 @@ export const metadata: Metadata = { title: 'Paramètres' };
 export default async function SettingsPage() {
   const ctx = await requireUser();
 
-  const [membership, preferences] = await Promise.all([
+  const [membership, preferences, user] = await Promise.all([
     prisma.membership.findUnique({
       where: { workspaceId_userId: { workspaceId: ctx.workspaceId, userId: ctx.userId } },
       select: { assistantProactivity: true, assistantBriefingOptIn: true },
@@ -32,6 +33,7 @@ export default async function SettingsPage() {
       },
       select: { kind: true, enabled: true },
     }),
+    prisma.user.findUnique({ where: { id: ctx.userId }, select: { theme: true } }),
   ]);
 
   const enabledByKind = new Map(preferences.map((p) => [p.kind, p.enabled]));
@@ -46,6 +48,9 @@ export default async function SettingsPage() {
       </header>
 
       <div className="flex flex-col gap-4">
+        {/* key : remonte le composant quand le thème change ailleurs (toggle topbar). */}
+        <AppearancePreferences key={user?.theme ?? 'system'} theme={user?.theme ?? 'system'} />
+
         <AssistantPreferences
           proactivity={membership?.assistantProactivity ?? true}
           briefingOptIn={membership?.assistantBriefingOptIn ?? false}

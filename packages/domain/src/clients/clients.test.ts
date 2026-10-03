@@ -76,13 +76,15 @@ describe('clientColorCss', () => {
 });
 
 describe('clientColorForeground', () => {
-  it('uses black text on light colors', () => {
-    expect(clientColorForeground('#ffff00')).toBe('#000000');
-    expect(clientColorForeground('c-lime')).toBe('#000000');
+  it('returns the theme-aware CSS variable for a palette token', () => {
+    expect(clientColorForeground('c-lime')).toBe('var(--color-c-lime-fg)');
+    expect(clientColorForeground('c-indigo')).toBe('var(--color-c-indigo-fg)');
   });
-  it('uses white text on dark colors', () => {
+  it('uses black text on light hex colors', () => {
+    expect(clientColorForeground('#ffff00')).toBe('#000000');
+  });
+  it('uses white text on dark hex colors', () => {
     expect(clientColorForeground('#101010')).toBe('#ffffff');
-    expect(clientColorForeground('c-indigo')).toBe('#ffffff');
   });
   it('defaults to white for unknown values', () => {
     expect(clientColorForeground('nope')).toBe('#ffffff');

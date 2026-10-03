@@ -650,7 +650,7 @@ export function AssistantChat({ csrfToken, firstName, overview, notices }: Assis
             >
               <p
                 className="text-xs font-bold uppercase tracking-wide"
-                style={{ color: 'var(--accent-primary)' }}
+                style={{ color: 'var(--color-accent-text)' }}
               >
                 ⚡ Confirmation — {CONFIRM_TOOL_LABELS[pendingConfirm.tool] ?? pendingConfirm.tool}
               </p>

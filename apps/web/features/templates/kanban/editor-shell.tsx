@@ -173,7 +173,7 @@ export function KanbanEditorShell({
       </div>
 
       {error ? (
-        <div className="mb-4 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">
+        <div className="mb-4 rounded-md border border-[color:var(--color-danger)] bg-[color:var(--color-danger-bg)] px-3 py-2 text-sm text-[color:var(--color-danger)]">
           {error}
         </div>
       ) : null}

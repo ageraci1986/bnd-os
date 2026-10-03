@@ -38,9 +38,9 @@ export function Avatar({
 }: AvatarProps) {
   const style: React.CSSProperties =
     variant === 'gradient'
-      ? { background: 'linear-gradient(135deg,#8B2BE2,#FF2A6D)', color: '#fff' }
+      ? { background: 'var(--accent-gradient)', color: '#fff' } // theme-exempt: texte sur fond de marque
       : variant === 'client' && color
-        ? { background: color, color: '#fff' }
+        ? { background: color, color: '#fff' } // theme-exempt: texte sur couleur client
         : {};
 
   return (
