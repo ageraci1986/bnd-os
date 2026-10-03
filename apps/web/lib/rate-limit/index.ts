@@ -26,7 +26,11 @@ export type RateLimitKey =
   | 'assistant_chat'
   | 'assistant_confirm'
   | 'assistant_voice_stt'
-  | 'assistant_voice_tts';
+  | 'assistant_voice_tts'
+  | 'card_attachment_upload'
+  | 'card_attachment_finalize'
+  | 'card_attachment_download'
+  | 'card_attachment_thumbs';
 
 export interface RateLimitResult {
   readonly success: boolean;
@@ -57,6 +61,14 @@ const WINDOWS: Record<
   assistant_confirm: { limit: 20, window: '1 m' },
   assistant_voice_stt: { limit: 30, window: '1 m' },
   assistant_voice_tts: { limit: 60, window: '1 m' },
+  card_attachment_upload: { limit: 60, window: '1 h' },
+  // Finalize = 1 par upload : même plafond que l'upload, clé dédiée pour ne
+  // pas consommer deux jetons d'upload par fichier.
+  card_attachment_finalize: { limit: 60, window: '1 h' },
+  card_attachment_download: { limit: 300, window: '1 h' },
+  // 1 appel par ouverture de carte (lot signé de toutes les vignettes) :
+  // plafond plus haut que les téléchargements unitaires.
+  card_attachment_thumbs: { limit: 600, window: '1 h' },
 };
 
 /* ---------- Upstash backend ---------------------------------------------- */

@@ -189,7 +189,7 @@ nexushub/
 1. **Zod schemas** pour 100% des entrées (forms, API bodies, query params, headers custom). Schémas partagés client/serveur.
 2. Aucune concaténation SQL, **uniquement** Prisma / requêtes paramétrées. `$queryRawUnsafe` interdit (lint rule).
 3. Sortie HTML : React échappe par défaut. `dangerouslySetInnerHTML` interdit sauf cas validé par revue de sécurité avec **DOMPurify**.
-4. Téléchargements / pièces jointes (V1.5) : scan antivirus + content-type validé + nom de fichier sanitisé.
+4. Téléchargements / pièces jointes (V1.5) : scan antivirus + content-type validé + nom de fichier sanitisé. **PJ de cartes** : upload direct navigateur → Storage (URL signée à chemin imposé) + scan asynchrone (Inngest + ClamAV, fail-closed) ; une PJ n'est **jamais servie avant `clean`** (URL signée 300 s, bucket privé sans policy anon/authenticated) — voir `docs/runbooks/card-attachments.md`.
 
 ### 4.6 Headers HTTP & transport
 
@@ -431,5 +431,6 @@ Avant chaque action :
 | 2026-08-03 | Assistant visibilité totale — tools notifications (list/mark lu), bulk mail by-filter gated (comptes réels + labels sanitisés), pagination search_mails, indicateurs total/truncated, règles d'exhaustivité prompt                                                              | Angelo L. + Claude |
 | 2026-10-02 | Lot A quick wins — renommage projet inline, widget + filtre « Mes cartes » (`mine`, userId de session), palette clients 12 tokens + couleur libre hex (contraste WCAG, sanitisation `clientColorCss` domain + ui), cartes terminées barrées au calendrier                       | Angelo L. + Claude |
 | 2026-10-03 | Lot B dark mode — User.theme + cookie nx-theme (SSR sans flash, CSP OK), tokens light-dark() pilotés par color-scheme, `@custom-variant dark` sur data-theme (préférer les tokens), toggle topbar + Paramètres › Apparence, garde-fou couleurs en dur, mails sur surface claire | Angelo L. + Claude |
+| 2026-10-03 | Lot C pièces jointes de cartes — upload direct Storage + scan asynchrone Inngest/ClamAV (jamais servi avant `clean`), §4.5.4 complété, rate limits `card_attachment_*`, CSP `media-src`/`frame-src` (`buildCsp` testé), runbook `card-attachments.md`                           | Angelo L. + Claude |
 
 > **Règle :** chaque modification de ce fichier ajoute une ligne ici.

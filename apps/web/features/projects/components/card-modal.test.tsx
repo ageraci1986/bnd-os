@@ -35,6 +35,7 @@ vi.mock('../actions/update-card-field', () => ({ updateCardField: vi.fn() }));
 vi.mock('../actions/change-card-template', () => ({ changeCardTemplate: vi.fn() }));
 vi.mock('@/features/shell/components/toaster', () => ({ notify }));
 vi.mock('./card-comments-thread', () => ({ CardCommentsThread: () => null }));
+vi.mock('./card-attachments-section', () => ({ CardAttachmentsSection: () => null }));
 
 import { CardModal, type CardModalProps } from './card-modal';
 import { CARD_UPDATED_EVENT, type CardUpdatedEventDetail } from './card-modal-controller';
@@ -59,6 +60,7 @@ const skeleton: CardModalProps['card'] = {
   templateItems: [],
   fieldValues: {},
   comments: [],
+  attachments: [],
 };
 
 const loaded: CardModalProps['card'] = {
