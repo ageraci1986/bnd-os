@@ -1,35 +1,53 @@
 'use client';
-import { useEffect, useState, useTransition } from 'react';
+import { useSyncExternalStore, useTransition } from 'react';
 import { oppositeTheme, parseThemePreference, type EffectiveTheme } from '@nexushub/domain';
 import { setThemePreference } from '@/features/settings/actions/set-theme-preference';
 import { notify } from '@/features/shell/components/toaster';
 
+const DARK_QUERY = '(prefers-color-scheme: dark)';
+
 function effectiveTheme(): EffectiveTheme {
   const pref = parseThemePreference(document.documentElement.dataset['theme']);
   if (pref !== 'system') return pref;
-  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  return window.matchMedia?.(DARK_QUERY).matches ? 'dark' : 'light';
 }
+
+/** Notifie quand data-theme change (Settings, ThemeSync, toggle) ou quand
+ *  l'OS bascule (pertinent en mode system). */
+function subscribe(onChange: () => void): () => void {
+  const observer = new MutationObserver(onChange);
+  observer.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ['data-theme'],
+  });
+  const mql = window.matchMedia?.(DARK_QUERY);
+  mql?.addEventListener?.('change', onChange);
+  return () => {
+    observer.disconnect();
+    mql?.removeEventListener?.('change', onChange);
+  };
+}
+
+const getServerSnapshot = (): EffectiveTheme => 'light';
 
 /**
  * Bascule rapide clair/sombre de la topbar (spec lot B §3). Application
  * immédiate sur <html>, puis persistance (DB + cookie) ; rollback si échec.
+ * L'état affiché est dérivé du DOM (source de vérité unique) : il suit
+ * donc les changements faits ailleurs et les bascules de l'OS.
  */
 export function ThemeToggle() {
-  const [current, setCurrent] = useState<EffectiveTheme>('light');
+  const current = useSyncExternalStore(subscribe, effectiveTheme, getServerSnapshot);
   const [, startTransition] = useTransition();
-
-  useEffect(() => setCurrent(effectiveTheme()), []);
 
   const toggle = () => {
     const previousAttr = document.documentElement.dataset['theme'] ?? 'system';
     const next = oppositeTheme(effectiveTheme());
     document.documentElement.dataset['theme'] = next;
-    setCurrent(next);
     startTransition(async () => {
       const res = await setThemePreference(next).catch(() => null);
       if (!res || !res.ok) {
         document.documentElement.dataset['theme'] = previousAttr;
-        setCurrent(effectiveTheme());
         notify({ tone: 'error', message: 'Impossible d’enregistrer le thème.' });
       }
     });

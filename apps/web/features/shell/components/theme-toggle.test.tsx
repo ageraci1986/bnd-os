@@ -9,13 +9,28 @@ vi.mock('@/features/shell/components/toaster', () => ({ notify: m.notify }));
 
 import { ThemeToggle } from './theme-toggle';
 
+const os = { dark: false, listeners: new Set<() => void>() };
+
 function setOsDark(dark: boolean) {
-  window.matchMedia = vi.fn().mockReturnValue({ matches: dark }) as never;
+  os.dark = dark;
+  window.matchMedia = vi.fn().mockImplementation(() => ({
+    get matches() {
+      return os.dark;
+    },
+    addEventListener: (_: string, cb: () => void) => os.listeners.add(cb),
+    removeEventListener: (_: string, cb: () => void) => os.listeners.delete(cb),
+  })) as never;
+}
+
+function flipOs(dark: boolean) {
+  os.dark = dark;
+  for (const cb of os.listeners) cb();
 }
 
 beforeEach(() => {
   m.setThemePreference.mockReset().mockResolvedValue({ ok: true });
   m.notify.mockReset();
+  os.listeners.clear();
   setOsDark(false);
 });
 
@@ -58,5 +73,32 @@ describe('<ThemeToggle />', () => {
     );
     expect(document.documentElement.dataset['theme']).toBe('light');
     expect(m.notify).toHaveBeenCalledWith(expect.objectContaining({ tone: 'error' }));
+  });
+  it('follows an external data-theme change (Settings, ThemeSync)', async () => {
+    document.documentElement.dataset['theme'] = 'light';
+    render(<ThemeToggle />);
+    expect(screen.getByRole('button', { name: 'Passer en mode sombre' })).toBeTruthy();
+    await act(async () => {
+      document.documentElement.dataset['theme'] = 'dark';
+      // laisse le MutationObserver notifier (microtâche)
+      await Promise.resolve();
+    });
+    expect(screen.getByRole('button', { name: 'Passer en mode clair' })).toBeTruthy();
+  });
+
+  it('follows an OS change while on system', async () => {
+    document.documentElement.dataset['theme'] = 'system';
+    render(<ThemeToggle />);
+    expect(screen.getByRole('button', { name: 'Passer en mode sombre' })).toBeTruthy();
+    act(() => flipOs(true));
+    expect(screen.getByRole('button', { name: 'Passer en mode clair' })).toBeTruthy();
+  });
+
+  it('unsubscribes from the OS media query on unmount', () => {
+    document.documentElement.dataset['theme'] = 'system';
+    const { unmount } = render(<ThemeToggle />);
+    expect(os.listeners.size).toBeGreaterThan(0);
+    unmount();
+    expect(os.listeners.size).toBe(0);
   });
 });

@@ -48,7 +48,8 @@ export default async function SettingsPage() {
       </header>
 
       <div className="flex flex-col gap-4">
-        <AppearancePreferences theme={user?.theme ?? 'system'} />
+        {/* key : remonte le composant quand le thème change ailleurs (toggle topbar). */}
+        <AppearancePreferences key={user?.theme ?? 'system'} theme={user?.theme ?? 'system'} />
 
         <AssistantPreferences
           proactivity={membership?.assistantProactivity ?? true}

@@ -32,6 +32,7 @@ describe('setThemePreference', () => {
       'dark',
       expect.objectContaining({ httpOnly: true }),
     );
+    expect(m.revalidatePath).toHaveBeenCalledWith('/settings');
   });
 
   it('rejects an invalid value without touching DB or cookie', async () => {
@@ -39,6 +40,7 @@ describe('setThemePreference', () => {
     expect(res.ok).toBe(false);
     expect(m.userUpdate).not.toHaveBeenCalled();
     expect(m.cookieSet).not.toHaveBeenCalled();
+    expect(m.revalidatePath).not.toHaveBeenCalled();
   });
 });
 
