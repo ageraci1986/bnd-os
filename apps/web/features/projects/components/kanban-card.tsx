@@ -182,6 +182,8 @@ export function KanbanCard({
       {card.commentCount && card.commentCount > 0 ? (
         <div
           className="kcard-comments"
+          // role="img" : un aria-label n'est pas annoncé sur un <div> générique.
+          role="img"
           title={`${card.commentCount} commentaire${card.commentCount > 1 ? 's' : ''}`}
           aria-label={`${card.commentCount} commentaire${card.commentCount > 1 ? 's' : ''}`}
         >
@@ -204,6 +206,7 @@ export function KanbanCard({
       {card.attachmentCount && card.attachmentCount > 0 ? (
         <div
           className="kcard-comments"
+          role="img"
           title={attachmentLabel(card.attachmentCount)}
           aria-label={attachmentLabel(card.attachmentCount)}
         >

@@ -63,20 +63,33 @@ describe('<KanbanCard /> — assignees', () => {
 });
 
 describe('<KanbanCard /> — attachments badge', () => {
-  it('shows the paperclip badge with the count when > 0', () => {
+  it('exposes the paperclip badge as a labelled image (role=img) with the count', () => {
     renderCard({ ...base, attachmentCount: 2 });
-    const badge = screen.getByLabelText('2 pièces jointes');
+    const badge = screen.getByRole('img', { name: '2 pièces jointes' });
     expect(badge).toHaveTextContent('2');
     expect(badge).toHaveAttribute('title', '2 pièces jointes');
   });
 
   it('uses the singular for one attachment', () => {
     renderCard({ ...base, attachmentCount: 1 });
-    expect(screen.getByLabelText('1 pièce jointe')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: '1 pièce jointe' })).toBeInTheDocument();
   });
 
   it('renders no badge when the count is 0', () => {
     renderCard({ ...base, attachmentCount: 0 });
-    expect(screen.queryByLabelText(/pièces? jointes?/)).toBeNull();
+    expect(screen.queryByRole('img', { name: /pièces? jointes?/ })).toBeNull();
+  });
+});
+
+describe('<KanbanCard /> — comments badge', () => {
+  it('exposes the comment badge as a labelled image (role=img)', () => {
+    renderCard({ ...base, commentCount: 3 });
+    const badge = screen.getByRole('img', { name: '3 commentaires' });
+    expect(badge).toHaveTextContent('3');
+  });
+
+  it('uses the singular for one comment', () => {
+    renderCard({ ...base, commentCount: 1 });
+    expect(screen.getByRole('img', { name: '1 commentaire' })).toBeInTheDocument();
   });
 });
