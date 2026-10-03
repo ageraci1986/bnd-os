@@ -141,6 +141,12 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
     `img-src 'self' data: blob: https:`,
     `font-src 'self' https://fonts.gstatic.com`,
     `connect-src 'self' https://${supabaseHost} wss://${supabaseHost} https://*.ingest.sentry.io`,
+    // Card attachments (lot C): videos stream from short-lived Supabase
+    // signed URLs; PDFs are previewed from a local blob: (typed
+    // application/pdf) in an iframe. `frame-ancestors` (below) still forbids
+    // anyone from framing OUR pages — frame-src only governs what we embed.
+    `media-src 'self' blob: https://${supabaseHost}`,
+    `frame-src 'self' blob:`,
     `frame-ancestors 'none'`,
     `base-uri 'self'`,
     `form-action 'self'`,
