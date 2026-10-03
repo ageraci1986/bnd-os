@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  PENDING_TTL_MS,
   cardAttachmentsCleanup,
   runCardAttachmentsCleanup,
   staleAttachmentsWhere,
@@ -24,10 +25,16 @@ function deps(overrides: Partial<CleanupDeps> = {}): CleanupDeps {
 }
 
 describe('staleAttachmentsWhere', () => {
-  it('targets pending rows older than 30 min and rejected rows older than 7 days', () => {
+  it('keeps pending rows longer than the 2 h signed-upload token validity (storage-js)', () => {
+    // Un jeton d'upload signé reste utilisable 2 h : supprimer la ligne avant
+    // laisserait un objet orphelin uploadé après le nettoyage.
+    expect(PENDING_TTL_MS).toBeGreaterThan(2 * 60 * 60 * 1000);
+  });
+
+  it('targets pending rows older than 2h15 and rejected rows older than 7 days', () => {
     expect(staleAttachmentsWhere(NOW)).toEqual({
       OR: [
-        { scanStatus: 'pending', createdAt: { lt: new Date('2026-10-03T11:30:00Z') } },
+        { scanStatus: 'pending', createdAt: { lt: new Date('2026-10-03T09:45:00Z') } },
         {
           scanStatus: { in: ['dirty', 'scan_failed'] },
           updatedAt: { lt: new Date('2026-09-26T12:00:00Z') },

@@ -3,8 +3,13 @@ import { createSupabaseAdmin } from '@/lib/supabase/server';
 
 /**
  * Bucket privé des pièces jointes de cartes (spec lot C §1). Service role
- * uniquement ; le client n'obtient qu'un jeton d'upload à usage unique lié
- * au chemin, ou une URL de lecture signée de 300 s pour une PJ `clean`.
+ * uniquement ; le client n'obtient qu'un jeton d'upload lié au chemin, ou
+ * une URL de lecture signée de 300 s pour une PJ `clean`.
+ *
+ * Jeton d'upload (storage-js 2.104.1) : valide 2 h (non configurable) et
+ * RÉUTILISABLE pendant ces 2 h tant qu'aucun objet n'existe au chemin
+ * (`upsert: false` par défaut → un second PUT échoue, pas d'écrasement).
+ * D'où le TTL `pending` du nettoyage > 2 h (`card-attachments-cleanup.ts`).
  * Ne jamais renvoyer `message` d'erreur au client (infos d'infra).
  */
 export const CARD_ATTACHMENTS_BUCKET = 'card-attachments';

@@ -5,8 +5,8 @@ import { inngestClient } from '../client';
 
 /**
  * Nettoyage horaire des pièces jointes de cartes (lot C, spec §3.5) :
- *   - lignes `pending` de plus de 30 min (upload abandonné, finalize jamais
- *     appelé, ou scan épuisé en retries) ;
+ *   - lignes `pending` de plus de 2 h 15 (upload abandonné, finalize jamais
+ *     appelé, ou scan épuisé en retries) — voir `PENDING_TTL_MS` ;
  *   - lignes `dirty` / `scan_failed` de plus de 7 jours (gardées une semaine
  *     pour l'investigation, l'objet ayant déjà été supprimé au rejet).
  * Objet Storage supprimé (si présent) + ligne supprimée. Lot borné à 500.
@@ -25,7 +25,14 @@ import { inngestClient } from '../client';
  * `@nexushub/agent` ni provider/registry.
  */
 
-const PENDING_TTL_MS = 30 * 60 * 1000;
+/**
+ * COUPLAGE storage-js : un jeton d'upload signé (`createSignedUploadUrl`)
+ * reste valide 2 h (non configurable) et réutilisable tant qu'aucun objet
+ * n'existe au chemin (upsert false). Le TTL `pending` DOIT dépasser 2 h,
+ * sinon un upload tardif mais légitime atterrirait après la suppression de
+ * sa ligne → objet orphelin jamais scanné. 2 h + 15 min de marge.
+ */
+export const PENDING_TTL_MS = (2 * 60 + 15) * 60 * 1000;
 const REJECTED_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const BATCH_LIMIT = 500;
 

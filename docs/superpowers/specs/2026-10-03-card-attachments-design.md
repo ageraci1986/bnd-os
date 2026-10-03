@@ -20,7 +20,7 @@ télécharger — avec scan antivirus obligatoire, sans jamais servir un fichier
 2. **ClamAV obligatoire** : le scan se fait **après** l'upload, dans un job Inngest qui relit l'objet depuis
    Storage. Le fichier reste en quarantaine (`pending`) tant que le verdict n'est pas `clean`.
 3. **CSP stricte** (§4.6) : `media-src` et `frame-src` ne sont pas déclarés (repli sur `default-src 'self'`).
-   → ajout de `media-src 'self' blob: https://<supabase-host>` et `frame-src blob:` ; les PDF sont affichés via
+   → ajout de `media-src 'self' blob: https://<supabase-host>` et `frame-src 'self' blob:` ; les PDF sont affichés via
    une URL `blob:` (fetch du fichier signé) plutôt qu'un iframe cross-origin.
 
 Approches écartées : Server Action avec `bodySizeLimit` relevé (bloquée par la limite Vercel) ; upload
@@ -37,14 +37,15 @@ fragmenté via Route Handler (complexité sans gain).
     `pending` ; `sha256` char(64) nullable (rempli au scan) ; `scanReport` Json nullable ;
   - `createdAt`, `updatedAt` ;
   - index `(workspaceId, cardId)`, `(scanStatus, createdAt)`.
-- **Migration** additive + **RLS** : policy `workspace_id = current_workspace_id()` (même helper que les
-  autres tables, cf. `20260427100002_rls_helpers_and_policies`). À appliquer manuellement sur Supabase
+- **Migration** additive + **RLS** : policy `workspace_id IN (SELECT public.workspace_ids_for_current_user())` (même
+  helper que les autres tables, cf. `20260427100002_rls_helpers_and_policies`). À appliquer manuellement sur Supabase
   (registre Prisma de la base partagée en dérive : `db execute` + `migrate resolve`, jamais `migrate deploy`
   à l'aveugle).
 - **Bucket** `card-attachments` : **privé**, `file_size_limit = 52428800` (50 Mo), `allowed_mime_types` =
   liste blanche ci-dessous ; policies Storage : aucun accès `anon`/`authenticated` direct en lecture — lecture
   uniquement via URL signée générée côté serveur (service role) ; l'upload passe par `createSignedUploadUrl`
-  (jeton à usage unique, chemin imposé). Création manuelle documentée dans un runbook
+  (jeton lié au chemin, valide 2 h et réutilisable tant qu'aucun objet n'existe au chemin —
+  `upsert: false` — donc un seul objet possible par chemin ; chemin imposé). Création manuelle documentée dans un runbook
   `docs/runbooks/card-attachments.md` (SQL fourni).
 
 ## 2. Types autorisés (liste blanche)
@@ -80,7 +81,8 @@ sniffés en `application/zip`, txt/csv non sniffables → acceptés si déclaré
    - `clean` → `scanStatus=clean`, `sha256`, `scanReport` ; sinon → **suppression de l'objet** Storage,
      `scanStatus=dirty|scan_failed`, audit `card_attachment_rejected` (raison, type, taille, sha256 — pas de
      nom de fichier sauf `dirty`, comme pour les mails).
-5. **Nettoyage** : cron Inngest horaire `card-attachments-cleanup` → lignes `pending` de plus de 30 min et
+5. **Nettoyage** : cron Inngest horaire `card-attachments-cleanup` → lignes `pending` de plus de 2 h 15 (> validité 2 h du jeton
+   d'upload signé, sinon objet orphelin) et
    lignes `dirty`/`scan_failed` de plus de 7 jours : suppression objet (si présent) + ligne.
 
 ## 4. Consultation & suppression
@@ -115,12 +117,13 @@ sniffés en `application/zip`, txt/csv non sniffables → acceptés si déclaré
 ## 6. Sécurité (récapitulatif)
 
 - Le binaire ne transite jamais par nos fonctions depuis le client ; le chemin Storage est imposé par le
-  serveur (jeton d'upload à usage unique, lié au chemin).
+  serveur (jeton d'upload lié au chemin, valide 2 h, réutilisable tant qu'aucun objet n'existe au
+  chemin — `upsert: false` : un seul objet par chemin, jamais d'écrasement).
 - Liste blanche type + extension, contrôle des octets réels, taille réelle, scan ClamAV obligatoire ; aucun
   fichier servi tant que `scanStatus !== 'clean'`.
 - Bucket privé, URLs signées courtes ; toutes les requêtes Prisma scopées `workspaceId` + scope projet ; RLS.
 - Rate limits upload / download ; noms de fichiers jamais loggés (sauf audit `dirty`, comme les mails).
-- CSP : ajouts minimaux (`media-src` hôte Supabase + `blob:`, `frame-src blob:`).
+- CSP : ajouts minimaux (`media-src` hôte Supabase + `blob:`, `frame-src 'self' blob:` — `frame-src` ne régit que ce que nous embarquons ; `X-Frame-Options: DENY` protège toujours nos pages).
 
 ## 7. Infra (côté utilisateur, documenté dans le runbook)
 

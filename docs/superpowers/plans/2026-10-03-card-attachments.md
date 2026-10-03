@@ -405,8 +405,8 @@ import { createSupabaseAdmin } from '@/lib/supabase/server';
 
 /**
  * Bucket privé des pièces jointes de cartes (spec lot C §1). Service role
- * uniquement ; le client n'obtient qu'un jeton d'upload à usage unique lié
- * au chemin, ou une URL de lecture signée de 300 s pour une PJ `clean`.
+ * uniquement ; le client n'obtient qu'un jeton d'upload lié au chemin
+ * (valide 2 h, réutilisable tant qu'aucun objet n'existe — upsert false), ou une URL de lecture signée de 300 s pour une PJ `clean`.
  * Ne jamais renvoyer `message` d'erreur au client (infos d'infra).
  */
 export const CARD_ATTACHMENTS_BUCKET = 'card-attachments';
@@ -607,7 +607,7 @@ export const scanCardAttachment = inngestClient.createFunction(
 
 (Vérifier la forme exacte des options v4 dans `blocked-cards-scan.ts` / la doc Inngest v4 si `concurrency`/`retries` diffèrent ; ne pas ajouter de dépendance.)
 
-Cleanup : `runCardAttachmentsCleanup({ now, findStale, remove, deleteRow })` — `findStale` = lignes `pending` avec `createdAt < now-30min` OU (`dirty|scan_failed`) avec `updatedAt < now-7j` (limit 500) ; pour chacune `remove(path)` puis `deleteRow(id)` ; isolation par ligne (try/catch). Export `cardAttachmentsCleanup` cron `'15 * * * *'`.
+Cleanup : `runCardAttachmentsCleanup({ now, findStale, remove, deleteRow })` — `findStale` = lignes `pending` avec `createdAt < now-2h15` (> validité 2 h du jeton d'upload signé) OU (`dirty|scan_failed`) avec `updatedAt < now-7j` (limit 500) ; pour chacune `remove(path)` puis `deleteRow(id)` ; isolation par ligne (try/catch). Export `cardAttachmentsCleanup` cron `'15 * * * *'`.
 
 - [ ] **Step 1: Failing tests** — scan : skipped (absent / déjà clean), clean (markClean appelé avec sha256 hex 64), virus → reject dirty + engines, type spoof (pdf déclaré, sniff `application/x-msdownload`), taille incohérente, objet absent → scan_failed, scanner KO → scan_failed. Cleanup : sélectionne/supprime, une erreur sur une ligne n'arrête pas les suivantes. Imports guard : pas d'import `@nexushub/agent` / provider / registry.
 - [ ] **Step 2: Run** → FAIL. **Step 3: Implement.** **Step 4: Run** → PASS (+ tests existants `functions/index` éventuels), typecheck, lint.
