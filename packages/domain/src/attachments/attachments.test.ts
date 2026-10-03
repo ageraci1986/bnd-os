@@ -53,6 +53,10 @@ describe('attachmentKind', () => {
     expect(attachmentKind('application/pdf')).toBe('pdf');
     expect(attachmentKind('text/csv')).toBe('file');
   });
+  it('treats HEIC/HEIF as a plain file (no browser preview → no broken thumbnail)', () => {
+    expect(attachmentKind('image/heic')).toBe('file');
+    expect(attachmentKind('IMAGE/HEIF')).toBe('file');
+  });
 });
 
 describe('isSniffCompatible', () => {
@@ -79,6 +83,13 @@ describe('isSniffCompatible', () => {
   it('accepts quicktime/mp4 container aliases', () => {
     expect(isSniffCompatible('video/quicktime', 'video/quicktime')).toBe(true);
     expect(isSniffCompatible('video/mp4', 'video/mp4')).toBe(true);
+  });
+  it('accepts sniffer aliases: heif for heic, x-m4v for mp4', () => {
+    expect(isSniffCompatible('image/heic', 'image/heif')).toBe(true);
+    expect(isSniffCompatible('video/mp4', 'video/x-m4v')).toBe(true);
+    // Aliases are one-way: they never widen another declared type.
+    expect(isSniffCompatible('image/jpeg', 'image/heif')).toBe(false);
+    expect(isSniffCompatible('video/webm', 'video/x-m4v')).toBe(false);
   });
   it('exposes the allow-list', () => {
     expect(ALLOWED_CARD_ATTACHMENT_TYPES.length).toBeGreaterThanOrEqual(15);

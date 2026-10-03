@@ -58,8 +58,13 @@ export function isAllowedAttachment(filename: string, contentType: string): bool
   return ALLOWED_CARD_ATTACHMENT_TYPES.some((t) => t.mime === mime && t.ext.includes(ext));
 }
 
+/** Images que la plupart des navigateurs ne savent pas afficher (hors Safari). */
+const NON_PREVIEWABLE_IMAGES = new Set(['image/heic', 'image/heif']);
+
 export function attachmentKind(contentType: string): AttachmentKind {
   const mime = contentType.toLowerCase();
+  // HEIC/HEIF : pas de miniature cassée — traité comme un fichier téléchargeable.
+  if (NON_PREVIEWABLE_IMAGES.has(mime)) return 'file';
   if (mime.startsWith('image/')) return 'image';
   if (mime.startsWith('video/')) return 'video';
   if (mime === 'application/pdf') return 'pdf';
@@ -67,6 +72,17 @@ export function attachmentKind(contentType: string): AttachmentKind {
 }
 
 const TEXT_TYPES = new Set(['text/plain', 'text/csv']);
+
+/**
+ * Alias de détection (`file-type`) → type déclaré de la liste blanche. Sens
+ * unique : un alias ne valide QUE son type déclaré cible.
+ *   - HEIF est le conteneur générique de HEIC (même brand ISO-BMFF) ;
+ *   - `video/x-m4v` est un MP4 Apple (brand `M4V `).
+ */
+const SNIFF_ALIASES: Readonly<Record<string, string>> = {
+  'image/heif': 'image/heic',
+  'video/x-m4v': 'video/mp4',
+};
 
 /**
  * `sniffed` = MIME détecté par magic bytes (`file-type`), `undefined` si non
@@ -78,6 +94,7 @@ export function isSniffCompatible(declared: string, sniffed: string | undefined)
   if (sniffed === undefined) return TEXT_TYPES.has(d);
   const s = sniffed.toLowerCase();
   if (s === d) return true;
+  if (SNIFF_ALIASES[s] === d) return true;
   if (d.startsWith(`${OOXML}.`) && s === 'application/zip') return true;
   return false;
 }
