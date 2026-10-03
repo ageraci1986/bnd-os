@@ -828,6 +828,9 @@
 .kcard-comments svg {
   display: block;
 }
+.kcard-comments + .kcard-comments {
+  margin-left: 10px;
+}
 .nx-comment-badge {
   display: inline-flex;
   align-items: center;

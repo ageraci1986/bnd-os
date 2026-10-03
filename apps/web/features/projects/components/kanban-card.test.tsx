@@ -61,3 +61,22 @@ describe('<KanbanCard /> — assignees', () => {
     expect(container.querySelector('.kcard-avatars')).toBeNull();
   });
 });
+
+describe('<KanbanCard /> — attachments badge', () => {
+  it('shows the paperclip badge with the count when > 0', () => {
+    renderCard({ ...base, attachmentCount: 2 });
+    const badge = screen.getByLabelText('2 pièces jointes');
+    expect(badge).toHaveTextContent('2');
+    expect(badge).toHaveAttribute('title', '2 pièces jointes');
+  });
+
+  it('uses the singular for one attachment', () => {
+    renderCard({ ...base, attachmentCount: 1 });
+    expect(screen.getByLabelText('1 pièce jointe')).toBeInTheDocument();
+  });
+
+  it('renders no badge when the count is 0', () => {
+    renderCard({ ...base, attachmentCount: 0 });
+    expect(screen.queryByLabelText(/pièces? jointes?/)).toBeNull();
+  });
+});

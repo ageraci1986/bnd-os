@@ -20,7 +20,13 @@ export interface KanbanCardData {
   readonly columnId: string;
   readonly categoryTag: string | null;
   readonly commentCount?: number;
+  /** Clean (scanned) attachments only — pending ones are not counted. */
+  readonly attachmentCount?: number;
   readonly assignees?: readonly CardUpdatedAssignee[];
+}
+
+function attachmentLabel(count: number): string {
+  return count > 1 ? `${count} pièces jointes` : `${count} pièce jointe`;
 }
 
 /** Avatars shown before collapsing the rest into a "+N" pill. */
@@ -193,6 +199,28 @@ export function KanbanCard({
             <path d="M2 4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H6.5L4 14.5V12a2 2 0 0 1-2-2V4z" />
           </svg>
           <span>{card.commentCount}</span>
+        </div>
+      ) : null}
+      {card.attachmentCount && card.attachmentCount > 0 ? (
+        <div
+          className="kcard-comments"
+          title={attachmentLabel(card.attachmentCount)}
+          aria-label={attachmentLabel(card.attachmentCount)}
+        >
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 16 16"
+            width="12"
+            height="12"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M13.5 7.5 8.1 12.9a3.2 3.2 0 0 1-4.5-4.5l5.6-5.6a2.1 2.1 0 0 1 3 3L6.6 11.4a1.1 1.1 0 0 1-1.5-1.5l5-5" />
+          </svg>
+          <span>{card.attachmentCount}</span>
         </div>
       ) : null}
       {card.assignees && card.assignees.length > 0 ? (

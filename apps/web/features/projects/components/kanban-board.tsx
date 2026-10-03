@@ -121,6 +121,9 @@ export function KanbanBoard({
                 ...(detail.categoryTag !== undefined ? { categoryTag: detail.categoryTag } : {}),
                 ...(detail.assignees !== undefined ? { assignees: detail.assignees } : {}),
                 ...(detail.columnId !== undefined ? { columnId: detail.columnId } : {}),
+                ...(detail.attachmentCount !== undefined
+                  ? { attachmentCount: detail.attachmentCount }
+                  : {}),
               }
             : c,
         ),

@@ -103,6 +103,8 @@ export interface CardUpdatedEventDetail {
   readonly assignees?: readonly CardUpdatedAssignee[];
   /** Set when a due-date change auto-routed the card in/out of Bloqué. */
   readonly columnId?: string;
+  /** Clean attachment count, set by the attachments section (lot C). */
+  readonly attachmentCount?: number;
 }
 
 export interface CardModalControllerProps {
@@ -312,6 +314,7 @@ export function CardModalController({
       templateItems: [],
       fieldValues: {},
       comments: [],
+      attachments: [],
     } satisfies CardModalData);
 
   return (

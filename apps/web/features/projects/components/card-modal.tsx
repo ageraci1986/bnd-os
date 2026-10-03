@@ -39,6 +39,7 @@ function emitCardUpdated(detail: CardUpdatedEventDetail): void {
   window.dispatchEvent(new CustomEvent(CARD_UPDATED_EVENT, { detail }));
 }
 import type { CardCommentDTO } from '../lib/comment-dto';
+import type { CardAttachmentDTO } from '../lib/card-attachment-core';
 
 export interface CardModalProps {
   readonly csrfToken: string;
@@ -66,6 +67,7 @@ export interface CardModalProps {
     readonly templateItems: readonly CardTemplateItem[];
     readonly fieldValues: Record<string, string>;
     readonly comments: readonly CardCommentDTO[];
+    readonly attachments: readonly CardAttachmentDTO[];
   };
   readonly availableTemplates: readonly TemplateOption[];
   /**

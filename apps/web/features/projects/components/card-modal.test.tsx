@@ -59,6 +59,7 @@ const skeleton: CardModalProps['card'] = {
   templateItems: [],
   fieldValues: {},
   comments: [],
+  attachments: [],
 };
 
 const loaded: CardModalProps['card'] = {
