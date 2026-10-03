@@ -90,3 +90,56 @@ export async function listCardAttachmentDTOs(
     canDelete: canDeleteAttachment(ctx, row.uploadedById),
   }));
 }
+
+/** Catégorie de rejet montrée à l'auteur (jamais le détail technique). */
+export type AttachmentRejectReason = 'virus' | 'type' | 'size' | 'scan_failed';
+
+export interface RejectedAttachmentDTO {
+  readonly id: string;
+  readonly rejectReason: AttachmentRejectReason;
+}
+
+/** Fenêtre pendant laquelle l'auteur est notifié d'un rejet (toast). */
+const RECENT_REJECTION_MS = 10 * 60 * 1000;
+
+/** `scanReport.reason` (écrit par `scan-card-attachment`) → catégorie UI. */
+export function rejectReasonCategory(scanReport: unknown): AttachmentRejectReason {
+  const reason =
+    scanReport !== null && typeof scanReport === 'object' && !Array.isArray(scanReport)
+      ? (scanReport as { reason?: unknown }).reason
+      : undefined;
+  switch (reason) {
+    case 'virus':
+      return 'virus';
+    case 'type_spoof':
+    case 'type_mismatch':
+      return 'type';
+    case 'size_mismatch':
+      return 'size';
+    default:
+      return 'scan_failed';
+  }
+}
+
+/**
+ * PJ de l'APPELANT rejetées (`dirty`/`scan_failed`) dans les 10 dernières
+ * minutes : permet un toast explicite quand une PJ « Analyse en cours… »
+ * disparaît. Ni nom de fichier ni rapport brut — id + catégorie seulement.
+ */
+export async function listRecentlyRejectedAttachments(
+  ctx: AuthContext,
+  cardId: string,
+  now: Date = new Date(),
+): Promise<RejectedAttachmentDTO[]> {
+  const rows = await prisma.cardAttachment.findMany({
+    where: {
+      workspaceId: ctx.workspaceId,
+      cardId,
+      uploadedById: ctx.userId,
+      scanStatus: { in: ['dirty', 'scan_failed'] },
+      updatedAt: { gte: new Date(now.getTime() - RECENT_REJECTION_MS) },
+    },
+    select: { id: true, scanReport: true },
+  });
+  return rows.map((row) => ({ id: row.id, rejectReason: rejectReasonCategory(row.scanReport) }));
+}

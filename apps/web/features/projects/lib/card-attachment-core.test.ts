@@ -18,7 +18,9 @@ import type { AuthContext } from '@/lib/auth';
 import {
   canDeleteAttachment,
   listCardAttachmentDTOs,
+  listRecentlyRejectedAttachments,
   loadAccessibleCard,
+  rejectReasonCategory,
 } from './card-attachment-core';
 
 const WS = '11111111-1111-1111-1111-111111111111';
@@ -175,5 +177,48 @@ describe('listCardAttachmentDTOs', () => {
     ]);
     expect((await listCardAttachmentDTOs(ctx('admin'), CARD))[0]!.canDelete).toBe(true);
     expect((await listCardAttachmentDTOs(ctx('viewer'), CARD))[0]!.canDelete).toBe(false);
+  });
+});
+
+describe('rejectReasonCategory', () => {
+  it('maps the scan report reason to a user-facing category', () => {
+    expect(rejectReasonCategory({ reason: 'virus' })).toBe('virus');
+    expect(rejectReasonCategory({ reason: 'type_spoof' })).toBe('type');
+    expect(rejectReasonCategory({ reason: 'type_mismatch' })).toBe('type');
+    expect(rejectReasonCategory({ reason: 'size_mismatch' })).toBe('size');
+    expect(rejectReasonCategory({ reason: 'scanner_error' })).toBe('scan_failed');
+    expect(rejectReasonCategory({ reason: 'missing_object' })).toBe('scan_failed');
+    expect(rejectReasonCategory({ reason: 'missing_metadata' })).toBe('scan_failed');
+  });
+  it('falls back to scan_failed for unknown / malformed reports', () => {
+    expect(rejectReasonCategory(null)).toBe('scan_failed');
+    expect(rejectReasonCategory('virus')).toBe('scan_failed');
+    expect(rejectReasonCategory([])).toBe('scan_failed');
+    expect(rejectReasonCategory({ reason: 42 })).toBe('scan_failed');
+  });
+});
+
+describe('listRecentlyRejectedAttachments', () => {
+  it("returns only the caller's own rejections of the last 10 min, without filename", async () => {
+    const now = new Date('2026-10-03T12:00:00Z');
+    mocks.attachmentFindMany.mockResolvedValue([
+      { id: 'r1', scanReport: { reason: 'virus' } },
+      { id: 'r2', scanReport: { reason: 'size_mismatch' } },
+    ]);
+    const res = await listRecentlyRejectedAttachments(ctx(), CARD, now);
+    expect(res).toEqual([
+      { id: 'r1', rejectReason: 'virus' },
+      { id: 'r2', rejectReason: 'size' },
+    ]);
+    const args = mocks.attachmentFindMany.mock.calls[0]![0];
+    expect(args.where).toEqual({
+      workspaceId: WS,
+      cardId: CARD,
+      uploadedById: ME,
+      scanStatus: { in: ['dirty', 'scan_failed'] },
+      updatedAt: { gte: new Date('2026-10-03T11:50:00Z') },
+    });
+    expect(args.select).toEqual({ id: true, scanReport: true });
+    expect(JSON.stringify(res)).not.toContain('filename');
   });
 });

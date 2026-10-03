@@ -79,6 +79,24 @@ describe('card attachment rate limits', () => {
   });
 });
 
+describe('card attachment finalize / thumbs rate limits', () => {
+  it('card_attachment_finalize allows 60 hits then blocks', async () => {
+    const userId = 'u-card-attachment-finalize';
+    for (let i = 0; i < 60; i++) {
+      expect((await getRateLimiter('card_attachment_finalize').check(userId)).success).toBe(true);
+    }
+    expect((await getRateLimiter('card_attachment_finalize').check(userId)).success).toBe(false);
+  });
+
+  it('card_attachment_thumbs allows 600 hits then blocks', async () => {
+    const userId = 'u-card-attachment-thumbs';
+    for (let i = 0; i < 600; i++) {
+      expect((await getRateLimiter('card_attachment_thumbs').check(userId)).success).toBe(true);
+    }
+    expect((await getRateLimiter('card_attachment_thumbs').check(userId)).success).toBe(false);
+  });
+});
+
 describe('recipient search rate limit', () => {
   it('recipient_search allows 300 hits then blocks', async () => {
     const rl = getRateLimiter('recipient_search');

@@ -4,6 +4,7 @@ const m = vi.hoisted(() => {
   const bucket = {
     createSignedUploadUrl: vi.fn(),
     createSignedUrl: vi.fn(),
+    createSignedUrls: vi.fn(),
     download: vi.fn(),
     info: vi.fn(),
     remove: vi.fn(),
@@ -19,6 +20,7 @@ import {
   cardAttachmentPath,
   createCardAttachmentUploadUrl,
   getCardAttachmentSignedUrl,
+  getCardAttachmentSignedUrls,
   downloadCardAttachment,
   removeCardAttachment,
   statCardAttachment,
@@ -55,6 +57,27 @@ describe('card attachment storage', () => {
     expect(m.bucket.createSignedUrl).toHaveBeenCalledWith('p', 300, { download: 'a.pdf' });
     await getCardAttachmentSignedUrl('p', {});
     expect(m.bucket.createSignedUrl).toHaveBeenLastCalledWith('p', 300, undefined);
+  });
+
+  it('batch-signs inline read URLs for 300 s in one call, skipping per-path failures', async () => {
+    m.bucket.createSignedUrls.mockResolvedValueOnce({
+      data: [
+        { path: 'p1', signedUrl: 'https://x/1', error: null },
+        { path: 'p2', signedUrl: null, error: 'Either the object does not exist' },
+      ],
+      error: null,
+    });
+    const res = await getCardAttachmentSignedUrls(['p1', 'p2']);
+    expect(m.bucket.createSignedUrls).toHaveBeenCalledWith(['p1', 'p2'], 300);
+    expect(res).toEqual({ ok: true, urls: new Map([['p1', 'https://x/1']]) });
+
+    m.bucket.createSignedUrls.mockResolvedValueOnce({ data: null, error: { message: 'boom' } });
+    expect((await getCardAttachmentSignedUrls(['p1'])).ok).toBe(false);
+  });
+
+  it('batch-signing nothing makes no Storage call', async () => {
+    expect(await getCardAttachmentSignedUrls([])).toEqual({ ok: true, urls: new Map() });
+    expect(m.bucket.createSignedUrls).not.toHaveBeenCalled();
   });
 
   it('downloads to a Buffer and reports missing objects', async () => {

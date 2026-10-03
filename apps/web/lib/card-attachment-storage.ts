@@ -57,6 +57,25 @@ export async function getCardAttachmentSignedUrl(
 }
 
 /**
+ * Signe en UN appel les URLs de lecture inline (300 s) de plusieurs objets
+ * (vignettes d'une carte). Map chemin → URL ; un chemin en échec est omis.
+ */
+export async function getCardAttachmentSignedUrls(
+  paths: readonly string[],
+): Promise<{ readonly ok: true; readonly urls: Map<string, string> } | Fail> {
+  if (paths.length === 0) return { ok: true, urls: new Map() };
+  const { data, error } = await createSupabaseAdmin()
+    .storage.from(CARD_ATTACHMENTS_BUCKET)
+    .createSignedUrls([...paths], READ_TTL_SECONDS);
+  if (error || !data) return { ok: false, message: error?.message ?? 'Sign failed' };
+  const urls = new Map<string, string>();
+  for (const entry of data) {
+    if (!entry.error && entry.path && entry.signedUrl) urls.set(entry.path, entry.signedUrl);
+  }
+  return { ok: true, urls };
+}
+
+/**
  * Métadonnées stockées de l'objet (`info`) : taille et MIME tels qu'écrits
  * par storage-api à l'upload. `undefined` si absents (traité `scan_failed`
  * par l'appelant — jamais supposés conformes).
