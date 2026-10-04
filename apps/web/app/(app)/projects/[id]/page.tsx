@@ -23,6 +23,7 @@ import {
 import { listCustomCategories } from '@/features/projects/lib/categories';
 import { reconcileBeforeRead } from '@/features/projects/lib/reconcile';
 import { loadCardComments } from '@/features/projects/lib/load-card-comments';
+import { listCardAttachmentDTOs } from '@/features/projects/lib/card-attachment-core';
 
 export const metadata: Metadata = { title: 'Projet' };
 
@@ -109,7 +110,12 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
             shortRef: true,
             title: true,
             categoryTag: true,
-            _count: { select: { comments: { where: { deletedAt: null } } } },
+            _count: {
+              select: {
+                comments: { where: { deletedAt: null } },
+                attachments: { where: { scanStatus: 'clean' } },
+              },
+            },
             assignees: {
               orderBy: { createdAt: 'asc' },
               select: {
@@ -204,13 +210,16 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
     redirect(buildHrefWithClient('/projects', '', clientSlug));
   }
 
-  const initialCardComments = openCard
-    ? await loadCardComments({
-        cardId: openCard.id,
-        currentUserId: ctx.userId,
-        currentRole: ctx.role,
-      })
-    : [];
+  const [initialCardComments, initialCardAttachments] = openCard
+    ? await Promise.all([
+        loadCardComments({
+          cardId: openCard.id,
+          currentUserId: ctx.userId,
+          currentRole: ctx.role,
+        }),
+        listCardAttachmentDTOs(ctx, openCard.id),
+      ])
+    : [[], []];
 
   const viewerOptions = viewers.map((v) => {
     const displayName =
@@ -344,6 +353,7 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
           title: c.title,
           categoryTag: c.categoryTag,
           commentCount: c._count.comments,
+          attachmentCount: c._count.attachments,
           assignees: c.assignees.map((a) => ({ userId: a.userId, ...memberLabel(a.user) })),
         }))}
         isReadOnly={isViewer}
@@ -413,6 +423,7 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
                   };
                 }),
                 comments: initialCardComments,
+                attachments: initialCardAttachments,
               } satisfies CardModalData)
             : null
         }

@@ -36,6 +36,18 @@ describe('scanFileWithClamAV', () => {
     expect(r.detectingEngines).toEqual(['ClamAV: Eicar-Test-Signature']);
   });
 
+  it.each([null, undefined])(
+    'returns scan_failed (never clean) when isInfected is %s (unknown verdict)',
+    async (isInfected) => {
+      const cs = await import('clamscan');
+      (cs.default as unknown as { prototype: Record<string, unknown> }).prototype.scanStream =
+        async () => ({ isInfected, viruses: [] });
+      const r = await scanFileWithClamAV(Buffer.from('x'), { host: 'clamav', port: 3310 });
+      expect(r.clean).toBe(false);
+      expect(r.verdict).toBe('scan_failed');
+    },
+  );
+
   it('returns scan_failed when init or scanStream throws (server unreachable)', async () => {
     const cs = await import('clamscan');
     (cs.default as unknown as { prototype: Record<string, unknown> }).prototype.init = async () => {

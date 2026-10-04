@@ -176,6 +176,8 @@ enum AuditAction {
   assistant_turn
   assistant_gate
   assistant_tool_run
+  card_attachment_rejected
+  card_attachment_deleted
 }
 
 // =====================================================================
@@ -214,6 +216,7 @@ model User {
   emailsSent             EmailMessage[]  @relation("EmailMessageSentByUser")
   mailDrafts             MailDraft[]
   assistantMemories      AssistantMemory[]
+  cardAttachmentsUploaded CardAttachment[] @relation("CardAttachmentUploadedBy")
 
   @@index([email])
   @@map("users")
@@ -544,6 +547,7 @@ model Card {
   assignees      CardAssignee[]
   checklistItems ChecklistItem[]
   comments       Comment[]
+  attachments    CardAttachment[]
 
   @@unique([projectId, shortRef])
   @@index([workspaceId])
@@ -610,6 +614,31 @@ model Comment {
   @@index([cardId, createdAt])
   @@index([authorId])
   @@map("comments")
+}
+
+/// Pièce jointe de carte (lot C). Binaire dans le bucket privé
+/// `card-attachments` ; jamais servi tant que `scanStatus != clean`.
+model CardAttachment {
+  id           String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId  String               @map("workspace_id") @db.Uuid
+  cardId       String               @map("card_id") @db.Uuid
+  uploadedById String?              @map("uploaded_by_id") @db.Uuid
+  filename     String               @db.VarChar(255)
+  contentType  String               @map("content_type") @db.VarChar(255)
+  sizeBytes    Int                  @map("size_bytes")
+  storagePath  String               @unique @map("storage_path") @db.VarChar(512)
+  scanStatus   AttachmentScanStatus @default(pending) @map("scan_status")
+  sha256       String?              @db.Char(64)
+  scanReport   Json?                @map("scan_report")
+  createdAt    DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  card       Card  @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  uploadedBy User? @relation("CardAttachmentUploadedBy", fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, cardId])
+  @@index([scanStatus, createdAt])
+  @@map("card_attachments")
 }
 
 // =====================================================================

@@ -8,6 +8,7 @@ import { loadUserScope } from '@/lib/auth/scope';
 import { SCOPE_ERROR_MESSAGE } from '../lib/scope-error';
 import type { CardCommentDTO } from '../lib/comment-dto';
 import { loadCardComments } from '../lib/load-card-comments';
+import { listCardAttachmentDTOs, type CardAttachmentDTO } from '../lib/card-attachment-core';
 
 const Schema = z.object({ cardId: z.string().uuid() });
 
@@ -43,6 +44,8 @@ export interface CardModalData {
   readonly templateId: string | null;
   readonly templateItems: readonly CardTemplateItem[];
   readonly comments: readonly CardCommentDTO[];
+  /** Visible attachments (pending + clean), oldest first (lot C). */
+  readonly attachments: readonly CardAttachmentDTO[];
 }
 
 /**
@@ -114,7 +117,7 @@ export async function getCardModalData(input: {
   // "Bloqué" excluded); comments feed the thread; columnCards gives the
   // card's 1-based rank in its column (the position badge). All three run
   // together, so this adds no extra round-trip latency.
-  const [columns, comments, columnCards] = await Promise.all([
+  const [columns, comments, columnCards, attachments] = await Promise.all([
     prisma.column.findMany({
       where: { projectId: card.projectId },
       orderBy: { position: 'asc' },
@@ -130,6 +133,7 @@ export async function getCardModalData(input: {
       orderBy: { position: 'asc' },
       select: { id: true },
     }),
+    listCardAttachmentDTOs(ctx, card.id),
   ]);
   const userCols = columns.filter((c) => !c.isBlockedSystem);
   const idx = userCols.findIndex((c) => c.name === card.column.name);
@@ -186,6 +190,7 @@ export async function getCardModalData(input: {
       templateId: card.templateId,
       templateItems,
       comments,
+      attachments,
     },
   };
 }

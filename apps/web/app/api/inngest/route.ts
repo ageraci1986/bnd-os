@@ -32,6 +32,14 @@ import { functions } from '@/lib/inngest/functions';
  * Les fonctions servies vivent dans `lib/inngest/functions/` — ce tableau
  * est vide au socle (Task 2) et s'étend aux Tasks 4-6.
  */
+/**
+ * Durée max d'une invocation (route segment config Vercel/Next). Le pas
+ * `scan` de `scan-card-attachment` télécharge jusqu'à 50 Mo puis attend
+ * ClamAV (INSTREAM) : 300 s laissent de la marge (plan Pro ; plafonné à
+ * 60 s sur Hobby). Voir docs/runbooks/card-attachments.md §5.
+ */
+export const maxDuration = 300;
+
 export const { GET, POST, PUT } = serve({
   client: inngestClient,
   functions,
