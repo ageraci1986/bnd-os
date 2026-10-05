@@ -150,34 +150,52 @@ Le daemon est celui des PJ mail (`CLAMAV_HOST` / `CLAMAV_PORT`, voir
 la limite de flux clamd est inférieure à 50 Mo, clamd coupe la connexion
 (« INSTREAM size limit exceeded ») → `scan_failed` sur les gros fichiers.
 
-1. Imposer dans `clamd.conf` (l'image `clamav/clamav` ne mappe pas ces
-   directives sur des variables d'environnement : monter un `clamd.conf`
-   via `[[files]]` dans `fly.toml`, ou une image dérivée qui l'écrase) :
+**État au 2026-10-05 (appliqué)** : la config de l'app `nexushub-clamav` est
+désormais **versionnée** dans `infra/clamav/` (`fly.toml` + `clamd.conf`
+monté via `[[files]]`). Déployer avec :
 
-   ```conf
-   StreamMaxLength 50M
-   MaxScanSize 100M
-   MaxFileSize 50M
-   ```
+```bash
+cd infra/clamav && fly deploy -c fly.toml -a nexushub-clamav
+```
 
-   `MaxScanSize` / `MaxFileSize` **≥ 50M** : en dessous, clamd n'analyse
-   que le début du fichier (verdict `OK` partiel).
+Valeurs effectives : `StreamMaxLength 100M`, `MaxFileSize 100M`,
+`MaxScanSize 400M` (≥ 50 Mo requis), `ConcurrentDatabaseReload no`,
+machine shared-cpu-1x **2 Go** (maximum de ce type ; `cpus = 2` pour aller
+jusqu'à 4 Go).
 
-2. Redéployer : `fly deploy -a nexushub-clamav`.
-3. Vérifier les valeurs effectives :
+**Incident 2026-09-05 → 2026-10-05** : clamd est mort d'OOM pendant un
+rechargement _concurrent_ de la base de signatures (deux copies ≈ 2 Go en
+mémoire). Le conteneur restait « vivant » (freshclam tournait), donc Fly ne
+l'a pas relancé : health check `clamd` en `critical` pendant un mois et
+**tous les scans en `scan_failed`** (PJ mail comprises, fail-closed). Corrigé
+par `ConcurrentDatabaseReload no` + redéploiement.
 
-   ```bash
-   fly ssh console -a nexushub-clamav -C "clamconf" | grep -E "StreamMaxLength|MaxScanSize|MaxFileSize"
-   ```
+Vérifications après tout changement :
 
-4. **RAM** : clamd charge la base de signatures (~1–1,5 Go) et bufferise le
-   flux en cours ; avec la concurrence Inngest de 5 scans × 50 Mo, viser
-   **≥ 2 Go** (`fly scale memory 2048 -a nexushub-clamav`). Surveiller
-   `fly status` / métriques mémoire après le premier pic d'uploads ; un OOM
-   se traduit par des `scan_failed` en rafale.
-5. Le client `clamscan` a un timeout de connexion de 15 s par défaut
-   (`packages/integrations/src/antivirus/clamav.ts`) : vérifier lors du test
-   « vidéo 40 Mo » (§7) qu'un gros fichier passe bien `clean`.
+```bash
+fly checks list -a nexushub-clamav          # clamd = passing
+fly ssh console -a nexushub-clamav -C "sh -c 'ps -o pid,stat,comm | grep clamd'"  # pas d'état Z
+```
+
+Test fonctionnel (PING + EICAR) depuis un poste : envoyer `zPING\0` sur
+`nexushub-clamav.fly.dev:3310` → `PONG` ; un flux INSTREAM contenant la chaîne
+EICAR → `Eicar-Test-Signature FOUND`.
+
+**Auto-réparation (depuis 2026-10-05)** : `infra/clamav/supervise.sh` est
+l'entrypoint de la machine. Il lance `/init`, attend que clamd réponde, puis
+fait `clamdscan --ping 3:10` toutes les 60 s ; si clamd ne répond plus, il
+sort en erreur et Fly redémarre la machine (`[[restart]] policy = "always"`).
+Testé le 2026-10-05 (`pkill -9 clamd`) : panne détectée en ~66 s, clamd de
+retour ~22 s après le redémarrage.
+
+**Alerte** : la fonction Inngest `clamav-health` (toutes les 10 min) pingue
+clamd depuis l'app avec `CLAMAV_HOST`/`CLAMAV_PORT` ; après 2 échecs
+consécutifs, email aux super-admins (au plus 1 toutes les 6 h), puis email
+« rétabli » au retour. Spec : `docs/superpowers/specs/2026-10-05-clamav-monitoring-design.md`.
+
+Le client `clamscan` a un timeout de connexion de 15 s
+(`packages/integrations/src/antivirus/clamav.ts`) ; un flux de 40 Mo passe
+(vérifié le 2026-10-05).
 
 Verdict : seul `isInfected === false` est `clean` ; `true` sans signature,
 `null`/`undefined` (réponse illisible) ou exception → `scan_failed`

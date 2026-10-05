@@ -5,6 +5,7 @@ import { blockedCardsScan } from './blocked-cards-scan';
 import { importantMails } from './important-mails';
 import { scanCardAttachment } from './scan-card-attachment';
 import { cardAttachmentsCleanup } from './card-attachments-cleanup';
+import { clamavHealth } from './clamav-health';
 
 /**
  * Registre des fonctions Inngest servies par `app/api/inngest/route.ts`.
@@ -21,6 +22,9 @@ import { cardAttachmentsCleanup } from './card-attachments-cleanup';
  * Lot C : `scanCardAttachment` (événement `card-attachment/uploaded`) et
  * `cardAttachmentsCleanup` (cron horaire) — garde d'import dans
  * `scan-card-attachment-imports.test.ts`.
+ *
+ * `clamavHealth` (cron 10 min) : sonde clamd + alerte super-admins — garde
+ * d'import dans `clamav-health-imports.test.ts`.
  */
 export const functions: InngestFunction.Any[] = [
   morningBriefing,
@@ -28,4 +32,5 @@ export const functions: InngestFunction.Any[] = [
   importantMails,
   scanCardAttachment,
   cardAttachmentsCleanup,
+  clamavHealth,
 ];
