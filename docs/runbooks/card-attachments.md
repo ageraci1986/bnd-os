@@ -181,9 +181,17 @@ Test fonctionnel (PING + EICAR) depuis un poste : envoyer `zPING\0` sur
 `nexushub-clamav.fly.dev:3310` → `PONG` ; un flux INSTREAM contenant la chaîne
 EICAR → `Eicar-Test-Signature FOUND`.
 
-**À surveiller** : un health check `clamd` en `critical` = antivirus hors
-service (toutes les PJ refusées). Mettre une alerte sur ce check (Fly
-metrics / Better Stack) — suivi ouvert.
+**Auto-réparation (depuis 2026-10-05)** : `infra/clamav/supervise.sh` est
+l'entrypoint de la machine. Il lance `/init`, attend que clamd réponde, puis
+fait `clamdscan --ping 3:10` toutes les 60 s ; si clamd ne répond plus, il
+sort en erreur et Fly redémarre la machine (`[[restart]] policy = "always"`).
+Testé le 2026-10-05 (`pkill -9 clamd`) : panne détectée en ~66 s, clamd de
+retour ~22 s après le redémarrage.
+
+**Alerte** : la fonction Inngest `clamav-health` (toutes les 10 min) pingue
+clamd depuis l'app avec `CLAMAV_HOST`/`CLAMAV_PORT` ; après 2 échecs
+consécutifs, email aux super-admins (au plus 1 toutes les 6 h), puis email
+« rétabli » au retour. Spec : `docs/superpowers/specs/2026-10-05-clamav-monitoring-design.md`.
 
 Le client `clamscan` a un timeout de connexion de 15 s
 (`packages/integrations/src/antivirus/clamav.ts`) ; un flux de 40 Mo passe

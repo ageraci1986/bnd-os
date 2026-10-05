@@ -35,6 +35,18 @@ primary_region = "cdg"
   guest_path = "/etc/clamav/clamd.conf"
   local_path = "clamd.conf"
 
+# Supervision : sort en erreur si clamd ne répond plus → Fly redémarre.
+[[files]]
+  guest_path = "/usr/local/bin/clamav-supervise.sh"
+  local_path = "supervise.sh"
+
+[experimental]
+  entrypoint = ["/bin/sh", "/usr/local/bin/clamav-supervise.sh"]
+
+[[restart]]
+  policy = "always"
+  retries = 10
+
 # 2 Go = maximum d'une machine shared-cpu-1x. Base de signatures ~1 Go en
 # mémoire ; le reste couvre les scans INSTREAM simultanés (PJ mail 25 Mo,
 # PJ cartes 50 Mo). Le 2026-09-05, clamd est mort d'OOM pendant un
