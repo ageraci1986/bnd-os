@@ -1,0 +1,46 @@
+# NexusHub — ClamAV daemon (clamd) sur Fly.io.
+# Source de vérité de l'app `nexushub-clamav` (auparavant non versionnée).
+# Déployer depuis ce dossier : `fly deploy -c infra/clamav/fly.toml`
+# Voir docs/runbooks/mail-attachments.md et docs/runbooks/card-attachments.md.
+app = "nexushub-clamav"
+primary_region = "cdg"
+
+[build]
+  image = "clamav/clamav:latest"
+
+[[mounts]]
+  source = "clamav_data"
+  destination = "/var/lib/clamav"
+
+[[services]]
+  protocol = "tcp"
+  internal_port = 3310
+
+  [[services.ports]]
+    port = 3310
+
+  [services.concurrency]
+    type = "connections"
+    hard_limit = 50
+    soft_limit = 25
+
+[checks]
+  [checks.clamd]
+    port = 3310
+    type = "tcp"
+    interval = "30s"
+    timeout = "5s"
+
+[[files]]
+  guest_path = "/etc/clamav/clamd.conf"
+  local_path = "clamd.conf"
+
+# 2 Go = maximum d'une machine shared-cpu-1x. Base de signatures ~1 Go en
+# mémoire ; le reste couvre les scans INSTREAM simultanés (PJ mail 25 Mo,
+# PJ cartes 50 Mo). Le 2026-09-05, clamd est mort d'OOM pendant un
+# rechargement CONCURRENT de la base (2 copies) → désactivé dans clamd.conf
+# (ConcurrentDatabaseReload no). Pour plus de RAM : cpus = 2 (jusqu'à 4 Go).
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 2048
