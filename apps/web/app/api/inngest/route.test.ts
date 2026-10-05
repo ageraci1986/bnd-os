@@ -33,14 +33,15 @@ describe('GET/POST/PUT /api/inngest', () => {
     expect(inngestClient.id).toBe('nexushub');
   });
 
-  it('registers the Plan 3b crons and the lot C card-attachment scan + cleanup', () => {
-    expect(functions).toHaveLength(5);
+  it('registers the Plan 3b crons, the lot C card-attachment scan + cleanup and the ClamAV health cron', () => {
+    expect(functions).toHaveLength(6);
     expect(functions.map((fn) => fn.id())).toEqual([
       'morning-briefing',
       'blocked-cards-scan',
       'important-mails',
       'scan-card-attachment',
       'card-attachments-cleanup',
+      'clamav-health',
     ]);
   });
 
