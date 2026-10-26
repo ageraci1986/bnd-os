@@ -5,6 +5,7 @@ import { matchVoiceConfirm, SentenceChunker } from '@nexushub/agent';
 import { briefParts } from '@/lib/assistant/brief-sentence';
 import type { TodayOverview } from '@/lib/assistant/overview-core';
 import { useVoiceMode } from '../hooks/use-voice-mode';
+import { fetchWithCsrfRetry } from '../lib/csrf-retry';
 import { parseSseLines, type StreamWidget } from '../lib/sse';
 import { AssistantOrb, deriveOrbActivity } from './assistant-orb';
 import { NoticeStack, type AgentNotice } from './notice-stack';
@@ -119,6 +120,19 @@ function widgetKey(widget: StreamWidget, index: number): string {
 }
 
 export function AssistantChat({ csrfToken, firstName, overview, notices }: AssistantChatProps) {
+  // Recovery CSRF (fetchWithCsrfRetry, voir features/assistant/lib/csrf-retry.ts) :
+  // `csrfToken` (prop) n'est que la valeur INITIALE — un onglet /assistant
+  // laissé ouvert des heures/jours voit sa valeur remplacée en place quand
+  // un appel échoue en 403 "CSRF invalide" (cookie expiré ou tourné par un
+  // déploiement) et qu'un jeton frais est réémis par /api/assistant/csrf.
+  const [csrf, setCsrf] = useState(csrfToken);
+  // Ref miroir de `csrf`, synchronisée à CHAQUE render (même pattern que
+  // `inputValueRef` ci-dessous) — `send`/`answerConfirm` la lisent au lieu de
+  // dépendre du state `csrf` : sans ça, ces callbacks changeraient d'identité
+  // à chaque refresh de token, ce qui casserait le contrat de stabilité de
+  // `send` (voir son commentaire de deps plus bas).
+  const csrfRef = useRef(csrf);
+  csrfRef.current = csrf;
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [input, setInput] = useState('');
   // Ref miroir de `input` (Plan 5c Task 6, mandat B) — `send` la lit au lieu
@@ -126,8 +140,10 @@ export function AssistantChat({ csrfToken, firstName, overview, notices }: Assis
   // memoïsé ci-dessous) changeait d'identité à CHAQUE frappe, ce qui aurait
   // remis à zéro le debounce d'autosave d'un widget comme `MailDraftWidget`
   // si ce dernier utilisait `actions` comme dépendance d'effet. `widgetActions`
-  // ne doit changer que sur `busy`/`csrfToken`. Synchronisée dans `onChange`
-  // (ci-dessous), jamais via un effet — pas de round-trip de rendu.
+  // ne doit changer que sur `busy` (voir aussi `csrfRef` ci-dessus, qui
+  // protège `send` d'un refresh de token pour la même raison). Synchronisée
+  // dans `onChange` (ci-dessous), jamais via un effet — pas de round-trip
+  // de rendu.
   const inputValueRef = useRef('');
   const [streamText, setStreamText] = useState<string | null>(null);
   const [streamWidgets, setStreamWidgets] = useState<StreamWidget[]>([]);
@@ -195,30 +211,32 @@ export function AssistantChat({ csrfToken, firstName, overview, notices }: Assis
     }
   }, [messages, streamText, streamWidgets, pendingConfirm]);
 
-  const answerConfirm = useCallback(
-    async (id: string, allowed: boolean) => {
-      setAnswering(allowed ? 'allow' : 'deny');
-      try {
-        const res = await fetch('/api/assistant/confirm', {
+  const answerConfirm = useCallback(async (id: string, allowed: boolean) => {
+    setAnswering(allowed ? 'allow' : 'deny');
+    try {
+      const res = await fetchWithCsrfRetry(
+        '/api/assistant/confirm',
+        {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ id, allowed }),
-        });
-        // Le dialog se ferme à la réception de confirm_resolved (source de vérité serveur).
-        if (!res.ok) {
-          // 404/409 : course avec le timeout serveur (voir confirm-store) — le
-          // dialog est déjà résolu ou en passe de l'être, rien à signaler.
-          if (res.status === 404 || res.status === 409) return;
-          setError('Impossible de transmettre la réponse — réessayez.');
-          setAnswering(null); // déverrouille pour permettre un nouvel essai
-        }
-      } catch {
+        },
+        () => csrfRef.current,
+        setCsrf,
+      );
+      // Le dialog se ferme à la réception de confirm_resolved (source de vérité serveur).
+      if (!res.ok) {
+        // 404/409 : course avec le timeout serveur (voir confirm-store) — le
+        // dialog est déjà résolu ou en passe de l'être, rien à signaler.
+        if (res.status === 404 || res.status === 409) return;
         setError('Impossible de transmettre la réponse — réessayez.');
-        setAnswering(null);
+        setAnswering(null); // déverrouille pour permettre un nouvel essai
       }
-    },
-    [csrfToken],
-  );
+    } catch {
+      setError('Impossible de transmettre la réponse — réessayez.');
+      setAnswering(null);
+    }
+  }, []);
 
   /**
    * `textOverride` (Plan 5c) : canal d'injection utilisé par les widgets
@@ -298,12 +316,20 @@ export function AssistantChat({ csrfToken, firstName, overview, notices }: Assis
       // dire. Sans ce drapeau, l'UI redevenait idle en silence.
       let sawTerminal = false;
       try {
-        const res = await fetch('/api/assistant/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken },
-          body: JSON.stringify({ messages: historyRef.current.slice(-HISTORY_MAX), message: text }),
-          signal: controller.signal,
-        });
+        const res = await fetchWithCsrfRetry(
+          '/api/assistant/chat',
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              messages: historyRef.current.slice(-HISTORY_MAX),
+              message: text,
+            }),
+            signal: controller.signal,
+          },
+          () => csrfRef.current,
+          setCsrf,
+        );
         if (!res.ok || res.body === null) {
           const payload = (await res.json().catch(() => null)) as { message?: string } | null;
           setError(payload?.message ?? 'Une erreur est survenue — réessayez.');
@@ -422,11 +448,18 @@ export function AssistantChat({ csrfToken, firstName, overview, notices }: Assis
     // dans ce tableau de dépendances — TDZ). `speakRef.current` (toujours à
     // jour, réassigné à chaque render juste après `useVoiceMode`) est lu à la
     // place — même pattern que `inputValueRef`/`propsRef`.
-    [busy, csrfToken],
+    // `csrf` volontairement absent aussi (recovery CSRF, voir csrfRef
+    // ci-dessus) : `send` lit `csrfRef.current` pour ne PAS changer d'identité
+    // à chaque refresh de token — sinon `widgetActions` (memoïsé sur `send`)
+    // en ferait autant, ce qui casserait le debounce d'autosave d'un widget
+    // comme `MailDraftWidget` si celui-ci utilisait `actions` comme dépendance
+    // d'effet.
+    [busy],
   );
 
   const voice = useVoiceMode({
-    csrfToken,
+    csrfToken: csrf,
+    onCsrfRefresh: setCsrf,
     busy,
     onTranscript: (text) => {
       nextTurnIsVoiceRef.current = true;

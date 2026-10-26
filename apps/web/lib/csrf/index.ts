@@ -59,3 +59,40 @@ export async function assertCsrfHeader(token: string | null | undefined): Promis
     throw new Error('CSRF: token mismatch');
   }
 }
+
+/**
+ * Mirrors `randomCsrfToken()` in middleware.ts byte-for-byte (24 random
+ * bytes, base64url, no padding) — kept as a separate copy rather than a
+ * shared import because middleware.ts intentionally duplicates the CSRF
+ * cookie config (see its own comment) to avoid pulling a `server-only`
+ * module into the Edge middleware bundle. Any change here should be
+ * mirrored there too.
+ */
+function randomCsrfToken(): string {
+  const bytes = new Uint8Array(24);
+  crypto.getRandomValues(bytes);
+  let bin = '';
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return globalThis.btoa(bin).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
+}
+
+/**
+ * Mints a fresh CSRF token and writes it to the cookie — used by
+ * `GET /api/assistant/csrf` to recover a stale tab whose cookie expired
+ * (TTL) or was rotated (deploy). Only callable from a Route Handler or
+ * Server Action: `cookies().set()` throws outside those contexts (App
+ * Router cookie-mutation rule — same reason `getCsrfTokenForForm` above is
+ * read-only).
+ */
+export async function mintCsrfToken(): Promise<string> {
+  const token = randomCsrfToken();
+  const store = await cookies();
+  store.set(CSRF_COOKIE, token, {
+    httpOnly: true,
+    secure: process.env['NODE_ENV'] === 'production',
+    sameSite: 'lax',
+    path: '/',
+    maxAge: CSRF_TTL_SECONDS,
+  });
+  return token;
+}

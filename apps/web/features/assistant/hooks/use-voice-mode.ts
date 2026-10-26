@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useRef, useState } from 'react';
+import { fetchWithCsrfRetry } from '../lib/csrf-retry';
 import { useSpeechQueue } from './use-speech-queue';
 import { useVoiceRecorder } from './use-voice-recorder';
 
@@ -26,12 +27,21 @@ export interface UseVoiceModeProps {
   readonly onVoiceConfirm: (transcript: string) => boolean;
   /** Interrompre le tour en cours (abort du stream) avant de réécouter. */
   readonly onInterrupt: () => void;
+  /**
+   * Recovery CSRF (fetchWithCsrfRetry) : appelé avec le token fraîchement
+   * réémis par `/api/assistant/csrf` après un 403 "CSRF invalide" sur
+   * transcribe OU speak (transmis tel quel à `useSpeechQueue`) — permet à
+   * l'appelant (AssistantChat) de garder son état `csrf` synchro pour les
+   * appels suivants. Optionnel : un appelant qui n'en a pas besoin (tests)
+   * en est dispensé, le retry se contente alors de ne pas notifier.
+   */
+  readonly onCsrfRefresh?: (token: string) => void;
 }
 
 export function useVoiceMode(props: UseVoiceModeProps) {
   const [transcribing, setTranscribing] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-  const queue = useSpeechQueue(props.csrfToken);
+  const queue = useSpeechQueue(props.csrfToken, props.onCsrfRefresh);
   const propsRef = useRef(props);
   // « Latest ref » volontaire (même pattern que csrfRef du speech-queue).
   propsRef.current = props;
@@ -40,11 +50,12 @@ export function useVoiceMode(props: UseVoiceModeProps) {
     setTranscribing(true);
     setNotice(null);
     try {
-      const res = await fetch('/api/assistant/voice/transcribe', {
-        method: 'POST',
-        headers: { 'Content-Type': blob.type, 'x-csrf-token': propsRef.current.csrfToken },
-        body: blob,
-      });
+      const res = await fetchWithCsrfRetry(
+        '/api/assistant/voice/transcribe',
+        { method: 'POST', headers: { 'Content-Type': blob.type }, body: blob },
+        () => propsRef.current.csrfToken,
+        (token) => propsRef.current.onCsrfRefresh?.(token),
+      );
       const payload = (await res.json().catch(() => null)) as {
         transcript?: string;
         message?: string;
