@@ -3,18 +3,16 @@ import 'server-only';
 import { z } from 'zod';
 import { prisma } from '@nexushub/db';
 import { requireUser } from '@/lib/auth';
+import { ownedMailWhere } from '@/features/communications/lib/owned-mail-where';
 
-// Asymétrie assumée avec `mail-state-core.ts` (Plan 5b Task 7) : cette action
-// UI est mono-mail et workspace-scopée (n'importe quel membre du workspace
-// peut marquer lu un mail qu'il voit), alors que le core bulk de l'assistant
-// est owner-only (integration.ownerUserId) — décision produit V2 sur les
-// mutations mail. Ne pas aligner l'un sur l'autre sans revalidation produit.
-//
-// Contraste avec `mark-email-unread.ts` (Plan 5c Task 3) : ce fichier reste
-// l'action historique mono-mail workspace-scopée décrite ci-dessus — SON
-// COMPORTEMENT N'A PAS CHANGÉ. `markEmailUnread`, elle, délègue directement au
-// core bulk owner-only (mêmes règles que mark_mail_unread côté assistant) —
-// asymétrie assumée entre les deux toggles, pas un oubli.
+// Owner-scoped (integration.ownerUserId), comme `markEmailUnread` et le core
+// bulk de l'assistant : un membre ne peut marquer lu QUE les mails de ses
+// propres boîtes. Correctif 2026-11-10 — l'ancienne asymétrie (marquage
+// workspace-scopé) laissait un membre modifier l'état des mails d'un collègue
+// et a été levée par décision produit : un mail n'appartient qu'à son
+// propriétaire. Volontairement PAS délégué à `setMailStateCore` : ce dernier
+// refuse le rôle Viewer et audite chaque appel, or ce toggle est déclenché à
+// chaque ouverture de mail.
 
 const Schema = z.object({ emailId: z.string().uuid() });
 
@@ -29,10 +27,11 @@ export async function markEmailRead(input: {
   if (!parsed.success) return { ok: false, message: 'Identifiant invalide.' };
   const ctx = await requireUser();
   try {
-    await prisma.emailMessage.update({
-      where: { id: parsed.data.emailId, workspaceId: ctx.workspaceId },
+    const result = await prisma.emailMessage.updateMany({
+      where: { id: parsed.data.emailId, ...ownedMailWhere(ctx) },
       data: { isRead: true },
     });
+    if (result.count === 0) return { ok: false, message: 'Mail introuvable.' };
     return { ok: true };
   } catch {
     return { ok: false, message: 'Mail introuvable.' };

@@ -4,6 +4,7 @@ import { prisma } from '@nexushub/db';
 import { openImapSession } from '@nexushub/integrations/imap';
 import { openSmtpTransport, sendViaSmtp, appendToSentFolder } from '@nexushub/integrations/smtp';
 import { getValidImapCredentials } from '@/features/integrations/lib/get-valid-imap-credentials';
+import { ownedMailWhere } from '@/features/communications/lib/owned-mail-where';
 
 export interface SendImapPayload {
   readonly subject: string;
@@ -45,8 +46,13 @@ export async function sendViaImapSmtp(args: Args): Promise<void> {
   // Threading: pull the original Message-ID stored as `conversationId`.
   let inReplyTo: string | undefined;
   if (args.payload.replyToLocalId) {
-    const orig = await prisma.emailMessage.findUnique({
-      where: { id: args.payload.replyToLocalId },
+    // Owner-scoped : le mail d'origine doit appartenir à une boîte de
+    // l'appelant (jamais un lookup par id seul).
+    const orig = await prisma.emailMessage.findFirst({
+      where: {
+        id: args.payload.replyToLocalId,
+        ...ownedMailWhere({ userId: args.userId, workspaceId: args.workspaceId }),
+      },
       select: { conversationId: true },
     });
     if (orig?.conversationId) inReplyTo = orig.conversationId;

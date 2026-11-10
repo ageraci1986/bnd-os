@@ -10,6 +10,7 @@ import {
 import { syncGraphInbox } from '@/features/communications/actions/sync-graph-inbox';
 import { syncImapInbox } from '@/features/communications/actions/sync-imap-inbox';
 import { toMailDTO } from '@/features/communications/lib/mail-dto';
+import { buildMailListWhere } from '@/features/communications/lib/owned-mail-where';
 import { resolveMailPage } from '@/features/communications/lib/resolve-mail-page';
 import { EmptyNoIntegration } from '@/features/communications/components/empty-no-integration';
 import { MailTabs } from '@/features/communications/components/mail-tabs';
@@ -108,13 +109,12 @@ export default async function CommunicationsPage({ searchParams }: PageProps) {
   const pageParam = Number(readSearchParamString(sp['page']) ?? '1');
   let page = Number.isFinite(pageParam) && pageParam > 0 ? Math.max(1, Math.floor(pageParam)) : 1;
 
-  const emailWhere = {
-    workspaceId: ctx.workspaceId,
-    deletedAt: null,
-    archivedAt: null,
-    ...(clientFilter ? { clientId: clientFilter } : {}),
-    ...(mailboxFilter ? { integrationId: mailboxFilter } : {}),
-  };
+  // Owner-scoped (integration.ownerUserId) : un membre ne voit QUE les mails
+  // de ses propres boîtes — jamais ceux d'un collègue du même workspace.
+  const emailWhere = buildMailListWhere(ctx, {
+    clientId: clientFilter,
+    mailboxId: mailboxFilter,
+  });
 
   // ?mail=<emailId> deep-link (Plan 5c Task 2): jump straight to the page
   // containing that mail, overriding `?page=N`. The id is validated loosely

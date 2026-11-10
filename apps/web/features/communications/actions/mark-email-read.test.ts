@@ -2,11 +2,11 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   requireUser: vi.fn(),
-  emailUpdate: vi.fn(),
+  emailUpdateMany: vi.fn(),
 }));
 
 vi.mock('@nexushub/db', () => ({
-  prisma: { emailMessage: { update: mocks.emailUpdate } },
+  prisma: { emailMessage: { updateMany: mocks.emailUpdateMany } },
 }));
 vi.mock('@/lib/auth', () => ({ requireUser: mocks.requireUser }));
 
@@ -24,14 +24,24 @@ beforeEach(() => {
 });
 
 describe('markEmailRead', () => {
-  it('flips isRead and returns ok:true', async () => {
-    mocks.emailUpdate.mockResolvedValue({});
+  it('flips isRead on a mail of the caller own mailbox and returns ok:true', async () => {
+    mocks.emailUpdateMany.mockResolvedValue({ count: 1 });
     const res = await markEmailRead({ emailId: '11111111-1111-1111-1111-111111111111' });
     expect(res).toEqual({ ok: true });
-    expect(mocks.emailUpdate).toHaveBeenCalledWith({
-      where: { id: '11111111-1111-1111-1111-111111111111', workspaceId: 'W1' },
+    expect(mocks.emailUpdateMany).toHaveBeenCalledWith({
+      where: {
+        id: '11111111-1111-1111-1111-111111111111',
+        workspaceId: 'W1',
+        integration: { workspaceId: 'W1', ownerUserId: 'U1' },
+      },
       data: { isRead: true },
     });
+  });
+
+  it("refuses a mail from another member's mailbox (owner scope, 0 row updated)", async () => {
+    mocks.emailUpdateMany.mockResolvedValue({ count: 0 });
+    const res = await markEmailRead({ emailId: '11111111-1111-1111-1111-111111111111' });
+    expect(res).toEqual({ ok: false, message: 'Mail introuvable.' });
   });
 
   it('rejects invalid id', async () => {

@@ -44,6 +44,12 @@ describe('loadTodayOverview', () => {
     });
     expect(prismaMock.card.count.mock.calls[0]?.[0]?.where?.workspaceId).toBe('w1');
     expect(prismaMock.emailMessage.count.mock.calls[0]?.[0]?.where?.workspaceId).toBe('w1');
+    // Mails non lus = ceux des boîtes de l'utilisateur seulement (régression
+    // 2026-11-10 : le KPI/briefing comptait les mails de toute l'équipe).
+    expect(prismaMock.emailMessage.count.mock.calls[0]?.[0]?.where?.integration).toEqual({
+      workspaceId: 'w1',
+      ownerUserId: 'u1',
+    });
     const notifWhere = prismaMock.notification.count.mock.calls[0]?.[0]?.where;
     expect(notifWhere?.workspaceId).toBe('w1');
     expect(notifWhere?.userId).toBe('u1');

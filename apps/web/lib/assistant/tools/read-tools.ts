@@ -11,6 +11,7 @@ import {
   scopedProjectWhere,
 } from '@/lib/auth/scope';
 import { fetchMailBody } from '@/features/communications/actions/fetch-mail-body';
+import { ownedMailWhere } from '@/features/communications/lib/owned-mail-where';
 import { loadTodayOverview } from '@/lib/assistant/overview-core';
 import { safeDb } from './safe-wrappers';
 
@@ -265,7 +266,7 @@ export async function buildReadTools(ctx: AuthContext): Promise<ToolSpec[]> {
     defineTool({
       name: 'search_mails',
       description:
-        "Recherche dans les mails du workspace par texte (sujet ou expéditeur). Renvoie les plus récents d'abord. Renvoie total/offset — boucler sur offset pour tout parcourir.",
+        "Recherche dans les mails des boîtes connectées de l'utilisateur (jamais celles des autres membres) par texte (sujet ou expéditeur). Renvoie les plus récents d'abord. Renvoie total/offset — boucler sur offset pour tout parcourir.",
       inputSchema: z.object({
         query: z.string().trim().min(1).max(100).optional(),
         unreadOnly: z.boolean().optional(),
@@ -283,8 +284,9 @@ export async function buildReadTools(ctx: AuthContext): Promise<ToolSpec[]> {
       },
       handler: async (input) =>
         safeDb('search_mails', async () => {
+          // Owner-scoped : uniquement les boîtes de l'utilisateur courant.
           const where: Prisma.EmailMessageWhereInput = {
-            workspaceId,
+            ...ownedMailWhere(ctx),
             deletedAt: null,
             archivedAt: null,
             ...(input.unreadOnly === true ? { isRead: false } : {}),
@@ -335,9 +337,9 @@ export async function buildReadTools(ctx: AuthContext): Promise<ToolSpec[]> {
       jsonSchema: { type: 'object', properties: { emailId: UUID_JSON }, required: ['emailId'] },
       handler: async (input) =>
         safeDb('read_mail', async () => {
-          // Convention repo (fetch-mail-body.ts) : les métadonnées mail sont
-          // visibles au workspace, les CORPS sont réservés au propriétaire de
-          // l'intégration — d'où le gate ownerUserId ci-dessous.
+          // Règle CLAUDE.md §4.4.6 : un mail (métadonnées ET corps) n'est
+          // visible que par le propriétaire de la boîte — d'où le gate
+          // ownerUserId ci-dessous (même scope que `ownedMailWhere`).
           const mail = await prisma.emailMessage.findFirst({
             where: {
               id: input.emailId,
