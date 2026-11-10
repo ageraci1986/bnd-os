@@ -295,8 +295,12 @@ function prodDeps(): ClamavHealthDeps {
   };
 }
 
+// `retries: 0` : une sonde ne se relance pas, le tick suivant arrive 10 min
+// plus tard. Avec les 4 relances par défaut d'Inngest, un tick en échec
+// (Upstash injoignable, novembre 2026) coûtait 5 exécutions, ~900 par jour
+// sur un quota partagé avec d'autres apps.
 export const clamavHealth = inngestClient.createFunction(
-  { id: 'clamav-health', triggers: [{ cron: '*/10 * * * *' }] },
+  { id: 'clamav-health', retries: 0, triggers: [{ cron: '*/10 * * * *' }] },
   async ({ step }) => {
     const result = await step.run('check', () => runClamavHealth(prodDeps()));
     // Comptes seulement — jamais d'adresse (CLAUDE.md §4.7).

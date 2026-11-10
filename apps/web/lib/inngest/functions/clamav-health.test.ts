@@ -275,5 +275,13 @@ describe('state stores', () => {
 describe('clamavHealth (Inngest wire)', () => {
   it('is registered as the 10-minute "clamav-health" cron', () => {
     expect(clamavHealth.id()).toBe('clamav-health');
+    expect(clamavHealth.opts.triggers).toEqual([{ cron: '*/10 * * * *' }]);
+  });
+
+  // Une sonde ne se relance pas : le tick suivant arrive 10 min plus tard.
+  // Avec les 4 relances par défaut d'Inngest, chaque tick en échec coûtait
+  // 5 exécutions (~900/jour pendant la panne Upstash de novembre 2026).
+  it('never retries (retries: 0)', () => {
+    expect(clamavHealth.opts.retries).toBe(0);
   });
 });
