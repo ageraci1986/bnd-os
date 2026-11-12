@@ -4,13 +4,10 @@ import { z } from 'zod';
 import { requireUser } from '@/lib/auth';
 import { setMailStateCore } from '@/features/communications/lib/mail-state-core';
 
-// Asymétrie assumée avec `mark-email-read.ts` (Plan 5b Task 7 / Plan 5c Task 3) :
-// `markEmailRead` reste l'action historique — mono-mail et workspace-scopée
-// (n'importe quel membre du workspace peut marquer lu un mail qu'il voit).
-// `markEmailUnread` est plus récente et délègue au core bulk owner-only
-// (integration.ownerUserId) : un mail d'une boîte d'un autre membre renvoie
-// `affected: 0` silencieusement plutôt qu'une erreur. Ne pas aligner l'un sur
-// l'autre sans revalidation produit.
+// Délègue au core bulk owner-only (integration.ownerUserId) : un mail d'une
+// boîte d'un autre membre renvoie `affected: 0` silencieusement plutôt
+// qu'une erreur. `markEmailRead` applique le même scope propriétaire (aligné
+// le 2026-11-10) mais sans passer par le core — voir son commentaire.
 
 const Schema = z.object({ emailId: z.string().uuid() });
 

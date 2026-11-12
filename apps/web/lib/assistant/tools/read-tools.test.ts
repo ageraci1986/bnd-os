@@ -368,6 +368,19 @@ describe('buildReadTools', () => {
     expect(where.deletedAt).toBeNull();
   });
 
+  it("search_mails ne renvoie QUE les mails des boîtes de l'utilisateur (jamais celles d'un autre membre)", async () => {
+    // Régression 2026-11-10 : search_mails scannait tout le workspace.
+    prismaMock.emailMessage.count.mockResolvedValue(0);
+    prismaMock.emailMessage.findMany.mockResolvedValue([]);
+    await execute('search_mails', { query: 'devis', unreadOnly: true });
+    for (const where of [
+      prismaMock.emailMessage.findMany.mock.calls[0]?.[0]?.where,
+      prismaMock.emailMessage.count.mock.calls[0]?.[0]?.where,
+    ]) {
+      expect(where.integration).toEqual({ workspaceId: 'w1', ownerUserId: ctx.userId });
+    }
+  });
+
   it('search_mails : renvoie { total, offset, mails } et transmet skip', async () => {
     prismaMock.emailMessage.count.mockResolvedValue(88);
     prismaMock.emailMessage.findMany.mockResolvedValue([]);

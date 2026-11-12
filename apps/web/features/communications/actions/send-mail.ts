@@ -15,6 +15,7 @@ import { getValidAccessToken } from '@/features/integrations/lib/get-valid-acces
 import { downloadMailAttachment } from '@/lib/mail-attachment-storage';
 import { sendViaImapSmtp } from './send-mail-imap';
 import { attachmentDraftSchema, type AttachmentDraft } from '../lib/attachment-draft-schema';
+import { ownedMailWhere } from '../lib/owned-mail-where';
 
 const inputSchema = z
   .object({
@@ -120,16 +121,38 @@ async function loadAttachmentBinaries(
  */
 async function verifyAttachmentsReady(
   list: readonly AttachmentDraft[],
-  workspaceId: string,
+  ctx: { readonly workspaceId: string; readonly userId: string },
 ): Promise<boolean> {
+  const { workspaceId } = ctx;
   for (const a of list) {
     if (!a.storagePath.startsWith(`${workspaceId}/`)) return false;
     if (a.reprisedFromAttachmentId) {
+      // Reprise (Forward) : la PJ source doit appartenir à une boîte de
+      // l'appelant ET le storagePath annoncé doit être le sien — sinon un
+      // membre pourrait réexpédier la PJ d'un collègue (correctif 2026-11-10).
       const source = await prisma.emailAttachment.findFirst({
-        where: { id: a.reprisedFromAttachmentId, workspaceId, scanStatus: 'clean' },
+        where: {
+          id: a.reprisedFromAttachmentId,
+          workspaceId,
+          scanStatus: 'clean',
+          storagePath: a.storagePath,
+          emailMessage: { integration: ownedMailWhere(ctx).integration },
+        },
         select: { id: true },
       });
       if (!source) return false;
+    } else {
+      // Upload frais : le storagePath vient du client. S'il désigne l'objet
+      // d'une PJ existante (dédup d'upload workspace-scopé, cf.
+      // upload-attachment.ts), exiger le sha256 exact — preuve de possession
+      // du contenu, jamais exposé aux non-propriétaires (mail-dto.ts). Tous
+      // les rows d'un même storagePath partagent le même sha256 (dédup par
+      // hash), un seul suffit.
+      const existing = await prisma.emailAttachment.findFirst({
+        where: { workspaceId, storagePath: a.storagePath },
+        select: { sha256: true },
+      });
+      if (existing && existing.sha256 !== a.sha256) return false;
     }
   }
   return true;
@@ -181,7 +204,7 @@ export async function sendMail(raw: SendMailInput): Promise<SendMailResult> {
 
   // 3b. Attachments readiness — defensive, fail before any outbox write.
   if (parsed.composeAttachments.length > 0) {
-    const ready = await verifyAttachmentsReady(parsed.composeAttachments, ctx.workspaceId);
+    const ready = await verifyAttachmentsReady(parsed.composeAttachments, ctx);
     if (!ready) {
       return {
         ok: false,

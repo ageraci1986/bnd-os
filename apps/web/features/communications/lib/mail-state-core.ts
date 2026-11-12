@@ -13,9 +13,9 @@ import { VIEWER_READ_ONLY_MESSAGE } from '@/features/projects/lib/scope-error';
  * Applique un changement d'état à un lot de mails — BOÎTES DE L'UTILISATEUR
  * UNIQUEMENT (ownership via integration.ownerUserId, décision produit V2) :
  * un mail d'une boîte d'un autre membre est silencieusement ignoré et compté
- * dans `skipped`. Contraste assumé avec la lecture (métadonnées workspace) et
- * avec l'action UI markEmailRead (mono-mail, workspace-scopée) — voir le
- * commentaire croisé dans mark-email-read.ts.
+ * dans `skipped`. Même scope propriétaire que la lecture et que l'action UI
+ * markEmailRead (CLAUDE.md §4.4.6, alignés le 2026-11-10 — voir
+ * `ownedMailWhere`).
  * Archive/delete sont LOCAUX à NexusHub (aucune sync retour IMAP/Graph).
  *
  * Le `where` ne filtre volontairement PAS sur `archivedAt` : marquer un mail

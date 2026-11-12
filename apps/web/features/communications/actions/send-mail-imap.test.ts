@@ -19,9 +19,9 @@ vi.mock('@nexushub/integrations/imap', () => ({
   openImapSession: (...a: unknown[]) => openImap(...a),
 }));
 
-const mailFindUnique = vi.hoisted(() => vi.fn());
+const mailFindFirst = vi.hoisted(() => vi.fn());
 vi.mock('@nexushub/db', () => ({
-  prisma: { emailMessage: { findUnique: mailFindUnique } },
+  prisma: { emailMessage: { findFirst: mailFindFirst } },
 }));
 
 import { sendViaImapSmtp } from './send-mail-imap';
@@ -108,7 +108,7 @@ describe('sendViaImapSmtp', () => {
         password: 'p',
       },
     });
-    mailFindUnique.mockResolvedValueOnce({ conversationId: '<original@ex.com>' });
+    mailFindFirst.mockResolvedValueOnce({ conversationId: '<original@ex.com>' });
     openSmtp.mockResolvedValueOnce({ close: vi.fn() });
     send.mockResolvedValueOnce({ messageId: '<new@ex.com>', accepted: [], rejected: [] });
     openImap.mockResolvedValueOnce({ logout: vi.fn().mockResolvedValue(undefined) });
@@ -135,6 +135,16 @@ describe('sendViaImapSmtp', () => {
     };
     expect(sendArgs.inReplyTo).toBe('<original@ex.com>');
     expect(sendArgs.references).toEqual(['<original@ex.com>']);
+    // Le mail d'origine doit appartenir à une boîte de l'appelant — jamais
+    // un lookup par id seul (fuite cross-membre, régression 2026-11-10).
+    expect(mailFindFirst).toHaveBeenCalledWith({
+      where: {
+        id: 'em-1',
+        workspaceId: 'w',
+        integration: { workspaceId: 'w', ownerUserId: 'u' },
+      },
+      select: { conversationId: true },
+    });
   });
 
   it('threads resolved attachment binaries through to sendViaSmtp', async () => {

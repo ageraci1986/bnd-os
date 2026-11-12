@@ -3,6 +3,7 @@ import 'server-only';
 import { prisma } from '@nexushub/db';
 import { loadUserScope, scopedCardWhere, type ScopeAuthContext } from '@/lib/auth/scope';
 import { startOfTodayUtc } from '@/features/projects/lib/card-filter';
+import { ownedMailWhere } from '@/features/communications/lib/owned-mail-where';
 
 /**
  * `loadTodayOverview` only reads `workspaceId`/`userId` directly and
@@ -68,7 +69,10 @@ export async function loadTodayOverview(ctx: OverviewAuthContext): Promise<Today
         AND: [liveProjectFilter, scopedCardWhere(scope)],
       },
     }),
-    prisma.emailMessage.count({ where: { workspaceId, deletedAt: null, isRead: false } }),
+    // Owner-scoped : les mails non lus des SEULES boîtes de l'utilisateur.
+    prisma.emailMessage.count({
+      where: { ...ownedMailWhere(ctx), deletedAt: null, isRead: false },
+    }),
     prisma.notification.count({ where: { workspaceId, userId: ctx.userId, readAt: null } }),
   ]);
   return { blockedCards, dueTodayCards, unreadMails, unreadNotifications };

@@ -183,6 +183,7 @@ nexushub/
 3. **Row Level Security PostgreSQL** activé sur toutes les tables, policies par `workspace_id`.
 4. Capacités sensibles (inviter / retirer membre, gérer intégrations, supprimer client/projet) → `Admin` uniquement, vérifié serveur **et** UI cachée.
 5. **Dernier Admin protégé** : impossible de retirer / dégrader le seul Admin restant (validation domain + DB constraint).
+6. **Mails = propriété personnelle** : un `EmailMessage` (et ses PJ) n'est visible / modifiable **que** par le propriétaire de la boîte (`integration.ownerUserId`) — être membre du workspace ne suffit jamais, Admin compris. Toute requête mail part de `ownedMailWhere(ctx)` (`features/communications/lib/owned-mail-where.ts`) ; doublé en base par la policy RLS `em_owner_all`.
 
 ### 4.5 Validation & échappement
 
@@ -432,5 +433,6 @@ Avant chaque action :
 | 2026-10-02 | Lot A quick wins — renommage projet inline, widget + filtre « Mes cartes » (`mine`, userId de session), palette clients 12 tokens + couleur libre hex (contraste WCAG, sanitisation `clientColorCss` domain + ui), cartes terminées barrées au calendrier                       | Angelo L. + Claude |
 | 2026-10-03 | Lot B dark mode — User.theme + cookie nx-theme (SSR sans flash, CSP OK), tokens light-dark() pilotés par color-scheme, `@custom-variant dark` sur data-theme (préférer les tokens), toggle topbar + Paramètres › Apparence, garde-fou couleurs en dur, mails sur surface claire | Angelo L. + Claude |
 | 2026-10-03 | Lot C pièces jointes de cartes — upload direct Storage + scan asynchrone Inngest/ClamAV (jamais servi avant `clean`), §4.5.4 complété, rate limits `card_attachment_*`, CSP `media-src`/`frame-src` (`buildCsp` testé), runbook `card-attachments.md`                           | Angelo L. + Claude |
+| 2026-11-10 | Correctif sécurité mails — §4.4.6 : mails owner-only (`ownedMailWhere`), liste Communications / `search_mails` / KPI non lus / `markEmailRead` / reprise PJ re-scopés, RLS `em_owner_all` (migration `20261110120000_email_messages_owner_rls`)                                 | Angelo L. + Claude |
 
 > **Règle :** chaque modification de ce fichier ajoute une ligne ici.

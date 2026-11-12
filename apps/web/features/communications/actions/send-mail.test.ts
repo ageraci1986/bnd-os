@@ -319,6 +319,76 @@ describe('sendMail with attachments — readiness check', () => {
     expect(emailCreate).not.toHaveBeenCalled();
   });
 
+  it("refuses a reprise of another member's attachment — lookup is owner-scoped + storagePath-bound", async () => {
+    // Régression 2026-11-10 : la reprise n'était vérifiée que par workspace +
+    // clean ; un membre pouvait réexpédier la PJ de la boîte d'un collègue.
+    rate.mockResolvedValueOnce({ success: true });
+    integrationFindFirst.mockResolvedValueOnce({
+      id: 'i1',
+      kind: 'graph',
+      externalAccountId: 'me@ex.com',
+      signatureHtml: null,
+    });
+    emailAttachmentFindFirst.mockResolvedValueOnce(null);
+    const reprised = cleanAttachment({
+      reprisedFromAttachmentId: '22222222-2222-2222-2222-222222222222',
+    });
+    const r = await sendMail({ ...baseInput(), composeAttachments: [reprised] });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe('ATTACHMENTS_NOT_READY');
+    expect(emailAttachmentFindFirst).toHaveBeenCalledWith({
+      where: {
+        id: '22222222-2222-2222-2222-222222222222',
+        workspaceId: 'w',
+        scanStatus: 'clean',
+        storagePath: reprised.storagePath,
+        emailMessage: { integration: { workspaceId: 'w', ownerUserId: 'u' } },
+      },
+      select: { id: true },
+    });
+    expect(emailCreate).not.toHaveBeenCalled();
+  });
+
+  it('refuses a fresh attachment pointing at an existing stored object without its exact sha256', async () => {
+    // Le storagePath vient du client : pointer sur l'objet Storage d'une PJ
+    // existante (ex. celle d'un collègue) exige de prouver la possession du
+    // contenu (sha256 identique — cas légitime du dédup d'upload).
+    rate.mockResolvedValueOnce({ success: true });
+    integrationFindFirst.mockResolvedValueOnce({
+      id: 'i1',
+      kind: 'graph',
+      externalAccountId: 'me@ex.com',
+      signatureHtml: null,
+    });
+    emailAttachmentFindFirst.mockResolvedValueOnce({ sha256: 'b'.repeat(64) });
+    const r = await sendMail({ ...baseInput(), composeAttachments: [cleanAttachment()] });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe('ATTACHMENTS_NOT_READY');
+    expect(emailAttachmentFindFirst).toHaveBeenCalledWith({
+      where: { workspaceId: 'w', storagePath: 'w/11111111-1111-1111-1111-111111111111' },
+      select: { sha256: true },
+    });
+    expect(emailCreate).not.toHaveBeenCalled();
+    expect(downloadAttachment).not.toHaveBeenCalled();
+  });
+
+  it('accepts a fresh attachment deduped onto an existing object when the sha256 matches', async () => {
+    rate.mockResolvedValueOnce({ success: true });
+    integrationFindFirst.mockResolvedValueOnce({
+      id: 'i1',
+      kind: 'imap',
+      externalAccountId: 'me@ex.com',
+      signatureHtml: null,
+    });
+    emailAttachmentFindFirst.mockResolvedValueOnce({ sha256: 'a'.repeat(64) });
+    emailCreate.mockResolvedValueOnce({ id: 'e1' });
+    downloadAttachment.mockResolvedValueOnce({ ok: true, binary: Buffer.from('y') });
+    imapSend.mockResolvedValueOnce(undefined);
+    emailAttachmentCreate.mockResolvedValueOnce({ id: 'att1' });
+    const r = await sendMail({ ...baseInput(), composeAttachments: [cleanAttachment()] });
+    expect(r).toEqual({ ok: true, emailMessageId: 'e1' });
+  });
+
   it('accepts a reprised attachment whose source IS clean, preserves reprisedFrom in scanReport', async () => {
     rate.mockResolvedValueOnce({ success: true });
     integrationFindFirst.mockResolvedValueOnce({
