@@ -160,6 +160,7 @@ nexushub/
 4. State OAuth (param `state`) signé HMAC + nonce single-use stocké Redis (TTL 10min) pour prévenir CSRF.
 5. Scopes OAuth **minimaux** pour Slack et Graph. Documentés dans `docs/security.md`.
 6. Webhook Slack : vérification **signature** (`X-Slack-Signature`) + timestamp (rejet si > 5 min). Webhook Graph : validation `validationToken` + `clientState`.
+7. Table `integrations` **hors API** : aucun privilège `anon` / `authenticated`, aucune policy RLS — accès **Prisma uniquement** (migration `20261112120000_integrations_no_api_access`). Une révocation de colonne ne suffit pas tant que le GRANT de table existe.
 
 ### 4.3 Authentification utilisateur
 
@@ -434,5 +435,6 @@ Avant chaque action :
 | 2026-10-03 | Lot B dark mode — User.theme + cookie nx-theme (SSR sans flash, CSP OK), tokens light-dark() pilotés par color-scheme, `@custom-variant dark` sur data-theme (préférer les tokens), toggle topbar + Paramètres › Apparence, garde-fou couleurs en dur, mails sur surface claire | Angelo L. + Claude |
 | 2026-10-03 | Lot C pièces jointes de cartes — upload direct Storage + scan asynchrone Inngest/ClamAV (jamais servi avant `clean`), §4.5.4 complété, rate limits `card_attachment_*`, CSP `media-src`/`frame-src` (`buildCsp` testé), runbook `card-attachments.md`                           | Angelo L. + Claude |
 | 2026-11-10 | Correctif sécurité mails — §4.4.6 : mails owner-only (`ownedMailWhere`), liste Communications / `search_mails` / KPI non lus / `markEmailRead` / reprise PJ re-scopés, RLS `em_owner_all` (migration `20261110120000_email_messages_owner_rls`)                                 | Angelo L. + Claude |
+| 2026-11-12 | §4.2.7 — table `integrations` fermée à l'API (REVOKE ALL anon/authenticated + policies supprimées) : le REVOKE de colonne `encrypted_tokens` était inopérant ; correctif calendrier `.cal-grid` `minmax(0, 1fr)`                                                                | Angelo L. + Claude |
 
 > **Règle :** chaque modification de ce fichier ajoute une ligne ici.
