@@ -1772,9 +1772,13 @@
   height: 9px;
   border-radius: 50%;
 }
+/* minmax(0, 1fr) et non 1fr : un `1fr` ne descend jamais sous le min-content
+   de sa colonne, et les titres `.cal-item` sont en nowrap — des titres longs
+   élargissaient la grille au-delà du conteneur et `overflow: hidden` coupait
+   les derniers jours (vendredi → dimanche invisibles). */
 .cal-grid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   background: var(--bg-card);
   border: 1px solid var(--border-light);
   border-radius: 14px;
