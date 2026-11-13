@@ -268,7 +268,7 @@
   width: 22px;
   height: 22px;
   border-radius: 2px;
-  background: var(--accent-gradient-soft, rgba(139, 43, 226, 0.08));
+  background: var(--accent-gradient-soft, rgba(26, 75, 255, 0.08));
   color: var(--color-accent-text);
   flex-shrink: 0;
 }
@@ -827,7 +827,7 @@
   margin-left: 8px;
   padding: 1px 6px;
   border-radius: 2px;
-  background: rgba(139, 43, 226, 0.08);
+  background: rgba(26, 75, 255, 0.08);
   color: var(--color-accent-text);
   font-size: 10px;
   font-weight: 700;
@@ -1291,10 +1291,11 @@
   color: var(--color-accent-text);
 }
 .card-title-input {
-  font-size: 24px;
-  font-weight: 800;
-  letter-spacing: -0.5px;
-  line-height: 1.2;
+  font-size: 26px;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  text-transform: uppercase;
   width: 100%;
   border: 0;
   background: transparent;
@@ -1730,10 +1731,10 @@
 }
 .cal-month {
   font-size: 24px;
-  font-weight: 800;
-  letter-spacing: -0.6px;
+  font-weight: 900;
+  letter-spacing: -0.03em;
   padding: 0 6px;
-  text-transform: capitalize;
+  text-transform: uppercase;
 }
 .cal-month span {
   color: var(--text-muted);
@@ -1783,10 +1784,10 @@
   font-size: 10px;
   font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 1px;
+  letter-spacing: 0.14em;
   color: var(--text-muted);
   border-right: 1px solid var(--border-soft);
-  border-bottom: 1px solid var(--border-light);
+  border-bottom: 2px solid var(--text-main);
 }
 .cal-dow:nth-child(7) {
   border-right: 0;
@@ -2232,35 +2233,17 @@
   }
 }
 
-/* Orbe assistant (Plan 4) — porté de la maquette validée (blob fluide + halo).
-   États par data-attribute sur .nx-orb : data-activity="idle|thinking|responding|listening".
+/* Orbe assistant — étincelle BND (disque Plasma + étoile Yellow) cerclée d'un
+   halo aux couleurs Aurora. États par data-attribute sur .nx-orb :
+   data-activity="idle|thinking|responding|listening".
    prefers-reduced-motion : toutes les animations remplacées par un fondu statique. */
 @keyframes nx-orb-morph {
   0%,
   100% {
-    border-radius: 42% 58% 55% 45%/48% 42% 58% 52%;
     transform: rotate(0deg) scale(1);
   }
-  25% {
-    border-radius: 58% 42% 47% 53%/40% 55% 45% 60%;
-    transform: rotate(6deg) scale(1.05);
-  }
   50% {
-    border-radius: 45% 55% 60% 40%/55% 45% 55% 45%;
-    transform: rotate(-4deg) scale(0.97);
-  }
-  75% {
-    border-radius: 55% 45% 42% 58%/45% 60% 40% 55%;
-    transform: rotate(3deg) scale(1.03);
-  }
-}
-@keyframes nx-orb-hue {
-  0%,
-  100% {
-    filter: hue-rotate(0);
-  }
-  50% {
-    filter: hue-rotate(-18deg);
+    transform: rotate(45deg) scale(0.86);
   }
 }
 @keyframes nx-orb-spin {
@@ -2288,17 +2271,26 @@
   align-items: center;
   justify-content: center;
 }
+.nx-orb::before {
+  content: '';
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--color-danger);
+}
 .nx-orb-ring {
   position: absolute;
   inset: 10px;
   border-radius: 50%;
-  padding: 2.5px;
+  padding: 2px;
   background: conic-gradient(
     from 0deg,
-    rgba(139, 43, 226, 0) 8%,
-    #8b2be2 35%,
-    #ff2a6d 60%,
-    rgba(255, 42, 109, 0) 92%
+    rgba(26, 75, 255, 0) 8%,
+    #1a4bff 30%,
+    #ff2e63 55%,
+    #ffe000 80%,
+    rgba(255, 224, 0, 0) 94%
   );
   -webkit-mask:
     linear-gradient(#fff 0 0) content-box,
@@ -2310,25 +2302,33 @@
     nx-orb-breathe 2.8s ease-in-out infinite;
 }
 .nx-orb-blob {
-  width: 76px;
-  height: 76px;
-  background: linear-gradient(135deg, #c98fff 0%, #8b2be2 45%, #ff2a6d 100%);
-  animation:
-    nx-orb-morph 6s ease-in-out infinite,
-    nx-orb-hue 9s ease-in-out infinite;
-  box-shadow: none;
-  transition: box-shadow 0.4s ease;
+  position: relative;
+  width: 72px;
+  height: 72px;
+  background: var(--color-accent-primary);
+  opacity: 0.92;
+  clip-path: polygon(
+    50% 0,
+    56.25% 43.75%,
+    100% 50%,
+    56.25% 56.25%,
+    50% 100%,
+    43.75% 56.25%,
+    0 50%,
+    43.75% 43.75%
+  );
+  animation: nx-orb-morph 6s ease-in-out infinite;
 }
 /* thinking : halo accéléré + intensifié (spec §6) */
 .nx-orb[data-activity='thinking'] .nx-orb-ring {
   animation-duration: 1.6s, 1.2s;
 }
 .nx-orb[data-activity='thinking'] .nx-orb-blob {
-  box-shadow: none;
+  animation-duration: 1.8s;
 }
 /* responding : blob pulse plus vif */
 .nx-orb[data-activity='responding'] .nx-orb-blob {
-  animation-duration: 2.4s, 9s;
+  animation-duration: 2.4s;
 }
 /* listening (V1.5, posé pour Storybook) : respiration ample du halo */
 .nx-orb[data-activity='listening'] .nx-orb-ring {
@@ -2341,11 +2341,8 @@
     animation: none;
   }
   .nx-orb-blob {
-    border-radius: 50%;
-    opacity: 0.9;
-    transition:
-      opacity 0.6s ease,
-      box-shadow 0.6s ease;
+    opacity: 0.8;
+    transition: opacity 0.6s ease;
   }
   .nx-orb[data-activity='thinking'] .nx-orb-blob,
   .nx-orb[data-activity='responding'] .nx-orb-blob {
@@ -2813,7 +2810,7 @@ button.nx-attachment__preview {
   margin: 0 0 6px 0;
 }
 .nx-comment__content code {
-  background: rgba(139, 43, 226, 0.08);
+  background: rgba(26, 75, 255, 0.08);
   padding: 1px 4px;
   border-radius: 2px;
   font-family: ui-monospace, SFMono-Regular, monospace;
@@ -2908,7 +2905,7 @@ button.nx-attachment__preview {
     color 120ms ease;
 }
 .nx-comment-editor__btn:hover:not([disabled]) {
-  background: rgba(139, 43, 226, 0.1);
+  background: rgba(26, 75, 255, 0.1);
   color: var(--color-accent-text);
 }
 .nx-comment-editor__btn:focus-visible {
@@ -2953,7 +2950,7 @@ button.nx-attachment__preview {
   text-decoration: underline;
 }
 .nx-comment-editor__surface code {
-  background: rgba(139, 43, 226, 0.08);
+  background: rgba(26, 75, 255, 0.08);
   padding: 1px 4px;
   border-radius: 2px;
   font-family: ui-monospace, SFMono-Regular, monospace;
@@ -2967,7 +2964,7 @@ button.nx-attachment__preview {
   overflow-x: auto;
 }
 .nx-comment-editor__btn.is-active {
-  background: rgba(139, 43, 226, 0.14);
+  background: rgba(26, 75, 255, 0.14);
   color: var(--color-accent-text);
 }
 
@@ -2977,9 +2974,9 @@ button.nx-attachment__preview {
    + a faint tint; the toolbar is borderless with just a divider. */
 .nx-comment-editor--description {
   border: 1px solid var(--border-light);
-  border-left: 3px solid #8b2be2;
+  border-left: 3px solid var(--color-brand-blue);
   border-radius: 2px;
-  background: rgba(139, 43, 226, 0.025);
+  background: rgba(26, 75, 255, 0.025);
   overflow: hidden;
 }
 .nx-comment-editor--description .nx-comment-editor__toolbar {
@@ -2995,7 +2992,7 @@ button.nx-attachment__preview {
   background: transparent;
 }
 .nx-comment-editor--description:focus-within {
-  border-color: #8b2be2;
+  border-color: var(--color-brand-blue);
   box-shadow: 0 0 0 1px var(--color-focus);
 }
 /* The wrapper owns the focus ring for this variant — suppress the surface's. */

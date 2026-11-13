@@ -564,9 +564,7 @@ export function AssistantChat({ csrfToken, firstName, overview, notices }: Assis
           speaking: voice.mode === 'speaking',
         })}
       />
-      <h1 className="text-lg font-bold text-[color:var(--color-text-main)]">
-        Bonjour {firstName} 👋
-      </h1>
+      <h1 className="bnd-title text-center">Bonjour {firstName}</h1>
       {overview !== undefined ? (
         <>
           <DigestedBrief overview={overview} />
@@ -597,10 +595,9 @@ export function AssistantChat({ csrfToken, firstName, overview, notices }: Assis
                 <div
                   className={
                     m.role === 'user'
-                      ? 'text-on-accent self-end rounded-2xl px-4 py-2 text-sm'
-                      : 'self-start rounded-2xl border border-[color:var(--color-border-soft)] bg-[color:var(--color-bg-card)] px-4 py-2 text-sm text-[color:var(--color-text-soft)]'
+                      ? 'self-end rounded-sm bg-[color:var(--color-text-main)] px-4 py-3 text-sm text-[color:var(--color-bg-app)]'
+                      : 'self-start rounded-sm border border-l-[3px] border-[color:var(--color-border-strong)] border-l-[color:var(--color-brand-blue)] bg-[color:var(--color-bg-card-raised)] px-4 py-3 text-sm text-[color:var(--color-text-main)]'
                   }
-                  style={m.role === 'user' ? { background: 'var(--accent-gradient)' } : undefined}
                 >
                   {m.content}
                 </div>
@@ -617,7 +614,7 @@ export function AssistantChat({ csrfToken, firstName, overview, notices }: Assis
         </div>
         <div className="flex flex-col gap-2">
           {streamText !== null && streamText !== '' && (
-            <div className="self-start rounded-2xl border border-[color:var(--color-border-soft)] bg-[color:var(--color-bg-card)] px-4 py-2 text-sm text-[color:var(--color-text-soft)]">
+            <div className="self-start rounded-sm border border-l-[3px] border-[color:var(--color-border-strong)] border-l-[color:var(--color-brand-blue)] bg-[color:var(--color-bg-card-raised)] px-4 py-3 text-sm text-[color:var(--color-text-main)]">
               {streamText}
             </div>
           )}
