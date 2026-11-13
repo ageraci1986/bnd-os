@@ -164,7 +164,7 @@ skip silencieux du scan.
 
 ---
 
-## 3. Storage bucket + RLS (déjà appliqué)
+## 3. Storage bucket (déjà appliqué)
 
 Bucket `mail-attachments` créé le **2026-07-16** (Task 3) sur le projet
 Supabase partagé `yphedrhofupththvlvoa`, **avant** l'application de la
@@ -176,22 +176,13 @@ migration Prisma. À rejouer tel quel pour provisionner un environnement neuf
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('mail-attachments', 'mail-attachments', false);
 
--- 2. RLS — lecture scopée par workspace_id (premier segment du path objet)
-CREATE POLICY "mail_attachments_select_own_workspace"
-  ON storage.objects FOR SELECT
-  USING (
-    bucket_id = 'mail-attachments'
-    AND (storage.foldername(name))[1] = (auth.jwt() ->> 'workspace_id')
-  );
-
--- 3. RLS — écriture (INSERT/UPDATE/DELETE) réservée au service role
---    (les Server Actions utilisent toujours la clé admin, jamais le JWT user)
-CREATE POLICY "mail_attachments_write_service_role_only"
-  ON storage.objects FOR ALL
-  USING (
-    bucket_id = 'mail-attachments'
-    AND (auth.jwt() ->> 'role') = 'service_role'
-  );
+-- 2. AUCUNE policy sur storage.objects pour ce bucket (depuis le 2026-11-13,
+--    migration 20261113150000_mail_attachments_storage_no_policies).
+--    Toutes les opérations passent par la clé service role côté serveur, après
+--    contrôle workspace + propriétaire de la boîte (CLAUDE.md §4.4.6) ; les
+--    fichiers ne sont servis que par URL signée (300 s). Ne PAS recréer de
+--    policy de lecture « par workspace » : elle exposerait les PJ de toute
+--    l'équipe.
 ```
 
 Path objet : `<workspaceId>/<attachmentId>` (voir
@@ -206,7 +197,7 @@ SELECT id FROM storage.buckets WHERE id = 'mail-attachments';
 
 SELECT policyname FROM pg_policies
 WHERE tablename = 'objects' AND policyname LIKE 'mail_attachments_%';
--- Attendu : 2 lignes
+-- Attendu : 0 ligne (aucune policy — accès service role uniquement)
 ```
 
 ### Migration Prisma
