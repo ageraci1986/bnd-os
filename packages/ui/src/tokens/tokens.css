@@ -1,44 +1,50 @@
 /* ============================================================
-   NEXUSHUB — Design tokens
-   Source: mockups/styles.css → ported to Tailwind v4 @theme
+   BND OS · Design tokens (charte Brand New Day 2026)
+   Source : mockups/bnd/index.html, spec 2026-11-13-bnd-brand-identity
    Modes: light / dark / system via color-scheme + light-dark()
    ============================================================ */
 
 @theme {
-  /* — Canvas — */
-  --color-bg-app: light-dark(#f4f6f9, #0b0c10);
-  --color-bg-sidebar: light-dark(#ffffff, #12141a);
-  --color-bg-card: light-dark(#ffffff, #1c1e26);
-  --color-bg-card-alt: light-dark(#fafbfc, #171923);
-  --color-bg-hover: light-dark(#f0f2f5, rgba(255, 255, 255, 0.05));
-  --color-bg-muted: light-dark(#f8f9fb, #14161e);
+  /* — Canvas (charte BND 2026 : Ice / Cobalt) — */
+  --color-bg-app: light-dark(#eef0f8, #060d1f);
+  --color-bg-sidebar: #060d1f;
+  --color-bg-card: light-dark(#f8f9fd, #0a1330);
+  --color-bg-card-raised: light-dark(#f8f9fd, #161e3a);
+  --color-bg-card-alt: light-dark(rgba(6, 13, 31, 0.07), rgba(238, 240, 248, 0.035));
+  --color-bg-hover: light-dark(rgba(6, 13, 31, 0.045), rgba(238, 240, 248, 0.05));
+  --color-bg-muted: light-dark(rgba(6, 13, 31, 0.07), rgba(238, 240, 248, 0.035));
 
   /* — Text — */
-  --color-text-main: light-dark(#111827, #f9fafb);
-  --color-text-soft: light-dark(#374151, #e5e7eb);
-  --color-text-muted: light-dark(#6b7280, #9ca3af);
-  --color-text-ghost: light-dark(#9ca3af, #6b7280);
+  --color-text-main: light-dark(#060d1f, #eef0f8);
+  --color-text-soft: light-dark(rgba(6, 13, 31, 0.82), rgba(238, 240, 248, 0.82));
+  --color-text-muted: light-dark(rgba(6, 13, 31, 0.66), rgba(238, 240, 248, 0.64));
+  --color-text-ghost: light-dark(rgba(6, 13, 31, 0.5), rgba(238, 240, 248, 0.42));
+  --color-sidebar-fg: #eef0f8;
 
-  /* — Borders — */
-  --color-border-light: light-dark(#e5e7eb, rgba(255, 255, 255, 0.08));
-  --color-border-soft: light-dark(#eef0f3, rgba(255, 255, 255, 0.05));
+  /* — Borders : filets, jamais d'ombre — */
+  --color-border-light: light-dark(rgba(6, 13, 31, 0.13), rgba(238, 240, 248, 0.1));
+  --color-border-soft: light-dark(rgba(6, 13, 31, 0.08), rgba(238, 240, 248, 0.06));
+  --color-border-strong: light-dark(rgba(6, 13, 31, 0.22), rgba(238, 240, 248, 0.22));
 
   /* — Brand — */
-  --color-accent-primary: #8b2be2;
-  --color-accent-secondary: #ff2a6d;
+  --color-accent-primary: #ffe000;
+  --color-accent-secondary: #ff2e63;
+  --color-brand-blue: #1a4bff;
+  --color-focus: #1a4bff;
+  /* Texte posé sur un aplat jaune ou plasma */
+  --color-on-accent: #060d1f;
+  /* Texte d'accent (liens, sur-titres) : bleu sur Ice, jaune sur Cobalt */
+  --color-accent-text: light-dark(#1a4bff, #ffe000);
 
-  /* Texte d'accent (liens, kickers) — violet plus clair en sombre */
-  --color-accent-text: light-dark(#8b2be2, #c084fc);
-
-  /* — Semantic — */
-  --color-success: light-dark(#059669, #00f0ff);
-  --color-success-bg: light-dark(#d1fae5, rgba(0, 240, 255, 0.1));
-  --color-warning: light-dark(#d97706, #ffb000);
-  --color-warning-bg: light-dark(#fef3c7, rgba(255, 176, 0, 0.1));
-  --color-danger: light-dark(#e11d48, #ff0055);
-  --color-danger-bg: light-dark(#ffe4e6, rgba(255, 0, 85, 0.08));
-  --color-info: light-dark(#2563eb, #60a5fa);
-  --color-info-bg: light-dark(#dbeafe, rgba(96, 165, 250, 0.1));
+  /* — Semantic : la charte n'a ni vert ni orange — */
+  --color-success: light-dark(#060d1f, #eef0f8);
+  --color-success-bg: light-dark(rgba(6, 13, 31, 0.07), rgba(238, 240, 248, 0.08));
+  --color-warning: light-dark(#060d1f, #ffe000);
+  --color-warning-bg: light-dark(#ffe000, rgba(255, 224, 0, 0.12));
+  --color-danger: light-dark(#d4144a, #ff2e63);
+  --color-danger-bg: light-dark(rgba(255, 46, 99, 0.12), rgba(255, 46, 99, 0.14));
+  --color-info: light-dark(#1a4bff, #7c9bff);
+  --color-info-bg: light-dark(rgba(26, 75, 255, 0.1), rgba(26, 75, 255, 0.22));
 
   /* — Client palette (5 fixed clients per workspace style guide) — */
   --color-c-acme: light-dark(#ff2a6d, #ff2a6d);
@@ -55,13 +61,28 @@
   --color-c-slate: light-dark(#475569, #94a3b8);
 
   /* — Typography — */
-  --font-sans: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
 
-  /* — Radius — */
-  --radius-sm: 10px;
-  --radius-md: 16px;
-  --radius-lg: 24px;
-  --radius-pill: 999px;
+  /* — Radius : limite de la charte, 2 px partout (échelle Tailwind comprise) — */
+  --radius-xs: 2px;
+  --radius-sm: 2px;
+  --radius-md: 2px;
+  --radius-lg: 2px;
+  --radius-xl: 2px;
+  --radius-2xl: 2px;
+  --radius-3xl: 2px;
+  --radius-4xl: 2px;
+  --radius-pill: 2px;
+
+  /* — Shadows : aucune (valeur neutre, valide dans la pile box-shadow de Tailwind) — */
+  --shadow-2xs: 0 0 #0000;
+  --shadow-xs: 0 0 #0000;
+  --shadow-sm: 0 0 #0000;
+  --shadow-md: 0 0 #0000;
+  --shadow-lg: 0 0 #0000;
+  --shadow-xl: 0 0 #0000;
+  --shadow-2xl: 0 0 #0000;
 
   /* — Layout — */
   --layout-sidebar-w: 260px;
@@ -110,6 +131,10 @@
   --text-ghost: var(--color-text-ghost);
   --border-light: var(--color-border-light);
   --border-soft: var(--color-border-soft);
+  --border-strong: var(--color-border-strong);
+  --bg-card-raised: var(--color-bg-card-raised);
+  --on-accent: var(--color-on-accent);
+  --focus: var(--color-focus);
   --accent-primary: var(--color-accent-primary);
   --accent-secondary: var(--color-accent-secondary);
   --success: var(--color-success);
@@ -134,16 +159,21 @@
   --c-slate: var(--color-c-slate);
 
   /* Gradients & shadows expected by mockup classes */
-  --accent-gradient: linear-gradient(135deg, #8b2be2 0%, #ff2a6d 100%);
+  --accent-gradient: linear-gradient(#ffe000, #ffe000);
   --accent-gradient-soft: linear-gradient(
-    135deg,
-    rgba(139, 43, 226, 0.08),
-    rgba(255, 42, 109, 0.08)
+    light-dark(rgba(6, 13, 31, 0.07), rgba(238, 240, 248, 0.06)),
+    light-dark(rgba(6, 13, 31, 0.07), rgba(238, 240, 248, 0.06))
   );
-  --shadow-card: 0 4px 15px light-dark(rgba(0, 0, 0, 0.03), rgba(0, 0, 0, 0.3));
-  --shadow-hover: 0 10px 25px light-dark(rgba(138, 43, 226, 0.1), rgba(138, 43, 226, 0.25));
-  --shadow-lg: 0 20px 60px light-dark(rgba(17, 24, 39, 0.15), rgba(0, 0, 0, 0.5));
-  --glass-bg: light-dark(rgba(255, 255, 255, 0.85), rgba(11, 12, 16, 0.75));
+  --aurora: linear-gradient(
+    90deg,
+    #1a4bff 0 25%,
+    #6537ff 25% 50%,
+    #ff2e63 50% 75%,
+    #ffe000 75% 100%
+  );
+  --shadow-card: 0 0 #0000;
+  --shadow-hover: 0 0 #0000;
+  --glass-bg: var(--color-bg-app);
   --transition: all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1);
 
   --sidebar-w: 260px;
