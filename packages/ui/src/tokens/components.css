@@ -1776,14 +1776,21 @@
    de sa colonne, et les titres `.cal-item` sont en nowrap — des titres longs
    élargissaient la grille au-delà du conteneur et `overflow: hidden` coupait
    les derniers jours (vendredi → dimanche invisibles). */
+/* Sous 840 px (7 × 120 px), la grille ne rétrécit plus : le cadre
+   `.cal-scroll` défile horizontalement au lieu d'écraser les colonnes. */
+.cal-scroll {
+  overflow-x: auto;
+  border-radius: 14px;
+  box-shadow: var(--shadow-card);
+}
 .cal-grid {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
+  min-width: 840px;
   background: var(--bg-card);
   border: 1px solid var(--border-light);
   border-radius: 14px;
   overflow: hidden;
-  box-shadow: var(--shadow-card);
 }
 .cal-dow {
   padding: 12px;

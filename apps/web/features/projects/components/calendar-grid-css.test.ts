@@ -18,5 +18,9 @@ describe('.cal-grid CSS', () => {
     );
     const rule = /\.cal-grid\s*\{([^}]*)\}/.exec(css)?.[1] ?? '';
     expect(rule).toMatch(/grid-template-columns:\s*repeat\(7,\s*minmax\(0,\s*1fr\)\)/);
+    // Plancher de lisibilité : sous 840 px, c'est `.cal-scroll` qui défile.
+    expect(rule).toMatch(/min-width:\s*840px/);
+    const scroll = /\.cal-scroll\s*\{([^}]*)\}/.exec(css)?.[1] ?? '';
+    expect(scroll).toMatch(/overflow-x:\s*auto/);
   });
 });
