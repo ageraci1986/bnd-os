@@ -352,6 +352,7 @@ Tous les écrans principaux sont construits sur le même cadre : **sidebar perma
   - **A — Approbateur** (badge ambre) : décide et valide
   - **C — Consulté** (badge vert) : sollicité pour avis
   - **I — Informé** (badge gris) : tenu au courant sans action
+  - Sur les cartes, plusieurs membres peuvent partager un même rôle (plusieurs R, plusieurs A…) ; un membre n'a qu'un rôle par carte.
 - **États possibles** : liste vide (aucun client), fiche en cours de création, édition en cours.
 
 ### Écran : Templates e-mail

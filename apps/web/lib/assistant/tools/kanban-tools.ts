@@ -319,7 +319,7 @@ export function buildKanbanTools(ctx: AuthContext): ToolSpec[] {
     defineTool({
       name: 'add_card_assignee',
       description:
-        'Assigne un membre du workspace à une carte avec un rôle RACI (responsible/approver/consulted/informed). Un seul responsible et un seul approver par carte. Utiliser get_team_members pour trouver les userId.',
+        'Assigne un membre du workspace à une carte avec un rôle RACI (responsible/approver/consulted/informed). Plusieurs personnes peuvent avoir le même rôle ; une personne n’a qu’un rôle par carte (réassigner = changer son rôle). Utiliser get_team_members pour trouver les userId.',
       inputSchema: z.object({
         cardId: uuid,
         userId: uuid,

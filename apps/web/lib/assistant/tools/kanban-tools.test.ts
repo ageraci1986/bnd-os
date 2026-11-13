@@ -478,11 +478,10 @@ describe('buildKanbanTools', () => {
     expect(JSON.parse(out)).toEqual({ assigned: true, userId: USER_ID, raci: 'approver' });
   });
 
-  it('add_card_assignee : échec (ex. déjà un responsible) → message montrable', async () => {
+  it('add_card_assignee : échec (ex. non-membre) → message montrable', async () => {
     assigneeMocks.addCardAssignee.mockResolvedValue({
       ok: false,
-      message:
-        'Une seule personne peut être Responsable. Réassignez le Responsable actuel d’abord.',
+      message: 'Cet utilisateur n’appartient pas à l’espace.',
     });
     const out = await run('add_card_assignee', {
       cardId: CARD_ID,
@@ -490,7 +489,13 @@ describe('buildKanbanTools', () => {
       raci: 'responsible',
     });
     expect(out).toContain('Échec :');
-    expect(out).toContain('Responsable');
+    expect(out).toContain('appartient');
+  });
+
+  it('add_card_assignee : la description autorise plusieurs personnes par rôle (2026-11-13)', () => {
+    const { description } = getTool('add_card_assignee');
+    expect(description).not.toContain('Un seul');
+    expect(description).toContain('Plusieurs personnes peuvent avoir le même rôle');
   });
 
   it('remove_card_assignee : succès → {removed:true} ; échec → message montrable', async () => {
