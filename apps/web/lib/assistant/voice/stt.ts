@@ -14,6 +14,12 @@ export class SttProviderError extends Error {}
 const DEEPGRAM_LISTEN_URL = 'https://api.deepgram.com/v1/listen';
 
 /**
+ * Borne par requête. Deux envois au pire (réessai sans termes) restent sous
+ * le `maxDuration = 30` de la route.
+ */
+const REQUEST_TIMEOUT_MS = 12_000;
+
+/**
  * `keyterm` se répète (un paramètre par terme). Les termes sont les noms
  * propres du workspace, déjà nettoyés et bornés par `toKeyterms` (domain).
  */
@@ -51,13 +57,23 @@ export async function transcribeAudio(
       method: 'POST',
       headers: { Authorization: `Token ${apiKey}`, 'Content-Type': contentType },
       body: audio,
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
 
   let res = await send(keyterms);
   // Le glossaire ne doit JAMAIS casser la transcription : si Deepgram refuse
-  // la requête (ex. plafond de 500 tokens de keyterms dépassé), on réessaie
-  // une fois sans termes plutôt que de rendre une erreur à l'utilisateur.
-  if (res.status === 400 && keyterms.length > 0) res = await send([]);
+  // les TERMES (ex. plafond de 500 tokens dépassé), on réessaie une fois sans
+  // eux. Le corps du 400 est lu ici uniquement pour reconnaître ce cas — il
+  // n'est ni relayé ni loggé. Un 400 sans rapport (audio illisible) n'est pas
+  // réessayé : il échouerait pareil, en doublant l'envoi.
+  if (res.status === 400 && keyterms.length > 0) {
+    const reason = await res.text().catch(() => '');
+    if (/keyterm/i.test(reason)) {
+      // Signal sans PII : le nombre de termes, jamais les termes.
+      console.warn('[assistant] stt keyterms rejected', { count: keyterms.length });
+      res = await send([]);
+    }
+  }
   if (!res.ok) {
     // Statut seul — jamais le corps (détails de compte) ni l'URL (noms propres).
     throw new SttProviderError(`deepgram status ${String(res.status)}`);

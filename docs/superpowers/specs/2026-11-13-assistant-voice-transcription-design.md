@@ -46,7 +46,7 @@ Le code du lot 2 ne doit rien faire qui empêche ces deux suites : les modules p
 ### 4.1 Module pur `packages/domain/src/voice-glossary/`
 
 - `toKeyterms(names: readonly string[]): string[]` — forme envoyée à Deepgram avant la parole :
-  - chiffres retirés, espaces normalisés ;
+  - mots contenant un chiffre retirés en entier, parenthèses et guillemets retirés, espaces normalisés ;
   - termes de 3 à 40 caractères ;
   - dédoublonnage insensible à la casse et aux accents ;
   - plafond `MAX_KEYTERMS = 40`, l'ordre d'entrée est conservé (c'est lui qui survit au plafond).
@@ -61,15 +61,15 @@ Aucune dépendance. Couverture 100 %, dont un test qui échoue si le retrait des
 1. l'utilisateur courant (`firstName lastName` en un seul terme) ;
 2. les membres du workspace ;
 3. les clients non supprimés et non archivés ;
-4. les projets non supprimés ;
-5. les contacts non supprimés (`firstName lastName`) ;
+4. les projets non supprimés et non archivés ;
+5. les contacts non supprimés (`firstName lastName`) de clients actifs ;
 6. le nom du workspace.
 
 **Périmètre d'accès** : un membre restreint (`WorkspaceAccess`) ne reçoit que les noms des clients, projets et contacts qu'il a le droit de voir — la récolte passe par `loadUserScope` + `scopedClientWhere` / `scopedProjectWhere`. C'est indispensable dès le lot 2, où les termes sont renvoyés au navigateur avec le jeton.
 
-**Quotas par table** (`take`), pour qu'aucune catégorie n'affame les autres sous le plafond de 40 : 11 membres (utilisateur courant compris), 12 clients, 8 projets, 8 contacts, les plus récemment modifiés d'abord. La fonction ne lève jamais : toute erreur rend une liste vide (la transcription sans glossaire vaut mieux qu'une panne).
+**Quotas par table** (`take`), pour qu'aucune catégorie n'affame les autres sous le plafond de 40 : l'utilisateur courant (lu à part, pour qu'un quota ne puisse pas l'exclure) + 10 autres membres, 12 clients, 8 projets, 8 contacts, les plus récemment modifiés d'abord. La fonction ne lève jamais : toute erreur rend une liste vide (la transcription sans glossaire vaut mieux qu'une panne).
 
-**Le glossaire ne doit jamais casser la transcription** : `toKeyterms` borne aussi le total à 800 caractères (marge sous le plafond Deepgram de 500 tokens), et si Deepgram répond 400 à une requête portant des termes, `transcribeAudio` réessaie une fois sans eux.
+**Le glossaire ne doit jamais casser la transcription** : `toKeyterms` borne aussi le total à 800 caractères (marge sous le plafond Deepgram de 500 tokens), et si Deepgram répond 400 en citant les termes, `transcribeAudio` réessaie une fois sans eux (un 400 sans rapport, comme un audio illisible, n'est pas réessayé). Les deux replis émettent un signal sans PII (nom d'erreur, nombre de termes).
 
 `toGlossaryList` n'est écrit qu'au lot 3, quand la correction en a besoin.
 
@@ -79,7 +79,7 @@ Aucune dépendance. Couverture 100 %, dont un test qui échoue si le retrait des
 
 ### 4.4 Confidentialité
 
-Les noms de membres, clients, projets et contacts partent chez Deepgram dans l'URL de la requête. L'audio les contient déjà, mais c'est une donnée explicite de plus chez le fournisseur : à consigner dans `docs/security.md`. Aucun terme n'est loggé côté BND (§4.7 CLAUDE.md).
+Les noms de membres, clients, projets et contacts partent chez Deepgram dans l'URL de la requête. Ils partent à **chaque** requête, prononcés ou non : une prise de deux mots divulgue quand même la liste au fournisseur : à consigner dans `docs/security.md`. Aucun terme n'est loggé côté BND (§4.7 CLAUDE.md).
 
 ## 5. Lot 2 — flux direct
 

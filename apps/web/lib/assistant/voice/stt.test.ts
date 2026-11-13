@@ -111,7 +111,44 @@ describe('transcribeAudio', () => {
     );
     const calls = (fetch as ReturnType<typeof vi.fn>).mock.calls;
     expect(calls).toHaveLength(2);
+    expect(new URL(String(calls[0]![0])).searchParams.getAll('keyterm')).toEqual(['Izybizi']);
     expect(new URL(String(calls[1]![0])).searchParams.getAll('keyterm')).toEqual([]);
+    // Le réessai renvoie le MÊME audio, avec les mêmes en-têtes.
+    const first = calls[0]![1] as RequestInit;
+    const second = calls[1]![1] as RequestInit;
+    expect(second.body).toBe(first.body);
+    expect(second.headers).toEqual(first.headers);
+  });
+
+  it('signale le refus des termes sans jamais logger un terme', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    (fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce(new Response('Keyterm limit exceeded', { status: 400 }))
+      .mockResolvedValueOnce(new Response(okBody, { status: 200 }));
+    await transcribeAudio(new ArrayBuffer(4), 'audio/webm', ['Angelo Geraci', 'Izybizi']);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0]![1]).toEqual({ count: 2 });
+    expect(JSON.stringify(warn.mock.calls[0])).not.toMatch(/Geraci|Izybizi|limit exceeded/);
+    warn.mockRestore();
+  });
+
+  it('ne réessaie pas un 400 sans rapport avec les termes (audio illisible)', async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
+      new Response('Bad Request: failed to process audio: corrupt or unsupported data', {
+        status: 400,
+      }),
+    );
+    await expect(
+      transcribeAudio(new ArrayBuffer(4), 'audio/webm', ['Izybizi']),
+    ).rejects.toBeInstanceOf(SttProviderError);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('borne chaque requête par un délai', async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue(new Response(okBody, { status: 200 }));
+    await transcribeAudio(new ArrayBuffer(4), 'audio/webm');
+    const init = (fetch as ReturnType<typeof vi.fn>).mock.calls[0]![1] as RequestInit;
+    expect(init.signal).toBeInstanceOf(AbortSignal);
   });
 
   it('ne réessaie pas un 400 sans termes', async () => {
@@ -131,11 +168,15 @@ describe('transcribeAudio', () => {
   });
 
   it('un second 400 après réessai jette SttProviderError', async () => {
-    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue(new Response('bad', { status: 400 }));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    (fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce(new Response('Keyterm limit exceeded', { status: 400 }))
+      .mockResolvedValueOnce(new Response('bad', { status: 400 }));
     await expect(
       transcribeAudio(new ArrayBuffer(4), 'audio/webm', ['Izybizi']),
     ).rejects.toBeInstanceOf(SttProviderError);
     expect(fetch).toHaveBeenCalledTimes(2);
+    warn.mockRestore();
   });
 
   it("l'erreur ne contient jamais un terme du glossaire (PII)", async () => {

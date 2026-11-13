@@ -12,15 +12,29 @@ describe('toKeyterms', () => {
     expect(toKeyterms(['Studio 54 Paris'])).toEqual(['Studio Paris']);
   });
 
-  it('aucun terme rendu ne contient de chiffre', () => {
-    const out = toKeyterms(['Agence 2000', 'B2B Lab', '4 Saisons', 'Web3 Factory']);
-    expect(out.length).toBeGreaterThan(0);
-    for (const term of out) expect(term).not.toMatch(/\d/);
+  it('retire en entier un mot qui contient un chiffre, sans laisser de fragment', () => {
+    expect(toKeyterms(['Agence 2000', 'B2B Lab', '4 Saisons', 'Web3 Factory'])).toEqual([
+      'Agence',
+      'Lab',
+      'Saisons',
+      'Factory',
+    ]);
+  });
+
+  it('retire aussi les chiffres non latins', () => {
+    expect(toKeyterms(['Casa ٤٧'])).toEqual(['Casa']);
   });
 
   it('normalise les espaces et retire la ponctuation en bordure', () => {
     expect(toKeyterms(['  Château   du Mylord  '])).toEqual(['Château du Mylord']);
     expect(toKeyterms(['(Izybizi)', '« Nova »'])).toEqual(['Izybizi', 'Nova']);
+  });
+
+  it('retire parenthèses et guillemets au milieu du nom', () => {
+    expect(toKeyterms(['Château (Mylord)', 'Hôtel "Le Nord" Mons'])).toEqual([
+      'Château Mylord',
+      'Hôtel Le Nord Mons',
+    ]);
   });
 
   it('conserve tirets et apostrophes internes', () => {

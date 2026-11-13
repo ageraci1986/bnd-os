@@ -29,11 +29,17 @@ export const MAX_KEYTERMS_TOTAL_CHARS = 800;
 const MIN_TERM_CHARS = 3;
 const MAX_TERM_CHARS = 40;
 
-/** Chiffres retirés, espaces normalisés, ponctuation de bordure retirée. */
+/**
+ * Mots contenant un chiffre retirés EN ENTIER (« B2B Lab » → « Lab », pas
+ * « B B Lab »), parenthèses et guillemets retirés, espaces normalisés,
+ * ponctuation de bordure retirée.
+ */
 function clean(raw: string): string {
   return raw
-    .replace(/\d+/g, ' ')
-    .replace(/\s+/g, ' ')
+    .replace(/[()[\]{}«»"“”]/g, ' ')
+    .split(/\s+/)
+    .filter((word) => !/\p{Nd}/u.test(word))
+    .join(' ')
     .replace(/^[^\p{L}]+|[^\p{L}]+$/gu, '');
 }
 

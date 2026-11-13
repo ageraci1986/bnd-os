@@ -121,4 +121,14 @@ describe('POST /api/assistant/voice/transcribe', () => {
     await POST(makeReq(new Uint8Array(0)));
     expect(mocks.loadProperNouns).not.toHaveBeenCalled();
   });
+
+  it('ne récolte pas le glossaire sans session, sans CSRF ou au-delà du rate limit', async () => {
+    mocks.getAuthContext.mockResolvedValueOnce(null);
+    expect((await POST(makeReq(new Uint8Array(4)))).status).toBe(401);
+    mocks.assertCsrfHeader.mockRejectedValueOnce(new Error('csrf'));
+    expect((await POST(makeReq(new Uint8Array(4)))).status).toBe(403);
+    mocks.check.mockResolvedValueOnce({ success: false, remaining: 0, reset: 0 });
+    expect((await POST(makeReq(new Uint8Array(4)))).status).toBe(429);
+    expect(mocks.loadProperNouns).not.toHaveBeenCalled();
+  });
 });
