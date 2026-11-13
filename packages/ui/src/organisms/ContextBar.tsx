@@ -27,19 +27,11 @@ export function ContextBar({ crumbs, right, className }: ContextBarProps) {
         className,
       )}
     >
-      <ol className="flex flex-wrap items-center gap-2.5 text-xs font-medium text-[color:var(--color-text-muted)]">
+      <ol className="bnd-crumbs">
         {crumbs.map((c, i) => (
-          <li key={`${c.label}-${i}`} className="flex items-center gap-2.5">
-            {i > 0 ? (
-              <span aria-hidden="true" className="text-[color:var(--color-text-ghost)]">
-                /
-              </span>
-            ) : null}
-            {c.current ? (
-              <strong className="font-bold text-[color:var(--color-text-main)]">{c.label}</strong>
-            ) : (
-              <span>{c.label}</span>
-            )}
+          <li key={`${c.label}-${i}`} className="flex items-center gap-2">
+            {i > 0 ? <span aria-hidden="true">·</span> : null}
+            {c.current ? <strong>{c.label}</strong> : <span>{c.label}</span>}
           </li>
         ))}
       </ol>

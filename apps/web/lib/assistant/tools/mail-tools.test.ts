@@ -1182,7 +1182,7 @@ describe('buildMailTools', () => {
         expect(mailStateMocks.countMailsByFilter).not.toHaveBeenCalled();
       });
 
-      it('archive/delete : la note « local à NexusHub » figure dans le describe', async () => {
+      it('archive/delete : la note « local à BND OS » figure dans le describe', async () => {
         mailStateMocks.countMailsByFilter.mockResolvedValue(9);
         const description = await describeFilterTool('archive_mails_by_filter', {
           folder: 'inbox',

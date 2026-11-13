@@ -130,7 +130,7 @@ export function ProjectTitleEditor({
           onClick={begin}
           aria-label="Renommer le projet"
           title="Renommer"
-          className="pointer-events-auto relative z-[2] inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[color:var(--color-text-muted)] opacity-0 transition hover:bg-[color:var(--color-bg-hover)] hover:text-[color:var(--color-text-main)] focus-visible:opacity-100 group-hover/title:opacity-100 group-hover:opacity-100"
+          className="pointer-events-auto relative z-[2] inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-sm text-[color:var(--color-text-muted)] opacity-0 transition hover:bg-[color:var(--color-bg-hover)] hover:text-[color:var(--color-text-main)] focus-visible:opacity-100 group-hover/title:opacity-100 group-hover:opacity-100"
         >
           <PencilIcon width={14} height={14} style={{ width: 14, height: 14, display: 'block' }} />
         </button>

@@ -38,7 +38,7 @@ export function buildSystemPrompt(input: SystemPromptInput): string {
       : `${input.userFirstName} est membre du workspace (certaines actions sont réservées aux administrateurs — si un tool le refuse, explique-le simplement).`;
 
   return [
-    `Tu es l'assistant NexusHub de ${input.userFirstName}, dans le workspace « ${input.workspaceName} ».`,
+    `Tu es l'assistant BND OS de ${input.userFirstName}, dans le workspace « ${input.workspaceName} ».`,
     '',
     "Ton rôle : avoir le dos de l'utilisateur — briefing du jour, questions sur les projets, cartes et clients, lecture et préparation des mails, séries d'actions dictées en langage naturel.",
     '',

@@ -62,7 +62,7 @@ export function MemoryPanel({ entries, csrfToken }: MemoryPanelProps) {
         >
           Retenir un nouveau fait
         </label>
-        <div className="flex items-center gap-2 rounded-full border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] px-4 py-2">
+        <div className="flex items-center gap-2 rounded-sm border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] px-4 py-2">
           <input type="hidden" name={CSRF_FIELD_NAME} value={csrfToken} />
           <input
             id="memory-new-fact"
@@ -75,7 +75,7 @@ export function MemoryPanel({ entries, csrfToken }: MemoryPanelProps) {
           <button
             type="submit"
             disabled={createPending}
-            className="text-on-accent shrink-0 rounded-full px-4 py-1.5 text-xs font-bold disabled:opacity-50"
+            className="text-on-accent shrink-0 rounded-sm px-4 py-1.5 text-xs font-bold disabled:opacity-50"
             style={{ background: 'var(--accent-gradient)' }}
           >
             {createPending ? 'Retenu…' : 'Retenir'}
@@ -170,7 +170,7 @@ function MemoryEntryRow({ entry, csrfToken }: MemoryEntryRowProps) {
         <button
           type="submit"
           disabled={updatePending}
-          className="shrink-0 rounded-full border border-[color:var(--color-border-light)] px-3 py-1.5 text-xs font-bold text-[color:var(--color-text-main)] disabled:opacity-50"
+          className="shrink-0 rounded-sm border border-[color:var(--color-border-light)] px-3 py-1.5 text-xs font-bold text-[color:var(--color-text-main)] disabled:opacity-50"
         >
           {updatePending ? 'Enregistre…' : 'Enregistrer'}
         </button>

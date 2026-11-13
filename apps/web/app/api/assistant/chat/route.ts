@@ -76,7 +76,7 @@ export async function POST(req: Request): Promise<Response> {
       loadMemories(ctx),
     ]);
     registry = builtRegistry;
-    workspaceName = workspace?.name ?? 'NexusHub';
+    workspaceName = workspace?.name ?? 'BND OS';
     memories = loadedMemories;
   } catch {
     return Response.json(

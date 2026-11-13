@@ -260,7 +260,7 @@ function ColorSwatch({
       aria-label={label}
       aria-pressed={selected}
       title={label}
-      className="grid h-9 w-9 place-items-center rounded-full transition"
+      className="grid h-9 w-9 place-items-center rounded-sm transition"
       style={{
         background: clientColorCss(value),
         boxShadow: selected
@@ -302,7 +302,7 @@ function CustomColorButton({ value, onChange }: { value: string; onChange: (c: s
         aria-label={isCustom ? `Couleur personnalisée (${value})` : 'Couleur personnalisée'}
         aria-pressed={isCustom}
         title="Couleur personnalisée"
-        className="grid h-9 w-9 place-items-center rounded-full border border-dashed border-[color:var(--color-border-light)] text-[color:var(--color-text-soft)] transition"
+        className="grid h-9 w-9 place-items-center rounded-sm border border-dashed border-[color:var(--color-border-light)] text-[color:var(--color-text-soft)] transition"
         style={
           isCustom
             ? {

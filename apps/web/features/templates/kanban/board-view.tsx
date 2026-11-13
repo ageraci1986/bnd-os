@@ -85,7 +85,7 @@ export function BoardView({
             <span className="text-[15px] font-extrabold tracking-[-0.3px] text-[color:var(--color-danger)]">
               Bloqué
             </span>
-            <span className="text-on-danger rounded-full bg-[color:var(--color-danger)] px-2.5 py-1 text-[9px] font-extrabold uppercase tracking-[0.5px]">
+            <span className="text-on-danger rounded-sm bg-[color:var(--color-danger)] px-2.5 py-1 text-[9px] font-extrabold uppercase tracking-[0.5px]">
               Système
             </span>
           </header>

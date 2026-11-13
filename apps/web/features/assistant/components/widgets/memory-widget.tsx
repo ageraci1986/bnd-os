@@ -38,7 +38,7 @@ export function MemoryWidget({ tool, data }: MemoryWidgetProps) {
   if (event === null) return null;
 
   return (
-    <p className="inline-flex max-w-full items-baseline gap-1.5 rounded-full border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] px-3 py-1 text-xs text-[color:var(--color-text-muted)]">
+    <p className="inline-flex max-w-full items-baseline gap-1.5 rounded-sm border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] px-3 py-1 text-xs text-[color:var(--color-text-muted)]">
       <span aria-hidden="true">🧠</span>
       <span className="truncate">
         <span className="font-bold text-[color:var(--color-text-main)]">Mémoire :</span>{' '}

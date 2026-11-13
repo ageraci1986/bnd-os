@@ -28,7 +28,7 @@ export function ContextChip({
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold shadow-[var(--shadow-card)]',
+        'inline-flex items-center gap-2 rounded-sm border px-3 py-1.5 text-xs font-semibold shadow-[var(--shadow-card)]',
         active
           ? 'border-[rgba(139,43,226,0.3)] bg-[image:var(--accent-gradient-soft)] text-[color:var(--color-accent-text)]'
           : 'border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] text-[color:var(--color-text-main)]',
@@ -42,7 +42,7 @@ export function ContextChip({
           type="button"
           onClick={onClear}
           aria-label={clearLabel}
-          className="-mr-1 ml-0.5 grid h-5 w-5 place-items-center rounded-full text-[color:var(--color-text-muted)] transition-colors hover:bg-[color:var(--color-bg-hover)] hover:text-[color:var(--color-text-main)]"
+          className="-mr-1 ml-0.5 grid h-5 w-5 place-items-center rounded-sm text-[color:var(--color-text-muted)] transition-colors hover:bg-[color:var(--color-bg-hover)] hover:text-[color:var(--color-text-main)]"
         >
           {/* SVG rather than the "×" glyph: the glyph's font metrics sit it
            *  below the label's centre line. */}

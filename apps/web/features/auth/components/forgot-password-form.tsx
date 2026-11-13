@@ -19,7 +19,7 @@ export function ForgotPasswordForm({ csrfToken }: ForgotFormProps) {
 
   return (
     <form action={formAction} className="auth-form" noValidate>
-      <p className="auth-kicker">NexusHub</p>
+      <p className="auth-kicker">BND OS</p>
       <h1 className="auth-title">Mot de passe oublié</h1>
       <p className="auth-sub">
         Saisissez votre adresse e-mail. Si un compte existe, vous recevrez un lien de

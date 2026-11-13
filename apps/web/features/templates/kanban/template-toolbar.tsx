@@ -52,7 +52,7 @@ export function TemplateToolbar({
                 return;
               setOpen((o) => !o);
             }}
-            className="flex min-w-[260px] items-center gap-3 rounded-full border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-muted)] px-4 py-2.5 text-[15px] font-extrabold tracking-[-0.3px]"
+            className="flex min-w-[260px] items-center gap-3 rounded-sm border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-muted)] px-4 py-2.5 text-[15px] font-extrabold tracking-[-0.3px]"
           >
             <span className="flex-1 truncate text-left">
               {selected?.name ?? '— Aucun template —'}

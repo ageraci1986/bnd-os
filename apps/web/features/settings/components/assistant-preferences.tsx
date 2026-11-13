@@ -153,12 +153,12 @@ function ToggleRow({ label, description, checked, disabled, onChange }: ToggleRo
         aria-label={label}
         disabled={disabled}
         onClick={() => onChange(!checked)}
-        className="relative mt-0.5 h-6 w-11 shrink-0 rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+        className="relative mt-0.5 h-6 w-11 shrink-0 rounded-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50"
         style={{ background: checked ? 'var(--color-accent-primary)' : 'var(--color-bg-muted)' }}
       >
         <span
           aria-hidden="true"
-          className="absolute top-0.5 h-5 w-5 rounded-full bg-[color:var(--color-bg-card)] shadow transition-transform"
+          className="absolute top-0.5 h-5 w-5 rounded-sm bg-[color:var(--color-bg-card)] shadow transition-transform"
           style={{ transform: checked ? 'translateX(22px)' : 'translateX(2px)' }}
         />
       </button>

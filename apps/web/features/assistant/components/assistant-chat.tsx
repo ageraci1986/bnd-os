@@ -665,7 +665,7 @@ export function AssistantChat({ csrfToken, firstName, overview, notices }: Assis
                 <button
                   ref={allowRef}
                   type="button"
-                  className="text-on-accent rounded-full px-4 py-1.5 text-xs font-bold disabled:opacity-50"
+                  className="text-on-accent rounded-sm px-4 py-1.5 text-xs font-bold disabled:opacity-50"
                   style={{ background: 'var(--accent-gradient)' }}
                   disabled={answering !== null}
                   onClick={() => void answerConfirm(pendingConfirm.id, true)}
@@ -675,7 +675,7 @@ export function AssistantChat({ csrfToken, firstName, overview, notices }: Assis
                 <button
                   ref={denyRef}
                   type="button"
-                  className="rounded-full border border-[color:var(--color-border-light)] px-4 py-1.5 text-xs font-bold text-[color:var(--color-text-muted)] disabled:opacity-50"
+                  className="rounded-sm border border-[color:var(--color-border-light)] px-4 py-1.5 text-xs font-bold text-[color:var(--color-text-muted)] disabled:opacity-50"
                   disabled={answering !== null}
                   onClick={() => void answerConfirm(pendingConfirm.id, false)}
                 >
@@ -715,7 +715,7 @@ export function AssistantChat({ csrfToken, firstName, overview, notices }: Assis
       )}
 
       <form
-        className="flex w-full items-center gap-2 rounded-full border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] px-4 py-2"
+        className="flex w-full items-center gap-2 rounded-sm border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] px-4 py-2"
         onSubmit={(e) => {
           e.preventDefault();
           void send();
@@ -735,7 +735,7 @@ export function AssistantChat({ csrfToken, firstName, overview, notices }: Assis
         />
         <button
           type="button"
-          className="h-8 w-8 rounded-full bg-[color:var(--color-bg-hover)] text-sm disabled:opacity-45"
+          className="h-8 w-8 rounded-sm bg-[color:var(--color-bg-hover)] text-sm disabled:opacity-45"
           title="Maintenir pour parler (ou maintenir ⌥ Option)"
           aria-label="Maintenir pour parler"
           disabled={voice.recorderUnsupported}
@@ -753,7 +753,7 @@ export function AssistantChat({ csrfToken, firstName, overview, notices }: Assis
         </button>
         <button
           type="submit"
-          className="text-on-accent h-8 w-8 rounded-full text-sm disabled:opacity-50"
+          className="text-on-accent h-8 w-8 rounded-sm text-sm disabled:opacity-50"
           style={{ background: 'var(--accent-gradient)' }}
           aria-label="Envoyer"
           disabled={busy || input.trim() === ''}

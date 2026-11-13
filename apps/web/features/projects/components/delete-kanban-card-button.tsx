@@ -148,7 +148,7 @@ export function DeleteKanbanCardButton({
         onClick={onTrigger}
         aria-label={`Supprimer ${cardTitle}`}
         title="Supprimer cette carte"
-        className="text-on-danger inline-flex h-7 w-7 items-center justify-center rounded-full border border-[color:var(--color-danger)] bg-[color:var(--color-danger)] shadow-[var(--shadow-card)] transition hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--color-danger)]"
+        className="text-on-danger inline-flex h-7 w-7 items-center justify-center rounded-sm border border-[color:var(--color-danger)] bg-[color:var(--color-danger)] shadow-[var(--shadow-card)] transition hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--color-danger)]"
       >
         <TrashIcon width={12} height={12} style={{ width: 12, height: 12, display: 'block' }} />
       </button>

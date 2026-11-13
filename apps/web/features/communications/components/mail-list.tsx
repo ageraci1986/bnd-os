@@ -82,7 +82,7 @@ export function MailList({
                 {!m.isRead ? (
                   <span
                     aria-hidden="true"
-                    className="absolute left-1 top-4 h-1.5 w-1.5 rounded-full bg-[color:var(--color-accent-primary)]"
+                    className="absolute left-1 top-4 h-1.5 w-1.5 rounded-sm bg-[color:var(--color-accent-primary)]"
                   />
                 ) : null}
                 <div className="flex items-center justify-between gap-2">
@@ -127,12 +127,12 @@ export function MailList({
                 </div>
                 {m.client ? (
                   <span
-                    className="mt-1 inline-flex items-center gap-1 rounded-full bg-[color:var(--color-bg-muted)] px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide"
+                    className="mt-1 inline-flex items-center gap-1 rounded-sm bg-[color:var(--color-bg-muted)] px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide"
                     style={{ color: clientColorCss(m.client.colorToken) }}
                   >
                     <span
                       aria-hidden="true"
-                      className="h-1.5 w-1.5 rounded-full"
+                      className="h-1.5 w-1.5 rounded-sm"
                       style={{ background: clientColorCss(m.client.colorToken) }}
                     />
                     {m.client.name}

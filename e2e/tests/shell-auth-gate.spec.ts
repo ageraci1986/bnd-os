@@ -41,7 +41,7 @@ for (const route of APP_ROUTES) {
 
 test('login page exposes the shell brand mark', async ({ page }) => {
   await page.goto('/login');
-  await expect(page.getByText(/NexusHub/i).first()).toBeVisible();
+  await expect(page.getByText(/BND OS/i).first()).toBeVisible();
 });
 
 test('clients sub-routes (?selected=, ?edit=1) inherit the auth gate', async ({ page }) => {

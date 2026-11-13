@@ -14,7 +14,7 @@ export function BadgeAuto({ label = 'Auto', className }: BadgeAutoProps) {
     <span
       style={{ background: 'var(--accent-gradient)', color: '#fff' }} // theme-exempt: texte sur fond de marque
       className={cn(
-        'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold',
+        'inline-flex items-center gap-1 rounded-sm px-2 py-0.5 text-[10px] font-bold',
         className,
       )}
     >

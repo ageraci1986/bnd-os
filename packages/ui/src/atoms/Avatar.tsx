@@ -51,7 +51,7 @@ export function Avatar({
       aria-label={ariaHidden ? undefined : (title ?? initials)}
       style={style}
       className={cn(
-        'inline-grid shrink-0 place-items-center rounded-full font-bold uppercase tracking-tight',
+        'inline-grid shrink-0 place-items-center rounded-sm font-bold uppercase tracking-tight',
         SIZES[size],
         variant === 'default' &&
           'bg-[color:var(--color-bg-hover)] text-[color:var(--color-text-main)]',

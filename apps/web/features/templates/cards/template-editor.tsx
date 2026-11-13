@@ -58,7 +58,7 @@ export function TemplateEditor({
           aria-label={
             isDefault ? 'Retirer comme template par défaut' : 'Marquer comme template par défaut'
           }
-          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border transition"
+          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-sm border transition"
           style={
             isDefault
               ? {

@@ -1,3 +1,4 @@
+import { BrandLogo } from '@nexushub/ui';
 import type { Metadata } from 'next';
 import { getCsrfTokenForForm } from '@/lib/csrf';
 import { LoginForm } from '@/features/auth/components/login-form';
@@ -21,11 +22,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
     <main className="auth">
       <aside className="auth-visual" aria-hidden="true">
         <div className="auth-brand">
-          <div className="brand-mark">N</div>
-          <div>
-            <span className="brand-name">NexusHub</span>
-            <span className="brand-sub">Agency OS</span>
-          </div>
+          <BrandLogo size="lg" />
         </div>
         <div className="auth-hero">
           <h2>

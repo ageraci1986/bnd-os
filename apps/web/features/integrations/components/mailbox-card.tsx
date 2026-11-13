@@ -105,7 +105,7 @@ function StatusPill({ kind, children }: { kind: 'ok' | 'err'; children: React.Re
       : 'bg-[color:var(--color-danger-bg)] text-[color:var(--color-danger)]';
   return (
     <span
-      className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${cls}`}
+      className={`rounded-sm px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${cls}`}
     >
       {children}
     </span>

@@ -109,7 +109,7 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
                 <div className="mb-2 flex items-center gap-2 text-xs text-[color:var(--color-text-muted)]">
                   <span
                     aria-hidden="true"
-                    className="inline-block h-2 w-2 rounded-full"
+                    className="inline-block h-2 w-2 rounded-sm"
                     style={{ background: clientColorCss(p.client.colorToken) }}
                   />
                   {p.client.name}

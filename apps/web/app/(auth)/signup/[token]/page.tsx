@@ -1,3 +1,4 @@
+import { BrandLogo } from '@nexushub/ui';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { prisma } from '@nexushub/db';
@@ -67,11 +68,7 @@ export default async function SignupPage({ params }: SignupPageProps) {
     <main className="auth">
       <aside className="auth-visual" aria-hidden="true">
         <div className="auth-brand">
-          <div className="brand-mark">N</div>
-          <div>
-            <span className="brand-name">NexusHub</span>
-            <span className="brand-sub">Agency OS</span>
-          </div>
+          <BrandLogo size="lg" />
         </div>
         <div className="auth-hero">
           <h2>
@@ -103,10 +100,7 @@ function InvalidLink({ reason }: { reason: InvalidReason }) {
     <main className="auth">
       <aside className="auth-visual" aria-hidden="true">
         <div className="auth-brand">
-          <div className="brand-mark">N</div>
-          <div>
-            <span className="brand-name">NexusHub</span>
-          </div>
+          <BrandLogo size="lg" />
         </div>
       </aside>
       <section className="auth-form-wrap">

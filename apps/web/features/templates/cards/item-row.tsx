@@ -83,7 +83,7 @@ export function ItemRow({ item, isEditing, onEdit, onRemove }: ItemRowProps) {
             ? `Checklist${item.items.length > 0 ? ` · ${item.items.length}` : ''}`
             : item.label}
       </span>
-      <span className="rounded-full border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] px-2 py-0.5 text-[10px] text-[color:var(--color-text-muted)]">
+      <span className="rounded-sm border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] px-2 py-0.5 text-[10px] text-[color:var(--color-text-muted)]">
         {TYPE_LABEL[item.type]}
       </span>
       <span className="flex gap-1 opacity-60 group-hover:opacity-100">

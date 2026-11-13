@@ -63,7 +63,7 @@ export default async function MyProjectsPage() {
                 <h2 className="mb-3 flex items-center gap-2 text-[11px] font-extrabold uppercase tracking-[1px] text-[color:var(--color-text-muted)]">
                   <span
                     aria-hidden="true"
-                    className="inline-block h-2 w-2 rounded-full"
+                    className="inline-block h-2 w-2 rounded-sm"
                     style={{ background: clientColorCss(first.client.colorToken) }}
                   />
                   {clientName}

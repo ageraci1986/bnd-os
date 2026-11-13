@@ -136,7 +136,7 @@ export async function acceptInvitation(
       return {
         status: 'error',
         message:
-          'Cet email a déjà un compte NexusHub. Saisissez votre mot de passe existant pour accepter l’invitation.',
+          'Cet email a déjà un compte BND OS. Saisissez votre mot de passe existant pour accepter l’invitation.',
       };
     }
     newUserId = existing.id;

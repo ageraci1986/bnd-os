@@ -18,7 +18,7 @@ export function LoginForm({ csrfToken, nextUrl, resetSuccess }: LoginFormProps) 
 
   return (
     <form action={formAction} className="auth-form" noValidate>
-      <p className="auth-kicker">NexusHub</p>
+      <p className="auth-kicker">BND OS</p>
       <h1 className="auth-title">Bon retour parmi nous</h1>
       <p className="auth-sub">
         Connectez-vous pour retrouver vos clients, projets et communications.
@@ -94,7 +94,7 @@ export function LoginForm({ csrfToken, nextUrl, resetSuccess }: LoginFormProps) 
         </Link>
       </div>
 
-      <p className="auth-foot">Pas encore de compte ? NexusHub fonctionne sur invitation.</p>
+      <p className="auth-foot">Pas encore de compte ? BND OS fonctionne sur invitation.</p>
     </form>
   );
 }

@@ -49,7 +49,7 @@ export function Tag({ variant, size = 'md', children, className }: TagProps) {
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1 rounded-full font-bold uppercase tracking-[0.5px]',
+        'inline-flex items-center gap-1 rounded-sm font-bold uppercase tracking-[0.5px]',
         SIZES[size],
         VARIANTS[variant],
         className,

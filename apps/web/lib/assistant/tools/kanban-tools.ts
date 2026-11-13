@@ -362,7 +362,7 @@ export function buildKanbanTools(ctx: AuthContext): ToolSpec[] {
     defineTool({
       name: 'set_checklist_item',
       description:
-        "Coche ou décoche un item de checklist d'une carte (ids des items via get_card_details). Si le dernier item vient d'être coché, la carte avance automatiquement de colonne (règle métier NexusHub) et le résultat l'indique.",
+        "Coche ou décoche un item de checklist d'une carte (ids des items via get_card_details). Si le dernier item vient d'être coché, la carte avance automatiquement de colonne (règle métier BND OS) et le résultat l'indique.",
       inputSchema: z.object({
         itemId: uuid,
         isChecked: z.boolean(),

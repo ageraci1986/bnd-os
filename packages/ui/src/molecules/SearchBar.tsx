@@ -38,8 +38,8 @@ export function SearchBar({
         aria-label={ariaLabel}
         disabled={disabled}
         className={cn(
-          'w-[340px] rounded-full border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] py-3 pl-11 pr-5 text-[13px] font-medium text-[color:var(--color-text-main)] shadow-[var(--shadow-card)] outline-none transition',
-          'placeholder:text-[color:var(--color-text-muted)] focus:border-[color:var(--color-accent-primary)] focus:shadow-[0_0_0_3px_rgba(139,43,226,0.1)]',
+          'w-[340px] rounded-sm border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] py-3 pl-11 pr-5 text-[13px] font-medium text-[color:var(--color-text-main)] shadow-[var(--shadow-card)] outline-none transition',
+          'focus: placeholder:text-[color:var(--color-text-muted)] focus:border-[color:var(--color-accent-primary)]',
           disabled && 'cursor-not-allowed opacity-60',
         )}
       />

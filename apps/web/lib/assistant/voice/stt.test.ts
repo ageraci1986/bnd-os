@@ -24,13 +24,13 @@ describe('transcribeAudio', () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
       new Response(
         JSON.stringify({
-          results: { channels: [{ alternatives: [{ transcript: ' Bonjour NexusHub ' }] }] },
+          results: { channels: [{ alternatives: [{ transcript: ' Bonjour BND OS ' }] }] },
         }),
         { status: 200 },
       ),
     );
     const out = await transcribeAudio(new Uint8Array([1, 2, 3]).buffer, 'audio/webm');
-    expect(out).toBe('Bonjour NexusHub');
+    expect(out).toBe('Bonjour BND OS');
     const [url, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0]!;
     expect(String(url)).toContain('api.deepgram.com/v1/listen');
     expect(String(url)).toContain('model=nova-3');

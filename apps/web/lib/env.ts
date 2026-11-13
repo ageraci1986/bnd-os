@@ -53,7 +53,7 @@ const ServerEnvSchema = z.object({
   // adapter falls back to a redacted console preview when missing).
   RESEND_API_KEY: optionalString(20),
   RESEND_FROM_EMAIL: z.string().email().default('invitations@mail.nexushub.app'),
-  RESEND_FROM_NAME: z.string().default('NexusHub'),
+  RESEND_FROM_NAME: z.string().default('BND OS'),
   SLACK_CLIENT_ID: optionalString(1),
   SLACK_CLIENT_SECRET: optionalString(1),
   SLACK_SIGNING_SECRET: optionalString(1),

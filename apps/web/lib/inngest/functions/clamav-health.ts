@@ -99,9 +99,9 @@ export function buildDownEmail(
 ): { subject: string; text: string; html: string } {
   const sinceMin = (fails - 1) * CHECK_INTERVAL_MIN;
   const since = formatUtc(now - sinceMin * 60_000);
-  const subject = '[NexusHub] Antivirus hors service';
+  const subject = '[BND OS] Antivirus hors service';
   const lines = [
-    "L'antivirus ClamAV de NexusHub ne répond plus.",
+    "L'antivirus ClamAV de BND OS ne répond plus.",
     '',
     `Statut : hors service (${fails} contrôles consécutifs en échec).`,
     `Depuis : environ ${since} (≈ ${sinceMin} min).`,
@@ -113,7 +113,7 @@ export function buildDownEmail(
     'Un nouvel email sera envoyé au rétablissement (rappel toutes les 6 h si la panne persiste).',
   ];
   const html = [
-    `<p>L'antivirus ClamAV de NexusHub ne répond plus.</p>`,
+    `<p>L'antivirus ClamAV de BND OS ne répond plus.</p>`,
     `<p><strong>Statut :</strong> hors service (${fails} contrôles consécutifs en échec).<br>`,
     `<strong>Depuis :</strong> environ ${escapeHtml(since)} (≈ ${sinceMin} min).</p>`,
     `<p><strong>Impact :</strong> les pièces jointes mail et cartes sont refusées tant que le service est indisponible.</p>`,
@@ -125,9 +125,9 @@ export function buildDownEmail(
 
 export function buildRecoveryEmail(now: number): { subject: string; text: string; html: string } {
   const at = formatUtc(now);
-  const subject = '[NexusHub] Antivirus rétabli';
+  const subject = '[BND OS] Antivirus rétabli';
   const text = [
-    "L'antivirus ClamAV de NexusHub répond de nouveau.",
+    "L'antivirus ClamAV de BND OS répond de nouveau.",
     '',
     `Statut : rétabli (${at}).`,
     '',
@@ -136,7 +136,7 @@ export function buildRecoveryEmail(now: number): { subject: string; text: string
     `Procédure (post-incident) : ${RUNBOOK_REF}.`,
   ].join('\n');
   const html = [
-    `<p>L'antivirus ClamAV de NexusHub répond de nouveau.</p>`,
+    `<p>L'antivirus ClamAV de BND OS répond de nouveau.</p>`,
     `<p><strong>Statut :</strong> rétabli (${escapeHtml(at)}).</p>`,
     `<p><strong>Impact :</strong> les pièces jointes mail et cartes sont de nouveau acceptées.</p>`,
     `<p><strong>Procédure (post-incident) :</strong> <code>${escapeHtml(RUNBOOK_REF)}</code>.</p>`,

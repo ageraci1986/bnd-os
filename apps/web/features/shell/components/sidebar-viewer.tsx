@@ -1,7 +1,6 @@
 import { Sidebar, SidebarBrand, SidebarFooter, SidebarSectionCollapsible } from '@nexushub/ui';
 import { NavLink } from './nav-link';
 import { UserChip } from './user-chip';
-import { DashboardIcon, GearIcon } from './icons';
 
 export interface SidebarViewerProps {
   readonly workspaceName: string;
@@ -12,19 +11,14 @@ export interface SidebarViewerProps {
 export function SidebarViewer({ workspaceName, displayName, initials }: SidebarViewerProps) {
   return (
     <Sidebar>
-      <SidebarBrand mark="N" name="NexusHub" subtitle={workspaceName} />
+      <SidebarBrand subtitle={workspaceName} />
 
-      <SidebarSectionCollapsible
-        label="Espace"
-        storageKey="viewer-main"
-        defaultOpen
-        icon={<DashboardIcon />}
-      >
-        <NavLink href="/my-projects" icon="◱" label="Mes projets" />
+      <SidebarSectionCollapsible label="Espace" storageKey="viewer-main" defaultOpen>
+        <NavLink href="/my-projects" icon="01" label="Mes projets" />
       </SidebarSectionCollapsible>
 
-      <SidebarSectionCollapsible label="Compte" storageKey="viewer-account" icon={<GearIcon />}>
-        <NavLink href="/settings" icon="⚙" label="Paramètres" />
+      <SidebarSectionCollapsible label="Compte" storageKey="viewer-account">
+        <NavLink href="/settings" icon="02" label="Paramètres" />
       </SidebarSectionCollapsible>
 
       <SidebarFooter>

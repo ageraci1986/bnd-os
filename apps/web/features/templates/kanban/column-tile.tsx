@@ -123,7 +123,7 @@ export function ColumnTile({
 
       {/* Sample card placeholder (matches the mockup look) */}
       <div className="rounded-md border border-dashed border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] p-3 opacity-60">
-        <div className="mb-2 inline-block rounded-full bg-[image:var(--accent-gradient-soft)] px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.5px] text-[color:var(--color-accent-text)]">
+        <div className="mb-2 inline-block rounded-sm bg-[image:var(--accent-gradient-soft)] px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.5px] text-[color:var(--color-accent-text)]">
           Exemple
         </div>
         <div className="text-[11px] leading-relaxed text-[color:var(--color-text-muted)]">

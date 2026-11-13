@@ -33,7 +33,7 @@ export function ClientDot({ colorToken, size = 8, className }: ClientDotProps) {
     <span
       role="presentation"
       style={{ background, width: size, height: size }}
-      className={cn('inline-block shrink-0 rounded-full', className)}
+      className={cn('inline-block shrink-0 rounded-sm', className)}
     />
   );
 }

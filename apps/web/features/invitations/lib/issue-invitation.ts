@@ -82,7 +82,7 @@ export async function issueInvitation(input: IssueInvitationInput): Promise<Issu
         .filter((s): s is string => Boolean(s))
         .join(' ')
         .trim() || inviter.email
-    : 'NexusHub';
+    : 'BND OS';
 
   const tpl = renderInvitationEmail({
     inviterName,

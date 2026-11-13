@@ -23,7 +23,7 @@ export function SignupForm(props: SignupFormProps) {
       <h1 className="auth-title">Créez votre compte</h1>
       <p className="auth-sub">
         {props.inviterName} vous a invité(e) à rejoindre l&apos;espace{' '}
-        <strong>{props.workspaceName}</strong> sur NexusHub.
+        <strong>{props.workspaceName}</strong> sur BND OS.
       </p>
 
       <input type="hidden" name={CSRF_FIELD_NAME} value={props.csrfToken} />

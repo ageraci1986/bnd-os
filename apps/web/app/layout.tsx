@@ -17,9 +17,9 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: { default: 'NexusHub', template: '%s · NexusHub' },
+  title: { default: 'BND OS', template: '%s · BND OS' },
   description: 'Agency OS — Client › Project › Task',
-  applicationName: 'NexusHub',
+  applicationName: 'BND OS',
   // SEO neutralisé : app privée
   robots: { index: false, follow: false },
 };
