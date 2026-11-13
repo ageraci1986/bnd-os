@@ -20,14 +20,6 @@ function prismaErrorCode(err: unknown): string | null {
   return null;
 }
 
-function raciUniqueMessage(raci: (typeof RACI_VALUES)[number]): string {
-  return raci === 'responsible'
-    ? 'Une seule personne peut être Responsable. Réassignez le Responsable actuel d’abord.'
-    : raci === 'approver'
-      ? 'Une seule personne peut être Approbateur. Réassignez l’Approbateur actuel d’abord.'
-      : 'Conflit d’unicité.';
-}
-
 const RaciSchema = z.enum(RACI_VALUES);
 
 const AddSchema = z.object({
@@ -70,10 +62,9 @@ async function checkCardScope(
 }
 
 /**
- * Assign a workspace member to a card with a RACI role. The PG partial
- * unique indexes on `(card_id) WHERE raci = 'responsible'` and
- * `(card_id) WHERE raci = 'approver'` enforce at-most-one R / A per card;
- * we surface that as a friendly error.
+ * Assign a workspace member to a card with a RACI role. Several people may
+ * share the same role (R/A/C/I) since 2026-11-13; the PK (card_id, user_id)
+ * still gives each person a single role per card.
  */
 export async function addCardAssignee(input: {
   cardId: string;
@@ -99,22 +90,15 @@ export async function addCardAssignee(input: {
   });
   if (!member) return { ok: false, message: 'Cet utilisateur n’appartient pas à l’espace.' };
 
-  try {
-    await prisma.cardAssignee.upsert({
-      where: { cardId_userId: { cardId: card.id, userId: parsed.data.userId } },
-      create: {
-        cardId: card.id,
-        userId: parsed.data.userId,
-        raci: parsed.data.raci,
-      },
-      update: { raci: parsed.data.raci },
-    });
-  } catch (err) {
-    if (prismaErrorCode(err) === 'P2002') {
-      return { ok: false, message: raciUniqueMessage(parsed.data.raci) };
-    }
-    throw err;
-  }
+  await prisma.cardAssignee.upsert({
+    where: { cardId_userId: { cardId: card.id, userId: parsed.data.userId } },
+    create: {
+      cardId: card.id,
+      userId: parsed.data.userId,
+      raci: parsed.data.raci,
+    },
+    update: { raci: parsed.data.raci },
+  });
 
   // No revalidatePath: assignees only show in the modal side rail, not
   // on the kanban card. The modal already updates optimistically.
@@ -148,7 +132,6 @@ export async function updateCardAssigneeRaci(input: {
   } catch (err) {
     const code = prismaErrorCode(err);
     if (code === 'P2025') return { ok: false, message: 'Assignation introuvable.' };
-    if (code === 'P2002') return { ok: false, message: raciUniqueMessage(parsed.data.raci) };
     throw err;
   }
 

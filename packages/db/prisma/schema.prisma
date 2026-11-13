@@ -558,9 +558,9 @@ model Card {
   @@map("cards")
 }
 
-/// Internal-team RACI assignments on cards (PRD §6.6 applied to tasks). At
-/// most one Responsible / Accountable per card is enforced via partial
-/// unique indexes in migration; Consulted / Informed are unbounded.
+/// Internal-team RACI assignments on cards (PRD §6.6 applied to tasks).
+/// Several people may share any role (R/A/C/I) since 2026-11-13; the PK
+/// (card_id, user_id) gives each person a single role per card.
 model CardAssignee {
   cardId    String   @map("card_id") @db.Uuid
   userId    String   @map("user_id") @db.Uuid

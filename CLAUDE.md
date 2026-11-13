@@ -309,6 +309,7 @@ nexushub/
 
 - 4 valeurs : **R** (Responsable, bleu) / **A** (Approbateur, ambre) / **C** (Consulté, vert) / **I** (Informé, gris).
 - Un contact peut avoir une seule valeur RACI par projet (à confirmer hypothèse PRD §10).
+- **Cartes** : plusieurs membres peuvent partager un même rôle (R/A/C/I) — plus de limite « un seul R / un seul A » depuis le 2026-11-13 (migration `20261113120000_card_assignees_multi_raci`) ; un membre n'a qu'un rôle par carte (PK `card_id, user_id`).
 
 ### 6.7 Permissions
 
@@ -436,5 +437,6 @@ Avant chaque action :
 | 2026-10-03 | Lot C pièces jointes de cartes — upload direct Storage + scan asynchrone Inngest/ClamAV (jamais servi avant `clean`), §4.5.4 complété, rate limits `card_attachment_*`, CSP `media-src`/`frame-src` (`buildCsp` testé), runbook `card-attachments.md`                           | Angelo L. + Claude |
 | 2026-11-10 | Correctif sécurité mails — §4.4.6 : mails owner-only (`ownedMailWhere`), liste Communications / `search_mails` / KPI non lus / `markEmailRead` / reprise PJ re-scopés, RLS `em_owner_all` (migration `20261110120000_email_messages_owner_rls`)                                 | Angelo L. + Claude |
 | 2026-11-12 | §4.2.7 — table `integrations` fermée à l'API (REVOKE ALL anon/authenticated + policies supprimées) : le REVOKE de colonne `encrypted_tokens` était inopérant ; correctif calendrier `.cal-grid` `minmax(0, 1fr)`                                                                | Angelo L. + Claude |
+| 2026-11-13 | §6.6 — RACI des cartes multi-personnes : plusieurs R/A par carte (index uniques partiels supprimés), message d'unicité retiré, description du tool `add_card_assignee` alignée                                                                                                  | Angelo L. + Claude |
 
 > **Règle :** chaque modification de ce fichier ajoute une ligne ici.

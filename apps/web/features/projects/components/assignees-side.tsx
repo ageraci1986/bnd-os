@@ -81,8 +81,8 @@ export function AssigneesSide({
         raci: 'responsible',
       });
       if (!res.ok) {
-        // Roll back optimistic add and surface the message (e.g. "one
-        // Responsible per card" partial-unique).
+        // Roll back optimistic add and surface the message (e.g. scope
+        // error, non-member). Several people may share a RACI role.
         setList((prev) => prev.filter((a) => a.userId !== member.userId));
         setError(res.message);
         return;
