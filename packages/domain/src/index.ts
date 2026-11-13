@@ -13,3 +13,4 @@ export * as crypto from './crypto/index';
 export * from './dates/index';
 export * from './theme/index';
 export * from './attachments/index';
+export * from './voice-glossary/index';
