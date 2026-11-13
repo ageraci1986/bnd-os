@@ -110,8 +110,10 @@ describe('AssistantChat', () => {
     });
     render(<AssistantChat csrfToken="tok" firstName="Angelo" />);
     // 21 échanges = 42 entrées sans plafond → le cap doit borner à 38.
+    // Saisie en un seul `change` (pas frappe par frappe) : ce test enchaîne 21
+    // allers-retours et dépassait les 5 s par défaut quand la machine est chargée.
     for (let i = 1; i <= 21; i += 1) {
-      await userEvent.type(screen.getByRole('textbox'), `q${i}`);
+      fireEvent.change(screen.getByRole('textbox'), { target: { value: `q${i}` } });
       await userEvent.click(screen.getByRole('button', { name: /envoyer/i }));
       await screen.findByText(`réponse ${i}`);
     }
@@ -123,7 +125,7 @@ describe('AssistantChat', () => {
     }
     // Au 21e envoi, l'historique non plafonné ferait 40 entrées.
     expect(bodies[20]?.messages).toHaveLength(38);
-  });
+  }, 20_000);
 
   it('conserve la réponse partielle si le flux se ferme sans done', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
