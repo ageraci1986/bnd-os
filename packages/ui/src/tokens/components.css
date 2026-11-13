@@ -143,10 +143,7 @@
 
 /* ---- Sidebar (mockup §03-overview, faithful port) ------------------- */
 .sidebar {
-  /* Barre latérale toujours Cobalt : light-dark() y résout les valeurs
-     sombres, quel que soit le thème (charte BND 2026). */
-  color-scheme: dark;
-  color: var(--text-main);
+  /* Toujours Cobalt : tokens sombres forcés dans tokens.css (surface Cobalt). */
   background: var(--bg-sidebar);
   border-right: 1px solid var(--border-light);
   display: flex;
@@ -527,10 +524,7 @@
   line-height: 1.05;
 }
 .wiz-title .gradient-text {
-  background: var(--accent-gradient);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: var(--color-accent-text);
 }
 .stepper {
   display: grid;

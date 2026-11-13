@@ -62,10 +62,7 @@ export default async function OverviewPage({ searchParams }: OverviewPageProps) 
       <div className="mb-9">
         <h1 className="text-[42px] font-extrabold tracking-tight">
           Hello {greeting},{' '}
-          <span
-            className="bg-clip-text text-transparent"
-            style={{ backgroundImage: 'var(--accent-gradient)' }}
-          >
+          <span className="text-[color:var(--color-accent-text)]">
             {activeClient ? `vue ${activeClient.name}.` : 'bienvenue sur NexusHub.'}
           </span>
         </h1>

@@ -76,6 +76,19 @@ describe('BND brand tokens', () => {
     expect(decl('color-on-accent').toLowerCase()).toBe('#060d1f');
   });
 
+  it('redeclares every light-dark token with its dark value on the forced Cobalt surface', () => {
+    const block = /\[data-surface='cobalt'\]\s*\{([^}]*)\}/.exec(css)?.[1] ?? '';
+    const themed = [...css.matchAll(/(--color-(?!c-)[\w-]+):\s*(light-dark\([^;]+\));/g)];
+    expect(themed.length).toBeGreaterThan(15);
+    for (const m of themed) {
+      const name = (m[1] ?? '').replace(/^--/, '');
+      const dark = color(name, 'dark');
+      const inBlock = new RegExp(`--${name}:\\s*([^;]+);`).exec(block)?.[1];
+      expect(inBlock, `--${name} absent de la surface Cobalt`).toBeDefined();
+      expect(parseColor((inBlock ?? '').replace(/\s+/g, ' ').trim())).toEqual(dark);
+    }
+  });
+
   it('uses Inter and JetBrains Mono', () => {
     expect(decl('font-sans')).toContain('Inter');
     expect(decl('font-mono')).toContain('JetBrains Mono');

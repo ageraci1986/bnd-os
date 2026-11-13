@@ -187,12 +187,7 @@ export default async function ProjectCalendarPage({
             suffix={
               <>
                 {' '}
-                <span
-                  className="bg-clip-text text-transparent"
-                  style={{ backgroundImage: 'var(--accent-gradient)' }}
-                >
-                  · calendrier
-                </span>
+                <span className="text-[color:var(--color-accent-text)]">· calendrier</span>
               </>
             }
           />
