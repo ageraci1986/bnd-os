@@ -109,7 +109,7 @@ describe('runClamavHealth', () => {
     });
     expect(h.sent.map((e) => e.to)).toEqual(['a@example.test', 'b@example.test']);
     const email = h.sent[0];
-    expect(email?.subject).toBe('[NexusHub] Antivirus hors service');
+    expect(email?.subject).toBe('[BND OS] Antivirus hors service');
     expect(email?.text).toContain('hors service');
     expect(email?.text).toContain('les pièces jointes mail et cartes sont refusées');
     expect(email?.text).toContain('docs/runbooks/card-attachments.md §4');
@@ -144,7 +144,7 @@ describe('runClamavHealth', () => {
 
     expect(result.action).toBe('alert');
     expect(h.sent).toHaveLength(2);
-    expect(h.sent[0]?.subject).toBe('[NexusHub] Antivirus hors service');
+    expect(h.sent[0]?.subject).toBe('[BND OS] Antivirus hors service');
     expect(h.state()).toEqual({ fails: 38, alertSentAt: NOW });
   });
 
@@ -160,7 +160,7 @@ describe('runClamavHealth', () => {
       sent: 2,
       failed: 0,
     });
-    expect(h.sent[0]?.subject).toBe('[NexusHub] Antivirus rétabli');
+    expect(h.sent[0]?.subject).toBe('[BND OS] Antivirus rétabli');
     expect(h.sent[0]?.text).toContain('docs/runbooks/card-attachments.md §4');
     expect(h.sent[0]?.text).toContain('de nouveau acceptées');
     expect(h.state()).toEqual({ fails: 0, alertSentAt: null });

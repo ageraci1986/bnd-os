@@ -9,18 +9,13 @@ export interface TopbarProps {
 }
 
 /**
- * Sticky glass topbar. PRD §6 — present on every authenticated page.
+ * Sticky topbar, opaque, soulignée du filet Aurora (charte BND 2026). PRD §6 — present on every authenticated page.
  * Renders nothing structural beyond the layout: actual buttons, search,
  * etc. come from the host via `left` / `right` slots.
  */
 export function Topbar({ left, right, className }: TopbarProps) {
   return (
-    <header
-      className={cn(
-        'sticky top-0 z-10 mb-6 flex items-center justify-between gap-6 border-b border-[color:var(--color-border-soft)] bg-[color:var(--glass-bg)] px-10 py-7 backdrop-blur',
-        className,
-      )}
-    >
+    <header className={cn('bnd-topbar', className)}>
       <div className="min-w-0 flex-1">{left}</div>
       <div className="flex items-center gap-3">{right}</div>
     </header>

@@ -17,16 +17,16 @@ describe('<Sidebar />', () => {
 });
 
 describe('<SidebarBrand />', () => {
-  it('renders mark + name + subtitle', () => {
-    render(<SidebarBrand mark="N" name="NexusHub" subtitle="Studio Atlas" />);
-    expect(screen.getByText('N')).toBeInTheDocument();
-    expect(screen.getByText('NexusHub')).toBeInTheDocument();
+  it('renders the BND OS logo + workspace name', () => {
+    render(<SidebarBrand subtitle="Studio Atlas" />);
+    expect(screen.getByRole('img', { name: 'BND OS' })).toBeInTheDocument();
     expect(screen.getByText('Studio Atlas')).toBeInTheDocument();
   });
 
   it('renders without subtitle', () => {
-    render(<SidebarBrand mark="N" name="NexusHub" />);
-    expect(screen.getByText('NexusHub')).toBeInTheDocument();
+    const { container } = render(<SidebarBrand />);
+    expect(screen.getByRole('img', { name: 'BND OS' })).toBeInTheDocument();
+    expect(container.querySelector('.brand-sub')).toBeNull();
   });
 });
 

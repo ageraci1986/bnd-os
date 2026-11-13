@@ -1,4 +1,6 @@
 export { Avatar } from './Avatar';
+export { BrandLogo } from './BrandLogo';
+export type { BrandLogoProps } from './BrandLogo';
 export type { AvatarProps, AvatarSize, AvatarVariant } from './Avatar';
 export { Tag } from './Tag';
 export type { TagProps, TagSize, TagVariant } from './Tag';

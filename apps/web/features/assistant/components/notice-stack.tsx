@@ -16,8 +16,8 @@ export interface NoticeStackProps {
 
 /** Pills calquées sur `.ap-btn` de la maquette (mail-list-widget.tsx suit la même convention de tokens). */
 const PILL_BASE =
-  'inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-3 py-1.5 text-[10.5px] font-bold disabled:opacity-50';
-const PILL_GRAD = `${PILL_BASE} bg-[image:var(--accent-gradient)] text-white shadow-[0_4px_12px_rgba(139,43,226,0.3)]`;
+  'inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-sm px-3 py-1.5 text-[10.5px] font-bold disabled:opacity-50';
+const PILL_GRAD = `${PILL_BASE} bg-[image:var(--accent-gradient)] text-on-accent`;
 const PILL_GHOST = `${PILL_BASE} border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] text-[color:var(--color-text-muted)] hover:bg-[color:var(--color-bg-hover)]`;
 
 /**

@@ -58,9 +58,9 @@ export default async function IntegrationsPage({ searchParams }: PageProps) {
   return (
     <div className="mx-auto max-w-[900px]">
       <header className="mb-6">
-        <h1 className="text-[28px] font-extrabold tracking-tight">Intégrations</h1>
+        <h1 className="bnd-title">Intégrations</h1>
         <p className="mt-1 text-sm text-[color:var(--color-text-muted)]">
-          Connecte tes outils externes à NexusHub.
+          Connecte tes outils externes à BND OS.
         </p>
       </header>
       {flash ? (

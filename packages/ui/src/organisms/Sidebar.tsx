@@ -1,9 +1,10 @@
 import type { ReactNode } from 'react';
+import { BrandLogo } from '../atoms/BrandLogo';
 import { cn } from '../utils';
 
 /**
- * Permanent left rail (260px sticky). Faithful port of the
- * `mockups/03-overview.html` `.sidebar` block — the host composes
+ * Permanent left rail (260px sticky, toujours Cobalt). Port of the
+ * `mockups/bnd/index.html` sidebar — the host composes
  * <SidebarBrand>, <SidebarSection> and <SidebarFooter> inside it.
  *
  * Visual rules live in `packages/ui/src/tokens/components.css` so the
@@ -28,20 +29,16 @@ export function Sidebar({
 }
 
 export interface SidebarBrandProps {
-  readonly mark: string;
-  readonly name: string;
+  /** Nom de l'espace de travail, affiché sous le logo. */
   readonly subtitle?: string;
   readonly className?: string;
 }
 
-export function SidebarBrand({ mark, name, subtitle, className }: SidebarBrandProps) {
+export function SidebarBrand({ subtitle, className }: SidebarBrandProps) {
   return (
     <div className={cn('brand', className)}>
-      <div className="brand-mark">{mark}</div>
-      <div>
-        <div className="brand-name">{name}</div>
-        {subtitle ? <span className="brand-sub">{subtitle}</span> : null}
-      </div>
+      <BrandLogo />
+      {subtitle ? <span className="brand-sub">{subtitle}</span> : null}
     </div>
   );
 }

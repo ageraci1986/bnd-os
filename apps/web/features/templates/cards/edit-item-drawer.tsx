@@ -98,7 +98,7 @@ export function EditItemDrawer({
         <button
           type="button"
           onClick={onClose}
-          className="rounded-md bg-[color:var(--color-accent-primary)] px-3 py-1 text-xs font-medium text-white"
+          className="text-on-accent rounded-md bg-[color:var(--color-accent-primary)] px-3 py-1 text-xs font-medium"
         >
           Fermer
         </button>

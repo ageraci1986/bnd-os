@@ -456,7 +456,7 @@ export function MailDraftWidget({
             type="button"
             disabled={buttonsDisabled}
             onClick={() => void handleSend()}
-            className="rounded-full px-3 py-1 text-xs font-bold text-white disabled:opacity-50"
+            className="text-on-accent rounded-sm px-3 py-1 text-xs font-bold disabled:opacity-50"
             style={{ background: 'var(--accent-gradient)' }}
           >
             📤 Envoyer
@@ -465,7 +465,7 @@ export function MailDraftWidget({
             type="button"
             disabled={buttonsDisabled}
             onClick={() => void handleKeepDraft()}
-            className="rounded-full border border-[color:var(--color-border-light)] px-3 py-1 text-xs font-semibold text-[color:var(--color-text-muted)] disabled:opacity-50"
+            className="rounded-sm border border-[color:var(--color-border-light)] px-3 py-1 text-xs font-semibold text-[color:var(--color-text-muted)] disabled:opacity-50"
           >
             💾 Garder en brouillon
           </button>

@@ -528,7 +528,7 @@ function FieldCell({
         <span className="flex min-w-0 items-center gap-1.5 text-[11px] text-[color:var(--color-text-muted)]">
           <span
             aria-hidden="true"
-            className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-[color:var(--color-text-ghost)]"
+            className="inline-block h-1.5 w-1.5 shrink-0 rounded-sm bg-[color:var(--color-text-ghost)]"
           />
           <span className="truncate font-medium text-[color:var(--color-text-soft)]">
             {card.columnName}
@@ -563,13 +563,13 @@ function FieldCell({
             <span
               key={a.userId}
               title={a.displayName}
-              className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 border-[color:var(--color-bg-card)] bg-[image:var(--accent-gradient)] text-[10px] font-bold text-white"
+              className="text-on-accent inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-sm border-2 border-[color:var(--color-bg-card)] bg-[image:var(--accent-gradient)] text-[10px] font-bold"
             >
               {a.initials}
             </span>
           ))}
           {card.assignees.length > 3 ? (
-            <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 border-[color:var(--color-bg-card)] bg-[color:var(--color-bg-muted)] text-[10px] font-bold text-[color:var(--color-text-soft)]">
+            <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-sm border-2 border-[color:var(--color-bg-card)] bg-[color:var(--color-bg-muted)] text-[10px] font-bold text-[color:var(--color-text-soft)]">
               +{card.assignees.length - 3}
             </span>
           ) : null}
@@ -603,7 +603,7 @@ function CategoryCell({ tag }: { tag: string | null }) {
   const c = customCategoryColor(tag);
   return (
     <span
-      className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.5px]"
+      className="inline-flex items-center gap-1 rounded-sm px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.5px]"
       style={{ background: c.bg, color: c.fg }}
     >
       {tag}
@@ -654,7 +654,7 @@ function ColumnPicker({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="inline-flex items-center gap-1.5 rounded-full border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] px-3 py-1.5 text-xs font-bold text-[color:var(--color-text-soft)] shadow-[var(--shadow-card)] hover:text-[color:var(--color-text-main)]"
+        className="inline-flex items-center gap-1.5 rounded-sm border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] px-3 py-1.5 text-xs font-bold text-[color:var(--color-text-soft)] shadow-[var(--shadow-card)] hover:text-[color:var(--color-text-main)]"
       >
         <span aria-hidden="true">⚙</span>
         Colonnes ({selected.length})

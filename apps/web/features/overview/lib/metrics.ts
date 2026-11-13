@@ -18,7 +18,7 @@
 import 'server-only';
 import { prisma } from '@nexushub/db';
 import { type UserScope } from '@nexushub/domain';
-import { scopedClientWhere, scopedProjectWhere, scopedCardWhere } from '@/lib/auth/scope';
+import { scopedClientWhere, scopedProjectWhere } from '@/lib/auth/scope';
 
 export interface OverviewMetrics {
   readonly clients: number;
@@ -42,7 +42,6 @@ export async function getOverviewMetrics({
 }: OverviewMetricsOptions): Promise<OverviewMetrics> {
   const scopeProjectWhere = scope ? scopedProjectWhere(scope) : {};
   const scopeClientWhere = scope ? scopedClientWhere(scope) : {};
-  const scopeCardWhere = scope ? scopedCardWhere(scope) : {};
 
   const projectScope = {
     workspaceId,
@@ -52,12 +51,14 @@ export async function getOverviewMetrics({
     ...(clientId ? { clientId } : {}),
   };
 
+  // Même périmètre que les blocs de l'Overview : cartes non archivées de
+  // projets actifs (un projet en corbeille ou archivé n'est plus actionnable).
   const blockedCardWhere = {
     workspaceId,
     deletedAt: null,
+    archivedAt: null,
     column: { isBlockedSystem: true },
-    ...scopeCardWhere,
-    ...(clientId ? { project: { clientId } } : {}),
+    project: projectScope,
   };
 
   if (clientId) {

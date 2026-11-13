@@ -60,13 +60,13 @@ export function renderInvitationEmail(params: InvitationEmailParams): Invitation
   const acceptUrlE = escapeHtml(acceptUrl);
   const expiresE = escapeHtml(expires);
 
-  const subject = `Vous êtes invité à rejoindre ${workspaceName} sur NexusHub`;
+  const subject = `Vous êtes invité à rejoindre ${workspaceName} sur BND OS`;
 
   /* ---------- Plain text fallback -------------------------------------- */
   const text = [
     `Bonjour,`,
     ``,
-    `${inviterName} vous invite à rejoindre l'espace "${workspaceName}" sur NexusHub.`,
+    `${inviterName} vous invite à rejoindre l'espace "${workspaceName}" sur BND OS.`,
     ``,
     `Pour finaliser votre inscription, ouvrez le lien ci-dessous :`,
     acceptUrl,
@@ -75,11 +75,11 @@ export function renderInvitationEmail(params: InvitationEmailParams): Invitation
     ``,
     `Si vous n'avez pas demandé cette invitation, ignorez ce message.`,
     ``,
-    `— L'équipe NexusHub`,
+    `— L'équipe BND OS`,
   ].join('\n');
 
   /* ---------- HTML email ----------------------------------------------- */
-  const preheader = `${inviterName} vous invite à rejoindre ${workspaceName} sur NexusHub.`;
+  const preheader = `${inviterName} vous invite à rejoindre ${workspaceName} sur BND OS.`;
   const preheaderE = escapeHtml(preheader);
 
   const htmlSanitized = `<!doctype html>
@@ -126,7 +126,7 @@ export function renderInvitationEmail(params: InvitationEmailParams): Invitation
                 <tr>
                   <td width="40" height="40" align="center" style="background:${BRAND_GRADIENT};border-radius:10px;color:#ffffff;font-weight:800;font-size:18px;font-family:${FONT_STACK};line-height:40px;">N</td>
                   <td style="padding-left:12px;vertical-align:middle;">
-                    <div style="font-weight:800;font-size:16px;letter-spacing:-0.3px;color:${TEXT_MAIN};">NexusHub</div>
+                    <div style="font-weight:800;font-size:16px;letter-spacing:-0.3px;color:${TEXT_MAIN};">BND OS</div>
                     <div style="font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:${TEXT_MUTED};font-weight:600;">Agency OS</div>
                   </td>
                 </tr>
@@ -142,7 +142,7 @@ export function renderInvitationEmail(params: InvitationEmailParams): Invitation
               </h1>
               <p style="margin:0;font-family:${FONT_STACK};font-size:15px;line-height:1.55;color:${TEXT_MUTED};">
                 <strong style="color:${TEXT_MAIN};font-weight:700;">${inviterE}</strong> vous invite à rejoindre l'espace de travail
-                <strong style="color:${TEXT_MAIN};font-weight:700;">${workspaceE}</strong> sur NexusHub —
+                <strong style="color:${TEXT_MAIN};font-weight:700;">${workspaceE}</strong> sur BND OS —
                 la plateforme qui réunit clients, projets et communications dans un seul endroit.
               </p>
             </td>
@@ -198,7 +198,7 @@ export function renderInvitationEmail(params: InvitationEmailParams): Invitation
                 aucun compte ne sera créé sans votre intervention.
               </p>
               <p style="margin:14px 0 0 0;font-family:${FONT_STACK};font-size:11px;color:${TEXT_GHOST};">
-                — L'équipe NexusHub
+                — L'équipe BND OS
               </p>
             </td>
           </tr>
@@ -209,7 +209,7 @@ export function renderInvitationEmail(params: InvitationEmailParams): Invitation
         <table role="presentation" class="nh-container" width="600" border="0" cellpadding="0" cellspacing="0" style="width:600px;max-width:600px;margin-top:16px;">
           <tr>
             <td class="nh-px" align="center" style="padding:0 40px;font-family:${FONT_STACK};font-size:10px;color:${TEXT_GHOST};line-height:1.6;">
-              Cet e-mail a été envoyé automatiquement par NexusHub à la demande de ${inviterE}.<br>
+              Cet e-mail a été envoyé automatiquement par BND OS à la demande de ${inviterE}.<br>
               Pour toute question, répondez directement à ce message.
             </td>
           </tr>

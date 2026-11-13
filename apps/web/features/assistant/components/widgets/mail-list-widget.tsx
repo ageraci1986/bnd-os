@@ -87,8 +87,8 @@ function communicationsHref(mail: MailRow): string {
  * valeur ad hoc réinventée ici.
  */
 const PILL_BASE =
-  'inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 text-[10px] font-bold disabled:opacity-50';
-const PILL_GRAD = `${PILL_BASE} bg-[image:var(--accent-gradient)] text-white shadow-[0_3px_10px_rgba(139,43,226,0.3)]`;
+  'inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-sm px-2.5 py-1 text-[10px] font-bold disabled:opacity-50';
+const PILL_GRAD = `${PILL_BASE} bg-[image:var(--accent-gradient)] text-on-accent`;
 const PILL_SOFT = `${PILL_BASE} bg-[image:var(--accent-gradient-soft)] text-[color:var(--color-accent-text)]`;
 const PILL_GHOST = `${PILL_BASE} border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)] text-[color:var(--color-text-muted)] hover:bg-[color:var(--color-bg-hover)]`;
 // Bordure pâle thème-aware : on réutilise --color-danger-bg (plutôt que la
@@ -276,7 +276,7 @@ export function MailListWidget({ data, actions }: MailListWidgetProps) {
                 >
                   <span
                     aria-label={read ? undefined : 'non lu'}
-                    className="h-1.5 w-1.5 shrink-0 rounded-full"
+                    className="h-1.5 w-1.5 shrink-0 rounded-sm"
                     style={{
                       background: read
                         ? 'var(--color-border-light)'

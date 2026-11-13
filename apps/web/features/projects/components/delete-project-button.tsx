@@ -120,7 +120,7 @@ export function DeleteProjectButton({
                     confirm();
                   }}
                   disabled={pending}
-                  className="rounded-md bg-[color:var(--color-danger)] px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+                  className="text-on-danger rounded-md bg-[color:var(--color-danger)] px-3 py-1.5 text-xs font-medium disabled:opacity-50"
                 >
                   {pending ? 'Suppression…' : 'Supprimer définitivement'}
                 </button>
@@ -137,7 +137,7 @@ export function DeleteProjectButton({
         onClick={onTrigger}
         aria-label={`Supprimer le projet ${projectName}`}
         title="Supprimer ce projet"
-        className={`inline-flex ${btnSize} items-center justify-center rounded-full border border-[color:var(--color-danger)] bg-[color:var(--color-danger)] text-white shadow-[var(--shadow-card)] transition hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--color-danger)]`}
+        className={`inline-flex ${btnSize} text-on-danger items-center justify-center rounded-sm border border-[color:var(--color-danger)] bg-[color:var(--color-danger)] shadow-[var(--shadow-card)] transition hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--color-danger)]`}
       >
         <TrashIcon
           width={iconPx}

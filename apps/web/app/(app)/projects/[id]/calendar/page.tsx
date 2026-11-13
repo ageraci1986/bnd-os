@@ -174,7 +174,7 @@ export default async function ProjectCalendarPage({
           <div className="mb-2 flex items-center gap-2 text-xs text-[color:var(--color-text-muted)]">
             <span
               aria-hidden="true"
-              className="inline-block h-2 w-2 rounded-full"
+              className="inline-block h-2 w-2 rounded-sm"
               style={{ background: clientColorCss(project.client.colorToken) }}
             />
             {project.client.name}
@@ -183,16 +183,11 @@ export default async function ProjectCalendarPage({
             projectId={project.id}
             name={project.name}
             canEdit={ctx.role !== Roles.Viewer}
-            className="text-[32px] font-extrabold tracking-tight"
+            className="bnd-title"
             suffix={
               <>
                 {' '}
-                <span
-                  className="bg-clip-text text-transparent"
-                  style={{ backgroundImage: 'var(--accent-gradient)' }}
-                >
-                  · calendrier
-                </span>
+                <span className="text-[color:var(--color-accent-text)]">· calendrier</span>
               </>
             }
           />

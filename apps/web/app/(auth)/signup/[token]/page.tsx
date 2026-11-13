@@ -1,3 +1,4 @@
+import { AuthBrandPanel } from '@/features/auth/components/auth-brand-panel';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { prisma } from '@nexushub/db';
@@ -65,23 +66,7 @@ export default async function SignupPage({ params }: SignupPageProps) {
 
   return (
     <main className="auth">
-      <aside className="auth-visual" aria-hidden="true">
-        <div className="auth-brand">
-          <div className="brand-mark">N</div>
-          <div>
-            <span className="brand-name">NexusHub</span>
-            <span className="brand-sub">Agency OS</span>
-          </div>
-        </div>
-        <div className="auth-hero">
-          <h2>
-            Bienvenue
-            <br />
-            <span>dans l&apos;équipe.</span>
-          </h2>
-          <p>Définissez votre mot de passe pour rejoindre {invitation.workspace.name}.</p>
-        </div>
-      </aside>
+      <AuthBrandPanel />
       <section className="auth-form-wrap">
         <SignupForm
           csrfToken={csrf}
@@ -101,14 +86,7 @@ function InvalidLink({ reason }: { reason: InvalidReason }) {
   const { title, message } = messages[reason];
   return (
     <main className="auth">
-      <aside className="auth-visual" aria-hidden="true">
-        <div className="auth-brand">
-          <div className="brand-mark">N</div>
-          <div>
-            <span className="brand-name">NexusHub</span>
-          </div>
-        </div>
-      </aside>
+      <AuthBrandPanel />
       <section className="auth-form-wrap">
         <div className="auth-form text-center">
           <p className="auth-kicker">Invitation</p>

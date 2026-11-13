@@ -289,7 +289,7 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
           <div className="mb-2 flex items-center gap-2 text-xs text-[color:var(--color-text-muted)]">
             <span
               aria-hidden="true"
-              className="inline-block h-2 w-2 rounded-full"
+              className="inline-block h-2 w-2 rounded-sm"
               style={{ background: clientColorCss(project.client.colorToken) }}
             />
             {project.client.name}
@@ -311,7 +311,7 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
             projectId={project.id}
             name={project.name}
             canEdit={!isViewer}
-            className="text-[32px] font-extrabold tracking-tight"
+            className="bnd-title"
           />
           {project.description ? (
             <p className="mt-1 max-w-3xl text-sm text-[color:var(--color-text-muted)]">

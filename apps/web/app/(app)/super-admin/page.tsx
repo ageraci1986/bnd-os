@@ -43,7 +43,7 @@ export default async function SuperAdminPage() {
   return (
     <div className="mx-auto max-w-5xl">
       <header className="mb-8">
-        <h1 className="text-[34px] font-extrabold tracking-tight">
+        <h1 className="bnd-title">
           Console <span className="gradient-text">super-admin</span>
         </h1>
         <p className="mt-2 text-sm text-[color:var(--color-text-muted)]">

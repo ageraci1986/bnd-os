@@ -112,12 +112,9 @@ export default async function CalendarPage({ searchParams }: CalendarPageProps) 
     <div className="mx-auto max-w-[1400px]">
       <header className="mb-6 flex items-end justify-between gap-4">
         <div>
-          <h1 className="text-[34px] font-extrabold tracking-tight">
+          <h1 className="bnd-title">
             Échéances{' '}
-            <span
-              className="bg-clip-text text-transparent"
-              style={{ backgroundImage: 'var(--accent-gradient)' }}
-            >
+            <span className="text-[color:var(--color-accent-text)]">
               {activeClient ? `· ${activeClient.name}` : 'du mois'}
             </span>
           </h1>

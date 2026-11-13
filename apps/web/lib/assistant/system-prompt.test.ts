@@ -14,7 +14,7 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('Angelo');
     expect(prompt).toContain('BND Agency');
     expect(prompt).toContain('2026-07-27');
-    expect(prompt).toContain('NexusHub');
+    expect(prompt).toContain('BND OS');
   });
 
   it('contient les règles de sécurité anti-injection', () => {

@@ -53,7 +53,7 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
     <div className="mx-auto max-w-6xl">
       <header className="mb-8 flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-[34px] font-extrabold tracking-tight">Projets</h1>
+          <h1 className="bnd-title">Projets</h1>
           <p className="mt-2 text-sm text-[color:var(--color-text-muted)]">
             {activeClient
               ? `Projets du client ${activeClient.name}.`
@@ -109,7 +109,7 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
                 <div className="mb-2 flex items-center gap-2 text-xs text-[color:var(--color-text-muted)]">
                   <span
                     aria-hidden="true"
-                    className="inline-block h-2 w-2 rounded-full"
+                    className="inline-block h-2 w-2 rounded-sm"
                     style={{ background: clientColorCss(p.client.colorToken) }}
                   />
                   {p.client.name}

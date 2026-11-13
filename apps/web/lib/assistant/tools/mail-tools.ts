@@ -325,7 +325,7 @@ function buildByFilterDescribe(
 function describeArchiveConfirm(total: number, owned: number): string {
   const label = `${total} mail${pluralS(total)}`;
   if (owned === total) {
-    return `Archiver ${label} de vos boîtes dans NexusHub ? (archivage local — ${MAIL_LOCAL_NOTE})`;
+    return `Archiver ${label} de vos boîtes dans BND OS ? (archivage local — ${MAIL_LOCAL_NOTE})`;
   }
   return `Archiver ${label} ? Seuls ${owned} vous appartiennent et seront archivés (les autres seront ignorés). (archivage local — ${MAIL_LOCAL_NOTE})`;
 }
@@ -333,7 +333,7 @@ function describeArchiveConfirm(total: number, owned: number): string {
 function describeDeleteConfirm(total: number, owned: number): string {
   const label = `${total} mail${pluralS(total)}`;
   if (owned === total) {
-    return `Masquer ${label} dans NexusHub (suppression locale : ${MAIL_LOCAL_NOTE}) ?`;
+    return `Masquer ${label} dans BND OS (suppression locale : ${MAIL_LOCAL_NOTE}) ?`;
   }
   return `Masquer ${label} ? Seuls ${owned} vous appartiennent et seront masqués (les autres seront ignorés). (suppression locale : ${MAIL_LOCAL_NOTE})`;
 }
@@ -881,7 +881,7 @@ export function buildMailTools(ctx: AuthContext): ToolSpec[] {
     defineTool({
       name: 'archive_mail',
       description:
-        'Archive un lot de mails (vos boîtes uniquement, ids via search_mails, max 100) — action LOCALE à NexusHub : le mail reste sur le serveur mail et peut réapparaître après une synchronisation. Action sensible : confirmation utilisateur requise.',
+        'Archive un lot de mails (vos boîtes uniquement, ids via search_mails, max 100) — action LOCALE à BND OS : le mail reste sur le serveur mail et peut réapparaître après une synchronisation. Action sensible : confirmation utilisateur requise.',
       inputSchema: mailBulkInputSchema,
       jsonSchema: {
         type: 'object',
@@ -900,7 +900,7 @@ export function buildMailTools(ctx: AuthContext): ToolSpec[] {
     defineTool({
       name: 'delete_mail',
       description:
-        'Masque (supprime localement) un lot de mails dans NexusHub (vos boîtes uniquement, ids via search_mails, max 100) — action LOCALE : le mail reste sur le serveur mail et peut réapparaître après une synchronisation. Action sensible : confirmation utilisateur requise.',
+        'Masque (supprime localement) un lot de mails dans BND OS (vos boîtes uniquement, ids via search_mails, max 100) — action LOCALE : le mail reste sur le serveur mail et peut réapparaître après une synchronisation. Action sensible : confirmation utilisateur requise.',
       inputSchema: mailBulkInputSchema,
       jsonSchema: {
         type: 'object',
@@ -939,7 +939,7 @@ export function buildMailTools(ctx: AuthContext): ToolSpec[] {
 
     defineTool({
       name: 'archive_mails_by_filter',
-      description: `Archive TOUS les mails de vos boîtes correspondant à un filtre serveur (expéditeur, sujet, dossier, lu/non-lu, période) — sans plafond, pour « archive tous les mails de X ». Action LOCALE à NexusHub : ${MAIL_LOCAL_NOTE}. Au moins un critère requis. Action de masse : confirmation utilisateur requise (le nombre exact est annoncé).`,
+      description: `Archive TOUS les mails de vos boîtes correspondant à un filtre serveur (expéditeur, sujet, dossier, lu/non-lu, période) — sans plafond, pour « archive tous les mails de X ». Action LOCALE à BND OS : ${MAIL_LOCAL_NOTE}. Au moins un critère requis. Action de masse : confirmation utilisateur requise (le nombre exact est annoncé).`,
       inputSchema: MailFilterSchema,
       jsonSchema: MAIL_FILTER_JSON,
       gated: true,
@@ -960,7 +960,7 @@ export function buildMailTools(ctx: AuthContext): ToolSpec[] {
 
     defineTool({
       name: 'delete_mails_by_filter',
-      description: `Masque (supprime localement) TOUS les mails de vos boîtes correspondant à un filtre serveur (expéditeur, sujet, dossier, lu/non-lu, période) — sans plafond, pour « supprime tous les mails de X ». Action LOCALE à NexusHub : ${MAIL_LOCAL_NOTE}. Au moins un critère requis. Action de masse : confirmation utilisateur requise (le nombre exact est annoncé).`,
+      description: `Masque (supprime localement) TOUS les mails de vos boîtes correspondant à un filtre serveur (expéditeur, sujet, dossier, lu/non-lu, période) — sans plafond, pour « supprime tous les mails de X ». Action LOCALE à BND OS : ${MAIL_LOCAL_NOTE}. Au moins un critère requis. Action de masse : confirmation utilisateur requise (le nombre exact est annoncé).`,
       inputSchema: MailFilterSchema,
       jsonSchema: MAIL_FILTER_JSON,
       gated: true,
@@ -969,7 +969,7 @@ export function buildMailTools(ctx: AuthContext): ToolSpec[] {
         'delete',
         'Masquer des mails ? (données invalides)',
         (count, label) =>
-          `Masquer ${count} mail${pluralS(count)} (${label}) dans NexusHub (suppression locale : ${MAIL_LOCAL_NOTE}) ?`,
+          `Masquer ${count} mail${pluralS(count)} (${label}) dans BND OS (suppression locale : ${MAIL_LOCAL_NOTE}) ?`,
       ),
       handler: async (input) =>
         safeMutation('delete_mails_by_filter', async () => {

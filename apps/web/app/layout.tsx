@@ -1,19 +1,25 @@
 import type { Metadata, Viewport } from 'next';
-import { Plus_Jakarta_Sans } from 'next/font/google';
+import { Inter, JetBrains_Mono } from 'next/font/google';
 import { readThemeCookie } from '@/lib/theme/cookie';
 import '../styles/globals.css';
 
-const jakarta = Plus_Jakarta_Sans({
+const inter = Inter({
   subsets: ['latin'],
-  weight: ['400', '500', '600', '700', '800'],
+  weight: ['400', '500', '600', '700', '800', '900'],
   variable: '--font-sans',
+  display: 'swap',
+});
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ['latin'],
+  weight: ['400', '700'],
+  variable: '--font-mono',
   display: 'swap',
 });
 
 export const metadata: Metadata = {
-  title: { default: 'NexusHub', template: '%s · NexusHub' },
+  title: { default: 'BND OS', template: '%s · BND OS' },
   description: 'Agency OS — Client › Project › Task',
-  applicationName: 'NexusHub',
+  applicationName: 'BND OS',
   // SEO neutralisé : app privée
   robots: { index: false, follow: false },
 };
@@ -22,15 +28,20 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#F4F6F9' }, // theme-exempt: meta theme-color
-    { media: '(prefers-color-scheme: dark)', color: '#0B0C10' }, // theme-exempt: meta theme-color
+    { media: '(prefers-color-scheme: light)', color: '#EEF0F8' }, // theme-exempt: meta theme-color
+    { media: '(prefers-color-scheme: dark)', color: '#060D1F' }, // theme-exempt: meta theme-color
   ],
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const theme = await readThemeCookie();
   return (
-    <html lang="fr" className={jakarta.variable} data-theme={theme} suppressHydrationWarning>
+    <html
+      lang="fr"
+      className={`${inter.variable} ${jetbrainsMono.variable}`}
+      data-theme={theme}
+      suppressHydrationWarning
+    >
       <body>{children}</body>
     </html>
   );

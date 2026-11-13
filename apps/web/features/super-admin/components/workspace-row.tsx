@@ -46,7 +46,7 @@ export function WorkspaceRow(props: WorkspaceRowProps) {
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-bold">
             {props.name}
-            <span className="ml-2 rounded-full bg-[color:var(--color-bg-hover)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.5px] text-[color:var(--color-text-muted)]">
+            <span className="ml-2 rounded-sm bg-[color:var(--color-bg-hover)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.5px] text-[color:var(--color-text-muted)]">
               {props.slug}
             </span>
           </p>

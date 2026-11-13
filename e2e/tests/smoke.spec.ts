@@ -6,9 +6,10 @@ import { expect, test } from '@playwright/test';
 test('home redirects to login with brand visible', async ({ page }) => {
   await page.goto('/');
   await expect(page).toHaveURL(/\/login$/);
-  // La marque apparaît deux fois sur /login (logo + pied) → .first() pour le mode strict.
-  await expect(page.getByText('NexusHub', { exact: true }).first()).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Bon retour parmi nous' })).toBeVisible();
+  // Le logo vit dans le panneau décoratif (aria-hidden) : la marque se vérifie
+  // sur le pied du formulaire, seul texte « BND OS » exposé.
+  await expect(page.getByText(/BND OS fonctionne sur invitation/)).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Content de vous revoir.' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Se connecter' })).toBeVisible();
 });
 

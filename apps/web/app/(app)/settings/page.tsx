@@ -41,7 +41,7 @@ export default async function SettingsPage() {
   return (
     <div className="mx-auto max-w-[900px]">
       <header className="mb-6">
-        <h1 className="text-[28px] font-extrabold tracking-tight">Paramètres</h1>
+        <h1 className="bnd-title">Paramètres</h1>
         <p className="mt-1 text-sm text-[color:var(--color-text-muted)]">
           Préférences personnelles pour cet espace de travail.
         </p>

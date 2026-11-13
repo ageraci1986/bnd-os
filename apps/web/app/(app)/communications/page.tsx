@@ -49,7 +49,7 @@ export default async function CommunicationsPage({ searchParams }: PageProps) {
     return (
       <div className="mx-auto max-w-[1100px]">
         <header className="mb-6">
-          <h1 className="text-[28px] font-extrabold tracking-tight">Communications</h1>
+          <h1 className="bnd-title">Communications</h1>
         </header>
         <EmptyNoIntegration />
       </div>
@@ -202,7 +202,7 @@ export default async function CommunicationsPage({ searchParams }: PageProps) {
   return (
     <div className="mx-auto max-w-[1200px]">
       <header className="mb-4">
-        <h1 className="text-[28px] font-extrabold tracking-tight">Communications</h1>
+        <h1 className="bnd-title">Communications</h1>
       </header>
       <div className="overflow-hidden rounded-2xl border border-[color:var(--color-border-light)] bg-[color:var(--color-bg-card)]">
         <MailTabs

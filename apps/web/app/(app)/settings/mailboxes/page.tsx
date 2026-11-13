@@ -26,7 +26,7 @@ export default async function SettingsMailboxesPage() {
   return (
     <div className="mx-auto max-w-[900px]">
       <header className="mb-6">
-        <h1 className="text-[28px] font-extrabold tracking-tight">Boîtes email</h1>
+        <h1 className="bnd-title">Boîtes email</h1>
         <p className="mt-1 text-sm text-[color:var(--color-text-muted)]">
           Signatures et préférences par boîte.
         </p>

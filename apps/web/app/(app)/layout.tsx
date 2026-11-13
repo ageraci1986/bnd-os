@@ -28,7 +28,6 @@ import { AGENT_NOTICE_KINDS } from '@/features/notifications/lib/agent-notice-ma
 import { ClientLink, AllClientsLink } from '@/features/shell/components/client-link';
 import { UserChip } from '@/features/shell/components/user-chip';
 import { ContextBarHost } from '@/features/shell/components/context-bar-host';
-import { DashboardIcon, ClientsIcon, GearIcon } from '@/features/shell/components/icons';
 import { SidebarViewer } from '@/features/shell/components/sidebar-viewer';
 import { Toaster } from '@/features/shell/components/toaster';
 import { ThemeToggle } from '@/features/shell/components/theme-toggle';
@@ -130,20 +129,15 @@ export default async function AppLayout({ children }: AppLayoutProps) {
         />
       ) : (
         <Sidebar>
-          <SidebarBrand mark="N" name="NexusHub" subtitle={workspace.name} />
+          <SidebarBrand subtitle={workspace.name} />
 
-          <SidebarSectionCollapsible
-            label="Main menu"
-            storageKey="main-menu"
-            defaultOpen
-            icon={<DashboardIcon />}
-          >
-            <NavLink href="/overview" icon="◈" label="Tableau de bord" />
-            <NavLink href="/projects" icon="◱" label="Projets" count={projectsCount} />
-            <NavLink href="/communications" icon="✉" label="Communications" />
+          <SidebarSectionCollapsible label="Menu" storageKey="main-menu" defaultOpen>
+            <NavLink href="/overview" icon="01" label="Tableau de bord" />
+            <NavLink href="/projects" icon="02" label="Projets" count={projectsCount} />
+            <NavLink href="/communications" icon="03" label="Communications" />
             <NavLink
               href="/assistant"
-              icon="◉"
+              icon="04"
               label="Assistant"
               {...(unreadAgentNoticesCount > 0 ? { dot: true } : {})}
             />
@@ -152,7 +146,6 @@ export default async function AppLayout({ children }: AppLayoutProps) {
           <SidebarSectionCollapsible
             label="Clients actifs"
             storageKey="clients-actifs"
-            icon={<ClientsIcon />}
             count={clients.length}
           >
             <AllClientsLink count={clients.length} />
@@ -167,15 +160,15 @@ export default async function AppLayout({ children }: AppLayoutProps) {
             ))}
           </SidebarSectionCollapsible>
 
-          <SidebarSectionCollapsible label="Atelier" storageKey="atelier" icon={<GearIcon />}>
-            <NavLink href="/clients" icon="◉" label="Clients" />
-            <NavLink href="/templates/cards" icon="▤" label="Templates cartes" />
-            <NavLink href="/templates/email" icon="✎" label="Templates e-mail" />
-            <NavLink href="/templates/kanban" icon="▦" label="Templates Kanban" />
-            {isAdmin ? <NavLink href="/team" icon="⎔" label="Équipe" /> : null}
-            <NavLink href="/integrations" icon="⟷" label="Intégrations" />
-            <NavLink href="/settings" icon="⚙" label="Paramètres" />
-            {isSuperAdmin ? <NavLink href="/super-admin" icon="✦" label="Super-admin" /> : null}
+          <SidebarSectionCollapsible label="Atelier" storageKey="atelier">
+            <NavLink href="/clients" icon="05" label="Clients" />
+            <NavLink href="/templates/cards" icon="06" label="Templates cartes" />
+            <NavLink href="/templates/email" icon="07" label="Templates e-mail" />
+            <NavLink href="/templates/kanban" icon="08" label="Templates Kanban" />
+            {isAdmin ? <NavLink href="/team" icon="09" label="Équipe" /> : null}
+            <NavLink href="/integrations" icon="10" label="Intégrations" />
+            <NavLink href="/settings" icon="11" label="Paramètres" />
+            {isSuperAdmin ? <NavLink href="/super-admin" icon="12" label="Super-admin" /> : null}
           </SidebarSectionCollapsible>
 
           <SidebarFooter>

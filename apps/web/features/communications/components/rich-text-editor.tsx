@@ -113,7 +113,7 @@ function ToolbarButton({
       onClick={onClick}
       className={`rounded px-2 py-0.5 text-xs font-bold ${
         on
-          ? 'bg-[color:var(--color-accent-primary)] text-white'
+          ? 'text-on-accent bg-[color:var(--color-accent-primary)]'
           : 'text-[color:var(--color-text-main)]'
       }`}
     >

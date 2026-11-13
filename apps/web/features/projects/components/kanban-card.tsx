@@ -155,7 +155,7 @@ export function KanbanCard({
             </Tag>
           ) : (
             <span
-              className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.5px]"
+              className="inline-flex items-center gap-1 rounded-sm px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.5px]"
               style={{
                 background: customColor?.bg,
                 color: customColor?.fg,

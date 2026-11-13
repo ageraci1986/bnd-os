@@ -40,7 +40,7 @@ export default async function MyProjectsPage() {
   return (
     <div className="mx-auto max-w-6xl">
       <header className="mb-8">
-        <h1 className="text-[34px] font-extrabold tracking-tight">Mes projets</h1>
+        <h1 className="bnd-title">Mes projets</h1>
         <p className="mt-2 text-sm text-[color:var(--color-text-muted)]">
           Les projets auxquels tu as accès dans cet espace.
         </p>
@@ -63,7 +63,7 @@ export default async function MyProjectsPage() {
                 <h2 className="mb-3 flex items-center gap-2 text-[11px] font-extrabold uppercase tracking-[1px] text-[color:var(--color-text-muted)]">
                   <span
                     aria-hidden="true"
-                    className="inline-block h-2 w-2 rounded-full"
+                    className="inline-block h-2 w-2 rounded-sm"
                     style={{ background: clientColorCss(first.client.colorToken) }}
                   />
                   {clientName}

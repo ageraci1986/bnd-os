@@ -1,0 +1,748 @@
+<!doctype html>
+<html lang="fr" data-mode="cobalt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BND OS - Maquettes identité 2026</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+/* ============ TOKENS · 5 couleurs de marque, rien d'autre ============ */
+:root{
+  --cobalt:#060D1F; --cobalt-2:#0A1330; --yellow:#FFE000; --plasma:#FF2E63; --blue:#1A4BFF; --ice:#EEF0F8;
+  --aurora:linear-gradient(100deg,#1A4BFF 0 25%,#6537FF 25% 50%,#FF2E63 50% 75%,#FFE000 75% 100%);
+  --r:2px; /* limite de rayon de la marque : 2–3 px */
+}
+[data-mode="cobalt"]{--lane:rgba(238,240,248,.035);--kc:#161E3A;--kc-line:rgba(238,240,248,.22);
+  --bg:var(--cobalt); --surface:var(--cobalt-2); --fg:var(--ice);
+  --mid:rgba(238,240,248,.64); --dim:rgba(238,240,248,.38);
+  --line:rgba(238,240,248,.10); --line-2:rgba(238,240,248,.20);
+  --hover:rgba(238,240,248,.05); --accent-text:var(--yellow); --ghost:rgba(238,240,248,.045);
+}
+[data-mode="ice"]{--lane:rgba(6,13,31,.07);--kc:#F8F9FD;--kc-line:rgba(6,13,31,.22);
+  --bg:var(--ice); --surface:var(--ice); --fg:var(--cobalt);
+  --mid:rgba(6,13,31,.66); --dim:rgba(6,13,31,.42);
+  --line:rgba(6,13,31,.13); --line-2:rgba(6,13,31,.28);
+  --hover:rgba(6,13,31,.045); --accent-text:var(--blue); --ghost:rgba(6,13,31,.05);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#000;font-family:Inter,system-ui,sans-serif;color:var(--ice);-webkit-font-smoothing:antialiased;font-size:14px;line-height:1.5}
+.mono{font-family:'JetBrains Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+
+/* ============ Barre de maquette (hors produit) ============ */
+.mk-bar{position:sticky;top:0;z-index:50;background:#000;border-bottom:1px solid rgba(238,240,248,.14);display:flex;align-items:center;gap:20px;padding:10px 20px;flex-wrap:wrap}
+.mk-bar .t{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(238,240,248,.5)}
+.mk-tabs{display:flex;gap:2px;flex-wrap:wrap}
+.mk-tabs button,.mk-mode button{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;padding:8px 12px;border:1px solid rgba(238,240,248,.16);border-radius:2px;color:rgba(238,240,248,.6)}
+.mk-tabs button[aria-selected="true"],.mk-mode button[aria-pressed="true"]{background:var(--yellow);color:var(--cobalt);border-color:var(--yellow)}
+.mk-mode{margin-left:auto;display:flex;gap:2px}
+.mk-stage{overflow-x:auto}
+.screen{display:none}
+.screen.on{display:block}
+
+/* ============ SHELL ============ */
+.app{display:grid;grid-template-columns:240px minmax(0,1fr);min-width:1240px;min-height:900px;background:var(--bg);color:var(--fg)}
+.side{background:var(--cobalt);color:var(--ice);border-right:1px solid rgba(238,240,248,.10);display:flex;flex-direction:column;padding:20px 0}
+.logo{display:flex;align-items:flex-start;gap:10px;padding:4px 20px 20px}
+.logo .w{font-weight:900;font-size:26px;letter-spacing:-.045em;line-height:.85;text-transform:uppercase;position:relative;padding-right:9px}
+.logo .w svg{position:absolute;top:-3px;right:-2px;width:10px;height:10px}
+.logo .os{font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(238,240,248,.45);padding-top:1px}
+.side .ws{margin:0 20px 16px;padding:10px 0;border-top:1px solid rgba(238,240,248,.10);border-bottom:1px solid rgba(238,240,248,.10);font-size:12px;display:flex;justify-content:space-between;color:rgba(238,240,248,.64)}
+.side h6{font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(238,240,248,.38);padding:14px 20px 6px}
+.nav a{display:flex;align-items:center;gap:12px;padding:8px 20px;font-size:13px;font-weight:500;color:rgba(238,240,248,.64);text-decoration:none;border-left:2px solid transparent}
+.nav a .i{font-family:'JetBrains Mono',monospace;font-size:10px;color:rgba(238,240,248,.38);width:16px}
+.nav a .n{margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:11px;color:rgba(238,240,248,.45)}
+.nav a.on{color:var(--ice);font-weight:700;border-left-color:var(--yellow);background:rgba(238,240,248,.05)}
+.nav a.on .i{color:var(--yellow)}
+.nav a .sq{width:8px;height:8px;flex:none;margin:0 4px}
+.side .me{margin-top:auto;padding:14px 20px 0;border-top:1px solid rgba(238,240,248,.10);display:flex;gap:10px;align-items:center;font-size:12px}
+.av{width:26px;height:26px;border-radius:var(--r);display:inline-grid;place-items:center;font-size:10px;font-weight:800;background:var(--fg);color:var(--bg);flex:none}
+.side .av{background:var(--ice);color:var(--cobalt)}
+.av.y{background:var(--yellow);color:var(--cobalt)} .av.b{background:var(--blue);color:#fff} .av.p{background:var(--plasma);color:var(--cobalt)}
+.av.o{background:transparent;color:var(--fg);border:1px solid var(--line-2)}
+.avs{display:flex;gap:2px}
+
+.main{display:flex;flex-direction:column;min-width:0}
+.top{height:60px;display:flex;align-items:center;gap:14px;padding:0 32px;border-bottom:1px solid var(--line);position:relative}
+.top::after{content:'';position:absolute;left:0;right:0;bottom:-1px;height:2px;background:linear-gradient(90deg,#1A4BFF 0 25%,#6537FF 25% 50%,#FF2E63 50% 75%,#FFE000 75% 100%)}
+.crumb{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+.crumb b{color:var(--fg)}
+.top .sp{flex:1}
+.chip{display:inline-flex;align-items:center;gap:8px;font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:6px 10px;border:1px solid var(--line-2);border-radius:var(--r);color:var(--fg)}
+.chip .sq{width:8px;height:8px}
+.btn{display:inline-flex;align-items:center;gap:8px;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;padding:10px 16px;border-radius:var(--r);border:1px solid var(--line-2);color:var(--fg);white-space:nowrap}
+.btn:hover{background:var(--hover)}
+.btn.pri{background:var(--yellow);border-color:var(--yellow);color:var(--cobalt)}
+.btn.pri:hover{background:#fff;border-color:#fff}
+[data-mode="ice"] .btn.pri:hover{background:var(--cobalt);border-color:var(--cobalt);color:var(--yellow)}
+.btn.dng{background:var(--plasma);border-color:var(--plasma);color:var(--cobalt)}
+.btn:focus-visible,.inp:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.page{padding:36px 32px 48px;flex:1}
+
+/* ============ TYPO ============ */
+.kicker{font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--accent-text);display:inline-flex;align-items:center;gap:12px}
+.h1{font-size:56px;font-weight:900;line-height:.92;letter-spacing:-.035em;text-transform:uppercase;margin-top:14px}
+.h1 em{font-style:normal;color:var(--accent-text)}
+.h1 .y{color:var(--accent-text)}
+.lead{font-size:15px;color:var(--mid);margin-top:14px;max-width:640px}
+.lead b{color:var(--fg);font-weight:600}
+.lbl{font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+.h3{font-size:13px;font-weight:700;letter-spacing:.14em;text-transform:uppercase}
+
+/* ============ Surfaces : filets, zéro ombre ============ */
+.card{border:1px solid var(--line);border-radius:var(--r);background:var(--surface);position:relative}
+.card-h{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--line)}
+.card-h a{font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--mid);text-decoration:none}
+.bdg{display:inline-flex;white-space:nowrap;flex:none;align-items:center;font-size:9px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;padding:2px 6px;border-radius:var(--r);border:1px solid var(--line-2);color:var(--mid)}
+.bdg.dng{background:var(--plasma);border-color:var(--plasma);color:var(--cobalt)}
+.bdg.wrn{background:var(--yellow);border-color:var(--yellow);color:var(--cobalt)}
+.bdg.inf{background:var(--blue);border-color:var(--blue);color:#fff}
+.bdg.ok{border-color:var(--fg);color:var(--fg)}
+
+/* KPI */
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--line);border-radius:var(--r);margin-top:32px}
+.kpi{padding:20px 22px 18px;border-right:1px solid var(--line);position:relative;overflow:hidden}
+.kpi:last-child{border-right:0}
+.kpi .ghost{position:absolute;right:-6px;bottom:-34px;font-size:150px;font-weight:900;letter-spacing:-.06em;line-height:1;color:var(--ghost);pointer-events:none}
+.kpi .v{font-size:64px;font-weight:900;letter-spacing:-.045em;line-height:.9;margin:14px 0 12px}
+.kpi .d{font-size:11px;color:var(--mid)}
+.kpi.alert{background:var(--plasma);color:var(--cobalt)}
+.kpi.alert .lbl,.kpi.alert .d{color:rgba(6,13,31,.75)}
+.kpi.alert .ghost{color:rgba(6,13,31,.08)}
+
+.grid3{display:grid;grid-template-columns:1.25fr 1fr 1fr;gap:16px;margin-top:16px}
+.row{display:flex;align-items:center;gap:12px;padding:12px 18px;border-bottom:1px solid var(--line)}
+.row:last-child{border-bottom:0}
+.row .bar{width:3px;align-self:stretch;flex:none}
+.row .tt{font-size:13px;font-weight:600;line-height:1.3}
+.row .mt{font-size:11px;color:var(--mid);margin-top:2px}
+.row>div{flex:1;min-width:0}.row .id{font-size:11px;color:var(--dim)}
+.prog{padding:13px 18px;border-bottom:1px solid var(--line)}
+.prog:last-child{border-bottom:0}
+.prog .l1{display:flex;justify-content:space-between;font-size:13px;font-weight:600}
+.prog .tr{height:4px;background:var(--line);margin:8px 0 6px}
+.prog .tr i{display:block;height:100%;background:var(--fg)}
+.prog .tr i.y{background:var(--yellow)} .prog .tr i.p{background:var(--plasma)}
+[data-mode="ice"] .prog .tr i.y{background:var(--blue)}
+.prog .mt{font-size:11px;color:var(--mid)}
+.act{display:flex;gap:10px;padding:11px 18px;border-bottom:1px solid var(--line);font-size:12px;color:var(--mid)}
+.act:last-child{border-bottom:0}
+.act b{color:var(--fg);font-weight:600}
+.act time{display:block;font-size:10px;color:var(--dim);margin-top:2px}
+
+/* ============ KANBAN ============ */
+.ptabs{display:flex;gap:24px;border-bottom:1px solid var(--line);margin-top:28px}
+.ptabs a{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);padding:10px 0;text-decoration:none;border-bottom:2px solid transparent;margin-bottom:-1px}
+.ptabs a.on{color:var(--fg);border-bottom-color:var(--yellow)}
+[data-mode="ice"] .ptabs a.on{border-bottom-color:var(--cobalt)}
+.kbar{display:flex;align-items:center;gap:28px;margin:18px 0}
+.stat b{font-size:22px;font-weight:900;letter-spacing:-.03em;margin-right:6px}
+.board{display:grid;grid-template-columns:repeat(6,minmax(180px,1fr));gap:10px;overflow-x:auto;padding-bottom:8px}
+.col{background:var(--lane);border-radius:var(--r);padding:12px 10px 10px;align-self:start}
+.col-h{display:flex;align-items:baseline;gap:8px;padding-bottom:8px;border-bottom:2px solid var(--fg)}
+.col-h .n{font-size:11px;color:var(--dim);margin-left:auto}
+.col-s{font-size:10px;color:var(--dim);padding:6px 0 10px}
+.col.blk .col-h{border-bottom-color:var(--plasma)}
+.col.blk .h3{color:var(--plasma)}
+[data-mode="ice"] .col.blk .h3{color:var(--cobalt)}
+.kc{border:1px solid var(--kc-line);border-left:3px solid var(--fg);border-radius:var(--r);background:var(--kc);padding:12px;margin-bottom:10px;position:relative}
+.kc:hover{border-color:var(--fg)}
+.kc.done{border-left-color:var(--kc-line)}
+.kc .tg{display:flex;gap:4px;margin-bottom:8px}
+.kc .tt{font-size:13.5px;font-weight:700;line-height:1.35}
+.kc .ft{display:flex;align-items:center;gap:8px;margin-top:12px;padding-top:10px;border-top:1px solid var(--line);font-size:11px;color:var(--mid)}
+.kc .ft .avs{margin-left:auto}
+.kc .ft .av{width:20px;height:20px;font-size:8px}
+.kc.late{border-color:var(--plasma);border-left-color:var(--plasma)}
+.kc.late .due{color:var(--plasma);font-weight:700}
+[data-mode="ice"] .kc.late .due{color:var(--cobalt);background:var(--plasma);padding:1px 4px}
+.kc .back{font-size:10px;color:var(--mid);border-top:1px solid var(--line);margin-top:10px;padding-top:8px}
+.kc.done .tt{text-decoration:line-through;color:var(--mid)}
+.auto{white-space:nowrap;margin:-12px -12px 10px -12px;padding:7px 12px;background:var(--yellow);color:var(--cobalt);font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;display:flex;justify-content:space-between;position:relative}
+.auto u{text-underline-offset:2px}
+.auto::after{content:'';position:absolute;left:0;bottom:0;height:2px;width:62%;background:var(--cobalt)}
+.add{font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);border:1px dashed var(--line-2);border-radius:var(--r);padding:9px 12px;width:100%;text-align:left}
+
+/* ============ MODAL CARTE ============ */
+.modal-wrap{position:relative}
+.scrim{position:absolute;inset:0;background:rgba(6,13,31,.82);display:grid;place-items:start center;padding-top:44px}
+.modal{width:880px;background:var(--bg);color:var(--fg);border:1px solid var(--line-2);border-radius:3px}
+.m-alert{background:var(--plasma);color:var(--cobalt);display:flex;align-items:center;gap:14px;padding:12px 24px;font-size:13px;font-weight:600}
+.m-alert .btn{margin-left:auto;background:var(--cobalt);border-color:var(--cobalt);color:var(--ice)}
+.m-h{padding:22px 24px 18px;border-bottom:1px solid var(--line)}
+.m-h h2{font-size:30px;font-weight:900;letter-spacing:-.03em;line-height:1;text-transform:uppercase;margin-top:10px}
+.m-b{display:grid;grid-template-columns:minmax(0,1fr) 280px}
+.m-l{padding:22px 24px;border-right:1px solid var(--line)}
+.m-r{padding:22px 24px}
+.sec{margin-bottom:24px}
+.sec>.lbl{display:flex;justify-content:space-between;margin-bottom:10px}
+.ck{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px}
+.ck .bx{width:16px;height:16px;border:1.5px solid var(--line-2);border-radius:var(--r);display:grid;place-items:center;font-size:11px;font-weight:900;flex:none}
+.ck.on .bx{background:var(--fg);border-color:var(--fg);color:var(--bg)}
+.ck.on span{color:var(--mid);text-decoration:line-through}
+.raci{display:flex;align-items:center;gap:10px;padding:7px 0;font-size:13px}
+.raci .rl{margin-left:auto;width:22px;height:22px;display:grid;place-items:center;font-size:11px;font-weight:900;border-radius:var(--r)}
+.rl.R{background:var(--blue);color:#fff}.rl.A{background:var(--yellow);color:var(--cobalt)}
+.rl.C{border:1.5px solid var(--fg)}.rl.I{border:1.5px solid var(--line-2);color:var(--mid)}
+.meta{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line);font-size:12px}
+.meta span:first-child{color:var(--mid)}
+
+
+/* ============ CALENDRIER ============ */
+.cal-bar{display:flex;align-items:center;gap:12px;margin:18px 0}
+.cal-bar .mo{font-size:22px;font-weight:900;letter-spacing:-.03em;text-transform:uppercase;margin-right:8px}
+.lg{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--mid);margin-left:12px}
+.lg i{width:8px;height:8px;display:block}
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border:1px solid var(--kc-line);border-radius:var(--r);overflow:hidden}
+.cal .dh{padding:10px 12px;font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);border-bottom:2px solid var(--fg);background:var(--lane)}
+.cal .d{min-height:112px;padding:8px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);min-width:0}
+.cal .d:nth-child(7n){border-right:0}
+.cal .d .n{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--mid);display:inline-block;padding:1px 4px;margin-bottom:6px}
+.cal .d.out{background:var(--lane)} .cal .d.out .n{color:var(--dim)}
+.cal .d.today .n{background:var(--yellow);color:var(--cobalt);font-weight:700}
+.ev{display:block;font-size:11px;font-weight:600;padding:3px 6px;margin-bottom:3px;background:var(--kc);border:1px solid var(--kc-line);border-left:3px solid var(--fg);border-radius:var(--r);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ev.blk{background:var(--plasma);border-color:var(--plasma);color:var(--cobalt)}
+.ev.done{text-decoration:line-through;color:var(--mid);border-left-color:var(--kc-line)}
+.ev.more{background:none;border:0;color:var(--mid);font-weight:400;padding-left:0}
+
+/* ============ COMMUNICATIONS ============ */
+.split{display:grid;border:1px solid var(--kc-line);border-radius:var(--r);margin-top:20px;min-height:600px}
+.split>*+*{border-left:1px solid var(--kc-line)}
+.pane-l{background:var(--lane)}
+.msg{display:flex;gap:10px;padding:13px 16px;border-bottom:1px solid var(--line);border-left:3px solid transparent}
+.msg.on{background:var(--kc);border-left-color:var(--yellow)}
+[data-mode="ice"] .msg.on{border-left-color:var(--cobalt)}
+.msg .bd{min-width:0;flex:1}
+.msg .l1{display:flex;justify-content:space-between;font-size:12px;color:var(--mid)}
+.msg .sj{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.msg.un .sj,.msg.un .l1 b{font-weight:800;color:var(--fg)}
+.msg .pv{font-size:12px;color:var(--mid);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.msg .dot{width:8px;height:8px;background:var(--accent-text);flex:none;margin-top:6px}
+.rd-h{padding:18px 24px;border-bottom:1px solid var(--line)}
+.rd-h h2{font-size:24px;font-weight:900;letter-spacing:-.03em;line-height:1.05;text-transform:uppercase;margin:10px 0 12px}
+.rd-b{padding:24px;font-size:14px;color:var(--mid);max-width:68ch}
+.rd-b p+p{margin-top:12px}
+.reply{margin:0 24px 24px;border:1px solid var(--kc-line);border-radius:var(--r);padding:14px;display:flex;align-items:center;gap:12px;color:var(--dim)}
+
+/* ============ TABLEAUX ============ */
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{text-align:left;font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);padding:10px 16px;border-bottom:2px solid var(--fg);background:var(--lane)}
+.tbl td{padding:11px 16px;border-bottom:1px solid var(--line);vertical-align:middle}
+.tbl tr:last-child td{border-bottom:0}
+.tbl td.m{color:var(--mid)}
+.who{display:flex;align-items:center;gap:10px;font-weight:600}
+.who small{display:block;font-weight:400;color:var(--mid);font-size:11px}
+.cl{display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid var(--line);border-left:3px solid transparent}
+.cl.on{background:var(--kc);border-left-color:var(--yellow)}
+[data-mode="ice"] .cl.on{border-left-color:var(--cobalt)}
+.cl b{display:block;font-size:13px}.cl small{font-size:11px;color:var(--mid)}
+.cl .sq{width:10px;height:10px;flex:none}
+.kpis.sm{margin-top:0;border-width:0 0 1px}
+.kpis.sm .kpi{padding:14px 18px}.kpis.sm .v{font-size:36px;margin:8px 0 0}
+.two-c{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px;margin-top:20px;align-items:start}
+
+/* ============ PARAMÈTRES ============ */
+.set{display:grid;grid-template-columns:200px minmax(0,1fr);gap:40px;margin-top:28px}
+.set nav a{display:block;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);padding:9px 12px;border-left:2px solid var(--line)}
+.set nav a.on{color:var(--fg);border-left-color:var(--yellow)}
+[data-mode="ice"] .set nav a.on{border-left-color:var(--cobalt)}
+.srow{display:flex;align-items:center;gap:20px;padding:14px 18px;border-bottom:1px solid var(--line)}
+.srow:last-child{border-bottom:0}
+.srow .tx{flex:1}.srow .tx b{display:block;font-size:13px}.srow .tx small{font-size:12px;color:var(--mid)}
+.seg{display:inline-flex;border:1px solid var(--kc-line);border-radius:var(--r)}
+.seg span{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;padding:7px 12px;color:var(--mid)}
+.seg span.on{background:var(--fg);color:var(--bg)}
+.tg{width:34px;height:18px;border:1.5px solid var(--kc-line);border-radius:var(--r);position:relative;flex:none;display:inline-block}
+.tg::after{content:'';position:absolute;top:2px;left:2px;width:11px;height:11px;background:var(--dim)}
+.tg.on{background:var(--yellow);border-color:var(--yellow)}
+.tg.on::after{left:auto;right:2px;background:var(--cobalt)}
+
+/* ============ ASSISTANT ============ */
+.chat{max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:16px;padding-top:8px}
+.orb{width:56px;height:56px;margin:0 auto}
+.bub{padding:12px 16px;border-radius:var(--r);font-size:14px;max-width:560px}
+.bub.me{align-self:flex-end;background:var(--fg);color:var(--bg)}
+.bub.ai{background:var(--kc);border:1px solid var(--kc-line);border-left:3px solid var(--blue)}
+.wdg{border:1px solid var(--kc-line);border-radius:var(--r);background:var(--kc);max-width:560px}
+.wdg .wh{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line)}
+.wdg .wb{padding:12px 14px;font-size:13px}
+.wdg .wf{display:flex;gap:8px;padding:10px 14px;border-top:1px solid var(--line)}
+.sugg{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.ask{display:flex;align-items:center;gap:12px;border:1px solid var(--kc-line);border-radius:var(--r);padding:10px 10px 10px 16px;color:var(--dim);background:var(--kc)}
+.ask span{flex:1}
+kbd{font-family:'JetBrains Mono',monospace;font-size:10px;border:1px solid var(--kc-line);border-radius:var(--r);padding:2px 5px;color:var(--mid)}
+
+/* ============ LOGIN ============ */
+.login{display:grid;grid-template-columns:1.15fr 1fr;min-width:1240px;min-height:820px}
+.l-brand{background:var(--cobalt);color:var(--ice);padding:48px 56px;display:flex;flex-direction:column;justify-content:space-between;position:relative;overflow:hidden}
+.l-brand::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 55% 60% at 90% 10%,rgba(26,75,255,.28),transparent 60%),radial-gradient(ellipse 60% 50% at 95% 75%,rgba(255,46,99,.20),transparent 60%),radial-gradient(ellipse 45% 50% at 5% 95%,rgba(255,224,0,.08),transparent 55%)}
+.l-brand>*{position:relative}
+.l-brand .big{font-size:104px;font-weight:900;line-height:.88;letter-spacing:-.045em;text-transform:uppercase}
+.l-brand .big .o{color:var(--ice)}
+.l-brand .big em{font-style:italic;background:linear-gradient(100deg,#FFE000 0 40%,#FF2E63 40% 72%,#6537FF 72% 90%,#1A4BFF 90%);-webkit-background-clip:text;background-clip:text;color:transparent;padding-right:.08em}
+.ticker{margin:0 -56px -48px;background:var(--yellow);color:var(--cobalt);padding:11px 0;font-size:12px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;white-space:nowrap;overflow:hidden}
+.l-form{background:var(--bg);color:var(--fg);padding:48px 72px;display:flex;flex-direction:column;justify-content:center}
+.l-form h2{font-size:40px;font-weight:900;letter-spacing:-.035em;line-height:.95;text-transform:uppercase;margin:14px 0 8px}
+.fld{margin-top:20px}
+.fld label{display:flex;justify-content:space-between;font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--mid);margin-bottom:8px}
+.inp{width:100%;font:inherit;font-size:14px;color:var(--fg);background:transparent;border:1px solid var(--line-2);border-radius:var(--r);padding:12px 14px}
+.inp::placeholder{color:var(--dim)}
+
+/* ============ FONDATIONS ============ */
+.fnd{background:var(--bg);color:var(--fg);padding:48px;min-width:1240px}
+.fnd h2{font-size:13px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;margin:44px 0 16px;padding-bottom:10px;border-bottom:1px solid var(--line)}
+.sw{display:grid;grid-template-columns:repeat(5,1fr);border:1px solid var(--line)}
+.sw div{padding:18px;min-height:150px;display:flex;flex-direction:column;justify-content:flex-end;font-size:12px}
+.sw b{font-size:15px;font-weight:800}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:40px}
+.spec{display:grid;grid-template-columns:150px 1fr;gap:10px 20px;align-items:baseline;font-size:13px}
+.spec dt{font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+.spec dd{color:var(--mid)} .spec dd b{color:var(--fg);font-weight:600}
+.flex{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.rules{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--line)}
+.rules>div{padding:20px}.rules>div+div{border-left:1px solid var(--line)}
+.rules li{list-style:none;padding:7px 0;border-bottom:1px solid var(--line);font-size:13px;color:var(--mid)}
+.rules li:last-child{border:0}
+</style>
+</head>
+<body>
+
+<div class="mk-bar">
+  <span class="t">Maquettes · identité BND 2026</span>
+  <div class="mk-tabs" role="tablist">
+    <button role="tab" data-s="overview" aria-selected="true">01 Overview</button>
+    <button role="tab" data-s="kanban" aria-selected="false">02 Kanban</button>
+    <button role="tab" data-s="modal" aria-selected="false">03 Carte</button>
+    <button role="tab" data-s="cal" aria-selected="false">04 Calendrier</button>
+    <button role="tab" data-s="comm" aria-selected="false">05 Communications</button>
+    <button role="tab" data-s="clients" aria-selected="false">06 Clients</button>
+    <button role="tab" data-s="team" aria-selected="false">07 Équipe</button>
+    <button role="tab" data-s="settings" aria-selected="false">08 Paramètres</button>
+    <button role="tab" data-s="assistant" aria-selected="false">09 Assistant</button>
+    <button role="tab" data-s="login" aria-selected="false">10 Login</button>
+    <button role="tab" data-s="fnd" aria-selected="false">11 Fondations</button>
+  </div>
+  <div class="mk-mode">
+    <button data-m="cobalt" aria-pressed="true">Cobalt (sombre)</button>
+    <button data-m="ice" aria-pressed="false">Ice (clair)</button>
+  </div>
+</div>
+
+<template id="tpl-side">
+  <aside class="side">
+    <div class="logo"><span class="w">BND<svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="6" fill="#FF2E63"/><path d="M16 0 18 14 32 16 18 18 16 32 14 18 0 16 14 14Z" fill="#FFE000" opacity=".9"/></svg></span><span class="os">OS</span></div>
+    <div class="ws"><span>Studio Atlas</span><span class="mono">▾</span></div>
+    <nav class="nav">
+      <a data-k="overview"><span class="i">01</span>Dashboard</a>
+      <a data-k="kanban"><span class="i">02</span>Projets<span class="n">14</span></a>
+      <a data-k="comm"><span class="i">03</span>Communications<span class="n">23</span></a>
+      <a data-k="assistant"><span class="i">04</span>Assistant</a>
+      <h6>Clients actifs</h6>
+      <a><span class="sq" style="background:#FF2E63"></span>Acme Brands<span class="n">5</span></a>
+      <a><span class="sq" style="background:#1A4BFF"></span>TechGroup SA<span class="n">3</span></a>
+      <a><span class="sq" style="background:#FFE000"></span>Nova Editions<span class="n">2</span></a>
+      <a><span class="sq" style="background:#EEF0F8"></span>Lumen &amp; Co<span class="n">3</span></a>
+      <h6>Atelier</h6>
+      <a data-k="clients"><span class="i">05</span>Clients</a>
+      <a><span class="i">06</span>Templates</a>
+      <a data-k="team"><span class="i">07</span>Équipe</a>
+      <a><span class="i">08</span>Intégrations</a>
+      <a data-k="settings"><span class="i">09</span>Paramètres</a>
+    </nav>
+    <div class="me"><span class="av">AL</span><div><b>Angelo Lambert</b><div class="lbl" style="color:rgba(238,240,248,.45)">Admin</div></div></div>
+  </aside>
+</template>
+
+<div class="mk-stage">
+
+<!-- ================= 01 OVERVIEW ================= -->
+<section class="screen on" id="s-overview">
+ <div class="app">
+  <div data-side="overview"></div>
+  <div class="main">
+    <header class="top">
+      <span class="crumb">Studio Atlas · <b>Dashboard</b></span><span class="sp"></span>
+      <span class="chip">Tous les clients · 5</span>
+      <button class="btn">Alertes <span class="mono">03</span></button>
+      <button class="btn pri">+ Nouveau projet</button>
+    </header>
+    <div class="page">
+      <span class="kicker">Lundi 13 avril 2026</span>
+      <h1 class="h1">5 livrables.<br><em>3 blocages.</em></h1>
+      <p class="lead"><b>Bienvenue ma star ! Prêt(e) à dead ça ?</b></p>
+      <p class="lead"><b>5 livrables critiques</b> sont dus aujourd'hui et <b>3 cartes</b> sont bloquées par une échéance dépassée.</p>
+
+      <div class="kpis">
+        <div class="kpi"><span class="ghost">14</span><div class="lbl">Projets actifs</div><div class="v">14</div><div class="d mono">+2 vs semaine dernière</div></div>
+        <div class="kpi"><span class="ghost">27</span><div class="lbl">Mes tâches</div><div class="v">27</div><div class="d mono">5 à livrer aujourd'hui</div></div>
+        <div class="kpi alert"><span class="ghost">03</span><div class="lbl">Cartes bloquées</div><div class="v">03</div><div class="d mono">retard détecté · auto</div></div>
+        <div class="kpi"><span class="ghost">32</span><div class="lbl">Messages non lus</div><div class="v">32</div><div class="d mono">18 Slack · 14 mails</div></div>
+      </div>
+
+      <div class="grid3">
+        <div class="card">
+          <div class="card-h"><span class="h3">Tâches urgentes</span><a href="#">Voir tout →</a></div>
+          <div class="row"><span class="bar" style="background:#FF2E63"></span><div><div class="tt">Valider la DA de la key visual · Été 2025</div><div class="mt">Acme Brands · Campagne Été</div></div><span class="bdg dng">Bloqué +2j</span><span class="id mono">#124</span></div>
+          <div class="row"><span class="bar" style="background:#1A4BFF"></span><div><div class="tt">Livrer les maquettes formats Meta</div><div class="mt">TechGroup · Lancement Q2</div></div><span class="bdg wrn">Auj. 14:00</span><span class="id mono">#089</span></div>
+          <div class="row"><span class="bar" style="background:#FFE000"></span><div><div class="tt">Brief créatif social media · mai</div><div class="mt">Nova · Ongoing 2026</div></div><span class="bdg wrn">Auj. 17:00</span><span class="id mono">#201</span></div>
+          <div class="row"><span class="bar" style="background:var(--fg)"></span><div><div class="tt">Relecture script spot TV 30''</div><div class="mt">Lumen · Spot Printemps</div></div><span class="bdg">Demain</span><span class="id mono">#167</span></div>
+          <div class="row"><span class="bar" style="background:#FF2E63"></span><div><div class="tt">Export final packaging · BAT</div><div class="mt">Acme · Packaging</div></div><span class="bdg dng">Bloqué</span><span class="id mono">#112</span></div>
+        </div>
+        <div class="card">
+          <div class="card-h"><span class="h3">Avancement projets</span><a href="#">Voir tout →</a></div>
+          <div class="prog"><div class="l1"><span>Campagne Été 2025</span><span class="mono">82%</span></div><div class="tr"><i class="y" style="width:82%"></i></div><div class="mt">Acme · fin 28 avril</div></div>
+          <div class="prog"><div class="l1"><span>Lancement Q2 produit</span><span class="mono">48%</span></div><div class="tr"><i style="width:48%"></i></div><div class="mt">TechGroup · fin 15 mai</div></div>
+          <div class="prog"><div class="l1"><span>Social Media Ongoing</span><span class="mono">34%</span></div><div class="tr"><i class="p" style="width:34%"></i></div><div class="mt">Nova · en retard 4 j</div></div>
+          <div class="prog"><div class="l1"><span>Spot TV Printemps</span><span class="mono">61%</span></div><div class="tr"><i style="width:61%"></i></div><div class="mt">Lumen · fin 22 avril</div></div>
+          <div class="prog"><div class="l1"><span>Refonte Packaging</span><span class="mono">19%</span></div><div class="tr"><i class="p" style="width:19%"></i></div><div class="mt">Acme · blocage en cours</div></div>
+        </div>
+        <div class="card">
+          <div class="card-h"><span class="h3">Activité</span><a href="#">24 h →</a></div>
+          <div class="act"><span class="av">MD</span><div><b>Marie</b> a coché les 3 derniers items de « Maquette hero »<time class="mono">14 min</time></div></div>
+          <div class="act"><span class="av b">◆</span><div><b>Système</b> a déplacé « Valider DA » vers Bloqué <span class="bdg inf">Auto</span><time class="mono">1 h</time></div></div>
+          <div class="act"><span class="av">JT</span><div><b>Julien</b> a créé le projet « Refonte site corporate »<time class="mono">2 h</time></div></div>
+          <div class="act"><span class="av">LP</span><div><b>Léa</b> a commenté « Script spot 30'' »<time class="mono">3 h</time></div></div>
+          <div class="act"><span class="av b">◆</span><div><b>Système</b> a avancé 2 cartes après checklist complète <span class="bdg inf">Auto</span><time class="mono">4 h</time></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+ </div>
+</section>
+
+<!-- ================= 02 KANBAN ================= -->
+<template id="tpl-kanban">
+  <div class="main">
+    <header class="top">
+      <span class="crumb">Projets · Acme Brands · <b>Campagne Été 2025</b></span><span class="sp"></span>
+      <span class="chip"><span class="sq" style="background:#FF2E63"></span>Mode Acme Brands ×</span>
+      <button class="btn">Partager</button>
+      <button class="btn pri">+ Nouvelle carte</button>
+    </header>
+    <div class="page">
+      <span class="kicker">Brand activation · livraison 28 avril</span>
+      <h1 class="h1">Campagne <em>Été 2025</em></h1>
+      <div class="ptabs"><a class="on">Kanban</a><a>Calendrier</a><a>RACI</a><a>Fichiers</a></div>
+      <div class="kbar">
+        <span class="stat"><b>24</b><span class="lbl">cartes</span></span>
+        <span class="stat"><b style="color:var(--plasma)">02</b><span class="lbl">bloquées</span></span>
+        <span class="stat"><b>82%</b><span class="lbl">réalisé</span></span>
+        <span class="sp" style="flex:1"></span>
+        <span class="bdg ok">Auto-progression active</span>
+        <button class="btn">Mes cartes</button>
+      </div>
+      <div class="board">
+        <div class="col"><div class="col-h"><span class="h3">Brief</span><span class="n mono">04</span></div><div class="col-s mono">checklist complète → Créa</div>
+          <div class="kc"><div class="tg"><span class="bdg">Stratégie</span></div><div class="tt">Workshop de cadrage avec Sophie (Acme)</div><div class="ft"><span class="mono">15 avr.</span><span class="avs"><span class="av">AL</span><span class="av y">MD</span></span></div></div>
+          <div class="kc"><div class="tg"><span class="bdg">Copy</span></div><div class="tt">Brief créatif v2 · retours légal</div><div class="ft"><span class="mono">16 avr.</span><span class="mono">2/5</span><span class="avs"><span class="av">JT</span></span></div></div>
+          <div class="kc"><div class="tg"><span class="bdg">Recherche</span></div><div class="tt">Benchmark concurrence été 2024</div><div class="ft"><span class="mono">18 avr.</span><span class="avs"><span class="av">LP</span></span></div></div>
+          <button class="add">+ Ajouter une carte</button></div>
+        <div class="col"><div class="col-h"><span class="h3">Créa</span><span class="n mono">06</span></div><div class="col-s mono">checklist complète → Revue</div>
+          <div class="kc"><div class="auto"><span>→ Revue</span><u>Annuler</u></div><div class="tg"><span class="bdg">Design</span><span class="bdg">Key visual</span></div><div class="tt">Hero web desktop + mobile</div><div class="ft"><span class="bdg wrn">Auj.</span><span class="mono">5/5</span><span class="avs"><span class="av b">CR</span><span class="av">AL</span></span></div></div>
+          <div class="kc"><div class="tg"><span class="bdg">Design</span></div><div class="tt">6 formats print OOH 4×3</div><div class="ft"><span class="mono">21 avr.</span><span class="avs"><span class="av b">CR</span></span></div></div>
+          <div class="kc"><div class="tg"><span class="bdg">Vidéo</span></div><div class="tt">Storyboard spot digital 15''</div><div class="ft"><span class="mono">22 avr.</span><span class="mono">3/10</span><span class="avs"><span class="av y">MD</span></span></div></div>
+          <button class="add">+ Ajouter une carte</button></div>
+        <div class="col"><div class="col-h"><span class="h3">Revue interne</span><span class="n mono">03</span></div><div class="col-s mono">checklist complète → Client</div>
+          <div class="kc"><div class="tg"><span class="bdg">Design</span></div><div class="tt">Maquettes hero · relecture DA</div><div class="ft"><span class="mono">17 avr.</span><span class="mono">3/3 ✓</span><span class="avs"><span class="av">AL</span></span></div></div>
+          <div class="kc"><div class="tg"><span class="bdg">Copy</span></div><div class="tt">Taglines · arbitrage DG</div><div class="ft"><span class="mono">18 avr.</span><span class="avs"><span class="av">JT</span></span></div></div>
+          <button class="add">+ Ajouter une carte</button></div>
+        <div class="col"><div class="col-h"><span class="h3">Validation client</span><span class="n mono">02</span></div><div class="col-s mono">checklist complète → Livré</div>
+          <div class="kc"><div class="tg"><span class="bdg">Design</span></div><div class="tt">Key visual v3 · validation Sophie</div><div class="ft"><span class="mono">Demain</span><span class="mono">1/2</span><span class="avs"><span class="av">AL</span></span></div></div>
+          <div class="kc"><div class="tg"><span class="bdg">Web</span></div><div class="tt">Landing · BAT client</div><div class="ft"><span class="mono">24 avr.</span><span class="avs"><span class="av">AL</span></span></div></div>
+          <button class="add">+ Ajouter une carte</button></div>
+        <div class="col"><div class="col-h"><span class="h3">Livré</span><span class="n mono">09</span></div><div class="col-s mono">colonne finale · archivage 30 j</div>
+          <div class="kc done"><div class="tg"><span class="bdg">Stratégie</span></div><div class="tt">Note d'intention validée</div><div class="ft"><span class="mono">✓ 02 avr.</span><span class="avs"><span class="av o">AL</span></span></div></div>
+          <div class="kc done"><div class="tg"><span class="bdg">Recherche</span></div><div class="tt">Moodboard · validé</div><div class="ft"><span class="mono">✓ 05 avr.</span><span class="avs"><span class="av o">LP</span></span></div></div>
+          <div class="kc done"><div class="tg"><span class="bdg">Design</span></div><div class="tt">Logo activation été</div><div class="ft"><span class="mono">✓ 08 avr.</span><span class="avs"><span class="av o">CR</span></span></div></div></div>
+        <div class="col blk"><div class="col-h"><span class="h3">Bloqué</span><span class="n mono">02</span></div><div class="col-s mono">système · non configurable</div>
+          <div class="kc late"><div class="tg"><span class="bdg">Design</span></div><div class="tt">Valider la DA de la key visual</div><div class="ft"><span class="mono due">8 avr. · +2 j</span><span class="avs"><span class="av">AL</span></span></div><div class="back mono">← Créa · repousser l'échéance</div></div>
+          <div class="kc late"><div class="tg"><span class="bdg">Web</span></div><div class="tt">Export final packaging · BAT</div><div class="ft"><span class="mono due">9 avr. · +1 j</span><span class="avs"><span class="av">LP</span></span></div><div class="back mono">← Validation client</div></div></div>
+      </div>
+    </div>
+  </div>
+</template>
+<section class="screen" id="s-kanban"><div class="app"><div data-side="kanban"></div><div data-kanban></div></div></section>
+
+<!-- ================= 03 MODAL CARTE ================= -->
+<section class="screen" id="s-modal">
+ <div class="modal-wrap">
+  <div class="app"><div data-side="kanban"></div><div data-kanban></div></div>
+  <div class="scrim">
+    <div class="modal">
+      <div class="m-alert"><span>Échéance dépassée depuis 2 jours. Carte déplacée en Bloqué.</span><button class="btn">Modifier l'échéance</button></div>
+      <div class="m-h">
+        <div class="flex"><span class="bdg dng">Bloqué</span><span class="bdg">Design</span><span class="lbl mono" style="margin-left:auto">#124 · Campagne Été 2025</span></div>
+        <h2>Valider la DA de la key visual</h2>
+      </div>
+      <div class="m-b">
+        <div class="m-l">
+          <div class="sec"><div class="lbl">Description</div><p style="color:var(--mid);font-size:14px">Arbitrer entre les pistes A et C avec Sophie (Acme). La piste retenue part en déclinaison OOH dès validation.</p></div>
+          <div class="sec"><div class="lbl"><span>Checklist</span><span class="mono">2/4</span></div>
+            <div class="ck on"><span class="bx">✓</span><span>Exporter les pistes A et C en HD</span></div>
+            <div class="ck on"><span class="bx">✓</span><span>Envoyer le comparatif à Sophie</span></div>
+            <div class="ck"><span class="bx"></span><span>Recueillir l'arbitrage client</span></div>
+            <div class="ck"><span class="bx"></span><span>Mettre à jour le brief de déclinaison</span></div>
+          </div>
+          <div class="sec" style="margin:0"><div class="lbl">Activité</div>
+            <div class="act" style="padding-left:0"><span class="av b">◆</span><div><b>Système</b> a déplacé la carte vers Bloqué <span class="bdg inf">Auto</span><time class="mono">8 avr. · 00:00</time></div></div>
+            <div class="act" style="padding-left:0"><span class="av y">MD</span><div><b>Marie</b> a ajouté la piste C en pièce jointe<time class="mono">7 avr. · 16:42</time></div></div>
+          </div>
+        </div>
+        <div class="m-r">
+          <div class="sec"><div class="lbl">Détails</div>
+            <div class="meta"><span>Échéance</span><b class="mono" style="color:var(--plasma)">08.04.2026</b></div>
+            <div class="meta"><span>Colonne d'origine</span><b>Créa</b></div>
+            <div class="meta"><span>Client</span><b>Acme Brands</b></div>
+          </div>
+          <div class="sec" style="margin:0"><div class="lbl"><span>RACI</span><span>+ Ajouter</span></div>
+            <div class="raci"><span class="av">AL</span>Angelo Lambert<span class="rl R">R</span></div>
+            <div class="raci"><span class="av b">CR</span>Camille Roy<span class="rl R">R</span></div>
+            <div class="raci"><span class="av y">MD</span>Marie Dubois<span class="rl A">A</span></div>
+            <div class="raci"><span class="av o">JT</span>Julien Thomas<span class="rl C">C</span></div>
+            <div class="raci"><span class="av o">LP</span>Léa Petit<span class="rl I">I</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+ </div>
+</section>
+
+
+<section class="screen" id="s-cal">
+ <div class="app">
+  <div data-side="kanban"></div>
+  <div class="main">
+    <header class="top"><span class="crumb">Projets · Tous clients · <b>Calendrier</b></span><span class="sp"></span><span class="chip">Tous les clients · 5</span><button class="btn pri">+ Nouvelle carte</button></header>
+    <div class="page">
+      <span class="kicker">42 échéances ce mois</span>
+      <h1 class="h1">Échéances <em>d'avril</em></h1>
+      <div class="ptabs"><a>Kanban</a><a class="on">Calendrier</a><a>RACI</a><a>Fichiers</a></div>
+      <div class="cal-bar"><span class="mo">Avril 2026</span><button class="btn">‹</button><button class="btn">›</button><button class="btn">Aujourd'hui</button><button class="btn">Mois · Année ▾</button>
+        <span style="flex:1"></span><span class="lg"><i style="background:#FF2E63"></i>Acme</span><span class="lg"><i style="background:#1A4BFF"></i>TechGroup</span><span class="lg"><i style="background:#FFE000"></i>Nova</span><span class="lg"><i style="background:var(--fg)"></i>Lumen</span><span class="bdg dng" style="margin-left:12px">Bloqué</span></div>
+      <div class="cal"><div class="dh">Lun</div><div class="dh">Mar</div><div class="dh">Mer</div><div class="dh">Jeu</div><div class="dh">Ven</div><div class="dh">Sam</div><div class="dh">Dim</div><div class="d out"><span class="n">30</span></div><div class="d out"><span class="n">31</span></div><div class="d"><span class="n">01</span><span class="ev " style="border-left-color:#FFE000">Kick-off Ongoing mai</span></div><div class="d"><span class="n">02</span><span class="ev done">Note d'intention</span></div><div class="d"><span class="n">03</span></div><div class="d"><span class="n">04</span></div><div class="d"><span class="n">05</span><span class="ev done">Moodboard validé</span></div><div class="d"><span class="n">06</span><span class="ev " style="border-left-color:#1A4BFF">Brief lancement Q2</span></div><div class="d"><span class="n">07</span></div><div class="d"><span class="n">08</span><span class="ev blk">Valider DA · +2 j</span></div><div class="d"><span class="n">09</span><span class="ev blk">Export BAT · +1 j</span></div><div class="d"><span class="n">10</span></div><div class="d"><span class="n">11</span></div><div class="d"><span class="n">12</span></div><div class="d today"><span class="n">13</span><span class="ev " style="border-left-color:#FF2E63">Hero web desktop</span><span class="ev " style="border-left-color:#1A4BFF">Formats Meta</span><span class="ev " style="border-left-color:#FFE000">Brief social mai</span><span class="ev more">+2 autres</span></div><div class="d"><span class="n">14</span><span class="ev " style="border-left-color:#FF2E63">Key visual v3</span><span class="ev " style="border-left-color:var(--fg)">Script spot 30''</span></div><div class="d"><span class="n">15</span><span class="ev " style="border-left-color:#FF2E63">Workshop Sophie</span></div><div class="d"><span class="n">16</span><span class="ev " style="border-left-color:#FF2E63">Brief créatif v2</span><span class="ev " style="border-left-color:#1A4BFF">Wireframes produit</span></div><div class="d"><span class="n">17</span><span class="ev " style="border-left-color:#FF2E63">Relecture DA hero</span></div><div class="d"><span class="n">18</span><span class="ev " style="border-left-color:#FF2E63">Benchmark été</span></div><div class="d"><span class="n">19</span></div><div class="d"><span class="n">20</span><span class="ev " style="border-left-color:var(--fg)">Rough cut 30''</span></div><div class="d"><span class="n">21</span><span class="ev " style="border-left-color:#FF2E63">6 formats OOH</span><span class="ev " style="border-left-color:var(--fg)">Casting spot TV</span></div><div class="d"><span class="n">22</span><span class="ev " style="border-left-color:#FF2E63">Storyboard 15''</span><span class="ev " style="border-left-color:var(--fg)">Livraison spot TV</span></div><div class="d"><span class="n">23</span><span class="ev " style="border-left-color:#FF2E63">Taglines FR/EN</span></div><div class="d"><span class="n">24</span><span class="ev " style="border-left-color:#FF2E63">Landing BAT</span><span class="ev " style="border-left-color:#1A4BFF">Module CMS</span></div><div class="d"><span class="n">25</span><span class="ev " style="border-left-color:#FF2E63">Packaging édition</span></div><div class="d"><span class="n">26</span></div><div class="d"><span class="n">27</span><span class="ev " style="border-left-color:#FFE000">Content plan mai</span></div><div class="d"><span class="n">28</span><span class="ev " style="border-left-color:#FF2E63">Livraison Campagne Été</span></div><div class="d"><span class="n">29</span></div><div class="d"><span class="n">30</span><span class="ev " style="border-left-color:#1A4BFF">Mid-review Q2</span></div><div class="d out"><span class="n">01</span></div><div class="d out"><span class="n">02</span></div><div class="d out"><span class="n">03</span></div></div></div>
+  </div>
+ </div>
+</section>
+
+<section class="screen" id="s-comm">
+ <div class="app">
+  <div data-side="comm"></div>
+  <div class="main">
+    <header class="top"><span class="crumb">Communications · Acme Brands · <b>Mails</b></span><span class="sp"></span><span class="chip"><span class="sq" style="background:#FF2E63"></span>Mode Acme Brands ×</span><button class="btn">Marquer tout lu</button><button class="btn pri">+ Nouveau message</button></header>
+    <div class="page">
+      <span class="kicker">14 non lus sur ce client</span>
+      <h1 class="h1">Boîte de réception <em>Acme</em></h1>
+      <div class="ptabs"><a class="on">Mails <span class="mono">07</span></a><a>Slack <span class="mono">05</span></a><a>Notes <span class="mono">02</span></a><a>Brouillons</a></div>
+      <div class="split" style="grid-template-columns:360px minmax(0,1fr)">
+        <div class="pane-l"><div class="msg un on"><span class="av o">SR</span><div class="bd"><div class="l1"><b>Sophie Renard</b><span class="mono">09:14</span></div><div class="sj">Re: Validation key visual v3</div><div class="pv">Bonjour Angelo, merci pour l'envoi. Nous avons regardé avec l'équipe...</div></div><span class="dot"></span></div><div class="msg un"><span class="av o">MT</span><div class="bd"><div class="l1"><b>Marc Tellier</b><span class="mono">08:47</span></div><div class="sj">Retours BAT packaging édition limitée</div><div class="pv">Salut, quelques points à revoir sur le pack, la tagline au dos...</div></div><span class="dot"></span></div><div class="msg un"><span class="av o">LC</span><div class="bd"><div class="l1"><b>Léonie Charpentier</b><span class="mono">Hier</span></div><div class="sj">Brief media buying · Q2</div><div class="pv">Hello, voici le brief media pour le Q2 comme convenu...</div></div><span class="dot"></span></div><div class="msg "><span class="av o">SR</span><div class="bd"><div class="l1"><b>Sophie Renard</b><span class="mono">Hier</span></div><div class="sj">Planning tournage spot TV</div><div class="pv">Petit point sur le planning de la semaine prochaine...</div></div></div><div class="msg "><span class="av o">MT</span><div class="bd"><div class="l1"><b>Marc Tellier</b><span class="mono">Lun.</span></div><div class="sj">Contrat prestataire photographe</div><div class="pv">Pour signature, je vous joins le contrat finalisé...</div></div></div><div class="msg "><span class="av o">SR</span><div class="bd"><div class="l1"><b>Sophie Renard</b><span class="mono">09 avr.</span></div><div class="sj">Note d'intention · OK final</div><div class="pv">Validé par le board, vous pouvez y aller. Bon travail...</div></div></div><div class="msg "><span class="av o">LC</span><div class="bd"><div class="l1"><b>Léonie Charpentier</b><span class="mono">08 avr.</span></div><div class="sj">Invitation : comité éditorial</div><div class="pv">Bonjour, je vous invite au comité éditorial du 25 avril...</div></div></div></div>
+        <div>
+          <div class="rd-h"><div class="flex"><span class="bdg">Acme Brands · Campagne Été</span><span style="flex:1"></span><button class="btn">Archiver</button><button class="btn">→ Tâche</button><button class="btn pri">Répondre</button></div>
+            <h2>Re: Validation du key visual v3</h2>
+            <div class="who"><span class="av o">SR</span><div>Sophie Renard<small>sophie@acme-brands.com</small></div><span class="lbl mono" style="margin-left:auto">13.04.2026 · 09:14 · à vous</span></div></div>
+          <div class="rd-b"><p style="color:var(--fg)">Bonjour Angelo,</p><p>Merci pour l'envoi de la v3 hier soir. Nous avons regardé en comité marketing ce matin avec Marc et Léonie, et l'ensemble nous plaît beaucoup. La direction est la bonne, bravo à Claire pour le travail sur la typographie.</p><p>Deux petits ajustements avant validation finale : le traitement photo sur le format mobile perd un peu en contraste, et la baseline mériterait un corps plus généreux sur les formats OOH.</p><p>Pouvez-vous nous renvoyer une version corrigée d'ici jeudi ?</p>
+            <div class="flex" style="margin-top:20px"><span class="chip mono">KV_v3_mobile.pdf · 2,4 Mo</span><span class="chip mono">retours_comite.docx · 48 Ko</span></div></div>
+          <div class="reply"><span style="flex:1">Répondre à Sophie...</span><span class="lbl">Signature · Modèles</span><button class="btn pri">Envoyer</button></div>
+        </div>
+      </div></div>
+  </div>
+ </div>
+</section>
+
+<section class="screen" id="s-clients">
+ <div class="app">
+  <div data-side="clients"></div>
+  <div class="main">
+    <header class="top"><span class="crumb">Atelier · <b>Clients</b></span><span class="sp"></span><button class="btn pri">+ Nouveau client</button></header>
+    <div class="page">
+      <span class="kicker">5 clients actifs · 18 contacts</span>
+      <h1 class="h1">Clients <em>&amp; RACI</em></h1>
+      <div class="split" style="grid-template-columns:300px minmax(0,1fr)">
+        <div class="pane-l"><div class="cl on"><span class="sq" style="background:#FF2E63"></span><div><b>Acme Brands</b><small>6 contacts · 2 canaux Slack · 5 projets</small></div></div><div class="cl "><span class="sq" style="background:#1A4BFF"></span><div><b>TechGroup SA</b><small>4 contacts · 1 canal · 3 projets</small></div></div><div class="cl "><span class="sq" style="background:#FFE000"></span><div><b>Nova Editions</b><small>3 contacts · 1 canal · 2 projets</small></div></div><div class="cl "><span class="sq" style="background:var(--fg)"></span><div><b>Lumen &amp; Co</b><small>3 contacts · 1 canal · 3 projets</small></div></div><div class="cl "><span class="sq" style="background:#6537FF"></span><div><b>Orbit Studio</b><small>2 contacts · 0 canal · 1 projet</small></div></div><div style="padding:12px"><button class="add">+ Nouveau client</button></div></div>
+        <div>
+          <div class="rd-h" style="display:flex;align-items:center;gap:14px"><span style="width:14px;height:14px;background:#FF2E63"></span><div><h2 style="margin:0">Acme Brands</h2><span class="lbl mono">#acme-general · #acme-creation · acme-brands.com</span></div><span style="flex:1"></span><button class="btn">Paramètres</button><button class="btn pri">+ Contact</button></div>
+          <div class="kpis sm"><div class="kpi"><div class="lbl">Projets actifs</div><div class="v">05</div></div><div class="kpi"><div class="lbl">Contacts</div><div class="v">06</div></div><div class="kpi"><div class="lbl">Tâches ouvertes</div><div class="v">24</div></div><div class="kpi alert"><div class="lbl">Bloquées</div><div class="v">02</div></div></div>
+          <table class="tbl"><tr><th>Contact</th><th>Rôle entreprise</th><th>RACI</th><th>E-mail</th><th></th></tr><tr><td><span class="who"><span class="av o">SR</span>Sophie Renard</span></td><td class="m">Brand Manager</td><td><span class="flex" style="gap:8px"><span class="rl A" style="width:22px;height:22px;display:grid;place-items:center;font-weight:900;font-size:11px;border-radius:2px">A</span>Approbateur</span></td><td class="m mono">sophie@acme-brands.com</td><td class="m">⋯</td></tr><tr><td><span class="who"><span class="av o">MT</span>Marc Tellier</span></td><td class="m">Head of Marketing</td><td><span class="flex" style="gap:8px"><span class="rl R" style="width:22px;height:22px;display:grid;place-items:center;font-weight:900;font-size:11px;border-radius:2px">R</span>Responsable</span></td><td class="m mono">marc@acme-brands.com</td><td class="m">⋯</td></tr><tr><td><span class="who"><span class="av o">LC</span>Léonie Charpentier</span></td><td class="m">Media &amp; PR</td><td><span class="flex" style="gap:8px"><span class="rl C" style="width:22px;height:22px;display:grid;place-items:center;font-weight:900;font-size:11px;border-radius:2px">C</span>Consulté</span></td><td class="m mono">leonie@acme-brands.com</td><td class="m">⋯</td></tr><tr><td><span class="who"><span class="av o">PG</span>Paul Germain</span></td><td class="m">CEO</td><td><span class="flex" style="gap:8px"><span class="rl I" style="width:22px;height:22px;display:grid;place-items:center;font-weight:900;font-size:11px;border-radius:2px">I</span>Informé</span></td><td class="m mono">paul@acme-brands.com</td><td class="m">⋯</td></tr><tr><td><span class="who"><span class="av o">EV</span>Éléonore Vasseur</span></td><td class="m">Legal &amp; Compliance</td><td><span class="flex" style="gap:8px"><span class="rl C" style="width:22px;height:22px;display:grid;place-items:center;font-weight:900;font-size:11px;border-radius:2px">C</span>Consulté</span></td><td class="m mono">eleonore@acme-brands.com</td><td class="m">⋯</td></tr><tr><td><span class="who"><span class="av o">HD</span>Hugo Delvaux</span></td><td class="m">Product Owner digital</td><td><span class="flex" style="gap:8px"><span class="rl R" style="width:22px;height:22px;display:grid;place-items:center;font-weight:900;font-size:11px;border-radius:2px">R</span>Responsable</span></td><td class="m mono">hugo@acme-brands.com</td><td class="m">⋯</td></tr></table>
+        </div>
+      </div></div>
+  </div>
+ </div>
+</section>
+
+<section class="screen" id="s-team">
+ <div class="app">
+  <div data-side="team"></div>
+  <div class="main">
+    <header class="top"><span class="crumb">Atelier · <b>Équipe</b></span><span class="sp"></span><span class="bdg inf">Admin uniquement</span><button class="btn pri">+ Inviter</button></header>
+    <div class="page">
+      <span class="kicker">2 admins · 6 membres</span>
+      <h1 class="h1">Votre <em>équipe</em></h1>
+      <div class="two-c">
+        <div class="card"><table class="tbl"><tr><th>Membre</th><th>Arrivée</th><th>Rôle</th><th></th></tr><tr><td><span class="who"><span class="av">AL</span><div>Angelo Lambert <span class="bdg">Vous</span><small>angelo@studio-atlas.com</small></div></span></td><td class="m">Sept. 2024 · Fondateur</td><td><span class="seg"><span class="on">Admin</span><span>Membre</span></span></td><td style="text-align:right"></td></tr><tr><td><span class="who"><span class="av">MD</span><div>Marie Duval<small>marie@studio-atlas.com</small></div></span></td><td class="m">Oct. 2024 · Design</td><td><span class="seg"><span class="on">Admin</span><span>Membre</span></span></td><td style="text-align:right"><button class="btn">Retirer</button></td></tr><tr><td><span class="who"><span class="av o">JT</span><div>Julien Trémaux<small>julien@studio-atlas.com</small></div></span></td><td class="m">Nov. 2024 · Copy</td><td><span class="seg"><span>Admin</span><span class="on">Membre</span></span></td><td style="text-align:right"><button class="btn">Retirer</button></td></tr><tr><td><span class="who"><span class="av o">CR</span><div>Claire Rémy<small>claire@studio-atlas.com</small></div></span></td><td class="m">Janv. 2025 · Design</td><td><span class="seg"><span>Admin</span><span class="on">Membre</span></span></td><td style="text-align:right"><button class="btn">Retirer</button></td></tr><tr><td><span class="who"><span class="av o">LP</span><div>Léa Paoli<small>lea@studio-atlas.com</small></div></span></td><td class="m">Févr. 2025 · Prod vidéo</td><td><span class="seg"><span>Admin</span><span class="on">Membre</span></span></td><td style="text-align:right"><button class="btn">Retirer</button></td></tr><tr><td><span class="who"><span class="av o">TH</span><div>Tom Hénard<small>tom@studio-atlas.com</small></div></span></td><td class="m">Mars 2025 · Motion</td><td><span class="seg"><span>Admin</span><span class="on">Membre</span></span></td><td style="text-align:right"><button class="btn">Retirer</button></td></tr><tr><td><span class="who"><span class="av o">NK</span><div>Nina Kessler<small>nina@studio-atlas.com</small></div></span></td><td class="m">Juin 2025 · PM</td><td><span class="seg"><span>Admin</span><span class="on">Membre</span></span></td><td style="text-align:right"><button class="btn">Retirer</button></td></tr></table></div>
+        <div>
+          <div class="card"><div class="card-h"><span class="h3">Nouvelle invitation</span></div><div style="padding:4px 18px 18px">
+            <div class="fld"><label>Adresse e-mail</label><input class="inp" placeholder="prenom@agence.com"></div>
+            <div class="fld"><label>Rôle</label><span class="seg"><span>Admin</span><span class="on">Membre</span></span></div>
+            <button class="btn pri" style="margin-top:20px;width:100%;justify-content:center">Envoyer l'invitation →</button>
+            <p class="lbl" style="margin-top:12px">Lien unique · valide 72 h</p></div></div>
+          <div class="card" style="margin-top:16px"><div class="card-h"><span class="h3">En attente</span><span class="mono lbl">02</span></div>
+            <div class="row"><div><div class="tt">stagiaire@studio-atlas.com</div><div class="mt mono">expire dans 61 h</div></div><button class="btn">Renvoyer</button></div>
+            <div class="row"><div><div class="tt">freelance-motion@gmail.com</div><div class="mt mono">expire dans 14 h</div></div><button class="btn">Renvoyer</button></div></div>
+        </div>
+      </div></div>
+  </div>
+ </div>
+</section>
+
+<section class="screen" id="s-settings">
+ <div class="app">
+  <div data-side="settings"></div>
+  <div class="main">
+    <header class="top"><span class="crumb">Atelier · <b>Paramètres</b></span><span class="sp"></span><span class="bdg ok">Sauvegardé automatiquement ✓</span></header>
+    <div class="page">
+      <span class="kicker">Votre compte uniquement</span>
+      <h1 class="h1">Vos <em>paramètres</em></h1>
+      <div class="set">
+        <nav><a class="on">01 · Profil</a><a>02 · Apparence</a><a>03 · Notifications</a><a>04 · Assistant</a><a>05 · Sécurité</a><a>06 · Zone rouge</a></nav>
+        <div>
+          <div class="card"><div class="card-h"><span class="h3">Profil</span></div>
+            <div class="srow"><span class="av" style="width:48px;height:48px;font-size:16px">AL</span><div class="tx"><b>Angelo Lambert</b><small>Admin · angelo@studio-atlas.com</small></div><button class="btn">Changer l'avatar</button></div><div class="srow"><div class="tx"><b>Nom affiché</b><small>Visible dans les commentaires et assignations.</small></div><input class="inp" style="width:260px" value="Angelo Lambert"></div><div class="srow"><div class="tx"><b>Mot de passe</b><small>Dernière modification il y a 3 mois.</small></div><button class="btn">Changer</button></div></div>
+          <div class="card" style="margin-top:16px"><div class="card-h"><span class="h3">Apparence</span></div><div class="srow"><div class="tx"><b>Thème</b><small>Cobalt pour le sombre, Ice pour le clair.</small></div><span class="seg"><span class="on">Cobalt</span><span>Ice</span><span>Système</span></span></div><div class="srow"><div class="tx"><b>Langue</b><small>Le contenu que vous saisissez n'est pas traduit.</small></div><span class="seg"><span class="on">Français</span><span>English</span></span></div><div class="srow"><div class="tx"><b>Fuseau horaire</b><small>Sert à calculer « aujourd'hui » et les notifications.</small></div><span class="chip mono">Europe/Brussels · UTC+2 ▾</span></div></div>
+          <div class="card" style="margin-top:16px"><div class="card-h"><span class="h3">Notifications</span></div>
+            <table class="tbl"><tr><th>Événement</th><th>Desktop</th><th>Slack</th><th>E-mail</th></tr><tr><td><b>Carte assignée à moi</b><div class="m" style="font-size:12px">Je reçois une nouvelle tâche</div></td><td><span class="tg on"></span></td><td><span class="tg on"></span></td><td><span class="tg "></span></td></tr><tr><td><b>Commentaire sur mes cartes</b><div class="m" style="font-size:12px">Quelqu'un réagit sur une de mes tâches</div></td><td><span class="tg on"></span></td><td><span class="tg "></span></td><td><span class="tg "></span></td></tr><tr><td><b>Carte passée en Bloqué</b><div class="m" style="font-size:12px">Alerte système automatique</div></td><td><span class="tg on"></span></td><td><span class="tg on"></span></td><td><span class="tg on"></span></td></tr><tr><td><b>Nouveau mail client</b><div class="m" style="font-size:12px">Via l'intégration Exchange</div></td><td><span class="tg "></span></td><td><span class="tg "></span></td><td><span class="tg on"></span></td></tr><tr><td><b>Mention Slack</b><div class="m" style="font-size:12px">Quelqu'un vous cite dans un canal client</div></td><td><span class="tg on"></span></td><td><span class="tg on"></span></td><td><span class="tg "></span></td></tr></table></div>
+          <div class="card" style="margin-top:16px;border-color:var(--plasma)"><div class="card-h"><span class="h3">Zone rouge</span></div><div class="srow"><div class="tx"><b>Quitter l'espace de travail</b><small>Vous perdez l'accès aux projets et aux clients.</small></div><button class="btn dng">Quitter</button></div></div>
+        </div>
+      </div></div>
+  </div>
+ </div>
+</section>
+
+<section class="screen" id="s-assistant">
+ <div class="app">
+  <div data-side="assistant"></div>
+  <div class="main">
+    <header class="top"><span class="crumb">Studio Atlas · <b>Assistant</b></span><span class="sp"></span><button class="btn">Mémoire <span class="mono">12</span></button><button class="btn">Nouvelle conversation</button></header>
+    <div class="page">
+      <div class="chat">
+        <svg class="orb" viewBox="0 0 32 32"><circle cx="16" cy="16" r="6" fill="#FF2E63"/><path d="M16 0 18 14 32 16 18 18 16 32 14 18 0 16 14 14Z" fill="#FFE000" opacity=".9"/></svg>
+        <div style="text-align:center"><span class="kicker">Briefing du lundi 13 avril</span><h1 class="h1" style="font-size:40px">3 cartes bloquées.<br><em>2 mails importants.</em></h1></div>
+        <div class="sugg"><span class="chip">Mes cartes du jour</span><span class="chip">Mails non lus Acme</span><span class="chip">Repousser une échéance</span></div>
+        <div class="bub me">Repousse l'échéance de « Valider la DA » à jeudi et préviens Sophie.</div>
+        <div class="bub ai">Je repousse l'échéance au <b>jeudi 16 avril</b>. La carte sortira de Bloqué et retournera dans <b>Créa</b>. Le mail à Sophie demande votre accord avant envoi.</div>
+        <div class="wdg"><div class="wh"><span class="h3">Carte mise à jour</span><span class="bdg ok">Fait ✓</span></div><div class="wb"><b>Valider la DA de la key visual</b><div class="mono" style="color:var(--mid);font-size:11px;margin-top:4px">Bloqué → Créa · échéance 16.04.2026</div></div></div>
+        <div class="wdg" style="border-color:var(--yellow)"><div class="wh"><span class="h3">Envoyer ce mail ?</span><span class="bdg wrn">Accord requis</span></div>
+          <div class="wb"><div class="mono" style="color:var(--mid);font-size:11px">À : sophie@acme-brands.com · Cci : aucun</div><b style="display:block;margin:6px 0 4px">Key visual : arbitrage attendu jeudi</b><span style="color:var(--mid)">Bonjour Sophie, nous avons besoin de votre choix entre les pistes A et C d'ici jeudi pour lancer la déclinaison OOH...</span></div>
+          <div class="wf"><button class="btn pri">Autoriser l'envoi</button><button class="btn">Modifier</button><button class="btn">Refuser</button></div></div>
+        <div class="ask"><span>Demandez quelque chose...</span><kbd>⌥ maintenu pour parler</kbd><button class="btn pri">Envoyer</button></div>
+      </div></div>
+  </div>
+ </div>
+</section>
+
+<!-- ================= LOGIN ================= -->
+<section class="screen" id="s-login">
+ <div class="login">
+  <div class="l-brand">
+    <div class="logo" style="padding:0"><span class="w">BND<svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="6" fill="#FF2E63"/><path d="M16 0 18 14 32 16 18 18 16 32 14 18 0 16 14 14Z" fill="#FFE000" opacity=".9"/></svg></span><span class="os">OS</span></div>
+    <div><span class="kicker" style="color:var(--yellow)">Agency operating system</span>
+      <div class="big" style="margin-top:22px">Create<br>Work<br>Slay<br><em>Repeat.</em></div></div>
+    <div class="ticker">Projets ◆ Communications ◆ Clients ◆ RACI ◆ Kanban ◆ Assistant ◆ Projets ◆ Communications ◆ Clients ◆ RACI ◆ Kanban ◆ Assistant ◆ Projets ◆ Communications</div>
+  </div>
+  <div class="l-form">
+    <span class="kicker">Connexion</span>
+    <h2>Content de<br>vous revoir.</h2>
+    <p style="color:var(--mid)">Connectez-vous à votre espace de travail.</p>
+    <div class="fld"><label>E-mail</label><input class="inp" placeholder="vous@agence.com"></div>
+    <div class="fld"><label><span>Mot de passe</span><span>Oublié ?</span></label><input class="inp" type="password" value="motdepasse"></div>
+    <button class="btn pri" style="margin-top:28px;justify-content:center;padding:14px">Se connecter →</button>
+    <p class="lbl" style="margin-top:28px">Accès sur invitation uniquement</p>
+  </div>
+ </div>
+</section>
+
+<!-- ================= 05 FONDATIONS ================= -->
+<section class="screen" id="s-fnd">
+ <div class="fnd">
+  <span class="kicker">Système de design</span>
+  <h1 class="h1">Cinq couleurs.<br><em>Zéro ombre.</em></h1>
+  <p class="lead">Comment les règles de la charte se traduisent en interface produit.</p>
+
+  <h2>Couleurs et rôles</h2>
+  <div class="sw">
+    <div style="background:#060D1F;color:#EEF0F8;border-right:1px solid rgba(238,240,248,.14)"><b>Cobalt Night</b><span class="mono">#060D1F</span><span>Fond (sombre), texte (clair), barre latérale</span></div>
+    <div style="background:#EEF0F8;color:#060D1F"><b>Ice White</b><span class="mono">#EEF0F8</span><span>Texte (sombre), fond (clair)</span></div>
+    <div style="background:#FFE000;color:#060D1F"><b>Flash Yellow</b><span class="mono">#FFE000</span><span>Action principale, élément actif, « aujourd'hui »</span></div>
+    <div style="background:#FF2E63;color:#060D1F"><b>Plasma</b><span class="mono">#FF2E63</span><span>Bloqué, retard, erreur, suppression</span></div>
+    <div style="background:#1A4BFF;color:#fff"><b>Electric Blue</b><span class="mono">#1A4BFF</span><span>Focus clavier, « Auto », rôle R, liens (clair)</span></div>
+  </div>
+  <div style="height:4px;background:var(--aurora);margin-top:12px"></div>
+  <p class="lbl" style="margin-top:8px">Aurora · filet d'accent uniquement (sous la barre du haut), jamais en aplat</p>
+
+  <div class="two">
+   <div>
+    <h2>Typographie</h2>
+    <dl class="spec">
+      <dt>Titre de page</dt><dd><b style="font-size:30px;font-weight:900;letter-spacing:-.035em;text-transform:uppercase;line-height:1">Inter Black</b><br>900 · capitales · -0.035em</dd>
+      <dt>Chiffre clé</dt><dd><b style="font-size:40px;font-weight:900;letter-spacing:-.045em;line-height:1">27</b><br>900 · numéral fantôme derrière</dd>
+      <dt>Label</dt><dd><b style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;font-weight:700">Cartes bloquées</b><br>700 · capitales · +0.14em</dd>
+      <dt>Corps</dt><dd><b style="font-weight:400">Titres de cartes, descriptions, messages.</b><br>400–600 · casse normale, pour rester lisible</dd>
+      <dt>Données</dt><dd><b class="mono" style="font-weight:400">#124 · 08.04.2026 · 82%</b><br>JetBrains Mono · dates, compteurs, identifiants</dd>
+    </dl>
+   </div>
+   <div>
+    <h2>Composants</h2>
+    <div class="flex"><button class="btn pri">Action principale</button><button class="btn">Secondaire</button><button class="btn dng">Supprimer</button></div>
+    <div class="flex" style="margin-top:18px"><span class="bdg dng">Bloqué</span><span class="bdg wrn">Aujourd'hui</span><span class="bdg inf">Auto</span><span class="bdg ok">Terminé ✓</span><span class="bdg">Design</span></div>
+    <div class="flex" style="margin-top:18px"><span class="rl R" style="width:22px;height:22px;display:grid;place-items:center;font-weight:900;font-size:11px;border-radius:2px">R</span><span class="rl A" style="width:22px;height:22px;display:grid;place-items:center;font-weight:900;font-size:11px;border-radius:2px">A</span><span class="rl C" style="width:22px;height:22px;display:grid;place-items:center;font-weight:900;font-size:11px;border-radius:2px">C</span><span class="rl I" style="width:22px;height:22px;display:grid;place-items:center;font-weight:900;font-size:11px;border-radius:2px">I</span><span class="lbl">RACI</span>
+      <span class="av" style="margin-left:16px">AL</span><span class="av y">MD</span><span class="av b">CR</span><span class="av o">JT</span><span class="lbl">Avatars carrés</span></div>
+    <div class="fld" style="max-width:340px"><label>Champ</label><input class="inp" placeholder="Filet 1 px, rayon 2 px"></div>
+   </div>
+  </div>
+
+  <h2>Règles appliquées</h2>
+  <div class="rules">
+    <div><div class="lbl" style="color:var(--fg)">Toujours</div><ul>
+      <li>Rayon 2 px partout (boutons, cartes, avatars, champs)</li>
+      <li>Filets 1–2 px pour séparer ; aucune ombre, aucun halo</li>
+      <li>Grille 8 px : espacements 8 / 16 / 24 / 40 / 64</li>
+      <li>Inter + JetBrains Mono, rien d'autre</li>
+      <li>Ton direct : « 5 livrables. 3 blocages. »</li></ul></div>
+    <div><div class="lbl" style="color:var(--fg)">Jamais</div><ul>
+      <li>Vert, orange, violet ou gris hors palette pour l'interface</li>
+      <li>Dégradé en aplat (bouton, carte, fond)</li>
+      <li>Coins arrondis « pilule », cartes flottantes</li>
+      <li>Emoji comme icônes</li>
+      <li>Logo recomposé : fichiers maîtres uniquement</li></ul></div>
+  </div>
+ </div>
+</section>
+</div>
+
+<script>
+// Injecte la barre latérale et le kanban partagés
+document.querySelectorAll('[data-side]').forEach(function (el) {
+  var n = document.getElementById('tpl-side').content.cloneNode(true);
+  var a = n.querySelector('[data-k="' + el.dataset.side + '"]');
+  if (a) a.classList.add('on');
+  el.replaceWith(n);
+});
+document.querySelectorAll('[data-kanban]').forEach(function (el) {
+  el.replaceWith(document.getElementById('tpl-kanban').content.cloneNode(true));
+});
+function show(s) {
+  document.querySelectorAll('.screen').forEach(function (x) { x.classList.toggle('on', x.id === 's-' + s); });
+  document.querySelectorAll('.mk-tabs button').forEach(function (b) { b.setAttribute('aria-selected', b.dataset.s === s); });
+}
+function mode(m) {
+  document.documentElement.dataset.mode = m;
+  document.querySelectorAll('.mk-mode button').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.m === m); });
+}
+document.querySelectorAll('.mk-tabs button').forEach(function (b) { b.onclick = function () { show(b.dataset.s); history.replaceState(null, '', '#' + b.dataset.s + '/' + document.documentElement.dataset.mode); }; });
+document.querySelectorAll('.mk-mode button').forEach(function (b) { b.onclick = function () { mode(b.dataset.m); }; });
+var h = location.hash.slice(1).split('/');
+if (h[0]) show(h[0]);
+if (h[1]) mode(h[1]);
+</script>
+</body>
+</html>

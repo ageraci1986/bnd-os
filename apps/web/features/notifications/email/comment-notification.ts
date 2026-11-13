@@ -61,7 +61,7 @@ export function renderCommentNotificationEmail(params: CommentEmailParams): Comm
     commentUrl,
   } = params;
 
-  const subject = `[NexusHub] ${authorDisplayName} a commenté « ${cardTitle} »`;
+  const subject = `[BND OS] ${authorDisplayName} a commenté « ${cardTitle} »`;
 
   const text = [
     `Salut ${recipientFirstName},`,
@@ -74,7 +74,7 @@ export function renderCommentNotificationEmail(params: CommentEmailParams): Comm
     commentUrl,
     ``,
     `Tu reçois cet email parce que tu es assigné à cette carte.`,
-    `— L'équipe NexusHub`,
+    `— L'équipe BND OS`,
   ].join('\n');
 
   const recipientE = escapeHtml(recipientFirstName);
@@ -104,7 +104,7 @@ export function renderCommentNotificationEmail(params: CommentEmailParams): Comm
                 <tr>
                   <td width="40" height="40" align="center" style="background:${BRAND_GRADIENT};border-radius:10px;color:#ffffff;font-weight:800;font-size:18px;font-family:${FONT_STACK};line-height:40px;">N</td>
                   <td style="padding-left:12px;vertical-align:middle;">
-                    <div style="font-weight:800;font-size:16px;color:${TEXT_MAIN};">NexusHub</div>
+                    <div style="font-weight:800;font-size:16px;color:${TEXT_MAIN};">BND OS</div>
                     <div style="font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:${TEXT_MUTED};font-weight:600;">Agency OS</div>
                   </td>
                 </tr>
@@ -148,7 +148,7 @@ export function renderCommentNotificationEmail(params: CommentEmailParams): Comm
               <hr style="border:0;border-top:1px solid ${BORDER_LIGHT};margin:0 0 16px 0;">
               <p style="margin:0;font-family:${FONT_STACK};font-size:11px;line-height:1.6;color:${TEXT_GHOST};">
                 Tu reçois cet email parce que tu es assigné à cette carte.<br>
-                — L'équipe NexusHub
+                — L'équipe BND OS
               </p>
             </td>
           </tr>

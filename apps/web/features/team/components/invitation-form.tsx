@@ -79,7 +79,7 @@ export function InvitationForm({ csrfToken, clientOptions, projectOptions }: Pro
 
       <div className="mb-3 flex items-center gap-2">
         <span
-          className="grid h-9 w-9 place-items-center rounded-full text-sm font-extrabold text-white"
+          className="text-on-accent grid h-9 w-9 place-items-center rounded-sm text-sm font-extrabold"
           style={{ background: 'var(--accent-gradient)' }}
           aria-hidden="true"
         >
@@ -223,7 +223,7 @@ export function InvitationForm({ csrfToken, clientOptions, projectOptions }: Pro
 
       <p className="mt-3 text-xs text-[color:var(--color-text-muted)]">
         L&apos;invitation envoie un lien à usage unique valide 72h. La personne définira son mot de
-        passe en arrivant sur NexusHub.
+        passe en arrivant sur BND OS.
         {role === 'viewer'
           ? ' Le scope choisi sera matérialisé automatiquement à l’acceptation.'
           : role === 'user'
