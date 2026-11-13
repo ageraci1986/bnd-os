@@ -148,38 +148,40 @@ export function CalendarView({
         </div>
       </div>
 
-      <div
-        className="cal-grid"
-        role="grid"
-        aria-label={`Calendrier ${MONTHS_FR[month1 - 1]} ${year}`}
-      >
-        {DOW.map((d) => (
-          <div key={d} className="cal-dow">
-            {d}
-          </div>
-        ))}
-        {cells.map((cell) => {
-          const dayCards = byDay.get(cell.isoDate) ?? [];
-          const isToday = cell.isoDate === todayIso;
-          const className = ['cal-day', !cell.inMonth && 'muted', isToday && 'today']
-            .filter(Boolean)
-            .join(' ');
-          const visible = dayCards.slice(0, MAX_VISIBLE_PER_DAY);
-          const overflow = dayCards.slice(MAX_VISIBLE_PER_DAY);
-          return (
-            <div key={cell.isoDate} className={className} role="gridcell">
-              <div className="cal-date">{cell.date.getUTCDate()}</div>
-              <div className="cal-items">
-                {visible.map((card) => (
-                  <CalendarItem key={card.id} card={card} clientSlug={clientSlug} />
-                ))}
-                {overflow.length > 0 ? (
-                  <CalendarDayOverflow cards={overflow} clientSlug={clientSlug} />
-                ) : null}
-              </div>
+      <div className="cal-scroll">
+        <div
+          className="cal-grid"
+          role="grid"
+          aria-label={`Calendrier ${MONTHS_FR[month1 - 1]} ${year}`}
+        >
+          {DOW.map((d) => (
+            <div key={d} className="cal-dow">
+              {d}
             </div>
-          );
-        })}
+          ))}
+          {cells.map((cell) => {
+            const dayCards = byDay.get(cell.isoDate) ?? [];
+            const isToday = cell.isoDate === todayIso;
+            const className = ['cal-day', !cell.inMonth && 'muted', isToday && 'today']
+              .filter(Boolean)
+              .join(' ');
+            const visible = dayCards.slice(0, MAX_VISIBLE_PER_DAY);
+            const overflow = dayCards.slice(MAX_VISIBLE_PER_DAY);
+            return (
+              <div key={cell.isoDate} className={className} role="gridcell">
+                <div className="cal-date">{cell.date.getUTCDate()}</div>
+                <div className="cal-items">
+                  {visible.map((card) => (
+                    <CalendarItem key={card.id} card={card} clientSlug={clientSlug} />
+                  ))}
+                  {overflow.length > 0 ? (
+                    <CalendarDayOverflow cards={overflow} clientSlug={clientSlug} />
+                  ) : null}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </>
   );
