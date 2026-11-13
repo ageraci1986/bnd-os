@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   assertCsrfHeader: vi.fn(),
   check: vi.fn(),
   transcribeAudio: vi.fn(),
+  loadProperNouns: vi.fn(),
 }));
 vi.mock('@/lib/auth', () => ({ getAuthContext: mocks.getAuthContext }));
 vi.mock('@/lib/csrf', () => ({ assertCsrfHeader: mocks.assertCsrfHeader }));
@@ -14,6 +15,9 @@ vi.mock('@/lib/rate-limit', () => ({
 vi.mock('@/lib/assistant/voice/stt', async (importOriginal) => ({
   ...(await importOriginal<object>()),
   transcribeAudio: mocks.transcribeAudio,
+}));
+vi.mock('@/lib/assistant/voice/glossary-repo', () => ({
+  loadProperNouns: mocks.loadProperNouns,
 }));
 
 import { SttNotConfiguredError } from '@/lib/assistant/voice/stt';
@@ -34,6 +38,7 @@ describe('POST /api/assistant/voice/transcribe', () => {
     mocks.assertCsrfHeader.mockResolvedValue(undefined);
     mocks.check.mockResolvedValue({ success: true, remaining: 1, reset: 0 });
     mocks.transcribeAudio.mockResolvedValue('bonjour');
+    mocks.loadProperNouns.mockResolvedValue(['Angelo Geraci', 'Casa 47']);
   });
 
   it('401 sans session — sans consommer le budget rate-limit', async () => {
@@ -90,5 +95,30 @@ describe('POST /api/assistant/voice/transcribe', () => {
     mocks.transcribeAudio.mockRejectedValue(new Error('deepgram status 500'));
     const res = await POST(makeReq(new Uint8Array(4)));
     expect(res.status).toBe(502);
+  });
+
+  it('passe à la transcription les termes du glossaire, nettoyés (sans chiffres)', async () => {
+    await POST(makeReq(new Uint8Array(4)));
+    expect(mocks.loadProperNouns).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'u1', workspaceId: 'w1' }),
+    );
+    expect(mocks.transcribeAudio).toHaveBeenCalledWith(expect.anything(), 'audio/webm', [
+      'Angelo Geraci',
+      'Casa',
+    ]);
+  });
+
+  it('glossaire vide : la transcription part quand même, sans terme', async () => {
+    mocks.loadProperNouns.mockResolvedValue([]);
+    const res = await POST(makeReq(new Uint8Array(4)));
+    expect(res.status).toBe(200);
+    expect(mocks.transcribeAudio).toHaveBeenCalledWith(expect.anything(), 'audio/webm', []);
+  });
+
+  it('ne récolte pas le glossaire pour une requête refusée (415, 413, 400)', async () => {
+    await POST(makeReq(new Uint8Array(4), 'application/json'));
+    await POST(makeReq(new Uint8Array(2_000_001)));
+    await POST(makeReq(new Uint8Array(0)));
+    expect(mocks.loadProperNouns).not.toHaveBeenCalled();
   });
 });

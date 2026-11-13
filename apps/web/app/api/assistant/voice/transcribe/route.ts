@@ -1,6 +1,8 @@
+import { toKeyterms } from '@nexushub/domain';
 import { getAuthContext } from '@/lib/auth';
 import { assertCsrfHeader } from '@/lib/csrf';
 import { getRateLimiter } from '@/lib/rate-limit';
+import { loadProperNouns } from '@/lib/assistant/voice/glossary-repo';
 import { SttNotConfiguredError, transcribeAudio } from '@/lib/assistant/voice/stt';
 
 export const runtime = 'nodejs';
@@ -50,8 +52,12 @@ export async function POST(req: Request): Promise<Response> {
   if (audio.byteLength > MAX_AUDIO_BYTES) {
     return Response.json({ ok: false, message: 'Enregistrement trop long.' }, { status: 413 });
   }
+  // Glossaire de noms propres (spec 2026-11-13 §4) : récolté APRÈS toutes les
+  // validations (aucune lecture DB pour une requête refusée), dans le
+  // périmètre d'accès de l'utilisateur. `loadProperNouns` ne lève jamais.
+  const keyterms = toKeyterms(await loadProperNouns(ctx));
   try {
-    const transcript = await transcribeAudio(audio, contentType);
+    const transcript = await transcribeAudio(audio, contentType, keyterms);
     return Response.json({ ok: true, transcript });
   } catch (err) {
     if (err instanceof SttNotConfiguredError) {
