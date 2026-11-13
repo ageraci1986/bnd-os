@@ -704,7 +704,8 @@
 /* ---- Kanban board (mockup §04-kanban, faithful port) ---------------- */
 .kanban-board {
   display: flex;
-  gap: 20px;
+  gap: 10px;
+  align-items: flex-start;
   overflow-x: auto;
   padding-bottom: 24px;
   margin: 0 -40px;
@@ -712,53 +713,49 @@
   padding-right: 40px;
 }
 .column {
-  flex: 0 0 310px;
+  flex: 0 0 300px;
   display: flex;
   flex-direction: column;
+  background: var(--bg-card-alt);
+  border-radius: 2px;
+  padding: 12px 10px 10px;
 }
 .col-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 14px;
-  padding: 0 4px;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--text-main);
 }
 .col-title {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.8px;
-  color: var(--text-muted);
+  letter-spacing: 0.12em;
+  color: var(--text-main);
   display: flex;
   align-items: center;
   gap: 8px;
 }
 .col-title .col-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 0;
-  background: var(--color-accent-primary);
+  display: none;
 }
 .col-count {
-  background: var(--bg-card);
-  border: 1px solid var(--border-light);
-  padding: 3px 10px;
-  border-radius: 2px;
+  font-family: var(--font-mono);
   font-size: 11px;
-  color: var(--text-main);
-  font-weight: 700;
+  color: var(--text-muted);
+  font-weight: 500;
 }
 .column.blocked {
   background: var(--color-danger-bg);
-  border: 1px solid rgba(225, 29, 72, 0.2);
-  border-radius: 2px;
-  padding: 18px 14px;
 }
 .column.blocked .col-title {
   color: var(--color-danger);
 }
 .column.blocked .col-title .col-dot {
-  background: var(--color-danger);
+  display: none;
 }
 .col-cards {
   display: flex;
@@ -768,45 +765,40 @@
 }
 .col-cards.is-over {
   background: var(--accent-gradient-soft);
-  border-radius: 2px;
   outline: 1px dashed var(--color-accent-primary);
-  outline-offset: 4px;
+  outline-offset: 2px;
 }
 
 /* Cards */
 .kcard {
-  background: var(--bg-card);
-  border: 1px solid var(--border-light);
+  background: var(--bg-card-raised);
+  border: 1px solid var(--border-strong);
+  border-left: 3px solid var(--text-main);
   border-radius: 2px;
-  padding: 14px 16px;
+  padding: 12px;
   margin-bottom: 10px;
   cursor: grab;
-  transition:
-    transform 0.12s,
-    box-shadow 0.12s,
-    border-color 0.12s;
-  box-shadow: var(--shadow-card);
+  transition: border-color 0.12s;
   position: relative;
 }
 .kcard:hover {
-  border-color: rgba(138, 43, 226, 0.3);
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-hover);
+  border-color: var(--text-main);
 }
 .kcard.dragging {
   opacity: 0.5;
   cursor: grabbing;
 }
 .kcard-ref {
+  font-family: var(--font-mono);
   font-size: 10px;
-  font-weight: 700;
-  color: var(--text-ghost);
+  font-weight: 500;
+  color: var(--text-muted);
   margin-bottom: 6px;
 }
 .kcard-title {
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 700;
-  line-height: 1.4;
+  line-height: 1.35;
   color: var(--text-main);
 }
 .kcard-title--done {
@@ -848,7 +840,9 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 10px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-light);
 }
 .kcard-avatars {
   display: flex;
@@ -856,7 +850,7 @@
 }
 /* Overlapping stack, as in mockups/04-kanban.html. */
 .kcard-avatars > * {
-  border: 2px solid var(--bg-card);
+  border: 2px solid var(--bg-card-raised);
   margin-left: -6px;
 }
 .kcard-avatars > :first-child {
@@ -875,8 +869,9 @@
   font-weight: 700;
 }
 .kcard-due {
+  font-family: var(--font-mono);
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--text-muted);
 }
 .kcard-due.overdue {
@@ -888,21 +883,14 @@
   font-weight: 700;
 }
 .kcard.blocked {
-  border-color: rgba(225, 29, 72, 0.4);
+  border-color: var(--color-danger);
+  border-left-color: var(--color-danger);
 }
-.kcard.blocked::after {
-  content: 'Bloqué';
-  position: absolute;
-  top: -9px;
-  right: 12px;
-  background: var(--color-danger);
-  color: var(--on-danger);
-  padding: 3px 10px;
-  border-radius: 2px;
-  font-size: 9px;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+.column.blocked .col-header {
+  border-bottom-color: var(--color-danger);
+}
+.kcard:has(.kcard-title--done) {
+  border-left-color: var(--border-strong);
 }
 
 /* ============================================================
@@ -1239,23 +1227,23 @@
 .add-card-btn {
   width: 100%;
   padding: 10px 12px;
-  border: 1px dashed var(--border-light);
+  border: 1px dashed var(--border-strong);
   border-radius: 2px;
   background: transparent;
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
   cursor: pointer;
   transition:
     border-color 0.15s,
-    color 0.15s,
-    background-color 0.15s;
+    color 0.15s;
   margin-top: 4px;
 }
 .add-card-btn:hover {
-  border-color: var(--color-accent-primary);
-  color: var(--color-accent-text);
-  background: var(--accent-gradient-soft);
+  border-color: var(--text-main);
+  color: var(--text-main);
 }
 
 /* ---- Card detail modal (mockup §06-card-modal, faithful port) ------ */
@@ -1894,18 +1882,16 @@
 
 .view-toggle {
   display: inline-flex;
-  background: var(--bg-card);
-  border: 1px solid var(--border-light);
+  border: 1px solid var(--border-strong);
   border-radius: 2px;
-  padding: 4px;
-  box-shadow: var(--shadow-card);
 }
 .view-toggle a,
 .view-toggle button {
-  padding: 7px 16px;
-  font-size: 12px;
+  padding: 8px 14px;
+  font-size: 10px;
   font-weight: 700;
-  border-radius: 2px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
   color: var(--text-muted);
   text-decoration: none;
   border: none;
@@ -1926,8 +1912,8 @@
   stroke-width: 2;
 }
 .view-toggle .active {
-  background-image: var(--accent-gradient);
-  color: var(--on-accent);
+  background: var(--text-main);
+  color: var(--bg-app);
 }
 
 /* ---- Card modal: assignees side row -------------------------------- */
@@ -3090,6 +3076,13 @@ button.nx-attachment__preview {
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--color-accent-text);
+}
+.bnd-title {
+  font-size: clamp(28px, 3vw, 40px);
+  font-weight: 900;
+  line-height: 0.95;
+  letter-spacing: -0.03em;
+  text-transform: uppercase;
 }
 .bnd-hero {
   margin-top: 14px;

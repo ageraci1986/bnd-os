@@ -183,7 +183,7 @@ export default async function ProjectCalendarPage({
             projectId={project.id}
             name={project.name}
             canEdit={ctx.role !== Roles.Viewer}
-            className="text-[32px] font-extrabold tracking-tight"
+            className="bnd-title"
             suffix={
               <>
                 {' '}

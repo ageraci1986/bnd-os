@@ -311,7 +311,7 @@ export default async function ProjectPage({ params, searchParams }: ProjectPageP
             projectId={project.id}
             name={project.name}
             canEdit={!isViewer}
-            className="text-[32px] font-extrabold tracking-tight"
+            className="bnd-title"
           />
           {project.description ? (
             <p className="mt-1 max-w-3xl text-sm text-[color:var(--color-text-muted)]">

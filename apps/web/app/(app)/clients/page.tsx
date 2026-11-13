@@ -36,7 +36,7 @@ export default async function ClientsPage({ searchParams }: ClientsPageProps) {
   return (
     <div className="mx-auto max-w-7xl">
       <header className="mb-8">
-        <h1 className="text-[34px] font-extrabold tracking-tight">Clients</h1>
+        <h1 className="bnd-title">Clients</h1>
         <p className="mt-2 text-sm text-[color:var(--color-text-muted)]">
           Fiches client, contacts et matrice RACI. Sélectionnez un client pour voir son détail.
         </p>

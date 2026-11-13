@@ -76,7 +76,7 @@ export default async function TeamPage() {
   return (
     <div className="mx-auto max-w-4xl">
       <header className="mb-8">
-        <h1 className="text-[34px] font-extrabold tracking-tight">Équipe</h1>
+        <h1 className="bnd-title">Équipe</h1>
         <p className="mt-2 text-sm text-[color:var(--color-text-muted)]">
           Gérez les membres et les invitations en cours pour cet espace.
         </p>

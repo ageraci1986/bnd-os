@@ -40,7 +40,7 @@ export default async function MyProjectsPage() {
   return (
     <div className="mx-auto max-w-6xl">
       <header className="mb-8">
-        <h1 className="text-[34px] font-extrabold tracking-tight">Mes projets</h1>
+        <h1 className="bnd-title">Mes projets</h1>
         <p className="mt-2 text-sm text-[color:var(--color-text-muted)]">
           Les projets auxquels tu as accès dans cet espace.
         </p>

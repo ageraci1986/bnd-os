@@ -37,7 +37,7 @@ export default async function CardTemplatesPage({
   return (
     <div className="mx-auto max-w-[1280px]">
       <header className="mb-6">
-        <h1 className="text-[34px] font-extrabold tracking-tight">Templates de cartes</h1>
+        <h1 className="bnd-title">Templates de cartes</h1>
         <p className="mt-2 text-sm text-[color:var(--color-text-muted)]">
           Compose le contenu d'une carte : champs, sections, description. L'aperçu à droite reflète
           exactement le rendu dans Projets.

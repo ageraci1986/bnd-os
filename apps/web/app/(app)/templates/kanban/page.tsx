@@ -46,7 +46,7 @@ export default async function KanbanTemplatesPage() {
   return (
     <div className="mx-auto max-w-[1400px]">
       <header className="mb-6">
-        <h1 className="text-[34px] font-extrabold tracking-tight">
+        <h1 className="bnd-title">
           Templates <span className="gradient-text">Kanban</span>
         </h1>
         <p className="mt-2 text-sm text-[color:var(--color-text-muted)]">
