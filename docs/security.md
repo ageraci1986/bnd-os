@@ -93,6 +93,7 @@ Threat model détaillé à finaliser en Phase 12 (audit).
 3. **Pas de rétention provider activée** côté Deepgram/ElevenLabs (options de conservation désactivées à la configuration du compte).
 4. **Erreurs génériques** renvoyées au client : aucun détail provider (message d'erreur brut, code interne, quota) ne fuite dans la réponse HTTP, un log applicatif ou Sentry.
 5. **Rate limiting** Upstash par utilisateur : 30 req/min sur la route STT, 60 req/min sur la route TTS.
+6. **Glossaire de noms propres** (2026-11-13) : chaque requête STT envoie à Deepgram, en paramètres `keyterm`, jusqu'à 40 noms du workspace (membres, clients, projets, contacts) pour fiabiliser leur transcription. Ces noms sont déjà présents dans l'audio, mais c'est une donnée explicite de plus chez le fournisseur. Garde-fous : récolte filtrée par `workspace_id` **et** par le périmètre d'accès de l'utilisateur (`loadUserScope`) ; chiffres retirés ; aucun terme dans les logs ni dans les messages d'erreur (l'URL de requête n'est jamais reportée) ; en cas de refus des termes par Deepgram, réessai sans eux.
 
 ---
 
@@ -166,3 +167,4 @@ Procédure synthétique :
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
 | 2026-04-27 | Version initiale (squelette à compléter en Phase 12)                                                                                                                                        | Claude (Opus 4.7)  |
 | 2026-08-03 | §3/§4.1 — Assistant voix V1.5 : `DEEPGRAM_API_KEY`/`ELEVENLABS_API_KEY` (inventaire secrets), pas de stockage/log audio, pas de rétention provider, erreurs génériques, rate limits STT/TTS | Angelo L. + Claude |
+| 2026-11-13 | §4.1.6 — Assistant voix : glossaire de noms propres envoyé à Deepgram (`keyterm`), scopé workspace + périmètre d'accès, jamais loggé                                                        | Angelo L. + Claude |
