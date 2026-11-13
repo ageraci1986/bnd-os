@@ -456,7 +456,7 @@ export function MailDraftWidget({
             type="button"
             disabled={buttonsDisabled}
             onClick={() => void handleSend()}
-            className="rounded-full px-3 py-1 text-xs font-bold text-white disabled:opacity-50"
+            className="text-on-accent rounded-full px-3 py-1 text-xs font-bold disabled:opacity-50"
             style={{ background: 'var(--accent-gradient)' }}
           >
             📤 Envoyer

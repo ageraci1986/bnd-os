@@ -133,7 +133,7 @@ export function TemplateEditor({
         <button
           type="button"
           onClick={onDeleteTemplate}
-          className="ml-auto rounded-md border border-[color:var(--color-danger)] px-3 py-1 text-xs text-[color:var(--color-danger)] hover:bg-[color:var(--color-danger)] hover:text-white"
+          className="hover:text-on-danger ml-auto rounded-md border border-[color:var(--color-danger)] px-3 py-1 text-xs text-[color:var(--color-danger)] hover:bg-[color:var(--color-danger)]"
         >
           Supprimer ce template
         </button>

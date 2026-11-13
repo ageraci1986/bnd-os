@@ -75,7 +75,7 @@ export function MemoryPanel({ entries, csrfToken }: MemoryPanelProps) {
           <button
             type="submit"
             disabled={createPending}
-            className="shrink-0 rounded-full px-4 py-1.5 text-xs font-bold text-white disabled:opacity-50"
+            className="text-on-accent shrink-0 rounded-full px-4 py-1.5 text-xs font-bold disabled:opacity-50"
             style={{ background: 'var(--accent-gradient)' }}
           >
             {createPending ? 'Retenu…' : 'Retenir'}

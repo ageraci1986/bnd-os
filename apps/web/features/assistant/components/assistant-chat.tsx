@@ -597,7 +597,7 @@ export function AssistantChat({ csrfToken, firstName, overview, notices }: Assis
                 <div
                   className={
                     m.role === 'user'
-                      ? 'self-end rounded-2xl px-4 py-2 text-sm text-white'
+                      ? 'text-on-accent self-end rounded-2xl px-4 py-2 text-sm'
                       : 'self-start rounded-2xl border border-[color:var(--color-border-soft)] bg-[color:var(--color-bg-card)] px-4 py-2 text-sm text-[color:var(--color-text-soft)]'
                   }
                   style={m.role === 'user' ? { background: 'var(--accent-gradient)' } : undefined}
@@ -665,7 +665,7 @@ export function AssistantChat({ csrfToken, firstName, overview, notices }: Assis
                 <button
                   ref={allowRef}
                   type="button"
-                  className="rounded-full px-4 py-1.5 text-xs font-bold text-white disabled:opacity-50"
+                  className="text-on-accent rounded-full px-4 py-1.5 text-xs font-bold disabled:opacity-50"
                   style={{ background: 'var(--accent-gradient)' }}
                   disabled={answering !== null}
                   onClick={() => void answerConfirm(pendingConfirm.id, true)}
@@ -753,7 +753,7 @@ export function AssistantChat({ csrfToken, firstName, overview, notices }: Assis
         </button>
         <button
           type="submit"
-          className="h-8 w-8 rounded-full text-sm text-white disabled:opacity-50"
+          className="text-on-accent h-8 w-8 rounded-full text-sm disabled:opacity-50"
           style={{ background: 'var(--accent-gradient)' }}
           aria-label="Envoyer"
           disabled={busy || input.trim() === ''}

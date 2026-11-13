@@ -223,7 +223,7 @@ export function RecipientField({
               >
                 <span
                   aria-hidden
-                  className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white"
+                  className="text-on-accent flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-[10px] font-bold"
                   style={{ background: 'var(--accent-gradient)' }}
                 >
                   {initials(s.name ?? s.email)}

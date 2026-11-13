@@ -254,7 +254,7 @@ function RaciButton({
       className={[
         'grid h-9 w-9 place-items-center rounded-full text-xs font-extrabold transition',
         active
-          ? 'bg-[color:var(--color-text-main)] text-white'
+          ? 'bg-[color:var(--color-text-main)] text-[color:var(--color-bg-app)]'
           : 'bg-[color:var(--color-bg-soft)] text-[color:var(--color-text-muted)] hover:bg-[color:var(--color-bg-hover)]',
       ].join(' ')}
     >

@@ -130,7 +130,7 @@ export function DeleteKanbanCardButton({
                     confirm();
                   }}
                   disabled={pending}
-                  className="rounded-md bg-[color:var(--color-danger)] px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+                  className="text-on-danger rounded-md bg-[color:var(--color-danger)] px-3 py-1.5 text-xs font-medium disabled:opacity-50"
                 >
                   {pending ? 'Suppression…' : 'Supprimer définitivement'}
                 </button>
@@ -148,7 +148,7 @@ export function DeleteKanbanCardButton({
         onClick={onTrigger}
         aria-label={`Supprimer ${cardTitle}`}
         title="Supprimer cette carte"
-        className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[color:var(--color-danger)] bg-[color:var(--color-danger)] text-white shadow-[var(--shadow-card)] transition hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--color-danger)]"
+        className="text-on-danger inline-flex h-7 w-7 items-center justify-center rounded-full border border-[color:var(--color-danger)] bg-[color:var(--color-danger)] shadow-[var(--shadow-card)] transition hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color:var(--color-danger)]"
       >
         <TrashIcon width={12} height={12} style={{ width: 12, height: 12, display: 'block' }} />
       </button>

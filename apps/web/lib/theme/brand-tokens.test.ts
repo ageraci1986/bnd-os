@@ -115,5 +115,6 @@ describe('BND brand tokens', () => {
     }
     expect(contrast('color-on-accent', 'color-accent-primary', mode)).toBeGreaterThanOrEqual(4.5);
     expect(contrast('color-on-accent', 'color-accent-secondary', mode)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast('color-on-danger', 'color-danger', mode)).toBeGreaterThanOrEqual(4.5);
   });
 });

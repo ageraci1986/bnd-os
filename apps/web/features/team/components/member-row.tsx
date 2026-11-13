@@ -61,7 +61,7 @@ export function MemberRow(props: MemberRowProps) {
   return (
     <li className="flex flex-wrap items-center gap-4 border-b border-[color:var(--color-border-soft)] py-4 last:border-b-0">
       <span
-        className="grid h-10 w-10 place-items-center rounded-full text-xs font-bold text-white"
+        className="text-on-accent grid h-10 w-10 place-items-center rounded-full text-xs font-bold"
         style={{ background: 'var(--accent-gradient)' }}
         aria-hidden="true"
       >
@@ -77,7 +77,7 @@ export function MemberRow(props: MemberRowProps) {
           ) : null}
           {props.isSuperAdmin ? (
             <span
-              className="ml-2 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.5px] text-white"
+              className="text-on-accent ml-2 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.5px]"
               style={{ backgroundImage: 'var(--accent-gradient)' }}
               title="Super-admin de la plateforme"
             >

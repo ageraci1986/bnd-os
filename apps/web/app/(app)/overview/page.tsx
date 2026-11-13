@@ -140,7 +140,7 @@ function EmptyProjectsCard({
       {isAdmin ? (
         <Link
           href="/projects"
-          className="mt-4 inline-flex rounded-full px-5 py-2.5 text-[13px] font-bold text-white shadow-md transition hover:-translate-y-0.5"
+          className="text-on-accent mt-4 inline-flex rounded-full px-5 py-2.5 text-[13px] font-bold shadow-md transition hover:-translate-y-0.5"
           style={{ backgroundImage: 'var(--accent-gradient)' }}
         >
           Créer un projet →
@@ -160,7 +160,7 @@ function AdminWelcomeCard() {
       </p>
       <Link
         href="/team"
-        className="mt-4 inline-flex rounded-full px-5 py-2.5 text-[13px] font-bold text-white shadow-md transition hover:-translate-y-0.5"
+        className="text-on-accent mt-4 inline-flex rounded-full px-5 py-2.5 text-[13px] font-bold shadow-md transition hover:-translate-y-0.5"
         style={{ backgroundImage: 'var(--accent-gradient)' }}
       >
         Aller à la page Équipe →

@@ -563,7 +563,7 @@ function FieldCell({
             <span
               key={a.userId}
               title={a.displayName}
-              className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 border-[color:var(--color-bg-card)] bg-[image:var(--accent-gradient)] text-[10px] font-bold text-white"
+              className="text-on-accent inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 border-[color:var(--color-bg-card)] bg-[image:var(--accent-gradient)] text-[10px] font-bold"
             >
               {a.initials}
             </span>

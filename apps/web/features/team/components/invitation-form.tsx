@@ -79,7 +79,7 @@ export function InvitationForm({ csrfToken, clientOptions, projectOptions }: Pro
 
       <div className="mb-3 flex items-center gap-2">
         <span
-          className="grid h-9 w-9 place-items-center rounded-full text-sm font-extrabold text-white"
+          className="text-on-accent grid h-9 w-9 place-items-center rounded-full text-sm font-extrabold"
           style={{ background: 'var(--accent-gradient)' }}
           aria-hidden="true"
         >

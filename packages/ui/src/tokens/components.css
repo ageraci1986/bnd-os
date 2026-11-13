@@ -23,7 +23,7 @@
 }
 .btn-primary {
   background: var(--accent-gradient);
-  color: #fff;
+  color: var(--on-accent);
   box-shadow: 0 4px 15px rgba(138, 43, 226, 0.3);
 }
 .btn-primary:hover {
@@ -118,7 +118,7 @@
   height: 38px;
   background: var(--accent-gradient);
   border-radius: 10px;
-  color: #fff;
+  color: var(--on-accent);
   display: grid;
   place-items: center;
   font-weight: 800;
@@ -143,6 +143,10 @@
 
 /* ---- Sidebar (mockup §03-overview, faithful port) ------------------- */
 .sidebar {
+  /* Barre latérale toujours Cobalt : light-dark() y résout les valeurs
+     sombres, quel que soit le thème (charte BND 2026). */
+  color-scheme: dark;
+  color: var(--text-main);
   background: var(--bg-sidebar);
   border-right: 1px solid var(--border-light);
   display: flex;
@@ -193,7 +197,7 @@
 }
 .nav-label .pill-new {
   background: var(--color-accent-secondary);
-  color: #fff;
+  color: var(--on-accent);
   padding: 2px 8px;
   border-radius: 9999px;
   font-size: 9px;
@@ -364,7 +368,7 @@
 }
 .nav-item .count.new {
   background: var(--accent-gradient);
-  color: #fff;
+  color: var(--on-accent);
 }
 /* Point animé — porté de la maquette `.ap-nav .dot`
    (docs/superpowers/specs/assets/2026-07-27-assistant-mockup.html l.28),
@@ -449,7 +453,7 @@
 }
 .user-profile .avatar.gradient {
   background: var(--accent-gradient);
-  color: #fff;
+  color: var(--on-accent);
 }
 .user-profile .user-meta {
   flex: 1;
@@ -568,7 +572,7 @@
   color: rgba(255, 255, 255, 0.75);
 }
 .step.active .step-name {
-  color: #fff;
+  color: var(--on-accent);
 }
 .step.pending .step-name {
   color: var(--text-ghost);
@@ -639,7 +643,7 @@
   font-size: 9px;
   letter-spacing: 0.5px;
   background: var(--accent-gradient);
-  color: #fff;
+  color: var(--on-accent);
   padding: 2px 8px;
   border-radius: 9999px;
   font-weight: 700;
@@ -899,7 +903,7 @@
   top: -9px;
   right: 12px;
   background: var(--color-danger);
-  color: #fff;
+  color: var(--on-danger);
   padding: 3px 10px;
   border-radius: 9999px;
   font-size: 9px;
@@ -1011,7 +1015,7 @@
   padding: 0 6px;
   border-radius: 9999px;
   background: var(--color-accent-primary);
-  color: #fff;
+  color: var(--on-accent);
   font-size: 10px;
   font-weight: 800;
 }
@@ -1079,7 +1083,7 @@
   height: 22px;
   border-radius: 9999px;
   background-image: var(--accent-gradient);
-  color: #fff;
+  color: var(--on-accent);
   font-size: 9px;
   font-weight: 800;
   flex-shrink: 0;
@@ -1111,7 +1115,7 @@
 .nx-filter-chip.is-active {
   background-image: var(--accent-gradient);
   border-color: transparent;
-  color: #fff;
+  color: var(--on-accent);
 }
 .nx-filter-due-range {
   display: flex;
@@ -1231,7 +1235,7 @@
 .nx-card-advance[data-state='checked'] {
   background: var(--color-accent-primary);
   border-color: var(--color-accent-primary);
-  color: #fff;
+  color: var(--on-accent);
   transform: scale(0.95);
 }
 .nx-card-advance:disabled {
@@ -1337,7 +1341,7 @@
 }
 .modal-close:hover {
   background: var(--color-danger);
-  color: #fff;
+  color: var(--on-danger);
 }
 
 .flow-banner {
@@ -1369,7 +1373,7 @@
 }
 .flow-banner button:hover {
   background: var(--color-success);
-  color: #fff;
+  color: var(--bg-app);
 }
 
 .blocked-banner {
@@ -1596,7 +1600,7 @@
 .check-item.done .box {
   background-image: var(--accent-gradient);
   border-color: transparent;
-  color: #fff;
+  color: var(--on-accent);
 }
 .check-item.done .text {
   color: var(--text-muted);
@@ -1635,7 +1639,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
+  color: var(--on-accent);
   flex-shrink: 0;
 }
 .check-add-plus svg {
@@ -1656,7 +1660,7 @@
 }
 .check-add button[type='submit'] {
   background-image: var(--accent-gradient);
-  color: #fff;
+  color: var(--on-accent);
   border: none;
   border-radius: 9999px;
   padding: 6px 14px;
@@ -1741,7 +1745,7 @@
 }
 .cal-nav-btn:hover {
   background-image: var(--accent-gradient);
-  color: #fff;
+  color: var(--on-accent);
 }
 .cal-month {
   font-size: 24px;
@@ -1829,7 +1833,7 @@
 }
 .cal-day.today .cal-date {
   background-image: var(--accent-gradient);
-  color: #fff;
+  color: var(--on-accent);
   width: 28px;
   height: 28px;
   border-radius: 50%;
@@ -1930,7 +1934,7 @@
 }
 .view-toggle .active {
   background-image: var(--accent-gradient);
-  color: #fff;
+  color: var(--on-accent);
 }
 
 /* ---- Card modal: assignees side row -------------------------------- */
@@ -2415,7 +2419,7 @@
 }
 .nx-btn--primary {
   background: var(--accent-gradient);
-  color: #fff;
+  color: var(--on-accent);
   font-weight: 700;
   padding: 8px 18px;
   border: 0;
@@ -2808,7 +2812,7 @@ button.nx-attachment__preview {
   flex-shrink: 0;
   border-radius: 999px;
   background: var(--accent-gradient);
-  color: #fff;
+  color: var(--on-accent);
   font-weight: 700;
   font-size: 12px;
   display: flex;
