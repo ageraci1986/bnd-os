@@ -52,7 +52,9 @@ describe('getOverviewMetrics', () => {
       where: {
         workspaceId: 'ws-1',
         deletedAt: null,
+        archivedAt: null,
         column: { isBlockedSystem: true },
+        project: { workspaceId: 'ws-1', deletedAt: null, archivedAt: null },
       },
     });
   });
@@ -75,8 +77,14 @@ describe('getOverviewMetrics', () => {
       where: {
         workspaceId: 'ws-1',
         deletedAt: null,
+        archivedAt: null,
         column: { isBlockedSystem: true },
-        project: { clientId: 'client-acme' },
+        project: {
+          workspaceId: 'ws-1',
+          deletedAt: null,
+          archivedAt: null,
+          clientId: 'client-acme',
+        },
       },
     });
     expect(projectMemberFindMany).toHaveBeenCalledWith({
