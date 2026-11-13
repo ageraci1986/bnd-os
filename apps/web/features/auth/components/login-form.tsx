@@ -18,11 +18,13 @@ export function LoginForm({ csrfToken, nextUrl, resetSuccess }: LoginFormProps) 
 
   return (
     <form action={formAction} className="auth-form" noValidate>
-      <p className="auth-kicker">BND OS</p>
-      <h1 className="auth-title">Bon retour parmi nous</h1>
-      <p className="auth-sub">
-        Connectez-vous pour retrouver vos clients, projets et communications.
-      </p>
+      <p className="auth-kicker">Connexion</p>
+      <h1 className="auth-title">
+        Content de
+        <br />
+        vous revoir.
+      </h1>
+      <p className="auth-sub">Connectez-vous à votre espace de travail.</p>
 
       <input type="hidden" name={CSRF_FIELD_NAME} value={csrfToken} />
       {nextUrl ? <input type="hidden" name="next" value={nextUrl} /> : null}

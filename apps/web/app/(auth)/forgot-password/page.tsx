@@ -1,4 +1,4 @@
-import { BrandLogo } from '@nexushub/ui';
+import { AuthBrandPanel } from '@/features/auth/components/auth-brand-panel';
 import type { Metadata } from 'next';
 import { getCsrfTokenForForm } from '@/lib/csrf';
 import { ForgotPasswordForm } from '@/features/auth/components/forgot-password-form';
@@ -11,17 +11,7 @@ export default async function ForgotPasswordPage() {
   const csrf = await getCsrfTokenForForm();
   return (
     <main className="auth">
-      <aside className="auth-visual" aria-hidden="true">
-        <div className="auth-brand">
-          <BrandLogo size="lg" />
-        </div>
-        <div className="auth-hero">
-          <h2>
-            Récupération <span>sans friction.</span>
-          </h2>
-          <p>Un e-mail. Un lien. Vous reprenez le contrôle.</p>
-        </div>
-      </aside>
+      <AuthBrandPanel />
       <section className="auth-form-wrap">
         <ForgotPasswordForm csrfToken={csrf} />
       </section>

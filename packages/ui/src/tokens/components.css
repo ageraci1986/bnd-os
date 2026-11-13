@@ -78,9 +78,9 @@
 }
 .field-label {
   display: block;
-  font-size: 11px;
+  font-size: 10px;
   text-transform: uppercase;
-  letter-spacing: 0.8px;
+  letter-spacing: 0.14em;
   color: var(--text-muted);
   font-weight: 700;
   margin-bottom: 8px;
@@ -89,11 +89,11 @@
 .field-select,
 .field-textarea {
   width: 100%;
-  background: var(--bg-card);
-  border: 1px solid var(--border-light);
+  background: transparent;
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
-  padding: 12px 16px;
-  font-size: 13px;
+  padding: 12px 14px;
+  font-size: 14px;
   outline: none;
   color: var(--text-main);
   transition: var(--transition);
@@ -2046,31 +2046,28 @@
 .auth {
   min-height: 100vh;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1.15fr 1fr;
   background: var(--bg-app);
 }
 .auth-visual {
-  background: linear-gradient(135deg, #0b0c10 0%, #1a0b2e 50%, #2d0f3f 100%);
-  color: #fff;
-  padding: 56px;
+  background: var(--bg-app);
+  color: var(--text-main);
+  padding: 48px 56px 0;
   display: flex;
   flex-direction: column;
+  justify-content: space-between;
   position: relative;
   overflow: hidden;
 }
+/* Halos de marque (charte : dégradés radiaux discrets, jamais en aplat). */
 .auth-visual::before {
   content: '';
   position: absolute;
   inset: 0;
-  background-image:
-    radial-gradient(circle at 30% 20%, rgba(139, 43, 226, 0.4), transparent 50%),
-    radial-gradient(circle at 80% 80%, rgba(255, 42, 109, 0.3), transparent 60%);
-}
-.auth-visual::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image: radial-gradient(circle at 20% 80%, rgba(0, 240, 255, 0.15), transparent 40%);
+  background:
+    radial-gradient(ellipse 55% 60% at 90% 10%, rgba(26, 75, 255, 0.28), transparent 60%),
+    radial-gradient(ellipse 60% 50% at 95% 75%, rgba(255, 46, 99, 0.2), transparent 60%),
+    radial-gradient(ellipse 45% 50% at 5% 95%, rgba(255, 224, 0, 0.08), transparent 55%);
 }
 .auth-visual > * {
   position: relative;
@@ -2082,59 +2079,45 @@
   align-items: center;
   gap: 14px;
 }
-.auth-brand .brand-name {
-  color: #fff;
-  font-size: 18px;
-}
-.auth-brand .brand-sub {
-  color: rgba(255, 255, 255, 0.5);
-}
 
-.auth-hero {
-  margin-top: auto;
-}
-.auth-hero h2 {
-  font-size: 58px;
-  font-weight: 800;
-  line-height: 1;
-  letter-spacing: -2px;
-  color: #fff;
-}
-.auth-hero h2 span {
-  background: linear-gradient(135deg, #c084fc 0%, #ff2a6d 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-.auth-hero p {
-  color: rgba(255, 255, 255, 0.7);
-  margin-top: 20px;
-  font-size: 15px;
-  font-weight: 500;
-  max-width: 420px;
-  line-height: 1.6;
-}
-
-.auth-stats {
-  display: flex;
-  gap: 32px;
-  margin-top: 48px;
-  padding-top: 32px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-}
-.auth-stat-value {
-  font-size: 28px;
-  font-weight: 800;
-  color: #fff;
-  letter-spacing: -0.5px;
-}
-.auth-stat-label {
-  font-size: 10px;
-  color: rgba(255, 255, 255, 0.5);
+.auth-hero-kicker {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  letter-spacing: 1px;
-  font-weight: 600;
-  margin-top: 4px;
+  color: var(--color-accent-text);
+}
+.auth-hero-big {
+  margin-top: 22px;
+  font-size: clamp(64px, 7.2vw, 104px);
+  font-weight: 900;
+  line-height: 0.88;
+  letter-spacing: -0.045em;
+  text-transform: uppercase;
+}
+.auth-hero-big em {
+  font-style: italic;
+  background: linear-gradient(100deg, #ffe000 0 40%, #ff2e63 40% 72%, #6537ff 72% 90%, #1a4bff 90%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  padding-right: 0.08em;
+}
+.auth-ticker {
+  margin: 0 -56px;
+  background: var(--color-accent-primary);
+  color: var(--on-accent);
+  padding: 11px 0;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.auth-ticker span::after {
+  content: '◆';
+  margin: 0 12px;
 }
 
 .auth-form-wrap {
@@ -2150,18 +2133,19 @@
   max-width: 420px;
 }
 .auth-kicker {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--color-accent-text);
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 1.5px;
+  letter-spacing: 0.16em;
   margin-bottom: 14px;
 }
 .auth-title {
-  font-size: 38px;
-  font-weight: 800;
-  letter-spacing: -1px;
-  line-height: 1.1;
+  font-size: 40px;
+  font-weight: 900;
+  letter-spacing: -0.035em;
+  line-height: 0.95;
+  text-transform: uppercase;
   margin-bottom: 12px;
 }
 .auth-sub {
