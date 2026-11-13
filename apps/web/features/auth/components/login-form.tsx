@@ -20,8 +20,7 @@ export function LoginForm({ csrfToken, nextUrl, resetSuccess }: LoginFormProps) 
     <form action={formAction} className="auth-form" noValidate>
       <p className="auth-kicker">Connexion</p>
       <h1 className="auth-title">
-        Content de
-        <br />
+        Content de <br />
         vous revoir.
       </h1>
       <p className="auth-sub">Connectez-vous à votre espace de travail.</p>
