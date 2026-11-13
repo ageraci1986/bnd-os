@@ -80,4 +80,69 @@ describe('transcribeAudio', () => {
     );
     expect(fetch).not.toHaveBeenCalled();
   });
+
+  const okBody = JSON.stringify({
+    results: { channels: [{ alternatives: [{ transcript: 'ok' }] }] },
+  });
+
+  it('ajoute un paramètre keyterm par terme, encodé', async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue(new Response(okBody, { status: 200 }));
+    await transcribeAudio(new ArrayBuffer(4), 'audio/webm', ['Angelo Geraci', 'Izybizi']);
+    const url = new URL(String((fetch as ReturnType<typeof vi.fn>).mock.calls[0]![0]));
+    expect(url.searchParams.getAll('keyterm')).toEqual(['Angelo Geraci', 'Izybizi']);
+    expect(url.searchParams.get('model')).toBe('nova-3');
+    expect(url.searchParams.get('language')).toBe('multi');
+    expect(url.searchParams.get('smart_format')).toBe('true');
+  });
+
+  it('sans terme, aucun paramètre keyterm', async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue(new Response(okBody, { status: 200 }));
+    await transcribeAudio(new ArrayBuffer(4), 'audio/webm');
+    const url = new URL(String((fetch as ReturnType<typeof vi.fn>).mock.calls[0]![0]));
+    expect(url.searchParams.getAll('keyterm')).toEqual([]);
+  });
+
+  it('réessaie UNE fois sans termes quand Deepgram répond 400 à une requête avec termes', async () => {
+    (fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce(new Response('Keyterm limit exceeded', { status: 400 }))
+      .mockResolvedValueOnce(new Response(okBody, { status: 200 }));
+    await expect(transcribeAudio(new ArrayBuffer(4), 'audio/webm', ['Izybizi'])).resolves.toBe(
+      'ok',
+    );
+    const calls = (fetch as ReturnType<typeof vi.fn>).mock.calls;
+    expect(calls).toHaveLength(2);
+    expect(new URL(String(calls[1]![0])).searchParams.getAll('keyterm')).toEqual([]);
+  });
+
+  it('ne réessaie pas un 400 sans termes', async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue(new Response('bad', { status: 400 }));
+    await expect(transcribeAudio(new ArrayBuffer(4), 'audio/webm')).rejects.toBeInstanceOf(
+      SttProviderError,
+    );
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('ne réessaie pas un autre statut que 400, même avec des termes', async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue(new Response('down', { status: 503 }));
+    await expect(
+      transcribeAudio(new ArrayBuffer(4), 'audio/webm', ['Izybizi']),
+    ).rejects.toBeInstanceOf(SttProviderError);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('un second 400 après réessai jette SttProviderError', async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue(new Response('bad', { status: 400 }));
+    await expect(
+      transcribeAudio(new ArrayBuffer(4), 'audio/webm', ['Izybizi']),
+    ).rejects.toBeInstanceOf(SttProviderError);
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("l'erreur ne contient jamais un terme du glossaire (PII)", async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue(new Response('down', { status: 500 }));
+    const err = await transcribeAudio(new ArrayBuffer(4), 'audio/webm', ['Angelo Geraci']).catch(
+      (e: unknown) => e,
+    );
+    expect(String((err as Error).message)).not.toContain('Geraci');
+  });
 });
